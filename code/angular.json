@@ -6,7 +6,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "prepdeck": {
+    "code": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -98,10 +98,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "prepdeck:build:production"
+              "buildTarget": "code:build:production"
             },
             "development": {
-              "buildTarget": "prepdeck:build:development"
+              "buildTarget": "code:build:development"
             }
           },
           "defaultConfiguration": "development"
