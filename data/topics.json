@@ -1,0 +1,12 @@
+{
+  "topics": [
+    { "id": "csharp",       "name": "C# & .NET",                    "icon": "🔷", "file": "csharp.json",       "order": 1 },
+    { "id": "aspnet",       "name": "ASP.NET Core & Web API",        "icon": "🌐", "file": "aspnet.json",       "order": 2 },
+    { "id": "efcore",       "name": "EF Core",                       "icon": "🗃️", "file": "efcore.json",       "order": 3 },
+    { "id": "sql",          "name": "SQL Server",                    "icon": "🗄️", "file": "sql.json",          "order": 4 },
+    { "id": "angular",      "name": "Angular & Frontend",            "icon": "🅰️", "file": "angular.json",      "order": 5 },
+    { "id": "architecture", "name": "System Design & Architecture",  "icon": "🏗️", "file": "architecture.json", "order": 6 },
+    { "id": "devops",       "name": "DevOps & Git",                  "icon": "🔧", "file": "devops.json",       "order": 7 },
+    { "id": "behavioral",   "name": "Project & Experience",          "icon": "💼", "file": "behavioral.json",   "order": 8 }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "topics": [
+    { "id": "csharp",  "name": "C#",           "icon": "🔷", "file": "csharp.json",  "order": 1 },
+    { "id": "aspnet",  "name": "ASP.NET Core", "icon": "🌐", "file": "aspnet.json",  "order": 2 },
+    { "id": "sql",     "name": "SQL Server",   "icon": "🗄️", "file": "sql.json",     "order": 3 },
+    { "id": "angular", "name": "Angular",      "icon": "🅰️", "file": "angular.json", "order": 4 }
+  ]
+}
