@@ -1,0 +1,1185 @@
+{
+  "topicId": "csharp",
+  "topicName": "C# & .NET",
+  "subtopics": [
+    {
+      "subtopicId": "oop",
+      "subtopicName": "OOP & SOLID",
+      "order": 1,
+      "questions": [
+        {
+          "id": "csharp-oop-001",
+          "q": "Explain the four pillars of OOP.",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["oop", "encapsulation", "inheritance", "polymorphism", "abstraction"],
+          "answer": {
+            "oneLiner": "The four pillars are Encapsulation (hiding internal state), Inheritance (deriving behavior from a parent), Polymorphism (same interface, different behavior), and Abstraction (exposing only essential details).",
+            "keyPoints": [
+              "**Encapsulation**: bundle data and methods together, expose only what's needed via `public`/`private` access modifiers.",
+              "**Inheritance**: a class (`Dog`) derives from a base class (`Animal`), reusing and extending behavior — supports IS-A relationships.",
+              "**Polymorphism**: a method call behaves differently depending on the actual runtime type; enabled by `virtual`/`override` in C#.",
+              "**Abstraction**: hide complex implementation details behind a clean interface or abstract class, reducing cognitive load for callers."
+            ],
+            "detail": "**Encapsulation** protects object integrity: a `BankAccount` exposes `Deposit()` and `Withdraw()` but keeps `_balance` private so external code can't corrupt it directly.\n\n**Inheritance** lets `SavingsAccount` extend `BankAccount` without copy-pasting logic. However, deep inheritance hierarchies become fragile — prefer composition for flexibility.\n\n**Polymorphism** comes in two flavors: compile-time (method overloading, resolved by the compiler based on parameter signature) and runtime (virtual dispatch, resolved at runtime via the vtable). In C# you opt in to runtime polymorphism with `virtual`/`override`.\n\n**Abstraction** is about designing the right public API. Abstract classes and interfaces are the primary tools. The goal is that callers depend on a contract, not a concrete implementation — which ties directly into the Dependency Inversion principle.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "public abstract class Animal\n{\n    public string Name { get; }  // encapsulation\n    public Animal(string name) => Name = name;\n    public abstract string Speak(); // abstraction\n}\n\npublic class Dog : Animal  // inheritance\n{\n    public Dog(string name) : base(name) { }\n    public override string Speak() => \"Woof\"; // polymorphism\n}\n\nAnimal a = new Dog(\"Rex\");\nConsole.WriteLine(a.Speak()); // runtime dispatch -> \"Woof\"",
+              "note": "All four pillars in one small example"
+            },
+            "analogy": "Think of a car: the steering wheel and pedals are the abstraction (you don't need to know how the engine works). The engine's internals are encapsulated. A Tesla inherits from 'Car' but overrides how propulsion works — that's polymorphism.",
+            "followUps": [
+              "What's the difference between compile-time and runtime polymorphism?",
+              "When would you choose composition over inheritance?",
+              "How does the C# `sealed` keyword relate to inheritance?"
+            ],
+            "redFlags": [
+              "Confusing abstraction with encapsulation (they solve different problems).",
+              "Saying polymorphism is only method overloading — missing the runtime virtual dispatch story.",
+              "Not being able to give a concrete code example."
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-002",
+          "q": "Explain the SOLID principles with a brief example for each.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["solid", "oop", "design-principles"],
+          "answer": {
+            "oneLiner": "SOLID is five design principles (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion) that keep code maintainable, extensible, and testable.",
+            "keyPoints": [
+              "**S** — Single Responsibility: a class has one reason to change. Separate `InvoiceCalculator` from `InvoicePrinter`.",
+              "**O** — Open/Closed: open for extension, closed for modification. Add new behavior via new classes, not by editing existing ones (strategy pattern, inheritance).",
+              "**L** — Liskov Substitution: a subtype must be substitutable for its base type without breaking correctness. If `Rectangle` has `Square` as a subclass and `Square` breaks `SetWidth`/`SetHeight` independently, that violates LSP.",
+              "**I** — Interface Segregation: prefer many small, focused interfaces over one fat interface. Clients shouldn't be forced to implement methods they don't use.",
+              "**D** — Dependency Inversion: high-level modules depend on abstractions, not on low-level concretions. Inject `IOrderRepository`, not `SqlOrderRepository`."
+            ],
+            "detail": "**SRP** is the most commonly violated principle. The smell is a class that has multiple reasons to change — mixing business logic with persistence, logging, or formatting.\n\n**OCP** is achieved via the Strategy or Decorator pattern: you add a new `IDiscountStrategy` implementation rather than adding another `if` branch to `CalculateDiscount()`.\n\n**LSP** is subtle. The classic violation is making `Square` inherit `Rectangle` because mathematically a square IS-A rectangle, but behaviorally the invariant 'width and height are independent' is broken. Fix: don't inherit; use a common interface or separate classes.\n\n**ISP** matters for large systems: a fat `IWorker` with both `Work()` and `Eat()` forces a `Robot` class to implement `Eat()`. Split into `IWorkable` and `IFeedable`.\n\n**DIP** is what makes unit testing practical: when `OrderService` depends on `IOrderRepository`, you can inject a mock in tests without touching a real database.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// DIP example\npublic interface IOrderRepository { Order GetById(int id); }\npublic class SqlOrderRepository : IOrderRepository { /* ... */ }\n\npublic class OrderService\n{\n    private readonly IOrderRepository _repo;\n    // high-level module depends on abstraction, not concretion\n    public OrderService(IOrderRepository repo) => _repo = repo;\n}",
+              "note": "DIP via constructor injection — the most common pattern in ASP.NET Core"
+            },
+            "followUps": [
+              "Which SOLID principle does ASP.NET Core's DI container directly enable?",
+              "Can you give me an example of an LSP violation in real production code?",
+              "Is it possible to follow OCP too zealously? What's the trade-off?"
+            ],
+            "redFlags": [
+              "Reciting the acronym without being able to give a concrete example.",
+              "Confusing OCP with 'never modify code ever'.",
+              "Not mentioning testability as a key benefit of DIP."
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-003",
+          "q": "What is the difference between an abstract class and an interface, and when do you use each?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["oop", "abstract-class", "interface", "design"],
+          "answer": {
+            "oneLiner": "An abstract class provides a partial implementation and shared state, while an interface defines a pure contract; use abstract class for an IS-A hierarchy with shared code, and interface for capability contracts across unrelated types.",
+            "keyPoints": [
+              "Abstract class can have fields, constructors, and concrete methods; interfaces (pre-C# 8) cannot have state.",
+              "C# does not support multiple inheritance from classes; a class can implement many interfaces.",
+              "C# 8+ interfaces can have default implementations, blurring the line — but avoid state in interfaces.",
+              "Use abstract class when classes truly share implementation (e.g., `Stream` base class); use interface for capabilities (`IDisposable`, `IComparable`, `ILogger`).",
+              "Interfaces are more flexible for unit testing because you can mock them without a base class constraint."
+            ],
+            "detail": "Before C# 8, the rule was clear: abstract classes own shared code + state, interfaces own contracts. C# 8 default interface implementations make this murkier, but the design guidance hasn't changed.\n\nChoose **abstract class** when:\n- Subclasses genuinely share implementation logic (Template Method pattern).\n- You need a constructor to enforce invariants on shared state.\n- You're modeling an IS-A relationship in a closed hierarchy (e.g., `Shape` → `Circle`, `Rectangle`).\n\nChoose **interface** when:\n- Multiple unrelated types share a capability (`IDisposable` applies to both `SqlConnection` and `FileStream`).\n- You want to support multiple 'roles' on one class.\n- You want maximum flexibility for mocking in tests.\n- You're building a public library API (interfaces are more stable contracts).",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Abstract class: shared state + template method\npublic abstract class DataExporter\n{\n    protected string ConnectionString { get; } // shared state\n    protected DataExporter(string cs) => ConnectionString = cs;\n    public void Export() { var data = FetchData(); WriteOutput(data); }\n    protected abstract IEnumerable<Row> FetchData();\n    protected abstract void WriteOutput(IEnumerable<Row> rows);\n}\n\n// Interface: capability contract\npublic interface IExportable\n{\n    byte[] ToBytes();\n}\n\npublic class Report : DataExporter, IExportable // both at once\n{\n    public Report(string cs) : base(cs) { }\n    protected override IEnumerable<Row> FetchData() => /* ... */ Array.Empty<Row>();\n    protected override void WriteOutput(IEnumerable<Row> rows) { /* ... */ }\n    public byte[] ToBytes() => /* ... */ Array.Empty<byte>();\n}",
+              "note": "Template Method pattern via abstract class + IExportable capability via interface"
+            },
+            "analogy": "An abstract class is like a job description at a company that already provides an office and HR system (shared infrastructure). An interface is like a professional certification (IDisposable = 'certified to be cleaned up') — many different people can hold it regardless of where they work.",
+            "followUps": [
+              "What did C# 8 default interface methods add, and when is that useful?",
+              "If you had to choose between changing an abstract class API or an interface API in a shipped library, which is safer?",
+              "How do you mock an abstract class vs an interface in unit tests?"
+            ],
+            "redFlags": [
+              "Saying 'interfaces have no implementation' without noting C# 8 DIM.",
+              "Not mentioning multiple interface implementation as a key differentiator.",
+              "Being unable to give a real-world scenario for each."
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-004",
+          "q": "What is Dependency Injection and how is it implemented in ASP.NET Core?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["di", "ioc", "asp.net-core", "solid"],
+          "answer": {
+            "oneLiner": "Dependency Injection is a pattern where an object's dependencies are supplied externally rather than created internally, decoupling components and making them testable; ASP.NET Core has a built-in DI container registered in `Program.cs` via `builder.Services`.",
+            "keyPoints": [
+              "Three service lifetimes: `Transient` (new per request), `Scoped` (new per HTTP request), `Singleton` (one for the app lifetime).",
+              "Register: `builder.Services.AddScoped<IOrderService, OrderService>()`.",
+              "Inject via constructor — the preferred pattern; ASP.NET Core resolves the dependency graph automatically.",
+              "Avoid `Singleton` consuming `Scoped` services — this causes a captive dependency bug.",
+              "Use `IOptions<T>` pattern to inject configuration."
+            ],
+            "detail": "DI is the practical application of the Dependency Inversion principle. Instead of `new SqlOrderRepository()` inside `OrderService`, you declare `IOrderRepository` in the constructor and let the container wire it up.\n\n**Lifetimes matter**:\n- `Transient` — safest default for lightweight, stateless services.\n- `Scoped` — one instance per HTTP request; ideal for `DbContext`.\n- `Singleton` — shared state across all requests; must be thread-safe.\n\n**Captive dependency**: if a `Singleton` service depends on a `Scoped` service, the scoped service lives as long as the singleton — for the entire app lifetime — which is almost certainly a bug (e.g., a stale `DbContext`). ASP.NET Core detects this in Development mode and throws.\n\nFor the built-in container, register in `Program.cs`. For advanced scenarios (open generics, decorators, Scrutor), third-party containers like Autofac can be swapped in via `UseServiceProviderFactory`.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Program.cs\nbuilder.Services.AddScoped<IOrderRepository, SqlOrderRepository>();\nbuilder.Services.AddScoped<IOrderService, OrderService>();\n\n// OrderService.cs\npublic class OrderService : IOrderService\n{\n    private readonly IOrderRepository _repo;\n    public OrderService(IOrderRepository repo) => _repo = repo; // constructor injection\n    public Order GetOrder(int id) => _repo.GetById(id);\n}",
+              "note": "Constructor injection — the container resolves IOrderRepository automatically"
+            },
+            "followUps": [
+              "What is a captive dependency and how do you detect it?",
+              "When would you use `IServiceScopeFactory` to manually create a scope?",
+              "How would you register an open generic like `IRepository<T>`?"
+            ],
+            "redFlags": [
+              "Confusing DI with the DI container — DI is the pattern, the container is just a tool.",
+              "Not knowing the three lifetimes or when to use each.",
+              "Using service locator (`IServiceProvider.GetService()`) everywhere instead of constructor injection."
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-005",
+          "q": "What is the difference between method overloading and method overriding?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["oop", "polymorphism", "overloading", "overriding"],
+          "answer": {
+            "oneLiner": "Overloading is multiple methods with the same name but different signatures in the same class (compile-time polymorphism); overriding is a subclass providing a new implementation of a virtual method from its base class (runtime polymorphism).",
+            "keyPoints": [
+              "Overloading is resolved at **compile time** by the compiler matching argument types.",
+              "Overriding requires `virtual` on the base and `override` on the derived method; resolved at **runtime**.",
+              "Return type alone does not differentiate overloads in C#.",
+              "Use `new` (method hiding) when you want to shadow without polymorphism — but this is almost always a design smell."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class Printer\n{\n    // Overloading — same name, different signatures\n    public void Print(string s) => Console.WriteLine(s);\n    public void Print(int n) => Console.WriteLine(n);\n}\n\npublic class Animal\n{\n    public virtual string Sound() => \"...\";\n}\npublic class Dog : Animal\n{\n    public override string Sound() => \"Woof\"; // Overriding\n}",
+              "note": "Overloading = compile-time; overriding = runtime dispatch"
+            },
+            "followUps": [
+              "What happens if you use `new` instead of `override`?",
+              "Can you override a static method?"
+            ],
+            "redFlags": [
+              "Saying they're the same thing.",
+              "Not knowing that overriding requires `virtual` on the base."
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-006",
+          "q": "Explain `virtual`, `override`, `new`, and `sealed` in C# inheritance.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["oop", "inheritance", "virtual", "override", "sealed"],
+          "answer": {
+            "oneLiner": "`virtual` enables runtime polymorphism on a base method, `override` provides a new implementation in a subclass, `new` hides the base method without polymorphism, and `sealed` prevents further overriding or class inheritance.",
+            "keyPoints": [
+              "`virtual` — opt-in to runtime dispatch; without it, C# methods are non-virtual by default (unlike Java).",
+              "`override` — tells the compiler this replaces the `virtual` method; the vtable entry is updated.",
+              "`new` (method hiding) — creates a new method slot; base reference still calls the original. This is almost always wrong.",
+              "`sealed override` — you override but prevent subclasses from overriding further.",
+              "`sealed class` — prevents any class from inheriting (e.g., `string` is sealed)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class Base\n{\n    public virtual void Greet() => Console.WriteLine(\"Base\");\n}\npublic class Child : Base\n{\n    public override void Greet() => Console.WriteLine(\"Child\"); // polymorphic\n}\npublic class GrandChild : Child\n{\n    public sealed override void Greet() => Console.WriteLine(\"GrandChild\"); // no further override\n}\n\nBase b = new Child();\nb.Greet(); // prints \"Child\" — runtime dispatch",
+              "note": "Without `virtual`+`override`, `b.Greet()` would print \"Base\" regardless of runtime type"
+            },
+            "redFlags": [
+              "Not knowing that C# methods are non-virtual by default.",
+              "Confusing `new` (hiding) with `override` — they behave very differently through a base reference."
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-007",
+          "q": "What are access modifiers in C# and what does each allow?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["oop", "encapsulation", "access-modifiers"],
+          "answer": {
+            "oneLiner": "C# has six access modifiers: `public`, `private`, `protected`, `internal`, `protected internal`, and `private protected`, controlling visibility across classes and assemblies.",
+            "keyPoints": [
+              "`public` — accessible everywhere.",
+              "`private` — accessible only within the declaring class (default for members).",
+              "`protected` — accessible within the class and derived classes.",
+              "`internal` — accessible within the same assembly (default for top-level types).",
+              "`protected internal` — accessible in the same assembly OR derived classes anywhere.",
+              "`private protected` — accessible only in derived classes within the same assembly."
+            ],
+            "followUps": [
+              "What is the default access modifier for a class member vs a top-level class?",
+              "How do you expose internals to a test project without making them public?"
+            ],
+            "redFlags": [
+              "Not knowing `internal` — it's very common in real-world .NET codebases.",
+              "Forgetting that `[InternalsVisibleTo]` is the standard way to expose internals to test assemblies."
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-008",
+          "q": "What is the difference between static and instance members?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["oop", "static", "instance"],
+          "answer": {
+            "oneLiner": "Static members belong to the type itself and are shared across all instances; instance members belong to a specific object and have their own state per object.",
+            "keyPoints": [
+              "Static members are accessed via the type name, not an object reference.",
+              "Static fields hold shared state — be careful with thread safety.",
+              "Static classes cannot be instantiated and can only contain static members.",
+              "Common legitimate uses: utility methods (`Math.Sqrt`), factory methods, extension methods, constants."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class Counter\n{\n    private static int _total = 0; // shared\n    private int _count = 0;        // per-instance\n\n    public void Increment() { _count++; _total++; }\n    public static int Total => _total;\n}",
+              "note": "`_total` is shared across all Counter instances"
+            },
+            "redFlags": [
+              "Overusing static state — leads to hard-to-test, non-thread-safe code.",
+              "Not knowing that static constructors are called once, lazily, before first use."
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-009",
+          "q": "What is 'composition over inheritance' and why is it preferred?",
+          "level": "mid",
+          "type": "design",
+          "freq": "medium",
+          "tags": ["oop", "design-principles", "composition", "inheritance"],
+          "answer": {
+            "oneLiner": "Composition over inheritance means building complex behavior by combining simple objects rather than deep class hierarchies, resulting in more flexible, testable, and loosely coupled designs.",
+            "keyPoints": [
+              "Inheritance creates tight coupling — a subclass depends on the implementation details of its parent.",
+              "Composition (HAS-A) is more flexible than inheritance (IS-A) because you can swap components at runtime.",
+              "Deep hierarchies are fragile: changing a base class breaks all subclasses.",
+              "Use inheritance when the IS-A relationship is genuinely stable and semantic; use composition for behavior that may vary."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Prefer this (composition):\npublic class OrderService\n{\n    private readonly IDiscountStrategy _discount; // inject behavior\n    private readonly INotifier _notifier;\n    public OrderService(IDiscountStrategy discount, INotifier notifier)\n    { _discount = discount; _notifier = notifier; }\n}\n\n// Over deep inheritance:\n// OrderService : DiscountedOrderService : NotifyingOrderService : BaseOrderService ...",
+              "note": "Injecting strategy objects avoids deep inheritance chains"
+            },
+            "followUps": [
+              "Can you give an example from the .NET BCL that uses composition?",
+              "When is inheritance actually the right choice?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-010",
+          "q": "What is runtime polymorphism vs compile-time polymorphism in C#?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["oop", "polymorphism"],
+          "answer": {
+            "oneLiner": "Compile-time polymorphism is method overloading resolved by the compiler based on argument types; runtime polymorphism is virtual dispatch resolved at runtime based on the object's actual type.",
+            "keyPoints": [
+              "Compile-time: overloading, operator overloading, generics — all resolved before the program runs.",
+              "Runtime: `virtual`/`override` methods, interface dispatch — the vtable determines which method runs.",
+              "Generics are a form of compile-time polymorphism in C# (unlike Java's type erasure, C# generates specialized IL per value type).",
+              "Runtime polymorphism is what enables the Strategy and Template Method patterns."
+            ],
+            "followUps": [
+              "How does the CLR implement virtual dispatch under the hood?",
+              "Why are C# generics more performant than Java generics for value types?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-oop-011",
+          "q": "What does the `sealed` keyword do and when should you use it?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "low",
+          "tags": ["oop", "inheritance", "sealed"],
+          "answer": {
+            "oneLiner": "`sealed` on a class prevents inheritance; `sealed override` prevents further overriding of a method in subclasses; it also allows the JIT to devirtualize calls for a minor performance benefit.",
+            "keyPoints": [
+              "A `sealed class` cannot be a base class — e.g., `string` is sealed.",
+              "`sealed override` in a subclass stops the chain of overriding.",
+              "JIT can inline and devirtualize calls to sealed members, a minor perf win.",
+              "Use `sealed` when you intentionally design a class not to be extended, or to communicate design intent."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "memory",
+      "subtopicName": "Memory & Types",
+      "order": 2,
+      "questions": [
+        {
+          "id": "csharp-memory-001",
+          "q": "What is the difference between value types and reference types in C#?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["memory", "value-types", "reference-types", "stack", "heap"],
+          "answer": {
+            "oneLiner": "Value types (struct, int, bool, enum) hold their data directly and are typically stack-allocated; reference types (class, string, array) store a reference on the stack pointing to heap-allocated data.",
+            "keyPoints": [
+              "Value types: assignment copies the entire value; two variables are independent.",
+              "Reference types: assignment copies the reference; two variables point to the same object.",
+              "Value types stored in fields of a class or boxed in collections go to the heap — 'stack vs heap' is about allocation, not a hard rule per type.",
+              "Built-in value types: `int`, `double`, `bool`, `char`, `DateTime`, `struct`.",
+              "Built-in reference types: `string`, `object`, arrays, delegates, all `class` types."
+            ],
+            "detail": "The common simplification is 'value types are on the stack, reference types are on the heap.' The more precise statement is: a local value-type variable whose address is not captured lives on the stack. A value-type field inside a class object lives on the heap as part of the class object.\n\nWhen you write `int a = 5; int b = a; b = 10;`, `a` is still 5 — they are independent copies.\n\nWhen you write `var p1 = new Person(); var p2 = p1; p2.Name = \"Alice\";`, `p1.Name` is also \"Alice\" — both point to the same heap object.\n\nThis distinction matters for:\n- **Performance**: large structs copied repeatedly are expensive; prefer `ref` or `in` parameters.\n- **Mutability bugs**: sharing a reference means mutations are visible everywhere.\n- **Equality**: value types compare by value by default; reference types compare by identity (`ReferenceEquals`) unless `Equals` is overridden.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Value type — copy semantics\nint a = 5;\nint b = a;\nb = 10;\nConsole.WriteLine(a); // 5 — unchanged\n\n// Reference type — reference semantics\nvar p1 = new Person { Name = \"Bob\" };\nvar p2 = p1;\np2.Name = \"Alice\";\nConsole.WriteLine(p1.Name); // \"Alice\" — same object",
+              "note": "Assignment behavior is the most practical difference"
+            },
+            "analogy": "A value type is like handing someone a photocopy of a document — they can mark it up without affecting your original. A reference type is like giving them a link to a shared Google Doc — their changes appear for everyone.",
+            "followUps": [
+              "Where does a value-type field inside a class get allocated?",
+              "How do records differ from structs in terms of value semantics?"
+            ],
+            "redFlags": [
+              "Stating 'value types are always on the stack' without the nuance about fields in classes.",
+              "Not knowing that strings are reference types with value-like equality."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-002",
+          "q": "What is boxing and unboxing? Why is it a performance concern?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["memory", "boxing", "performance", "value-types"],
+          "answer": {
+            "oneLiner": "Boxing wraps a value type in a heap-allocated object (converting `int` to `object`); unboxing extracts it back — both involve heap allocation, copying, and casting overhead that adds up in hot paths.",
+            "keyPoints": [
+              "Boxing allocates a new object on the heap for every boxed value — GC pressure.",
+              "Unboxing requires an explicit cast and throws `InvalidCastException` if the type doesn't match.",
+              "Common boxing sources: `ArrayList`, non-generic collections, `string.Format` with value types, `object` parameters.",
+              "Fix: use generics (`List<int>` instead of `ArrayList`); use `$\"\"` interpolation carefully — still boxes structs that don't implement `IFormattable` well."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Boxing: int -> object (heap alloc)\nobject boxed = 42;\n\n// Unboxing: object -> int (cast required)\nint value = (int)boxed;\n\n// Avoid: ArrayList boxes every int\nvar list = new ArrayList();\nlist.Add(1); // boxed!\n\n// Prefer: no boxing\nvar typed = new List<int>();\ntyped.Add(1); // no boxing",
+              "note": "List<T> uses a generic array internally — zero boxing"
+            },
+            "followUps": [
+              "Does `string.Format(\"{0}\", 42)` box the integer?",
+              "Are there cases in modern C# where boxing is unavoidable?"
+            ],
+            "redFlags": [
+              "Not knowing that pre-generic collections like `ArrayList` box everything.",
+              "Claiming `$\"Hello {x}\"` never boxes — it can if the type overrides ToString in a specific way."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-003",
+          "q": "How does the .NET garbage collector work? Explain generations.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["memory", "gc", "garbage-collection", "performance"],
+          "answer": {
+            "oneLiner": "The .NET GC is a generational, mark-and-compact collector with three generations (0, 1, 2) based on the weak generational hypothesis: most objects die young, so collecting Gen 0 frequently is cheap and efficient.",
+            "keyPoints": [
+              "**Gen 0**: newly allocated small objects. Collected very frequently (milliseconds). Short-lived objects should die here.",
+              "**Gen 1**: objects that survived Gen 0. A buffer between Gen 0 and Gen 2.",
+              "**Gen 2**: long-lived objects (static data, caches, singletons). Full GC (Gen 2 collection) is expensive and should be rare.",
+              "**Large Object Heap (LOH)**: objects ≥ 85KB go here; collected with Gen 2 and not compacted by default (can cause fragmentation).",
+              "GC roots: static fields, local variables on the stack, GC handles — objects reachable from roots survive.",
+              "Avoid holding references longer than needed — prevents objects from being collected and promotes them to Gen 2."
+            ],
+            "detail": "The GC suspends managed threads for collection (Stop-The-World), though background GC (default in .NET Core) minimizes pauses by doing most Gen 2 work concurrently.\n\n**Finalization** delays collection: if an object has a finalizer, it's placed on the finalization queue and collected one GC cycle later, promoting it at least to Gen 1. This is why `Dispose` + `GC.SuppressFinalize` is the preferred pattern — you clean up deterministically and remove the object from the finalization queue.\n\n**Tuning tips** for high-throughput services:\n- Use `Server GC` (multiple GC heaps, one per core) in server workloads.\n- Use `ArrayPool<T>` and `MemoryPool<T>` to reuse buffers.\n- `Span<T>` / `Memory<T>` avoid allocations for slicing.\n- Monitor Gen 2 and LOH collection frequency via `dotnet-counters` or Application Insights.",
+            "followUps": [
+              "What is Server GC vs Workstation GC?",
+              "How does `GC.SuppressFinalize` relate to the Dispose pattern?",
+              "What is the Large Object Heap and why can it cause fragmentation?"
+            ],
+            "redFlags": [
+              "Thinking the GC is triggered purely by time interval — it's triggered by allocation pressure.",
+              "Not knowing that finalizers delay collection and should be avoided unless managing unmanaged resources."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-004",
+          "q": "What is the difference between `struct` and `class` in C#?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["memory", "struct", "class", "value-types"],
+          "answer": {
+            "oneLiner": "`struct` is a value type with copy semantics, no inheritance, and typically stack-allocated, making it suitable for small, immutable data; `class` is a reference type with reference semantics, heap allocation, and full OOP support.",
+            "keyPoints": [
+              "`struct` copies on assignment; `class` copies the reference.",
+              "`struct` cannot inherit from another class/struct (but can implement interfaces); `class` supports full inheritance.",
+              "`struct` has no default parameterless constructor you can define (pre-C# 10); all fields are zero-initialized.",
+              "Use `struct` for small (≤16 bytes), immutable, frequently allocated data (e.g., `Vector2`, `DateTime`, `Guid`).",
+              "Avoid large mutable structs — copying overhead and unexpected mutation bugs.",
+              "C# 10+ allows parameterless constructors in structs and `record struct` for immutable value-type records."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public struct Point\n{\n    public float X { get; init; }\n    public float Y { get; init; }\n}\n\n// Copy semantics\nvar p1 = new Point { X = 1, Y = 2 };\nvar p2 = p1;\n// p2.X = 99; // would not affect p1 if mutable",
+              "note": "Use `record struct` in C# 10+ for immutable value types with value equality"
+            },
+            "followUps": [
+              "When would you use `readonly struct`?",
+              "What is `ref struct` and how does `Span<T>` use it?"
+            ],
+            "redFlags": [
+              "Recommending structs for large objects because 'they avoid heap allocation' — the copy cost outweighs the benefit.",
+              "Not knowing that mutable structs in collections cause silent bugs (you're mutating a copy)."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-005",
+          "q": "What is the difference between `IEnumerable<T>` and `IQueryable<T>`?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["memory", "linq", "ienumerable", "iqueryable", "ef-core"],
+          "answer": {
+            "oneLiner": "`IEnumerable<T>` executes LINQ in memory (C# code); `IQueryable<T>` translates LINQ to a query expression (e.g., SQL) that runs on the data source — use `IQueryable` to filter in the database, not in memory.",
+            "keyPoints": [
+              "`IEnumerable<T>` — pull-based, in-memory iteration. LINQ operators are C# delegates.",
+              "`IQueryable<T>` — extends `IEnumerable` with an `Expression` tree. The provider (EF Core) translates the tree to SQL.",
+              "Calling `.ToList()` on an `IQueryable` materializes it — after that you have `IEnumerable` in memory.",
+              "Critical mistake: calling `AsEnumerable()` or `ToList()` before filtering loads ALL rows into memory.",
+              "EF Core returns `IQueryable<T>` from `DbSet<T>` — keep it queryable as long as possible."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// BAD: loads all orders into memory, then filters\nvar orders = _db.Orders.ToList().Where(o => o.Total > 100);\n\n// GOOD: WHERE clause translated to SQL\nvar orders = _db.Orders.Where(o => o.Total > 100).ToList();",
+              "note": "Always filter on IQueryable before materializing"
+            },
+            "followUps": [
+              "What happens if you use a C# method in a Where clause that EF Core can't translate to SQL?",
+              "When would you intentionally switch from IQueryable to IEnumerable?"
+            ],
+            "redFlags": [
+              "Putting `.ToList()` early in a chain 'just to be safe' — this is a very common performance bug.",
+              "Not knowing that `IQueryable` carries an expression tree, not executed code."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-006",
+          "q": "Explain the `IDisposable` interface and the `using` statement.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["memory", "idisposable", "using", "unmanaged-resources"],
+          "answer": {
+            "oneLiner": "`IDisposable.Dispose()` provides deterministic cleanup of unmanaged resources (file handles, DB connections, sockets); the `using` statement guarantees `Dispose()` is called even if an exception occurs.",
+            "keyPoints": [
+              "Implement `IDisposable` when your class holds unmanaged resources or subscribes to events that could cause memory leaks.",
+              "`using (var conn = new SqlConnection(...)) { }` compiles to a try/finally with `conn.Dispose()` in the finally.",
+              "C# 8 `using var` declaration: `using var conn = new SqlConnection(...);` — disposes at end of scope.",
+              "The full Dispose pattern: override `Dispose(bool disposing)`, call `GC.SuppressFinalize(this)` to avoid double-cleanup.",
+              "`IAsyncDisposable` + `await using` for async cleanup (e.g., flushing async streams)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// C# 8 using declaration\npublic async Task ProcessAsync()\n{\n    await using var conn = new SqlConnection(_cs);\n    using var cmd = conn.CreateCommand();\n    await conn.OpenAsync();\n    // conn and cmd disposed at end of method scope\n}\n\n// Full dispose pattern\npublic class ResourceHolder : IDisposable\n{\n    private bool _disposed;\n    protected virtual void Dispose(bool disposing)\n    {\n        if (!_disposed)\n        {\n            if (disposing) { /* free managed resources */ }\n            /* free unmanaged resources here */\n            _disposed = true;\n        }\n    }\n    public void Dispose() { Dispose(true); GC.SuppressFinalize(this); }\n    ~ResourceHolder() { Dispose(false); } // finalizer as safety net\n}",
+              "note": "GC.SuppressFinalize removes the object from the finalization queue — avoids an extra GC cycle"
+            },
+            "followUps": [
+              "What is the difference between Dispose and a finalizer?",
+              "When would you implement IAsyncDisposable?"
+            ],
+            "redFlags": [
+              "Not calling `GC.SuppressFinalize` when implementing the full pattern.",
+              "Thinking `using` is only for database connections — any `IDisposable` should use it."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-007",
+          "q": "What is the difference between managed and unmanaged code, and what is the CLR?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["memory", "clr", "managed-code", "il"],
+          "answer": {
+            "oneLiner": "Managed code runs under the CLR (Common Language Runtime) which provides GC, type safety, and JIT compilation; unmanaged code (C/C++ DLLs, COM) runs natively without CLR services.",
+            "keyPoints": [
+              "CLR responsibilities: JIT compilation (IL → native), GC, type safety, exception handling, security.",
+              "C# compiles to IL (Intermediate Language / CIL) — platform-agnostic bytecode.",
+              "The JIT compiles IL to native machine code at runtime (with tiered compilation in .NET Core).",
+              "Interop with unmanaged code via P/Invoke (`DllImport`) or COM interop — you're responsible for marshalling and memory."
+            ],
+            "followUps": [
+              "What is ahead-of-time (AOT) compilation and how does it differ from JIT?",
+              "What is IL and how can you inspect it?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-008",
+          "q": "Why is `string` immutable in C# and what are the implications?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["memory", "string", "immutability"],
+          "answer": {
+            "oneLiner": "Strings are immutable reference types in C# — every 'modification' creates a new string object — which makes them safe to share across threads but costly when concatenated in loops.",
+            "keyPoints": [
+              "String interning: the CLR may reuse string literals with the same value.",
+              "Concatenation in a loop creates O(n) intermediate strings — use `StringBuilder` instead.",
+              "`StringBuilder` is a mutable buffer that amortizes allocations.",
+              "Immutability makes strings safe for use as dictionary keys, in concurrent scenarios, and as constants."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// BAD: O(n) allocations\nstring result = \"\";\nfor (int i = 0; i < 10000; i++) result += i.ToString();\n\n// GOOD: StringBuilder\nvar sb = new StringBuilder();\nfor (int i = 0; i < 10000; i++) sb.Append(i);\nstring result2 = sb.ToString();",
+              "note": "StringBuilder is backed by a resizable char array — one allocation at the end"
+            }
+          }
+        },
+        {
+          "id": "csharp-memory-009",
+          "q": "What are nullable value types and nullable reference types in C#?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["memory", "nullable", "null-safety"],
+          "answer": {
+            "oneLiner": "Nullable value types (`int?`) wrap a struct in `Nullable<T>` to allow null; nullable reference types (C# 8+) are a compiler annotation system that warns you about potential null dereferences on reference types.",
+            "keyPoints": [
+              "`int?` is syntactic sugar for `Nullable<int>` — has `.HasValue` and `.Value` properties.",
+              "C# 8 nullable reference types (NRT) enabled via `<Nullable>enable</Nullable>` — compiler warns when you might dereference null.",
+              "NRT doesn't change runtime behavior — it's compile-time analysis only.",
+              "Use `string?` to explicitly declare that null is a valid value; `string` (non-nullable) means you promise it won't be null.",
+              "Null-coalescing `??`, null-conditional `?.`, and null-forgiving `!` operators are key tools."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "int? age = null;\nint displayAge = age ?? 0; // 0 if null\n\nstring? name = GetNameOrNull();\nint len = name?.Length ?? 0; // safe navigation\n\n// Null-forgiving (suppress warning — use sparingly)\nstring definitelyNotNull = name!;",
+              "note": "The null-forgiving `!` operator is a code smell — prefer proper null checks"
+            },
+            "followUps": [
+              "Does enabling nullable reference types change runtime behavior?",
+              "How do you handle NRT warnings on third-party libraries that aren't annotated?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-010",
+          "q": "What is `Dispose` vs `Finalize` (destructor)?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["memory", "gc", "dispose", "finalize"],
+          "answer": {
+            "oneLiner": "`Dispose` is deterministic cleanup called by your code (or `using`); a finalizer is a non-deterministic GC safety net that runs on the GC finalizer thread — always prefer `Dispose` and suppress the finalizer.",
+            "keyPoints": [
+              "Finalizers run on a dedicated GC thread at a non-deterministic time — you can't control when.",
+              "Objects with finalizers survive one extra GC cycle (promoted to Gen 1) — they're expensive.",
+              "Always call `GC.SuppressFinalize(this)` in `Dispose()` to remove the object from the finalization queue.",
+              "The finalizer is a safety net for when consumers forget to call `Dispose()` — not the primary path.",
+              "Never call managed object methods in a finalizer (they may already be collected)."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-011",
+          "q": "What is `Span<T>` and when should you use it?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["memory", "span", "performance", "zero-alloc"],
+          "answer": {
+            "oneLiner": "`Span<T>` is a stack-only, ref struct that provides a type-safe view over contiguous memory (array slice, stack memory, or unmanaged memory) with zero allocation, ideal for high-performance parsing and buffer slicing.",
+            "keyPoints": [
+              "`Span<T>` is a `ref struct` — it can only live on the stack, can't be boxed or captured in lambdas.",
+              "Use `span.Slice(start, length)` to get a window into an array without copying.",
+              "`ReadOnlySpan<T>` for read-only views (e.g., `string.AsSpan()`).",
+              "`Memory<T>` is the heap-compatible equivalent — use when you need to store the reference or use async.",
+              "Enables zero-allocation parsing in hot paths — used extensively in ASP.NET Core's HTTP parser."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Parse a date from a string without any substring allocations\nReadOnlySpan<char> input = \"2024-06-15\".AsSpan();\nint year = int.Parse(input.Slice(0, 4));\nint month = int.Parse(input.Slice(5, 2));\nint day = int.Parse(input.Slice(8, 2));",
+              "note": "No substring allocation — Slice returns a view, not a copy"
+            },
+            "followUps": [
+              "Why can't Span<T> be used in async methods?",
+              "When would you choose Memory<T> over Span<T>?"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "async",
+      "subtopicName": "Async & Threading",
+      "order": 3,
+      "questions": [
+        {
+          "id": "csharp-async-001",
+          "q": "How does `async`/`await` work in C#?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["async", "await", "task", "state-machine"],
+          "answer": {
+            "oneLiner": "`async`/`await` lets you write asynchronous code in a sequential style; the compiler transforms an `async` method into a state machine that suspends at each `await` and resumes on completion without blocking a thread.",
+            "keyPoints": [
+              "The compiler generates a state machine struct for each `async` method — each `await` is a state transition.",
+              "While awaiting an I/O operation, the calling thread is released back to the thread pool — no thread is blocked.",
+              "`await` on an already-completed task is essentially synchronous (fast path).",
+              "The continuation after `await` is scheduled on the captured `SynchronizationContext` (UI apps) or the thread pool (ASP.NET Core).",
+              "Return `Task<T>` (or `ValueTask<T>` for low-allocation hot paths), not `void` (except for event handlers)."
+            ],
+            "detail": "When you write `var result = await SomeOperationAsync()`, the compiler:\n1. Checks if the task is already complete — if so, continues synchronously.\n2. Otherwise, registers a continuation with the task and returns control to the caller.\n3. When the task completes, the continuation is scheduled (on the thread pool or SynchronizationContext).\n4. The state machine resumes from the `await` point.\n\nThis means async I/O (HTTP calls, DB queries, file I/O) frees the thread while waiting — critical for scalability. A synchronous thread-blocking call holds the thread the entire time, limiting throughput.\n\n`ValueTask<T>` avoids the heap allocation of `Task<T>` when a method frequently completes synchronously — e.g., reading from a buffer that's usually full. Use it only when you have measured allocation pressure.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// What you write:\npublic async Task<string> GetDataAsync()\n{\n    var response = await _httpClient.GetAsync(\"https://api.example.com/data\");\n    return await response.Content.ReadAsStringAsync();\n}\n\n// Simplified what the compiler generates (conceptually):\n// A state machine struct with MoveNext() called at each await point",
+              "note": "The thread is free while waiting for the HTTP response — another request can be served"
+            },
+            "analogy": "Ordering food at a restaurant: you order (start the async operation) and wait at your table (the thread is free). The waiter (OS/I/O subsystem) brings the food when ready. You don't stand blocking the kitchen.",
+            "followUps": [
+              "What does `ConfigureAwait(false)` do and when should you use it?",
+              "What is `ValueTask<T>` and when is it better than `Task<T>`?",
+              "What happens if you `await` a `null` task?"
+            ],
+            "redFlags": [
+              "Saying async/await creates a new thread — it does not.",
+              "Using `async void` for anything other than event handlers.",
+              "Not knowing that the state machine is generated by the compiler."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-002",
+          "q": "How can `.Result` or `.Wait()` cause a deadlock and how do you avoid it?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["async", "deadlock", "synchronization-context"],
+          "answer": {
+            "oneLiner": "Calling `.Result` or `.Wait()` on a Task blocks the current thread; if that thread owns a `SynchronizationContext` (e.g., ASP.NET classic, UI thread) that the async continuation needs to post to, you get a deadlock.",
+            "keyPoints": [
+              "The classic deadlock: UI thread calls `.Result` on a Task; the continuation needs the UI thread to resume; UI thread is blocked waiting for the Task — circular wait.",
+              "ASP.NET Core does NOT have a `SynchronizationContext`, so this deadlock is less common there — but still bad practice.",
+              "Fix 1: go async all the way — `await` instead of `.Result`.",
+              "Fix 2: use `ConfigureAwait(false)` in library code so the continuation doesn't need the original context.",
+              "Fix 3 (last resort): `Task.Run(() => SomeAsync()).Result` — offloads to thread pool where no SC exists."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// DEADLOCK in ASP.NET Classic / WinForms\npublic string GetData()\n{\n    return GetDataAsync().Result; // blocks UI/request thread\n}\npublic async Task<string> GetDataAsync()\n{\n    return await _http.GetStringAsync(\"...\"); // tries to resume on blocked thread\n}\n\n// FIX: async all the way\npublic async Task<string> GetData()\n{\n    return await GetDataAsync();\n}",
+              "note": "The only real fix is to not block on async code — go async end-to-end"
+            },
+            "followUps": [
+              "Does .NET Core's ASP.NET still deadlock with .Result?",
+              "When is GetAwaiter().GetResult() preferred over .Result?"
+            ],
+            "redFlags": [
+              "Not knowing WHY the deadlock happens (SynchronizationContext).",
+              "Proposing `.ConfigureAwait(false)` as the only fix — the real fix is go async all the way."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-003",
+          "q": "What is the difference between `Task`, `Thread`, and `ThreadPool`?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["async", "task", "thread", "thread-pool"],
+          "answer": {
+            "oneLiner": "`Thread` is a raw OS thread (expensive, 1MB stack); `ThreadPool` is a managed pool of reusable threads; `Task` is a higher-level abstraction representing future work — often backed by the ThreadPool but not necessarily tied to any thread (for I/O tasks).",
+            "keyPoints": [
+              "`new Thread(...)` — creates a dedicated OS thread; expensive to start and terminate; use for long-running, dedicated work.",
+              "`ThreadPool.QueueUserWorkItem` / `Task.Run` — submits short work items to a pool of reused threads.",
+              "`Task` — abstracts over asynchronous work; for I/O-bound work, no thread is consumed during the wait.",
+              "For CPU-bound work: `Task.Run(() => HeavyComputation())` offloads to thread pool.",
+              "For I/O-bound work: `await httpClient.GetAsync(...)` — no thread consumed while waiting."
+            ],
+            "detail": "The thread pool exists to avoid the overhead of creating and destroying threads for short work items. It maintains a pool of worker threads and a queue of work items.\n\n`Task` builds on this with a richer model: cancellation, continuation chaining (`ContinueWith`, `await`), exception aggregation, and the ability to represent I/O completion without a thread.\n\nRule of thumb:\n- **CPU-bound**: `await Task.Run(() => CpuWork())` to move off the request thread.\n- **I/O-bound**: `await SomeAsync()` — no `Task.Run` needed; the async I/O completion port handles it.\n- **Dedicated long-running**: `new Thread(...)` or `Task.Factory.StartNew(..., TaskCreationOptions.LongRunning)`.",
+            "followUps": [
+              "When would you use `Task.Factory.StartNew` with `LongRunning` flag?",
+              "What is the difference between CPU-bound and I/O-bound work, and why does it matter for async?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-004",
+          "q": "What is `CancellationToken` and when should you use it?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["async", "cancellation", "cancellation-token"],
+          "answer": {
+            "oneLiner": "`CancellationToken` is a cooperative cancellation mechanism — the caller signals cancellation via `CancellationTokenSource`; the callee checks for it and throws `OperationCanceledException` to stop cleanly.",
+            "keyPoints": [
+              "Create with `CancellationTokenSource cts = new(); var token = cts.Token;`.",
+              "Cancel with `cts.Cancel()` or `cts.CancelAfter(TimeSpan)`.",
+              "Respect it by passing token to every async call: `await _http.GetAsync(url, token)`.",
+              "Check manually with `token.ThrowIfCancellationRequested()` in CPU-bound loops.",
+              "In ASP.NET Core, `HttpContext.RequestAborted` is a token that cancels when the client disconnects — always thread it through your DB calls."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// ASP.NET Core controller action\n[HttpGet(\"data\")]\npublic async Task<IActionResult> GetData(CancellationToken cancellationToken)\n{\n    // Pass token through — stops DB query if client disconnects\n    var result = await _db.Orders\n        .Where(o => o.Active)\n        .ToListAsync(cancellationToken);\n    return Ok(result);\n}",
+              "note": "ASP.NET Core injects HttpContext.RequestAborted automatically for CancellationToken parameters"
+            },
+            "followUps": [
+              "What is the difference between CancellationToken and a timeout?",
+              "How do you combine multiple CancellationTokens?"
+            ],
+            "redFlags": [
+              "Not threading CancellationToken through async calls — it defeats the purpose.",
+              "Catching OperationCanceledException and swallowing it silently."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-005",
+          "q": "What is the difference between `async void` and `async Task`?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["async", "async-void", "exception-handling"],
+          "answer": {
+            "oneLiner": "`async void` cannot be awaited and exceptions thrown inside it crash the process (posted to `SynchronizationContext` unhandled); `async Task` returns an awaitable and propagates exceptions properly — always use `async Task` except for event handlers.",
+            "keyPoints": [
+              "Exceptions in `async void` are posted to the current `SynchronizationContext` as unhandled — they terminate the app in ASP.NET Core.",
+              "`async void` methods cannot be awaited by callers — fire-and-forget with no control.",
+              "Use `async void` ONLY for event handlers (e.g., `button.Click += async (s, e) => { ... }`), where the signature is fixed.",
+              "For fire-and-forget with error handling, prefer `_ = Task.Run(async () => { try { await Work(); } catch { Log(); } })`."
+            ],
+            "redFlags": [
+              "Using async void for anything other than event handlers.",
+              "Not knowing that exceptions in async void are unobserved and can crash the process."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-006",
+          "q": "What does `ConfigureAwait(false)` do and when should you use it?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["async", "configure-await", "synchronization-context"],
+          "answer": {
+            "oneLiner": "`ConfigureAwait(false)` tells `await` not to capture the current `SynchronizationContext`, so the continuation runs on a thread pool thread rather than posting back to the original context — preventing deadlocks in library code and reducing overhead.",
+            "keyPoints": [
+              "In UI or classic ASP.NET apps, `await` by default captures the SC and posts the continuation back to it.",
+              "`ConfigureAwait(false)` opts out — continuation may run on any thread pool thread.",
+              "Use it in **library code** that doesn't need to run on a specific context.",
+              "In **application code** (ASP.NET Core), the SC is null by default — `ConfigureAwait(false)` has no deadlock-prevention benefit but can still reduce overhead.",
+              "Do NOT use it in UI code after awaits that update UI controls — you need the UI thread."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Library method — ConfigureAwait(false) everywhere\npublic async Task<string> FetchAsync(string url)\n{\n    var response = await _http.GetAsync(url).ConfigureAwait(false);\n    return await response.Content.ReadAsStringAsync().ConfigureAwait(false);\n}",
+              "note": "Library code should always ConfigureAwait(false) to avoid deadlocking consumers"
+            }
+          }
+        },
+        {
+          "id": "csharp-async-007",
+          "q": "What is `SynchronizationContext` and how does it affect `await`?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["async", "synchronization-context", "ui", "asp.net"],
+          "answer": {
+            "oneLiner": "`SynchronizationContext` is an abstraction that controls how continuations are scheduled — UI frameworks post back to the UI thread; ASP.NET Core has no SC (null); by default `await` captures and resumes on the current SC.",
+            "keyPoints": [
+              "WinForms/WPF: SC is a queue that processes items on the UI thread — ensures UI updates happen on the right thread.",
+              "ASP.NET classic: SC was per-request, ensuring HttpContext was accessible on the continuation thread.",
+              "ASP.NET Core deliberately removed the SC — threads are symmetric, use `IHttpContextAccessor` for context access.",
+              "Setting `SynchronizationContext.Current` to null before blocking (`Task.Run`) is why `Task.Run(() => ...).Result` avoids the deadlock."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-008",
+          "q": "What is the difference between parallelism and concurrency? How do `Task.WhenAll` and `Task.WhenAny` fit in?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["async", "parallelism", "concurrency", "task-when-all"],
+          "answer": {
+            "oneLiner": "Concurrency is making progress on multiple tasks in overlapping time (interleaving on one or more threads); parallelism is literally executing multiple tasks simultaneously on multiple CPU cores — `Task.WhenAll` enables concurrent async I/O, `Parallel.For` enables CPU parallelism.",
+            "keyPoints": [
+              "`Task.WhenAll(t1, t2, t3)` — starts all tasks concurrently, awaits all; much faster than sequential awaits for independent I/O.",
+              "`Task.WhenAny(t1, t2)` — returns when the first task completes; useful for timeouts (`Task.WhenAny(workTask, Task.Delay(timeout))`).",
+              "For CPU-bound parallel work: `Parallel.For`, `Parallel.ForEach`, or PLINQ (`.AsParallel()`).",
+              "Async concurrency ≠ multi-threading: three concurrent `await` HTTP calls may run on one thread interleaved."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Sequential: ~3 seconds total\nvar a = await GetAAsync(); // 1s\nvar b = await GetBAsync(); // 1s\nvar c = await GetCAsync(); // 1s\n\n// Concurrent: ~1 second total\nvar taskA = GetAAsync();\nvar taskB = GetBAsync();\nvar taskC = GetCAsync();\nvar (ra, rb, rc) = (await taskA, await taskB, await taskC);\n// or\nvar results = await Task.WhenAll(taskA, taskB, taskC);",
+              "note": "Start tasks before awaiting to run them concurrently"
+            }
+          }
+        },
+        {
+          "id": "csharp-async-009",
+          "q": "What actually happens under the hood when you `await` a Task? Explain the state machine.",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["async", "state-machine", "compiler", "internals"],
+          "answer": {
+            "oneLiner": "The compiler transforms each `async` method into a struct implementing `IAsyncStateMachine` with a `MoveNext()` method; each `await` point is a numbered state, and `MoveNext()` is called when the awaited task completes to resume from that state.",
+            "keyPoints": [
+              "The async method body becomes a `switch` over state numbers in `MoveNext()`.",
+              "All local variables become fields on the state machine struct (captured across await points).",
+              "The awaiter pattern (`GetAwaiter()`, `IsCompleted`, `OnCompleted`, `GetResult()`) is what the compiler hooks into.",
+              "If the task is already complete (`IsCompleted == true`), `MoveNext()` is called synchronously — the fast path.",
+              "In .NET 7+, the async state machine is a struct by default (no heap allocation on the fast path) — a significant perf optimization."
+            ],
+            "followUps": [
+              "How does IValueTaskSource relate to zero-allocation async?",
+              "What is the overhead of an async method compared to a synchronous one?"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "advanced",
+      "subtopicName": "Advanced C#",
+      "order": 4,
+      "questions": [
+        {
+          "id": "csharp-advanced-001",
+          "q": "Explain delegates, events, `Func`, and `Action` with examples.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["delegates", "events", "func", "action", "functional"],
+          "answer": {
+            "oneLiner": "A delegate is a type-safe function pointer; `Func<T>` and `Action<T>` are built-in generic delegate types; an event wraps a delegate with add/remove semantics to prevent external invocation.",
+            "keyPoints": [
+              "Delegate: `delegate int Transformer(int x);` — defines a method signature type.",
+              "`Action<T>` — delegate with no return value; `Func<T, TResult>` — delegate that returns a value.",
+              "Multicast delegates: `+=` adds multiple methods to the invocation list; `-=` removes them.",
+              "Events: a delegate field marked `event` — external code can only `+=`/`-=`, not invoke directly.",
+              "Events follow the `EventHandler<TEventArgs>` convention in .NET: `sender` + `EventArgs`."
+            ],
+            "detail": "Delegates are the foundation of C# functional features: LINQ, events, callbacks, and strategy pattern implementations all use them.\n\n```csharp\n// Inline delegate (lambda)\nFunc<int, int> square = x => x * x;\nConsole.WriteLine(square(5)); // 25\n\nAction<string> log = msg => Console.WriteLine(msg);\nlog(\"Hello\");\n```\n\nEvents prevent external code from clearing the invocation list (`= null`) or invoking the event directly — encapsulation for callbacks.\n\nThe difference between `delegate` and `Func/Action`: use `Func/Action` for simple callbacks; define a named delegate type when the semantic meaning matters (self-documenting) or when you need special attributes.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Named delegate\npublic delegate void OrderShippedHandler(int orderId);\n\npublic class OrderService\n{\n    public event OrderShippedHandler? OrderShipped;\n\n    public void Ship(int orderId)\n    {\n        // Process...\n        OrderShipped?.Invoke(orderId); // null-conditional invoke\n    }\n}\n\n// Subscriber\nvar svc = new OrderService();\nsvc.OrderShipped += id => Console.WriteLine($\"Order {id} shipped!\");\nsvc.Ship(42);",
+              "note": "?.Invoke() is the thread-safe way to raise events (no TOCTOU race)"
+            },
+            "followUps": [
+              "What is the difference between an event and a public delegate field?",
+              "What memory leak pattern is common with events?",
+              "What is a multicast delegate and what order are delegates invoked?"
+            ],
+            "redFlags": [
+              "Not knowing that events protect the delegate from external invocation.",
+              "Event memory leaks: subscribing with a long-lived object and never unsubscribing with `-=`."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-002",
+          "q": "What are generics in C#? Why are they useful and how are they different from Java generics?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["generics", "type-safety", "performance"],
+          "answer": {
+            "oneLiner": "Generics allow writing type-safe, reusable code parameterized by a type (`List<T>`, `Repository<T>`) — unlike Java's type erasure, C# generics are reified at runtime and generate specialized IL for value types, avoiding boxing.",
+            "keyPoints": [
+              "Type safety: `List<int>` cannot contain a `string` — caught at compile time.",
+              "No boxing for value types: `List<int>` uses an `int[]` internally, not `object[]`.",
+              "Constraints: `where T : class`, `where T : new()`, `where T : IComparable<T>` — restrict what T can be.",
+              "Generic methods: `T Max<T>(T a, T b) where T : IComparable<T>`.",
+              "C# generics are reified — at runtime, `typeof(List<int>) != typeof(List<string>)` — separate types exist."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class Repository<T> where T : class, IEntity\n{\n    private readonly DbContext _db;\n    public Repository(DbContext db) => _db = db;\n    public Task<T?> GetByIdAsync(int id) => _db.Set<T>().FindAsync(id).AsTask();\n    public void Add(T entity) => _db.Set<T>().Add(entity);\n}",
+              "note": "Generic repository with constraints — T must be a class and implement IEntity"
+            },
+            "followUps": [
+              "What is the difference between covariance and contravariance in generics?",
+              "What constraints can you put on a generic type parameter?"
+            ],
+            "redFlags": [
+              "Not knowing that C# generics avoid boxing for value types (unlike Java's erasure).",
+              "Using `object` instead of generics in new code."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-003",
+          "q": "Explain LINQ — key concepts and most commonly used operators.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["linq", "functional", "ienumerable", "query"],
+          "answer": {
+            "oneLiner": "LINQ (Language Integrated Query) provides a unified, composable, type-safe query syntax over any `IEnumerable<T>` or `IQueryable<T>` using standard operators like `Where`, `Select`, `GroupBy`, `OrderBy`, and `Join`.",
+            "keyPoints": [
+              "LINQ is lazy: chaining operators builds a query; execution happens when enumerated (`.ToList()`, `foreach`).",
+              "Method syntax (`list.Where(x => x > 0).Select(x => x * 2)`) and query syntax (`from x in list where x > 0 select x * 2`) are equivalent.",
+              "Key operators: `Where` (filter), `Select` (project/map), `SelectMany` (flatten), `GroupBy`, `OrderBy`/`ThenBy`, `Join`/`GroupJoin`, `Aggregate`, `Any`/`All`, `First`/`FirstOrDefault`, `Take`/`Skip`.",
+              "Deferred execution means a LINQ query can be enumerated multiple times — each time it re-evaluates.",
+              "On `IQueryable` (EF Core), operators are translated to SQL — not executed in memory."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "var result = orders\n    .Where(o => o.Status == OrderStatus.Shipped)\n    .GroupBy(o => o.CustomerId)\n    .Select(g => new {\n        CustomerId = g.Key,\n        TotalSpend = g.Sum(o => o.Total),\n        OrderCount = g.Count()\n    })\n    .OrderByDescending(x => x.TotalSpend)\n    .Take(10)\n    .ToList();",
+              "note": "Top 10 customers by spend — if orders is IQueryable, this becomes a single SQL query"
+            },
+            "followUps": [
+              "What is deferred execution and when can it cause bugs?",
+              "What is the difference between `First()` and `FirstOrDefault()`?",
+              "How does `SelectMany` work and when do you need it?"
+            ],
+            "redFlags": [
+              "Not knowing that LINQ is lazy — calling it multiple times can enumerate a data source multiple times.",
+              "Putting `.ToList()` before a `Where` on a DbSet — fetches all rows."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-004",
+          "q": "Explain pattern matching in C# — switch expressions, type patterns, property patterns.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["pattern-matching", "switch", "csharp-8", "csharp-9"],
+          "answer": {
+            "oneLiner": "Pattern matching (C# 7-11) lets you test a value's shape, type, and properties in a single concise expression — switch expressions, type patterns, property patterns, and positional patterns replace verbose if/else chains.",
+            "keyPoints": [
+              "Type pattern: `if (shape is Circle c) { use c.Radius; }`",
+              "Switch expression (C# 8): returns a value, exhaustive, compiler-warns on unmatched arms.",
+              "Property pattern: `shape is Circle { Radius: > 10 }`.",
+              "Relational patterns: `x is > 0 and < 100`.",
+              "Positional pattern: works with types that have `Deconstruct()` methods."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public string Describe(Shape shape) => shape switch\n{\n    Circle { Radius: > 100 } c => $\"Large circle r={c.Radius}\",\n    Circle c                   => $\"Circle r={c.Radius}\",\n    Rectangle { Width: var w, Height: var h } when w == h\n                               => $\"Square {w}x{h}\",\n    Rectangle r                => $\"Rect {r.Width}x{r.Height}\",\n    null                       => \"null\",\n    _                          => \"Unknown shape\"\n};",
+              "note": "Switch expression: exhaustive, returns a value, guards with 'when'"
+            },
+            "followUps": [
+              "What is a positional pattern and what type must support it?",
+              "How do list patterns (C# 11) work?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-005",
+          "q": "What are extension methods and when should you use them?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["extension-methods", "linq", "fluent"],
+          "answer": {
+            "oneLiner": "Extension methods add new methods to existing types without modifying or inheriting them — defined as `static` methods in a `static` class with `this T param` as the first parameter; LINQ operators are all extension methods.",
+            "keyPoints": [
+              "Syntax: `public static class Extensions { public static string Truncate(this string s, int max) => s.Length <= max ? s : s[..max]; }`",
+              "Called as instance methods: `\"Hello World\".Truncate(5)`.",
+              "They're compile-time sugar — the compiler rewrites them to static calls.",
+              "Use for: fluent APIs, adding utility to sealed/third-party types, LINQ-style chaining.",
+              "Overuse can lead to methods that look like instance methods but don't have access to private state — document clearly."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static class StringExtensions\n{\n    public static string ToSlug(this string s) =>\n        s.ToLower().Replace(' ', '-');\n}\n\n// Usage\nstring slug = \"Hello World\".ToSlug(); // \"hello-world\"",
+              "note": "Extension methods must be in a static class"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-006",
+          "q": "What are `yield return` and iterators in C#?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["yield", "iterators", "ienumerable", "lazy"],
+          "answer": {
+            "oneLiner": "`yield return` lets you write a method that produces a lazily-evaluated sequence without building a full collection in memory — the compiler generates an `IEnumerator<T>` state machine.",
+            "keyPoints": [
+              "The method must return `IEnumerable<T>` or `IEnumerator<T>`.",
+              "Execution is suspended at each `yield return` and resumed when the caller calls `MoveNext()`.",
+              "`yield break` exits the iterator early.",
+              "Useful for: generating infinite sequences, streaming large data without loading all into memory, building lazy pipelines."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public IEnumerable<int> Fibonacci()\n{\n    int a = 0, b = 1;\n    while (true)\n    {\n        yield return a;\n        (a, b) = (b, a + b); // infinite sequence — consumer decides when to stop\n    }\n}\n\nvar first10 = Fibonacci().Take(10).ToList();",
+              "note": "Infinite sequence — Take(10) pulls only 10 values; the rest are never computed"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-007",
+          "q": "What are C# records and how do they differ from classes?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["records", "immutability", "csharp-9", "value-equality"],
+          "answer": {
+            "oneLiner": "Records (C# 9+) are class/struct types with built-in value equality, non-destructive mutation (`with` expressions), and concise positional syntax — ideal for DTOs, domain value objects, and immutable data.",
+            "keyPoints": [
+              "Value equality by default: two records with the same property values are equal (`==`, `Equals`, `GetHashCode` auto-generated).",
+              "`with` expression: `var updated = original with { Name = \"Alice\" };` — creates a new record with one property changed.",
+              "`record class` = reference type with value equality; `record struct` (C# 10) = value type.",
+              "Positional records: `public record Point(double X, double Y);` — auto-generates constructor, properties, deconstructor.",
+              "Immutable by default with `init`-only properties."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Positional record — concise\npublic record OrderSummary(int Id, string Customer, decimal Total);\n\nvar order = new OrderSummary(1, \"Alice\", 99.99m);\nvar updated = order with { Total = 149.99m }; // new record\n\nConsole.WriteLine(order == updated);  // false\nConsole.WriteLine(order == new OrderSummary(1, \"Alice\", 99.99m)); // true — value equality",
+              "note": "Records auto-generate Equals/GetHashCode based on all properties"
+            },
+            "followUps": [
+              "Can a record inherit from a class?",
+              "When would you use a record struct vs a record class?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-008",
+          "q": "What are tuples in C# and when should you use them?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["tuples", "value-tuples", "named-tuples"],
+          "answer": {
+            "oneLiner": "C# 7 value tuples let you return multiple values from a method without defining a new class — `(string Name, int Age) person = (\"Alice\", 30);` with named elements and deconstruction support.",
+            "keyPoints": [
+              "`ValueTuple` is a value type (struct) — unlike the old `Tuple` class which was a reference type.",
+              "Named elements: `(string First, string Last) GetName() => (\"John\", \"Doe\");`.",
+              "Deconstruction: `var (first, last) = GetName();`.",
+              "Use for private/internal methods returning 2-3 related values; use a named class/record for public APIs.",
+              "Discard: `var (first, _) = GetName();` when you don't need one element."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-009",
+          "q": "What is the difference between `ref`, `out`, and `in` parameters?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["ref", "out", "in", "parameters", "performance"],
+          "answer": {
+            "oneLiner": "`ref` passes by reference (must be initialized); `out` is write-only by the callee (must be set before return, need not be initialized by caller); `in` is a read-only reference (no copy, no modification) used for performance with large structs.",
+            "keyPoints": [
+              "`ref`: caller must initialize; callee can read and write; useful for in-place mutation.",
+              "`out`: caller need not initialize; callee MUST assign before returning; classic for `TryParse` pattern.",
+              "`in`: caller passes a reference, callee cannot modify — avoids copying large structs in hot paths.",
+              "`ref return` and `ref local` allow returning references to avoid copies."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// out — TryParse pattern\nif (int.TryParse(\"42\", out int result))\n    Console.WriteLine(result);\n\n// ref — in-place increment\nvoid Increment(ref int x) => x++;\nint n = 5;\nIncrement(ref n); // n == 6\n\n// in — avoid copying large struct\nvoid ProcessMatrix(in BigMatrix m) { /* read-only, no copy */ }",
+              "note": "`in` is important for large readonly structs in performance-sensitive code"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-010",
+          "q": "What are nullable reference types (NRT) and how do you enable and use them?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["nullable", "nrt", "csharp-8", "null-safety"],
+          "answer": {
+            "oneLiner": "Nullable reference types (C# 8+, enabled via `<Nullable>enable</Nullable>`) add compile-time null-safety annotations to reference types — `string?` means null is valid, `string` means the compiler assumes non-null and warns on potential dereferences.",
+            "keyPoints": [
+              "Opt-in per project in `.csproj`: `<Nullable>enable</Nullable>`.",
+              "Compiler uses flow analysis to track nullability through branches.",
+              "`[NotNull]`, `[MaybeNull]`, `[NotNullWhen]` attributes fine-tune nullable contracts in complex scenarios.",
+              "Runtime behavior is unchanged — NRT is a static analysis feature only.",
+              "Gradually enabling NRT: use `#nullable enable` per file to migrate incrementally."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-011",
+          "q": "What are expression-bodied members and when do you use them?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "low",
+          "tags": ["expression-bodied", "syntax", "concise"],
+          "answer": {
+            "oneLiner": "Expression-bodied members use `=>` instead of a block body for single-expression methods, properties, constructors, and operators — they reduce boilerplate for simple members.",
+            "keyPoints": [
+              "Works on: methods, read-only properties, constructors, destructors, indexers, operators.",
+              "`public string FullName => $\"{First} {Last}\";` — expression-bodied property.",
+              "`public override string ToString() => $\"{Id}: {Name}\";`",
+              "Use when the body is a single, readable expression; avoid for complex logic."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class Person\n{\n    public string First { get; }\n    public string Last { get; }\n    public Person(string first, string last) => (First, Last) = (first, last);\n    public string FullName => $\"{First} {Last}\";\n    public override string ToString() => FullName;\n}",
+              "note": "Constructor and properties all expression-bodied — very concise"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-012",
+          "q": "What is covariance and contravariance in C# generics?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["generics", "covariance", "contravariance", "variance"],
+          "answer": {
+            "oneLiner": "Covariance (`out T`) allows a generic type to be used where a less-derived type parameter is expected (e.g., `IEnumerable<Dog>` as `IEnumerable<Animal>`); contravariance (`in T`) allows using a more-derived type (e.g., `Action<Animal>` as `Action<Dog>`).",
+            "keyPoints": [
+              "Only valid on interfaces and delegates — not classes.",
+              "`out T` (covariant): T can only appear in output position (return type). `IEnumerable<T>`, `IReadOnlyList<T>`.",
+              "`in T` (contravariant): T can only appear in input position (parameters). `Action<T>`, `IComparer<T>`.",
+              "Mnemonic: 'producers are covariant (out), consumers are contravariant (in)'."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Covariance — IEnumerable<out T>\nIEnumerable<Dog> dogs = new List<Dog>();\nIEnumerable<Animal> animals = dogs; // valid because Dog IS-A Animal and T is 'out'\n\n// Contravariance — Action<in T>\nAction<Animal> treatAnimal = a => Console.WriteLine(a.Name);\nAction<Dog> treatDog = treatAnimal; // valid — can use Animal handler for Dog",
+              "note": "Variance only applies to reference types — not value types"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-013",
+          "q": "What is `dynamic` in C# and when would you (and wouldn't you) use it?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "low",
+          "tags": ["dynamic", "dlr", "late-binding"],
+          "answer": {
+            "oneLiner": "`dynamic` bypasses compile-time type checking — member access and method calls are resolved at runtime via the DLR (Dynamic Language Runtime); use sparingly for COM interop, reflection simplification, and consuming JSON/dynamic data.",
+            "keyPoints": [
+              "No IntelliSense, no compile-time checking — all errors are runtime `RuntimeBinderException`.",
+              "Legitimate uses: COM interop (Office Automation), `ExpandoObject`, consuming dynamic JSON when `JsonElement` is too verbose.",
+              "Avoid in application code — prefer `JsonDocument`, `System.Text.Json`, or generated models.",
+              "`dynamic` is slower than static dispatch — DLR caches call sites but it's still overhead."
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
