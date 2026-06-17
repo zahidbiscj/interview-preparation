@@ -1,7 +1,7 @@
 # System Design & Architecture Cheat Sheet
 
 Master reference for senior .NET/Azure engineers — scan before walking into the room.
-Mirrors `data/questions/architecture.json` (32 questions across 3 subtopics).
+Mirrors `data/questions/architecture.json` (48 questions across 4 subtopics).
 
 ---
 
@@ -27,6 +27,9 @@ Deciding architecture (ADRs) · STAR technical challenge · Framing a perf impro
 
 ### 3. Advanced Patterns (`patterns-advanced`, 9 Qs)
 DDD building blocks · Event sourcing vs CRUD · Cache-aside/write-through/write-behind · Modular monolith vs monolith vs microservices · Multi-tenancy (DB-per-tenant vs shared schema) · API backward compatibility · Bulkhead pattern · Vertical vs horizontal scaling · Zero-downtime deployment.
+
+### 4. Design Patterns — GoF & Enterprise (`design-patterns`, 16 Qs)
+Singleton (thread-safe / DI-as-singleton) · Factory Method vs Abstract Factory · Builder · Prototype · Adapter · Facade · Decorator (vs inheritance) · Proxy · Strategy (replace if/switch) · Observer (events / IObservable) · Mediator (MediatR) · Command · Template Method · Chain of Responsibility · Dependency Injection as a pattern · Options pattern.
 
 ---
 
@@ -180,6 +183,51 @@ Pairs naturally with CQRS (events feed projections) but **doesn't require** it.
 - **Zero-downtime:** rolling (batch replace), **blue-green** (two envs, instant rollback), **canary** (small % first, watch metrics), **feature flags** (ship dark, release ≠ deploy). All need **backward-compatible DB migrations** via **expand/contract**.
 - **Multi-tenancy** (isolation ↔ cost): DB-per-tenant (best isolation, costly) → schema-per-tenant (middle) → shared schema + `TenantId` (cheapest/densest, **enforce EF global query filters** to stop leakage; handle noisy neighbours).
 - **API backward compat:** additive changes are safe; **tolerant reader** ignores unknown fields; version (v1/v2) only for real breaks; deprecate with Sunset headers + migration window before removal.
+
+---
+
+## Design Patterns (GoF & Enterprise) — Quick Map
+
+### Creational (how objects are made)
+
+| Pattern | Intent (one line) | .NET reality / when |
+|---|---|---|
+| **Singleton** | Exactly one instance, global access | Prefer `AddSingleton<T>()` (injectable, testable) over static. Hand-rolled: `Lazy<T>` for thread-safe init. Must be thread-safe. |
+| **Factory Method** | Create **one** product, defer the concrete choice | `Create(channel)` returns the right `INotification`. In DI: keyed services / `Func<T>`. |
+| **Abstract Factory** | Create a **family** of related products that stay consistent | `IUiFactory` → matching dark/light button + checkbox. |
+| **Builder** | Assemble a complex object step-by-step (fluent) | `WebApplication.CreateBuilder`, `StringBuilder`; use over telescoping ctors / when steps need validation. |
+| **Prototype** | Create by **cloning** a configured instance | Records `with` expression (shallow!); deep-clone mutable members explicitly. |
+
+### Structural (how objects are composed)
+
+| Pattern | Intent | Key distinction / .NET use |
+|---|---|---|
+| **Adapter** | Convert one interface into the one the client expects | Wrap a vendor SDK (Stripe) behind your `IPaymentGateway`; lives in Infrastructure. |
+| **Facade** | One simple entry point over a complex subsystem | `CheckoutFacade.PlaceOrderAsync` hides inventory/payment/shipping. **Simplifies** (vs Adapter = converts). |
+| **Decorator** | Wrap to **add behaviour**, same interface | Caching/logging/retry wrappers; Scrutor `.Decorate<T>()`; MediatR behaviours. Beats inheritance (composes at runtime, no class explosion). |
+| **Proxy** | Stand-in that **controls access** | EF lazy-loading proxies (N+1!), gRPC/HTTP clients, virtual/protection/remote/caching. **Controls access** (vs Decorator = adds behaviour). |
+
+### Behavioral (how objects interact)
+
+| Pattern | Intent | .NET use / note |
+|---|---|---|
+| **Strategy** | Interchangeable algorithms behind one interface | **Replaces the growing if/switch** (payment providers, pricing). Select via keyed DI / dictionary. Open/Closed. |
+| **Observer** | One-to-many auto-notification | C# `event` (built-in); `IObservable<T>`/Rx for streams; MediatR `INotification`. Watch the lapsed-listener leak (`-=`). |
+| **Mediator** | Components talk through a hub, not each other | **MediatR** `Send` → handler; pipeline behaviours for cross-cutting. MediatR ≠ CQRS. |
+| **Command** | Encapsulate a request as an object | Enables queue/log/retry/undo. MediatR commands, WPF `ICommand`, job payloads. (vs Strategy = swap algorithm.) |
+| **Template Method** | Fix the algorithm skeleton, override the steps | Import/ETL pipelines via inheritance + hook methods. Inheritance (compile-time) vs Strategy (composition, runtime). |
+| **Chain of Responsibility** | Pass request along handlers until one handles it | **ASP.NET Core middleware** (`next()` / short-circuit), MediatR behaviours, `DelegatingHandler`, approval flows. |
+
+### Enterprise / .NET
+
+| Pattern | Intent | Note |
+|---|---|---|
+| **Repository + Unit of Work** | Collection-like data abstraction + atomic commit | `DbContext` *is* UoW, `DbSet` *is* a repo — often redundant on EF Core (see `patterns` Qs). |
+| **CQRS** | Separate read model from write model | Reads bypass domain → DTO; writes run full validation (see `patterns` Qs). |
+| **Dependency Injection** | Supply dependencies from outside (DIP in practice) | A pattern, not just the container. Lifetimes: Transient/Scoped/Singleton. Avoid captive deps (Scoped in Singleton) & Service Locator. |
+| **Options pattern** | Bind config to validated, strongly-typed classes | `IOptions` (snapshot) / `IOptionsSnapshot` (per-request) / `IOptionsMonitor` (live). `ValidateOnStart()` to fail fast vs raw `IConfiguration`. |
+
+**Pairs interviewers love to contrast:** Factory Method vs Abstract Factory (one vs family) · Adapter vs Facade (convert vs simplify) · Decorator vs Proxy (add behaviour vs control access) · Strategy vs Command (swap algorithm vs encapsulate request) · Strategy vs Template Method (composition/runtime vs inheritance/compile-time).
 
 ---
 

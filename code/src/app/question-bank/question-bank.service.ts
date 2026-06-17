@@ -9,12 +9,21 @@ import {
 const BOOKMARK_KEY = 'qbank.bookmarks';
 const THEME_KEY = 'qbank.theme';
 const DAILY_KEY = 'qbank.daily';
+const SETS_KEY = 'qbank.sets';
 
 /** Per-day practice tally, keyed by YYYY-MM-DD. */
 export interface DailyStat {
   date: string;
   answered: number;
   got: number;
+}
+
+/** A user-curated collection of questions (by id), e.g. "Interview question set 1". */
+export interface QuestionSet {
+  id: string;
+  name: string;
+  questionIds: string[];
+  createdAt: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -30,6 +39,7 @@ export class QuestionBankService {
   private _isDark = signal<boolean>(this.loadTheme());
   private _daily = signal<Record<string, DailyStat>>(this.loadDaily());
   private _focusQuestionId = signal<string | null>(null);
+  private _sets = signal<QuestionSet[]>(this.loadSets());
 
   private topicCache = new Map<string, TopicFile>();
   private cheatSheetCache = new Map<string, string>();
@@ -43,6 +53,8 @@ export class QuestionBankService {
   readonly daily = this._daily.asReadonly();
   /** When set, the matching question card should scroll into view and expand. */
   readonly focusQuestionId = this._focusQuestionId.asReadonly();
+  /** User-curated question sets, newest first. */
+  readonly sets = this._sets.asReadonly();
 
   /** Total questions self-graded across all days. */
   readonly totalAnswered = computed(() =>
@@ -299,6 +311,98 @@ export class QuestionBankService {
       }
     }
     return pool;
+  }
+
+  /**
+   * Build a pool from an explicit, ordered list of question ids (used by custom
+   * sets). Loads whichever topics the ids belong to and returns the matching
+   * QuestionViews in the same order as `ids` (unknown ids are skipped).
+   */
+  async buildPoolFromIds(ids: string[]): Promise<QuestionView[]> {
+    const bookmarks = this._bookmarks();
+    const topicIds = new Set<string>();
+    for (const id of ids) {
+      const topic = this._topics().find(t => id.startsWith(t.id + '-'));
+      if (topic) topicIds.add(topic.id);
+    }
+
+    const lookup = new Map<string, QuestionView>();
+    for (const topicId of topicIds) {
+      const file = await this.ensureTopicLoaded(topicId);
+      if (!file) continue;
+      const topicNode = this._topics().find(t => t.id === topicId);
+      for (const sub of file.subtopics) {
+        for (const q of sub.questions) {
+          lookup.set(q.id, {
+            ...q,
+            topicId: file.topicId,
+            topicName: topicNode?.name ?? file.topicName,
+            subtopicId: sub.subtopicId,
+            subtopicName: sub.subtopicName,
+            bookmarked: bookmarks.has(q.id),
+          });
+        }
+      }
+    }
+
+    return ids
+      .map(id => lookup.get(id))
+      .filter((q): q is QuestionView => !!q);
+  }
+
+  // ── Custom sets ──
+
+  /** Create a new set and return its id. */
+  createSet(name: string): string {
+    const id = `set-${Date.now()}-${this._sets().length}`;
+    const set: QuestionSet = {
+      id,
+      name: name.trim() || 'Untitled set',
+      questionIds: [],
+      createdAt: Date.now(),
+    };
+    this._sets.update(list => this.persistSets([set, ...list]));
+    return id;
+  }
+
+  renameSet(id: string, name: string): void {
+    const clean = name.trim();
+    if (!clean) return;
+    this._sets.update(list =>
+      this.persistSets(list.map(s => (s.id === id ? { ...s, name: clean } : s))));
+  }
+
+  deleteSet(id: string): void {
+    this._sets.update(list => this.persistSets(list.filter(s => s.id !== id)));
+  }
+
+  /** Add or remove a question id from a set (no-op duplicates). */
+  toggleInSet(setId: string, questionId: string): void {
+    this._sets.update(list =>
+      this.persistSets(list.map(s => {
+        if (s.id !== setId) return s;
+        const has = s.questionIds.includes(questionId);
+        return {
+          ...s,
+          questionIds: has
+            ? s.questionIds.filter(q => q !== questionId)
+            : [...s.questionIds, questionId],
+        };
+      })));
+  }
+
+  private persistSets(list: QuestionSet[]): QuestionSet[] {
+    localStorage.setItem(SETS_KEY, JSON.stringify(list));
+    return list;
+  }
+
+  private loadSets(): QuestionSet[] {
+    try {
+      const raw = localStorage.getItem(SETS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
   }
 
   /** Record a finished practice batch into today's tally. */

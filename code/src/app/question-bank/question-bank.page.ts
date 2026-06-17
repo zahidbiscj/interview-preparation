@@ -34,6 +34,7 @@ import { ButtonModule } from 'primeng/button';
         </div>
         <div class="topbar-right">
           <a routerLink="/dashboard" class="sim-link">📊 Dashboard</a>
+          <a routerLink="/sets" class="sim-link">🗂 Sets</a>
           <a routerLink="/simulator" class="sim-link">🎯 Simulator</a>
           <button class="theme-btn" (click)="toggleTheme()" [title]="isDark() ? 'Switch to light' : 'Switch to dark'">
             {{ isDark() ? '☀️' : '🌙' }}

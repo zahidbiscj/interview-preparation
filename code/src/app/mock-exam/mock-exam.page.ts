@@ -25,6 +25,7 @@ interface Graded { question: QuestionView; grade: Grade; }
         <a routerLink="/" class="back-link">← Question Bank</a>
         <span class="app-brand">🎯 Interview Simulator</span>
         <span class="topbar-spacer">
+          <a routerLink="/sets" class="nav-link">🗂 Sets</a>
           <a routerLink="/dashboard" class="nav-link">📊 Dashboard</a>
           <button class="theme-btn" (click)="svc.toggleTheme()">{{ isDark() ? '☀️' : '🌙' }}</button>
         </span>
@@ -274,6 +275,20 @@ export class MockExamPage implements OnInit {
     this.topicChoices.set(
       this.svc.topics().map(t => ({ id: t.id, name: t.name, icon: t.icon, selected: true }))
     );
+
+    // Custom set launch: /simulator?set=<id> — run that exact curated list.
+    const setId = this.route.snapshot.queryParamMap.get('set');
+    if (setId) {
+      const set = this.svc.sets().find(s => s.id === setId);
+      if (set?.questionIds.length) {
+        this.loading.set(true);
+        const pool = await this.svc.buildPoolFromIds(set.questionIds);
+        this.loading.set(false);
+        if (pool.length) { this.beginExam(pool); return; }
+      }
+      this.setupError.set('That set is empty or could not be loaded.');
+      return;
+    }
 
     // Quick-start preset (e.g. dashboard "Shuffle 10"): /simulator?quick=10
     const quick = Number(this.route.snapshot.queryParamMap.get('quick'));

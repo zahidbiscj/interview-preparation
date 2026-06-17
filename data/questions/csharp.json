@@ -3076,6 +3076,885 @@
               }
             ]
           }
+        },
+        {
+          "id": "csharp-async-017",
+          "q": "Walk me through exactly what happens the moment execution hits an `await` on an in-flight I/O call.",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "await",
+            "state-machine",
+            "continuation",
+            "thread-pool"
+          ],
+          "answer": {
+            "oneLiner": "The method runs synchronously up to the `await`; if the awaited task isn't done, the method returns its own Task to the caller and the current thread is released back to the pool — when the I/O completes, a continuation resumes the rest of the method.",
+            "keyPoints": [
+              "Compiler rewrites the method into a state machine that saves locals and a resume point.",
+              "If the task is already complete, it keeps running synchronously (no thread hop).",
+              "If not, the thread is released — it is NOT blocked waiting.",
+              "On completion the continuation runs, restoring state and continuing after the await."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "async Task<string> GetNameAsync()\n{\n    Console.WriteLine(\"before\");        // runs on caller's thread\n    var data = await _http.GetStringAsync(url); // thread released here if not done\n    Console.WriteLine(\"after\");         // runs as a continuation\n    return data.Trim();\n}",
+              "note": "No thread sits and waits during the network call — that is the whole point."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Say I have a handler that calls an external payment API with await. The instant we hit that await, what is the thread doing?"
+              },
+              {
+                "role": "me",
+                "text": "It runs synchronously right up to the await. If the API call hasn't completed yet, the method returns its own Task to the caller and the thread goes back to the pool to serve other work - it isn't sitting and waiting."
+              },
+              {
+                "role": "interviewer",
+                "text": "So how does the rest of my method ever run after the response comes back?"
+              },
+              {
+                "role": "me",
+                "text": "The compiler turned the method into a state machine that saved my locals and a resume point. When the payment task completes it schedules a continuation that restores that state and runs everything after the await."
+              },
+              {
+                "role": "interviewer",
+                "text": "What if the payment result was already cached and the task is already complete at the await?"
+              },
+              {
+                "role": "me",
+                "text": "Then there's no thread hop at all - await sees a completed task and just keeps running synchronously on the same thread, which is a nice fast path."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Does await always switch threads?",
+                "a": "No - completed tasks continue synchronously; only pending ones schedule a continuation."
+              },
+              {
+                "q": "Where are my local variables stored across the await?",
+                "a": "In the generated state-machine struct/object, not on the original stack."
+              },
+              {
+                "q": "Who resumes the method?",
+                "a": "A continuation scheduled on the captured context or the thread pool.",
+                "relatedId": "csharp-async-007"
+              },
+              {
+                "q": "Is the calling thread blocked during the await?",
+                "a": "No - it is released; that is how async scales."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-018",
+          "q": "An endpoint calls `service.GetAsync().Result` instead of awaiting. Under load it hangs and throughput collapses — explain why and fix it.",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "blocking",
+            "thread-pool-starvation",
+            "result",
+            "wait"
+          ],
+          "answer": {
+            "oneLiner": "Blocking with `.Result`/`.Wait()` ties up a pool thread that does nothing but wait for I/O; under load every request consumes a thread, the pool can't grow fast enough, and you get thread-pool starvation (and possibly deadlock). Fix: await all the way down.",
+            "keyPoints": [
+              "Blocking holds a thread hostage for the entire I/O duration instead of releasing it.",
+              "The pool grows only ~1 thread/500ms, so a burst exhausts it → requests queue → latency spikes.",
+              "Sync-over-async can also deadlock where a SynchronizationContext exists.",
+              "Fix: make the call chain async end-to-end; never block on async."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// BAD: blocks a pool thread for the whole call\npublic IActionResult Get() => Ok(_svc.GetAsync().Result);\n\n// GOOD: releases the thread during I/O\npublic async Task<IActionResult> Get() => Ok(await _svc.GetAsync());",
+              "note": "Each blocked thread can't serve other requests; awaiting frees it for the pool."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "We have an action that does service.GetAsync().Result. It's fine in dev but in prod under traffic the whole service freezes. What's going on?"
+              },
+              {
+                "role": "me",
+                "text": "Each request grabs a thread-pool thread and then blocks it on .Result for the entire downstream I/O. Under load every concurrent request holds a thread doing nothing, so the pool runs dry."
+              },
+              {
+                "role": "interviewer",
+                "text": "But the pool can grow new threads, right? Why doesn't it just recover?"
+              },
+              {
+                "role": "me",
+                "text": "It injects new threads slowly - roughly one every half second. A traffic burst exhausts threads far faster than that, so requests queue up and latency explodes; that's thread-pool starvation."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the fix, and is there any case where blocking is acceptable?"
+              },
+              {
+                "role": "me",
+                "text": "Await the whole chain so the thread is released during I/O. Blocking is only OK at a true top-level entry point that can't be async, like a console Main before C# 7.1 - never inside request handling."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why does awaiting scale better than blocking?",
+                "a": "Awaiting releases the thread during I/O so one thread can serve many requests."
+              },
+              {
+                "q": "How fast does the thread pool add threads?",
+                "a": "Roughly one new thread per 500ms by default - too slow for bursts."
+              },
+              {
+                "q": "Can .Result also deadlock?",
+                "a": "Yes, in contexts with a SynchronizationContext like UI or classic ASP.NET.",
+                "relatedId": "csharp-async-002"
+              },
+              {
+                "q": "Quick way to spot the problem?",
+                "a": "Rising thread count plus queued requests and CPU mostly idle."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-019",
+          "q": "A teammate wrote `public async void SaveAsync()` for a service method. What's the risk, and when is `async void` ever the right choice?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "async-void",
+            "task",
+            "exceptions",
+            "event-handlers"
+          ],
+          "answer": {
+            "oneLiner": "`async void` can't be awaited and its exceptions escape onto the SynchronizationContext (often crashing the process) instead of being captured in a Task — so use `async Task`. The only legitimate use of `async void` is an event handler.",
+            "keyPoints": [
+              "Caller can't await it or know when it finished → fire-and-forget with no error capture.",
+              "Unhandled exceptions are raised on the context/thread pool and can crash the app.",
+              "Return `Task` (or `Task<T>`) so callers can await and observe results/errors.",
+              "`async void` is acceptable only for event handlers (signature must be void)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// BAD: can't await, exception can crash the app\npublic async void SaveAsync() => await _repo.SaveAsync();\n\n// GOOD: awaitable, exceptions captured in the Task\npublic async Task SaveAsync() => await _repo.SaveAsync();\n\n// OK exception: event handler must return void\nbutton.Click += async (s, e) => await SaveAsync();",
+              "note": "Only event handlers justify async void; everything else returns Task."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Code review: someone made a repository helper async void. Why would I push back on that?"
+              },
+              {
+                "role": "me",
+                "text": "Because callers can't await it - they can't tell when the save finished or whether it failed. And if SaveAsync throws, the exception escapes onto the context instead of into a Task, which can crash the whole process."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where exactly does that exception go that makes it so dangerous?"
+              },
+              {
+                "role": "me",
+                "text": "There's no Task to put it on, so it's re-raised on the captured SynchronizationContext or the thread pool as an unhandled exception - no try/catch around the call can catch it."
+              },
+              {
+                "role": "interviewer",
+                "text": "So is async void ever correct?"
+              },
+              {
+                "role": "me",
+                "text": "Yes, for event handlers - their signature has to return void, like a button Click handler. Even then I keep the body tiny and delegate to an awaitable Task method so I can test and handle errors."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why can't you await async void?",
+                "a": "It returns void, so there's no Task to await or observe."
+              },
+              {
+                "q": "Where do async void exceptions land?",
+                "a": "On the SynchronizationContext or thread pool as unhandled - they can crash the app."
+              },
+              {
+                "q": "What's the one valid use?",
+                "a": "Event handlers, whose delegate signature must return void."
+              },
+              {
+                "q": "Async void vs async Task difference?",
+                "a": "Task is awaitable and captures exceptions; void is fire-and-forget.",
+                "relatedId": "csharp-async-005"
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-020",
+          "q": "A dashboard needs data from 3 independent microservices, each ~200ms. It currently awaits them one after another. How do you make it fast?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "task-whenall",
+            "parallel-io",
+            "performance",
+            "scenario"
+          ],
+          "answer": {
+            "oneLiner": "Sequential awaits run the calls back-to-back (~600ms). Start all three tasks first, then `await Task.WhenAll(...)` so they run concurrently and total time is roughly the slowest one (~200ms).",
+            "keyPoints": [
+              "Awaiting in sequence serializes independent I/O — times add up.",
+              "Kick off all tasks, then await `Task.WhenAll` to overlap them.",
+              "Total ≈ slowest call, not the sum, since they're I/O-bound and independent.",
+              "WhenAll surfaces the first exception (and stores the rest on the returned task)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// SLOW (~600ms): each await waits for the previous\nvar a = await _svcA.GetAsync();\nvar b = await _svcB.GetAsync();\nvar c = await _svcC.GetAsync();\n\n// FAST (~200ms): start all, then await together\nvar ta = _svcA.GetAsync();\nvar tb = _svcB.GetAsync();\nvar tc = _svcC.GetAsync();\nawait Task.WhenAll(ta, tb, tc);\nvar (ra, rb, rc) = (ta.Result, tb.Result, tc.Result); // safe: all completed",
+              "note": "Start the tasks before awaiting; .Result is safe only after WhenAll has completed them."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "My dashboard calls three independent services sequentially and feels sluggish - each is about 200ms. How would you speed it up?"
+              },
+              {
+                "role": "me",
+                "text": "Right now you're paying 600ms because each await blocks the next call from even starting. Since they're independent, I'd kick off all three tasks first and then await Task.WhenAll, so they overlap and you're down to about 200ms."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does just moving the awaits make them run concurrently?"
+              },
+              {
+                "role": "me",
+                "text": "Calling GetAsync starts the I/O immediately and returns a hot task; if I don't await right away, all three are already in flight. WhenAll just waits for the set to finish."
+              },
+              {
+                "role": "interviewer",
+                "text": "If two of those calls throw, what does WhenAll give you?"
+              },
+              {
+                "role": "me",
+                "text": "Awaiting WhenAll rethrows the first exception, but the returned task holds all of them in its Exception property, so I can inspect the full AggregateException if I need every failure."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is sequential slower for independent calls?",
+                "a": "Each await waits for the prior call before starting the next, so times add up."
+              },
+              {
+                "q": "Does WhenAll use multiple threads?",
+                "a": "Not necessarily - I/O completions overlap without dedicating threads."
+              },
+              {
+                "q": "How does WhenAll report multiple errors?",
+                "a": "Await rethrows one; the task's Exception holds all as an AggregateException.",
+                "relatedId": "csharp-async-022"
+              },
+              {
+                "q": "When would you still await sequentially?",
+                "a": "When a later call depends on an earlier call's result.",
+                "relatedId": "csharp-async-027"
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-021",
+          "q": "You call a flaky external API and want to give up if it doesn't answer within 2 seconds. How do you implement first-to-respond / timeout with tasks?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": [
+            "async",
+            "task-whenany",
+            "timeout",
+            "cancellation",
+            "scenario"
+          ],
+          "answer": {
+            "oneLiner": "Race the real call against a delay using `Task.WhenAny`; whichever finishes first wins. If the delay wins it's a timeout — cancel the real call and throw. In modern .NET, `task.WaitAsync(timeout)` does this cleanly.",
+            "keyPoints": [
+              "`Task.WhenAny` returns the first task to complete — use it to race work vs a timer.",
+              "Pair it with a `CancellationTokenSource` so the losing call is actually cancelled.",
+              "Always observe the loser to avoid an unobserved-task exception.",
+              ".NET 6+: `await task.WaitAsync(TimeSpan, ct)` is the built-in shortcut."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "using var cts = new CancellationTokenSource();\nvar work = _api.GetAsync(cts.Token);\nvar delay = Task.Delay(TimeSpan.FromSeconds(2), cts.Token);\n\nif (await Task.WhenAny(work, delay) == delay)\n{\n    cts.Cancel();                 // stop the real call\n    throw new TimeoutException();\n}\ncts.Cancel();                     // cancel the delay\nreturn await work;                // observe result/exception\n\n// .NET 6+ one-liner:\n// return await _api.GetAsync(ct).WaitAsync(TimeSpan.FromSeconds(2), ct);",
+              "note": "WhenAny picks the winner; the CTS makes sure the loser is cancelled, not orphaned."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "We integrate with a partner API that sometimes stalls. I want a hard 2-second budget. How would you build that?"
+              },
+              {
+                "role": "me",
+                "text": "I'd race the API call against a Task.Delay of 2 seconds with Task.WhenAny. If the delay finishes first, that's my timeout signal and I throw; otherwise I return the API result."
+              },
+              {
+                "role": "interviewer",
+                "text": "When the timeout fires, the API call is still running in the background. Doesn't that leak?"
+              },
+              {
+                "role": "me",
+                "text": "Yes, which is why I pass a CancellationToken into the call and cancel the CTS on timeout, so the underlying request actually aborts instead of dangling. I also observe the losing task to avoid an unobserved exception."
+              },
+              {
+                "role": "interviewer",
+                "text": "Is there a simpler built-in way now?"
+              },
+              {
+                "role": "me",
+                "text": "On .NET 6 and later I'd just use task.WaitAsync with a timeout - it handles the race and throws TimeoutException for me, so I only write the WhenAny version when I need custom behavior."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does Task.WhenAny return?",
+                "a": "The first task to complete; you inspect which one to act on it."
+              },
+              {
+                "q": "Why cancel after a timeout?",
+                "a": "So the losing call stops consuming resources instead of running orphaned."
+              },
+              {
+                "q": "Modern shortcut for timeouts?",
+                "a": "Task.WaitAsync(TimeSpan) on .NET 6+ throws TimeoutException."
+              },
+              {
+                "q": "Why observe the loser task?",
+                "a": "An unawaited faulted task can raise an unobserved-exception event.",
+                "relatedId": "csharp-async-022"
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-022",
+          "q": "Where do exceptions thrown inside an async method actually surface, and how does that change when you don't await?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "exceptions",
+            "aggregateexception",
+            "try-catch",
+            "task"
+          ],
+          "answer": {
+            "oneLiner": "An exception in an async method is captured and stored on the returned Task; it re-throws at the `await`, so a normal `try/catch` around the await works. If you never await (or you block with `.Result`), it stays wrapped as an `AggregateException` or goes unobserved.",
+            "keyPoints": [
+              "Exceptions are stored on the Task, then rethrown at the awaiting point.",
+              "`try/catch` around `await` catches them like synchronous code.",
+              "`.Result`/`.Wait()` throws `AggregateException` (wrapping the real one).",
+              "Never-awaited faulted tasks raise `TaskScheduler.UnobservedTaskException`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "try\n{\n    await DoWorkAsync();   // exception rethrown here, unwrapped\n}\ncatch (HttpRequestException ex)\n{\n    _log.LogError(ex, \"call failed\");\n}\n\n// Blocking unwraps differently:\ntry { DoWorkAsync().Wait(); }\ncatch (AggregateException ag) { var real = ag.InnerException; }",
+              "note": "await gives you the original exception; .Wait()/.Result wrap it in AggregateException."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "If an async method throws, where do I catch it? Does a regular try/catch even work?"
+              },
+              {
+                "role": "me",
+                "text": "Yes - the exception is captured on the returned Task and rethrown when you await, so a normal try/catch around the await catches the original exception type just like sync code."
+              },
+              {
+                "role": "interviewer",
+                "text": "We had a service where the exception showed up as AggregateException and our catch missed it. Why?"
+              },
+              {
+                "role": "me",
+                "text": "That happens when you block with .Result or .Wait instead of awaiting - those wrap everything in an AggregateException. The fix is to await, which unwraps to the real exception, or inspect InnerException if you must block."
+              },
+              {
+                "role": "interviewer",
+                "text": "What if a task throws but nobody ever awaits it?"
+              },
+              {
+                "role": "me",
+                "text": "It becomes an unobserved task exception - the failure is silent until the task is collected, when TaskScheduler.UnobservedTaskException fires. That's why fire-and-forget needs an explicit catch."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why does await unwrap but .Result wrap?",
+                "a": "Await rethrows the first inner exception; .Result throws the AggregateException directly."
+              },
+              {
+                "q": "Does try/catch around await work?",
+                "a": "Yes - it behaves like synchronous exception handling."
+              },
+              {
+                "q": "What about exceptions from WhenAll?",
+                "a": "Await throws the first; the task holds all in AggregateException.",
+                "relatedId": "csharp-async-020"
+              },
+              {
+                "q": "How to handle fire-and-forget errors?",
+                "a": "Wrap the body in try/catch or attach a continuation that logs faults."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-023",
+          "q": "A user starts a report that takes 30s, then closes the browser. How do you cancel the work end-to-end with `CancellationToken`?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "cancellationtoken",
+            "cooperative-cancellation",
+            "aspnetcore",
+            "scenario"
+          ],
+          "answer": {
+            "oneLiner": "Cancellation is cooperative: thread a single `CancellationToken` from the entry point through every async call. In ASP.NET Core bind `HttpContext.RequestAborted`; each layer passes the token down and the lowest-level I/O or your loops check it and throw `OperationCanceledException`.",
+            "keyPoints": [
+              "It's cooperative — nothing is force-killed; code must observe the token.",
+              "Pass the same token through every layer down to the actual I/O call.",
+              "ASP.NET Core gives you `HttpContext.RequestAborted` (or a `CancellationToken` action param).",
+              "Check `token.ThrowIfCancellationRequested()` inside long loops between I/O steps."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "[HttpGet(\"report\")]\npublic async Task<IActionResult> Report(CancellationToken ct) // bound to RequestAborted\n{\n    var data = await _repo.QueryAsync(ct);          // token flows to EF/DB\n    foreach (var row in data)\n    {\n        ct.ThrowIfCancellationRequested();          // check between CPU chunks\n        Process(row);\n    }\n    return Ok();\n}",
+              "note": "Same token, top to bottom; cancellation surfaces as OperationCanceledException."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "A 30-second report is running and the client disconnects. I want the server to stop doing the work. How do you wire that up?"
+              },
+              {
+                "role": "me",
+                "text": "Cancellation is cooperative, so I accept a CancellationToken on the action - in ASP.NET Core it's automatically bound to RequestAborted - and pass that same token all the way down to the database call and any loops."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does passing it down actually accomplish?"
+              },
+              {
+                "role": "me",
+                "text": "The lowest-level async I/O honors the token and throws OperationCanceledException when it's signaled, which unwinds the whole call chain. For CPU loops I add ThrowIfCancellationRequested between iterations so it stops promptly."
+              },
+              {
+                "role": "interviewer",
+                "text": "Should I catch that OperationCanceledException and turn it into a 500?"
+              },
+              {
+                "role": "me",
+                "text": "No - a cancellation isn't an error. I let it propagate; ASP.NET Core treats a request-aborted cancellation as expected and won't log it as a failure."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Is cancellation forceful?",
+                "a": "No - it's cooperative; code must check the token to stop."
+              },
+              {
+                "q": "Where does ASP.NET Core get the token?",
+                "a": "From HttpContext.RequestAborted, bound to a CancellationToken parameter."
+              },
+              {
+                "q": "How to cancel CPU-bound loops?",
+                "a": "Call token.ThrowIfCancellationRequested() between iterations."
+              },
+              {
+                "q": "Should you treat OperationCanceledException as an error?",
+                "a": "No - it's expected; let it propagate rather than logging a failure.",
+                "relatedId": "csharp-async-004"
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-024",
+          "q": "Should you put `ConfigureAwait(false)` in your ASP.NET Core controllers? What about in a NuGet library you ship?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "async",
+            "configureawait",
+            "synchronizationcontext",
+            "library",
+            "aspnetcore"
+          ],
+          "answer": {
+            "oneLiner": "ASP.NET Core has no SynchronizationContext, so `ConfigureAwait(false)` does nothing there — skip it in app code. In a reusable library you don't control the caller's context, so use `ConfigureAwait(false)` everywhere to avoid forcing continuations back onto a (possibly blocking) context.",
+            "keyPoints": [
+              "`ConfigureAwait(false)` says: don't resume on the captured context, just use the pool.",
+              "ASP.NET Core has no SyncContext → no effect → don't clutter controllers with it.",
+              "Library code: use it everywhere to stay context-agnostic and avoid deadlocks for callers.",
+              "UI apps (WPF/WinForms) need the default (true) to resume on the UI thread."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Library method - be context-agnostic, prevent caller deadlocks\npublic async Task<int> GetCountAsync()\n{\n    var rows = await _db.QueryAsync().ConfigureAwait(false);\n    return rows.Count;\n}\n\n// ASP.NET Core controller - no SyncContext, so this is just noise\npublic async Task<IActionResult> Get() => Ok(await _svc.GetCountAsync());",
+              "note": "Default in libraries: ConfigureAwait(false). In ASP.NET Core app code: don't bother."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Our static analyzer flags every await in our ASP.NET Core controllers for missing ConfigureAwait(false). Should we add it?"
+              },
+              {
+                "role": "me",
+                "text": "No - ASP.NET Core doesn't have a SynchronizationContext, so ConfigureAwait(false) is a no-op there. Adding it everywhere just adds noise without changing behavior."
+              },
+              {
+                "role": "interviewer",
+                "text": "So when does it actually matter?"
+              },
+              {
+                "role": "me",
+                "text": "In reusable libraries. You don't know who calls you - a WPF app or legacy ASP.NET might block on your task with a SyncContext. Using ConfigureAwait(false) keeps continuations off that context and avoids deadlocking your callers."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any place where ConfigureAwait(false) is actually wrong?"
+              },
+              {
+                "role": "me",
+                "text": "In UI code that touches controls after the await - you need the default so the continuation resumes on the UI thread. ConfigureAwait(false) there would throw a cross-thread access exception."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does ConfigureAwait(false) do?",
+                "a": "Resumes the continuation on the thread pool instead of the captured context."
+              },
+              {
+                "q": "Why no effect in ASP.NET Core?",
+                "a": "It has no SynchronizationContext to capture."
+              },
+              {
+                "q": "Why use it in libraries?",
+                "a": "To stay context-agnostic and avoid deadlocking blocking callers.",
+                "relatedId": "csharp-async-006"
+              },
+              {
+                "q": "When is it harmful?",
+                "a": "In UI continuations that must run on the UI thread."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-025",
+          "q": "A WPF button handler calls a legacy library method that does `SomeAsync().Result`, and the UI freezes forever. Diagnose and fix the deadlock.",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "deadlock",
+            "sync-over-async",
+            "synchronizationcontext",
+            "ui"
+          ],
+          "answer": {
+            "oneLiner": "The UI thread blocks on `.Result` while holding the single-threaded UI SynchronizationContext; the awaited continuation needs that same thread to resume, but it's blocked — classic sync-over-async deadlock. Fix: await all the way, or have the library use `ConfigureAwait(false)`.",
+            "keyPoints": [
+              "UI has a one-thread SyncContext; the continuation is queued back to that thread.",
+              "`.Result` blocks that thread, so the continuation can never run → mutual deadlock.",
+              "Real fix: make the handler `async` and `await` instead of blocking.",
+              "Library fix/mitigation: `ConfigureAwait(false)` so the continuation skips the UI context."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// DEADLOCKS: UI thread blocked, continuation needs UI thread\nvoid Button_Click(object s, EventArgs e)\n{\n    var data = _legacy.LoadAsync().Result;   // freeze\n}\n\n// FIX: async all the way\nasync void Button_Click(object s, EventArgs e)\n{\n    var data = await _legacy.LoadAsync();    // continuation resumes on UI thread, no block\n}\n\n// Library mitigation: await ... .ConfigureAwait(false) inside LoadAsync",
+              "note": "Never block on async from a thread that owns a single-threaded context."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "A WPF app freezes the moment a button is clicked. The handler calls a library method that does SomeAsync().Result. Walk me through why it hangs."
+              },
+              {
+                "role": "me",
+                "text": "The click runs on the UI thread, which has a single-threaded SynchronizationContext. .Result blocks that thread. But the await inside the library captured that context and wants to resume its continuation on the UI thread - which is blocked - so neither side can proceed."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does the continuation insist on the UI thread in the first place?"
+              },
+              {
+                "role": "me",
+                "text": "Because by default await captures the current SynchronizationContext and posts the continuation back to it. In a UI app that's the UI thread, so the blocked thread is exactly the one the continuation is waiting for."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me the proper fix versus a quick mitigation."
+              },
+              {
+                "role": "me",
+                "text": "The proper fix is async all the way - make the handler async and await instead of blocking, so the thread is free to run the continuation. A quick mitigation is having the library await with ConfigureAwait(false) so the continuation doesn't need the UI context."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What two things must coincide for this deadlock?",
+                "a": "A single-threaded SyncContext plus blocking on the async call."
+              },
+              {
+                "q": "Why doesn't this deadlock in ASP.NET Core?",
+                "a": "It has no SynchronizationContext, so the continuation runs on the pool."
+              },
+              {
+                "q": "Best fix?",
+                "a": "Await all the way down instead of blocking.",
+                "relatedId": "csharp-async-002"
+              },
+              {
+                "q": "Library-side mitigation?",
+                "a": "ConfigureAwait(false) on internal awaits.",
+                "relatedId": "csharp-async-024"
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-026",
+          "q": "You must export a 5-million-row query to CSV without blowing up memory. How do you stream it with `IAsyncEnumerable` / `await foreach`?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": [
+            "async",
+            "iasyncenumerable",
+            "await-foreach",
+            "streaming",
+            "memory"
+          ],
+          "answer": {
+            "oneLiner": "Return an `IAsyncEnumerable<T>` and `await foreach` over it so rows flow one batch at a time instead of being materialized into a giant list — EF Core's `AsAsyncEnumerable()` streams from the DB, and you write each row straight to the output.",
+            "keyPoints": [
+              "`await foreach` pulls items lazily and asynchronously — constant memory, not O(rows).",
+              "EF Core: `AsAsyncEnumerable()` streams; `ToListAsync()` buffers everything.",
+              "Write each row to the response/file as it arrives instead of collecting.",
+              "Flow a `[EnumeratorCancellation]` token so a disconnect stops the stream."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public async IAsyncEnumerable<Order> StreamAsync(\n    [EnumeratorCancellation] CancellationToken ct = default)\n{\n    await foreach (var o in _db.Orders.AsAsyncEnumerable().WithCancellation(ct))\n        yield return o;\n}\n\n// Consumer writes as it streams - memory stays flat\nawait foreach (var o in StreamAsync(ct))\n    await csv.WriteLineAsync($\"{o.Id},{o.Total}\");",
+              "note": "ToListAsync would load all 5M rows into RAM; AsAsyncEnumerable streams them."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "We need a CSV export of about 5 million rows and the current ToListAsync version OOMs. How do you fix it?"
+              },
+              {
+                "role": "me",
+                "text": "ToListAsync buffers every row in memory first. I'd switch to streaming - expose an IAsyncEnumerable and use EF's AsAsyncEnumerable, then await foreach and write each row straight to the CSV stream so memory stays flat."
+              },
+              {
+                "role": "interviewer",
+                "text": "How is await foreach different from just looping a normal collection?"
+              },
+              {
+                "role": "me",
+                "text": "Each iteration awaits the next item as it's fetched, so rows are pulled lazily from the DB instead of all at once. Combined with writing as we go, we never hold more than a small buffer in memory."
+              },
+              {
+                "role": "interviewer",
+                "text": "If the client cancels the download halfway, does the DB query keep running?"
+              },
+              {
+                "role": "me",
+                "text": "Not if I flow the token - I add an [EnumeratorCancellation] CancellationToken and pass it via WithCancellation, so cancelling breaks out of the await foreach and stops pulling from the database."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why does ToListAsync blow memory?",
+                "a": "It materializes the entire result set before returning."
+              },
+              {
+                "q": "How does await foreach keep memory flat?",
+                "a": "It pulls and processes one item at a time, lazily."
+              },
+              {
+                "q": "EF Core streaming API?",
+                "a": "AsAsyncEnumerable() streams rows from the database.",
+                "relatedId": "csharp-async-016"
+              },
+              {
+                "q": "How to cancel a stream?",
+                "a": "Flow an [EnumeratorCancellation] token via WithCancellation."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-027",
+          "q": "You need to call an API for each of 500 order IDs. Compare `await`-in-a-`foreach` vs collecting tasks and `WhenAll` — and what could go wrong with the parallel version?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "loop",
+            "task-whenall",
+            "throttling",
+            "semaphoreslim"
+          ],
+          "answer": {
+            "oneLiner": "Awaiting inside the foreach runs the 500 calls one at a time (slow but gentle). Collecting tasks then `await Task.WhenAll` runs them concurrently (fast) — but 500 simultaneous calls can hammer the API and exhaust connections, so throttle with `SemaphoreSlim` (or `Parallel.ForEachAsync` with `MaxDegreeOfParallelism`).",
+            "keyPoints": [
+              "`await` in the loop = sequential; total time is the sum of all calls.",
+              "Build `tasks` then `await Task.WhenAll` = concurrent; total ≈ slowest call.",
+              "Unbounded concurrency risks rate-limits, socket/connection exhaustion, downstream overload.",
+              "Throttle with `SemaphoreSlim(n)` or `Parallel.ForEachAsync(..., MaxDegreeOfParallelism=n)`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Sequential: slow\nforeach (var id in ids) results.Add(await _api.GetAsync(id));\n\n// Concurrent but unbounded: fast, can DDoS the API\nvar tasks = ids.Select(id => _api.GetAsync(id));\nvar all = await Task.WhenAll(tasks);\n\n// Throttled concurrency (best): bounded parallelism\nawait Parallel.ForEachAsync(ids,\n    new ParallelOptions { MaxDegreeOfParallelism = 10 },\n    async (id, ct) => results.Add(await _api.GetAsync(id, ct)));",
+              "note": "WhenAll is fastest but throttle it - 500 concurrent calls exhausts connections."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "I have 500 order IDs and need to enrich each from an API. I wrote a foreach with an await inside. Is that good?"
+              },
+              {
+                "role": "me",
+                "text": "It's correct but slow - each await waits for the previous call, so you're paying the sum of all 500 round-trips. Since the calls are independent, I'd start them and await Task.WhenAll so they run concurrently."
+              },
+              {
+                "role": "interviewer",
+                "text": "Okay, so let's fire all 500 at once with WhenAll. Any concern?"
+              },
+              {
+                "role": "me",
+                "text": "Yes - 500 simultaneous requests can trip the API's rate limits, exhaust the HTTP connection pool, and overload the downstream service. Unbounded concurrency is its own bug."
+              },
+              {
+                "role": "interviewer",
+                "text": "So how do you get speed without the blast radius?"
+              },
+              {
+                "role": "me",
+                "text": "I bound the concurrency - either a SemaphoreSlim with a limit like 10 around each call, or Parallel.ForEachAsync with MaxDegreeOfParallelism set. That keeps a steady pipeline without flooding the API."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is await-in-loop slow?",
+                "a": "It serializes independent calls; total time is their sum."
+              },
+              {
+                "q": "What does WhenAll improve and risk?",
+                "a": "Improves speed via concurrency; risks unbounded load on the API.",
+                "relatedId": "csharp-async-020"
+              },
+              {
+                "q": "How do you throttle?",
+                "a": "SemaphoreSlim(n) or Parallel.ForEachAsync with MaxDegreeOfParallelism."
+              },
+              {
+                "q": "When keep it sequential?",
+                "a": "When each call depends on the previous result or order matters."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-028",
+          "q": "A junior says \"async makes my code multithreaded and faster.\" Correct them — and explain when threads actually help.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": [
+            "async",
+            "concurrency",
+            "parallelism",
+            "io-bound",
+            "cpu-bound"
+          ],
+          "answer": {
+            "oneLiner": "Async is about concurrency, not parallelism — for I/O-bound work it frees a thread while waiting, using *fewer* threads, not more. CPU-bound work gets no benefit from `await`; that's where you use real parallelism via `Task.Run`/`Parallel`.",
+            "keyPoints": [
+              "Async ≠ multithreading: an await on I/O uses no thread while waiting.",
+              "Concurrency = many things in flight; parallelism = many things executing at once.",
+              "I/O-bound → async/await (scales with fewer threads).",
+              "CPU-bound → offload to threads with `Task.Run`/`Parallel.For` to use multiple cores."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// I/O-bound: no extra thread, just frees the current one\nvar page = await _http.GetStringAsync(url);\n\n// CPU-bound: await alone gives nothing - use a thread to parallelize\nvar hash = await Task.Run(() => ComputeExpensiveHash(bigBuffer));",
+              "note": "await ComputeExpensiveHash() wouldn't help - it's CPU work; Task.Run moves it off the caller."
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "A junior on the team thinks adding async/await automatically makes code run on multiple threads and run faster. How do you set them straight?"
+              },
+              {
+                "role": "me",
+                "text": "Async is about concurrency, not parallelism. For I/O-bound work, await actually uses fewer threads - while waiting on the network or disk, no thread is consumed at all. It doesn't spin up threads or make CPU work faster."
+              },
+              {
+                "role": "interviewer",
+                "text": "So if I wrap a heavy calculation in an async method and await it, does that speed it up?"
+              },
+              {
+                "role": "me",
+                "text": "No - if it's pure CPU work, await does nothing useful; the calculation still runs on one core and you may just add overhead. await only pays off when there's real I/O to wait on."
+              },
+              {
+                "role": "interviewer",
+                "text": "Then how would you actually speed up that heavy calculation?"
+              },
+              {
+                "role": "me",
+                "text": "Use real parallelism - Task.Run to push it off the calling thread, or Parallel.For / PLINQ to split it across cores. That's parallelism for CPU-bound work, which is a different tool than async for I/O."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Is async the same as multithreading?",
+                "a": "No - I/O await uses no thread while waiting; it's concurrency, not parallelism."
+              },
+              {
+                "q": "Concurrency vs parallelism?",
+                "a": "Concurrency is managing many tasks; parallelism is executing many at once."
+              },
+              {
+                "q": "When to use Task.Run?",
+                "a": "To offload CPU-bound work off the current/UI thread.",
+                "relatedId": "csharp-async-003"
+              },
+              {
+                "q": "Best tool for I/O vs CPU?",
+                "a": "async/await for I/O-bound; Parallel/PLINQ for CPU-bound.",
+                "relatedId": "csharp-async-014"
+              }
+            ]
+          }
         }
       ]
     },

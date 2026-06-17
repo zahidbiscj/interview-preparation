@@ -38,21 +38,21 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
         </div>
       </div>
 
-      <!-- Predict-the-output: show code upfront so you can guess before revealing -->
-      @if (isPredict()) {
+      <!-- Predict-the-output: when expanded, show code first so you can guess before revealing -->
+      @if (isPredict() && state() !== 'collapsed') {
         <div class="predict-code">
           <div class="code-block">
             <div class="code-lang-tag">{{ q().answer.code!.lang }}</div>
             <markdown [data]="codeMarkdown()" />
           </div>
-          @if (state() === 'collapsed') {
-            <button class="reveal-btn" (click)="toggle()">🔮 Reveal answer</button>
+          @if (!answerRevealed()) {
+            <button class="reveal-btn" (click)="revealAnswer($event)">🔮 Reveal answer</button>
           }
         </div>
       }
 
       <!-- One-liner + full content -->
-      @if (state() !== 'collapsed') {
+      @if (state() !== 'collapsed' && showAnswer()) {
         <div class="qcard-body fade-slide-enter">
           <div class="answer-divider"></div>
 
@@ -471,8 +471,13 @@ export class QuestionCardComponent {
   private svc = inject(QuestionBankService);
   private host = inject(ElementRef<HTMLElement>);
   readonly state = signal<RevealState>('collapsed');
+  /** For predict (code) questions: has the user revealed the answer yet? */
+  readonly answerRevealed = signal(false);
 
   readonly q = this.question;
+
+  /** Whether the answer body should show: non-predict always; predict only after reveal. */
+  readonly showAnswer = computed(() => !this.isPredict() || this.answerRevealed());
 
   readonly hasFullAnswer = computed(() => {
     const a = this.q().answer;
@@ -485,6 +490,7 @@ export class QuestionCardComponent {
     effect(() => {
       if (this.svc.focusQuestionId() === this.q().id) {
         this.state.set('full');
+        this.answerRevealed.set(true);
         queueMicrotask(() => {
           this.host.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           this.svc.clearFocus();
@@ -507,7 +513,13 @@ export class QuestionCardComponent {
       this.state.set('one-liner');
     } else {
       this.state.set('collapsed');
+      this.answerRevealed.set(false);
     }
+  }
+
+  revealAnswer(e: Event): void {
+    e.stopPropagation();
+    this.answerRevealed.set(true);
   }
 
   showFull(e: Event): void {
@@ -518,6 +530,7 @@ export class QuestionCardComponent {
   collapse(e: Event): void {
     e.stopPropagation();
     this.state.set('collapsed');
+    this.answerRevealed.set(false);
   }
 
   onBookmark(e: Event): void {
