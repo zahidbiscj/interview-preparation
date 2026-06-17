@@ -73,8 +73,16 @@ export class VoiceService {
         let interim = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const part = event.results[i][0].transcript;
-          if (event.results[i].isFinal) finalText += part + ' ';
-          else interim = part;
+          if (event.results[i].isFinal) {
+            // "done" as a standalone utterance = stop command
+            if (/^\s*done\.?\s*$/i.test(part.trim())) {
+              rec.stop();
+              return;
+            }
+            finalText += part + ' ';
+          } else {
+            interim = part;
+          }
         }
         onText(finalText + interim);
         resetSilence();

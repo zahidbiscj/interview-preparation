@@ -9,7 +9,9 @@ import { ReviewLogService } from '../shared/review-log.service';
 import { VoiceService } from './voice.service';
 import { GraderService } from './grader.service';
 import { LiveSettingsService } from './live-settings.service';
-import { LivePhase, GradeResult, LiveResult } from './live-interview.models';
+import { GradeResult, LiveResult } from './live-interview.models';
+
+type LivePhase = 'setup' | 'listening' | 'evaluating' | 'feedback' | 'done';
 
 interface TopicChoice { id: string; name: string; icon: string; selected: boolean; }
 
@@ -38,8 +40,8 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
           <div class="setup fade-slide-enter">
             <h1 class="setup-title">🎤 Live Interview Mode</h1>
             <p class="setup-sub">
-              The AI interviewer speaks each question. Answer verbally.
-              Your answer is graded by AI — missed key points are highlighted and read back to you.
+              Speak your answer. Your voice is converted to text, graded by AI, and
+              missed key points are highlighted instantly.
             </p>
 
             <section class="setup-block">
@@ -93,7 +95,7 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
           </div>
         }
 
-        <!-- ════════ RUNNING (asking / listening / evaluating / feedback) ════════ -->
+        <!-- ════════ RUNNING (listening / evaluating / feedback) ════════ -->
         @if (phase() !== 'setup' && phase() !== 'done') {
           <div class="runner">
             <!-- Progress -->
@@ -120,14 +122,6 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
             <!-- Phase zone -->
             <div class="phase-zone">
 
-              <!-- ASKING: interviewer TTS is reading the question -->
-              @if (phase() === 'asking') {
-                <div class="speaking-indicator fade-slide-enter">
-                  <span class="speaker-icon">🔊</span>
-                  <span>Interviewer is speaking…</span>
-                </div>
-              }
-
               <!-- LISTENING: mic open or textarea fallback -->
               @if (phase() === 'listening') {
                 <div class="listening-zone fade-slide-enter">
@@ -140,7 +134,7 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
                     <!-- STT mode -->
                     <div class="mic-row">
                       <div class="mic-dot"></div>
-                      <span class="mic-label">Listening… speak your answer</span>
+                      <span class="mic-label">Listening… speak your answer, then say <strong>"done"</strong> to stop</span>
                     </div>
                     <div class="live-transcript">
                       @if (transcript()) {
@@ -283,7 +277,7 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
     @if (showSettings()) {
       <div class="settings-backdrop" (click)="showSettings.set(false)">
         <div class="settings-panel" (click)="$event.stopPropagation()">
-          <h2>⚙ AI &amp; Voice Settings</h2>
+          <h2>⚙ AI Settings</h2>
 
           <div class="settings-row">
             <label class="settings-label">OpenRouter API Key</label>
@@ -311,31 +305,6 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
             <span class="settings-hint">
               Free models: xiaomi/mimo-v2-flash:free · deepseek/deepseek-chat-v3-0324:free · meta-llama/llama-3.3-70b-instruct:free
             </span>
-          </div>
-
-          <div class="settings-row">
-            <label class="settings-label">Speaking Rate — {{ draftRate() }}x</label>
-            <input
-              type="range" min="0.8" max="1.5" step="0.05"
-              class="settings-input-range"
-              [value]="draftRate()"
-              (input)="draftRate.set(+$any($event.target).value)"
-            />
-          </div>
-
-          <div class="settings-row">
-            <label class="settings-label">Voice</label>
-            <select
-              class="settings-input"
-              (change)="draftVoice.set($any($event.target).value || null)"
-            >
-              <option value="" [selected]="!draftVoice()">Default</option>
-              @for (v of availableVoices(); track v.voiceURI) {
-                <option [value]="v.voiceURI" [selected]="draftVoice() === v.voiceURI">
-                  {{ v.name }} ({{ v.lang }})
-                </option>
-              }
-            </select>
           </div>
 
           <div class="settings-warn">
@@ -392,9 +361,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   readonly showSettings   = signal(false);
   readonly draftKey       = signal('');
   readonly draftModel     = signal('');
-  readonly draftRate      = signal(1.0);
-  readonly draftVoice     = signal<string | null>(null);
-  readonly availableVoices = signal<SpeechSynthesisVoice[]>([]);
 
   // ── computed ──
   readonly current      = computed(() => this.questions()[this.index()] ?? null);
@@ -437,7 +403,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopTimer();
-    this.voice.cancelSpeech();
     this.voice.stopListening();
   }
 
@@ -486,16 +451,12 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   }
 
   // ── session flow ──
-  private async askQuestion(i: number): Promise<void> {
+  private askQuestion(i: number): void {
     const q = this.questions()[i];
     if (!q) return;
-    this.phase.set('asking');
     this.transcript.set('');
     this.grade.set(null);
     this.micError.set(null);
-
-    const { rate, voiceURI } = this.liveSettings.settings();
-    await this.voice.speak(`Question ${i + 1}. ${q.q}`, rate, voiceURI);
     this.openInput();
   }
 
@@ -540,18 +501,9 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     });
 
     this.phase.set('feedback');
-
-    // Fire-and-forget TTS feedback — user can tap "Next" at any time
-    const { rate, voiceURI } = this.liveSettings.settings();
-    void this.voice.speakSequence(
-      [result.spokenFeedback, `The model answer is: ${q.answer.oneLiner}`],
-      rate,
-      voiceURI,
-    );
   }
 
   advance(): void {
-    this.voice.cancelSpeech();
     const q = this.current();
     const g = this.grade();
     if (q && g) this.results.update(r => [...r, { question: q, grade: g }]);
@@ -567,7 +519,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   finish(): void {
     if (this.phase() === 'done') return;
     this.stopTimer();
-    this.voice.cancelSpeech();
     this.voice.stopListening();
     // If we finish mid-question (End session tap), still record current if graded
     const q = this.current();
@@ -586,7 +537,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
 
   resetToSetup(): void {
     this.stopTimer();
-    this.voice.cancelSpeech();
     this.voice.stopListening();
     this.phase.set('setup');
     this.questions.set([]);
@@ -602,26 +552,13 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     const s = this.liveSettings.settings();
     this.draftKey.set(s.openrouterKey);
     this.draftModel.set(s.model);
-    this.draftRate.set(s.rate);
-    this.draftVoice.set(s.voiceURI);
-
-    let voices = this.voice.getVoices();
-    this.availableVoices.set(voices);
-    if (!voices.length && typeof speechSynthesis !== 'undefined') {
-      speechSynthesis.onvoiceschanged = () => {
-        this.availableVoices.set(speechSynthesis.getVoices());
-        speechSynthesis.onvoiceschanged = null;
-      };
-    }
     this.showSettings.set(true);
   }
 
   saveSettings(): void {
     this.liveSettings.update({
       openrouterKey: this.draftKey().trim(),
-      model:   this.draftModel().trim(),
-      rate:    this.draftRate(),
-      voiceURI: this.draftVoice(),
+      model: this.draftModel().trim(),
     });
     this.showSettings.set(false);
   }
