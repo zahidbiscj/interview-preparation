@@ -32,7 +32,7 @@ import { ButtonModule } from 'primeng/button';
           <span class="app-brand">🚀 <span class="lbl">crackInterview</span></span>
         </div>
         <div class="topbar-center">
-          <span class="stats-pill">{{ topicCount() }} topics · 550 questions</span>
+          <qb-global-search />
         </div>
         <div class="topbar-right">
           <a routerLink="/dashboard" class="sim-link"><span class="ico">📊</span><span class="lbl">Dashboard</span></a>
@@ -43,11 +43,6 @@ import { ButtonModule } from 'primeng/button';
           </button>
         </div>
       </header>
-
-      <!-- ── Global search row (full width, always visible) ── -->
-      <div class="search-row">
-        <qb-global-search />
-      </div>
 
       <!-- ── Main layout ── -->
       <div class="layout">
@@ -156,26 +151,14 @@ import { ButtonModule } from 'primeng/button';
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
       z-index: 100;
-      gap: 12px;
+      gap: 14px;
+      position: relative;
     }
 
     .topbar-left { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-    .topbar-center { flex: 1; display: flex; justify-content: center; min-width: 0; }
+    /* Search fills all the space between brand and the right-hand nav */
+    .topbar-center { flex: 1 1 auto; display: flex; min-width: 0; }
     .topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-
-    /* Full-width search row under the top bar */
-    .search-row {
-      display: flex;
-      justify-content: center;
-      padding: 10px 16px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      z-index: 90;
-    }
-    @media (max-width: 600px) {
-      .search-row { padding: 8px 10px; }
-    }
 
     .menu-btn {
       display: none;

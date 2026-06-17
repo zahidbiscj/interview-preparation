@@ -10,21 +10,28 @@ import { QuestionBankService, SearchItem } from '../../question-bank.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
-    <div class="gsearch">
-      <span class="gs-icon">🔍</span>
-      <input
-        class="gs-input"
-        type="text"
-        placeholder="Search all questions…"
-        [ngModel]="query()"
-        (ngModelChange)="onInput($event)"
-        (focus)="onFocus()"
-        (keydown)="onKey($event)"
-        autocomplete="off"
-        spellcheck="false" />
-      @if (query()) {
-        <button class="gs-clear" (click)="clear()" aria-label="Clear">✕</button>
-      }
+    <div class="gsearch" [class.expanded]="expanded()">
+      <!-- Mobile: compact icon that expands the search -->
+      <button class="gs-toggle" (click)="expand()" aria-label="Search">🔍</button>
+
+      <!-- Search field (always visible on desktop; on mobile when expanded) -->
+      <div class="gs-field">
+        <span class="gs-icon">🔍</span>
+        <input
+          class="gs-input"
+          type="text"
+          placeholder="Search all questions…"
+          [ngModel]="query()"
+          (ngModelChange)="onInput($event)"
+          (focus)="onFocus()"
+          (keydown)="onKey($event)"
+          autocomplete="off"
+          spellcheck="false" />
+        @if (query()) {
+          <button class="gs-clear" (click)="clear()" aria-label="Clear">✕</button>
+        }
+        <button class="gs-close" (click)="collapse()" aria-label="Close search">✕</button>
+      </div>
 
       @if (open() && results().length) {
         <ul class="gs-results">
@@ -45,33 +52,50 @@ import { QuestionBankService, SearchItem } from '../../question-bank.service';
     </div>
   `,
   styles: [`
-    .gsearch { position: relative; width: 100%; max-width: 680px; }
-    .gs-icon {
-      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-      font-size: 1em; pointer-events: none; opacity: 0.7;
-    }
-    .gs-input {
+    :host { display: block; width: 100%; }
+
+    .gsearch { position: relative; width: 100%; }
+
+    /* ── Field ── */
+    .gs-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       width: 100%;
-      height: 42px;
-      padding: 0 38px 0 40px;
+      height: 36px;
+      padding: 0 10px;
       background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: 10px;
+      transition: border-color 120ms, box-shadow 120ms;
+    }
+    .gs-field:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+    .gs-icon { font-size: 0.9em; opacity: 0.7; flex-shrink: 0; }
+    .gs-input {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      background: none;
+      border: none;
       color: var(--text);
-      font-size: 0.95em;
+      font-size: 0.92em;
       font-family: inherit;
       &::placeholder { color: var(--text-muted); }
-      &:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+      &:focus { outline: none; }
     }
-    .gs-clear {
-      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-      background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9em;
-      padding: 4px;
+    .gs-clear, .gs-close {
+      flex-shrink: 0;
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); font-size: 0.9em; padding: 4px;
       &:hover { color: var(--text); }
     }
-    @media (max-width: 600px) {
-      .gs-input { height: 40px; font-size: 1em; }
-    }
+    .gs-toggle { display: none; }
+    .gs-close { display: none; }   /* only on mobile-expanded */
+
+    /* ── Results dropdown ── */
     .gs-results {
       position: absolute;
       top: calc(100% + 6px);
@@ -79,11 +103,11 @@ import { QuestionBankService, SearchItem } from '../../question-bank.service';
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
       list-style: none;
       padding: 6px;
       margin: 0;
-      max-height: 60vh;
+      max-height: 65vh;
       overflow-y: auto;
       z-index: 300;
     }
@@ -91,30 +115,49 @@ import { QuestionBankService, SearchItem } from '../../question-bank.service';
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 10px;
+      padding: 9px 10px;
       border-radius: 7px;
       cursor: pointer;
       &.active, &:hover { background: var(--surface-2); }
     }
-    .gs-q {
-      flex: 1;
-      font-size: 0.85em;
-      color: var(--text);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+    .gs-q { flex: 1; font-size: 0.88em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .gs-badge {
       flex-shrink: 0;
-      font-size: 0.66em;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      padding: 2px 8px;
-      border-radius: 10px;
-      border: 1px solid transparent;
+      font-size: 0.66em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+      padding: 2px 8px; border-radius: 10px; border: 1px solid transparent;
     }
     .gs-empty { padding: 12px; font-size: 0.82em; color: var(--text-muted); text-align: center; }
+
+    /* ══════ Mobile: collapse to an icon, expand to cover the top bar ══════ */
+    @media (max-width: 768px) {
+      .gs-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px; height: 36px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1em;
+        margin-left: auto;   /* push to the right edge of the center cell */
+      }
+      .gs-field { display: none; }
+
+      .gsearch.expanded {
+        position: absolute;
+        inset: 0;                /* cover the whole top bar */
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        z-index: 200;
+      }
+      .gsearch.expanded .gs-toggle { display: none; }
+      .gsearch.expanded .gs-field { display: flex; height: 40px; }
+      .gsearch.expanded .gs-close { display: block; }
+      .gsearch.expanded .gs-results { top: calc(100% + 4px); left: 10px; right: 10px; }
+    }
   `]
 })
 export class GlobalSearchComponent {
@@ -124,6 +167,7 @@ export class GlobalSearchComponent {
 
   readonly query = signal('');
   readonly open = signal(false);
+  readonly expanded = signal(false);
   readonly activeIndex = signal(0);
 
   readonly results = computed<SearchItem[]>(() => {
@@ -161,13 +205,26 @@ export class GlobalSearchComponent {
       if (item) this.select(item);
     } else if (e.key === 'Escape') {
       this.open.set(false);
+      this.collapse();
     }
+  }
+
+  expand(): void {
+    this.expanded.set(true);
+    this.svc.ensureSearchIndex();
+    queueMicrotask(() => this.host.nativeElement.querySelector('input')?.focus());
+  }
+
+  collapse(): void {
+    this.expanded.set(false);
+    this.open.set(false);
+    this.query.set('');
   }
 
   select(item: SearchItem): void {
     this.open.set(false);
+    this.expanded.set(false);
     this.query.set('');
-    // ensure we're on the bank page, then jump to the question
     this.router.navigate(['/']).then(() => this.svc.goToQuestion(item.id));
   }
 
@@ -178,6 +235,9 @@ export class GlobalSearchComponent {
 
   @HostListener('document:click', ['$event'])
   onDocClick(e: MouseEvent): void {
-    if (!this.host.nativeElement.contains(e.target as Node)) this.open.set(false);
+    if (!this.host.nativeElement.contains(e.target as Node)) {
+      this.open.set(false);
+      if (!this.query()) this.expanded.set(false);
+    }
   }
 }

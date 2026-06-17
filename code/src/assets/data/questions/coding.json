@@ -638,6 +638,1126 @@
               { "q": "How do you count direct reports per manager?", "a": "GROUP BY m.Id with COUNT(*).", "relatedId": "coding-sql50-013" }
             ]
           }
+        },
+        {
+          "id": "coding-sql-005",
+          "q": "Find duplicate records in a table — rows that share the same values across one or more columns. (Asked at Amazon.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "duplicates", "group-by", "having"],
+          "answer": {
+            "oneLiner": "Group by the columns that define a duplicate and keep groups whose count exceeds one.",
+            "keyPoints": [
+              "GROUP BY the candidate-key columns, then HAVING COUNT(*) > 1.",
+              "Return COUNT(*) too if you want how many times each repeats."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT column1, column2, COUNT(*) AS cnt\nFROM your_table\nGROUP BY column1, column2\nHAVING COUNT(*) > 1;",
+              "note": "HAVING filters the aggregated groups"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "How would you find duplicate records in a table?" },
+              { "role": "me", "text": "Group by the columns that define a duplicate and keep groups with COUNT(*) > 1." },
+              { "role": "interviewer", "text": "How would you then delete all but one of each?" },
+              { "role": "me", "text": "Use ROW_NUMBER() OVER (PARTITION BY those columns ORDER BY id) and delete rows where the number is greater than 1." }
+            ],
+            "followUpsQA": [
+              { "q": "Why HAVING and not WHERE?", "a": "The count only exists after grouping; WHERE filters pre-aggregation rows." },
+              { "q": "How to keep one copy when deleting?", "a": "ROW_NUMBER per group and delete rn > 1.", "relatedId": "coding-sql50-047" }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-006",
+          "q": "Find employees who are not assigned to any department, using a LEFT JOIN. Employee(id, name, department_id), Department(department_id, name). (Asked at Uber.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "left-join", "anti-join", "null"],
+          "answer": {
+            "oneLiner": "LEFT JOIN to Department and keep rows where the joined department is NULL — the classic anti-join.",
+            "keyPoints": [
+              "LEFT JOIN preserves every employee even with no match.",
+              "WHERE d.department_id IS NULL keeps only the unmatched ones."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT e.*\nFROM Employee e\nLEFT JOIN Department d ON e.department_id = d.department_id\nWHERE d.department_id IS NULL;",
+              "note": "LEFT JOIN + IS NULL = anti-join"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Find employees with no department using a LEFT JOIN." },
+              { "role": "me", "text": "I LEFT JOIN Department and filter WHERE the department side IS NULL, which keeps only employees without a match." },
+              { "role": "interviewer", "text": "Could you do this with NOT IN or NOT EXISTS?" },
+              { "role": "me", "text": "Yes; NOT EXISTS is usually safest because NOT IN misbehaves if the subquery returns NULLs." }
+            ],
+            "followUpsQA": [
+              { "q": "Why filter on the joined key being NULL?", "a": "Unmatched left rows get NULLs on the right, marking the absence of a department." },
+              { "q": "NOT IN caveat?", "a": "A single NULL in the subquery makes NOT IN return nothing." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-007",
+          "q": "Calculate the total revenue per product. Sales(product_id, quantity, price). (Asked at PayPal.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "aggregate", "group-by", "revenue"],
+          "answer": {
+            "oneLiner": "Sum quantity × price grouped by product.",
+            "keyPoints": [
+              "Revenue per row is quantity * price.",
+              "SUM(...) GROUP BY product_id totals it per product."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT product_id, SUM(quantity * price) AS total_revenue\nFROM Sales\nGROUP BY product_id;",
+              "note": "Multiply per row, then SUM per group"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Total revenue per product?" },
+              { "role": "me", "text": "SUM(quantity * price) grouped by product_id." },
+              { "role": "interviewer", "text": "What if price lives in a separate Product table?" },
+              { "role": "me", "text": "Join Sales to Product on product_id first, then apply the same SUM and GROUP BY." }
+            ],
+            "followUpsQA": [
+              { "q": "Why multiply inside SUM?", "a": "Each row's revenue is qty*price; summing the products gives the total." },
+              { "q": "Add product names?", "a": "JOIN to Product and include its name in SELECT and GROUP BY." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-008",
+          "q": "Get the top 3 highest-paid employees. Employee(id, name, salary). (Asked at Google.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "top-n", "order-by", "limit"],
+          "answer": {
+            "oneLiner": "Order by salary descending and take the first three; use TOP (SQL Server) or LIMIT (MySQL/Postgres).",
+            "keyPoints": [
+              "TOP 3 / LIMIT 3 after ORDER BY salary DESC.",
+              "For ties at the boundary, TOP 3 WITH TIES or DENSE_RANK keeps equal salaries."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- SQL Server\nSELECT TOP 3 *\nFROM Employee\nORDER BY salary DESC;\n\n-- MySQL / Postgres\nSELECT *\nFROM Employee\nORDER BY salary DESC\nLIMIT 3;",
+              "note": "TOP vs LIMIT depending on engine"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Top 3 highest-paid employees." },
+              { "role": "me", "text": "ORDER BY salary DESC and TOP 3 in SQL Server or LIMIT 3 elsewhere." },
+              { "role": "interviewer", "text": "What if the 3rd and 4th salaries tie?" },
+              { "role": "me", "text": "Plain TOP 3 cuts arbitrarily; TOP 3 WITH TIES, or DENSE_RANK <= 3, keeps all tied employees." }
+            ],
+            "followUpsQA": [
+              { "q": "TOP vs LIMIT?", "a": "TOP is T-SQL; LIMIT is MySQL/Postgres — same intent." },
+              { "q": "Top 3 distinct salaries per department?", "a": "DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) <= 3.", "relatedId": "coding-sql50-044" }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-009",
+          "q": "Find customers who made purchases but never returned any product. Customers(customer_id), Orders(customer_id), Returns(customer_id). (Asked at Walmart.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "not-in", "anti-join", "join"],
+          "answer": {
+            "oneLiner": "Take customers who appear in Orders but are absent from Returns (set difference).",
+            "keyPoints": [
+              "JOIN Customers to Orders to keep buyers.",
+              "Exclude anyone present in Returns via NOT IN / NOT EXISTS.",
+              "DISTINCT since a customer can have many orders."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT DISTINCT c.customer_id\nFROM Customers c\nJOIN Orders o ON c.customer_id = o.customer_id\nWHERE c.customer_id NOT IN (SELECT customer_id FROM Returns);",
+              "note": "Bought (in Orders) minus returned (in Returns)"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Customers who purchased but never returned anything." },
+              { "role": "me", "text": "Join Customers to Orders so they're buyers, then exclude any customer_id that appears in Returns." },
+              { "role": "interviewer", "text": "Why prefer NOT EXISTS over NOT IN here?" },
+              { "role": "me", "text": "If Returns.customer_id can be NULL, NOT IN returns nothing; NOT EXISTS handles NULLs correctly." }
+            ],
+            "followUpsQA": [
+              { "q": "Why DISTINCT?", "a": "A customer may have many orders, which would repeat their id." },
+              { "q": "Set-based alternative?", "a": "EXCEPT between the Orders customer set and the Returns customer set." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-010",
+          "q": "Show the count of orders per customer. Orders(order_id, customer_id). (Asked at Meta.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "group-by", "count"],
+          "answer": {
+            "oneLiner": "Group by customer and COUNT the orders.",
+            "keyPoints": [
+              "COUNT(*) per customer_id group.",
+              "LEFT JOIN from a Customers table if you must show zero-order customers."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT customer_id, COUNT(*) AS order_count\nFROM Orders\nGROUP BY customer_id;",
+              "note": "Basic grouped count"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Orders per customer." },
+              { "role": "me", "text": "GROUP BY customer_id with COUNT(*)." },
+              { "role": "interviewer", "text": "How to include customers with zero orders?" },
+              { "role": "me", "text": "LEFT JOIN from Customers to Orders and COUNT(o.order_id), which is 0 for non-matching customers." }
+            ],
+            "followUpsQA": [
+              { "q": "COUNT(*) vs COUNT(order_id)?", "a": "Same here, but COUNT(col) ignores NULLs — relevant after a LEFT JOIN." },
+              { "q": "Show only customers above N orders?", "a": "Add HAVING COUNT(*) > N." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-011",
+          "q": "Retrieve all employees who joined in 2023. Employee(id, name, hire_date). (Asked at Amazon.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "date", "filter", "sargable"],
+          "answer": {
+            "oneLiner": "Filter by year; a range predicate on hire_date stays index-friendly (sargable), unlike wrapping the column in YEAR().",
+            "keyPoints": [
+              "YEAR(hire_date) = 2023 is simplest to read.",
+              "hire_date >= '2023-01-01' AND < '2024-01-01' lets an index be used."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Simple\nSELECT *\nFROM Employee\nWHERE YEAR(hire_date) = 2023;\n\n-- Sargable (index-friendly)\nSELECT *\nFROM Employee\nWHERE hire_date >= '2023-01-01'\n  AND hire_date <  '2024-01-01';",
+              "note": "Range form keeps an index on hire_date usable"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Employees hired in 2023." },
+              { "role": "me", "text": "WHERE YEAR(hire_date) = 2023, though I'd prefer a date range so an index on hire_date is usable." },
+              { "role": "interviewer", "text": "Why does YEAR(hire_date) hurt index usage?" },
+              { "role": "me", "text": "Wrapping the column in a function makes the predicate non-sargable, forcing a scan; the range form compares the raw column." }
+            ],
+            "followUpsQA": [
+              { "q": "What is a sargable predicate?", "a": "One that can use an index — the column appears bare, not inside a function." },
+              { "q": "Why < '2024-01-01' rather than <= '2023-12-31'?", "a": "The half-open bound correctly includes any time component on Dec 31." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-012",
+          "q": "Calculate the average order value per customer. Orders(customer_id, total_amount). (Asked at Microsoft.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "average", "group-by"],
+          "answer": {
+            "oneLiner": "Group by customer and AVG the order amount.",
+            "keyPoints": [
+              "AVG(total_amount) per customer_id.",
+              "AVG ignores NULL amounts; use COALESCE if NULL should count as 0."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT customer_id, AVG(total_amount) AS avg_order_value\nFROM Orders\nGROUP BY customer_id;",
+              "note": "AVG per group"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Average order value per customer." },
+              { "role": "me", "text": "GROUP BY customer_id with AVG(total_amount)." },
+              { "role": "interviewer", "text": "How does AVG treat NULL amounts?" },
+              { "role": "me", "text": "AVG skips NULLs entirely; if a NULL should count as zero I'd AVG(COALESCE(total_amount,0))." }
+            ],
+            "followUpsQA": [
+              { "q": "AVG vs SUM/COUNT?", "a": "AVG = SUM/COUNT of non-NULLs; they match unless NULLs are present." },
+              { "q": "Round it?", "a": "Wrap in ROUND(AVG(...), 2)." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-013",
+          "q": "Get the latest order placed by each customer. Orders(customer_id, order_date). (Asked at Uber.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "group-by", "max", "latest-row"],
+          "answer": {
+            "oneLiner": "For just the date, GROUP BY customer and MAX(order_date); for the whole latest row, use ROW_NUMBER per customer.",
+            "keyPoints": [
+              "MAX(order_date) per customer gives the latest date.",
+              "To return the full latest order, ROW_NUMBER() OVER (PARTITION BY customer ORDER BY order_date DESC) = 1."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Latest date only\nSELECT customer_id, MAX(order_date) AS latest_order_date\nFROM Orders\nGROUP BY customer_id;\n\n-- Full latest row\nSELECT customer_id, order_id, order_date\nFROM (\n    SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) AS rn\n    FROM Orders\n) t\nWHERE rn = 1;",
+              "note": "MAX for the date; ROW_NUMBER for the whole row"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Latest order per customer." },
+              { "role": "me", "text": "If they just want the date, MAX(order_date) grouped by customer; if they want the order's other columns, ROW_NUMBER per customer ordered by date desc and keep rn = 1." },
+              { "role": "interviewer", "text": "Why can't plain GROUP BY return the order_id too?" },
+              { "role": "me", "text": "MAX(order_date) doesn't tie back to a specific row's order_id, so I need the window approach to keep the matching row." }
+            ],
+            "followUpsQA": [
+              { "q": "Two orders on the same latest date?", "a": "ROW_NUMBER picks one; add a tiebreaker like order_id DESC to make it deterministic." },
+              { "q": "ROW_NUMBER vs RANK here?", "a": "ROW_NUMBER guarantees a single row; RANK could return ties." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-014",
+          "q": "Find products that were never sold. Products(product_id), Sales(product_id). (Asked at Adobe.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "left-join", "anti-join", "null"],
+          "answer": {
+            "oneLiner": "LEFT JOIN Products to Sales and keep products with no matching sale (NULL on the Sales side).",
+            "keyPoints": [
+              "LEFT JOIN from Products preserves unsold ones.",
+              "WHERE s.product_id IS NULL filters to never-sold."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT p.product_id\nFROM Products p\nLEFT JOIN Sales s ON p.product_id = s.product_id\nWHERE s.product_id IS NULL;",
+              "note": "Anti-join for never-matched products"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Which products were never sold?" },
+              { "role": "me", "text": "LEFT JOIN Products to Sales and keep rows where the Sales side is NULL." },
+              { "role": "interviewer", "text": "NOT EXISTS instead?" },
+              { "role": "me", "text": "Yes — WHERE NOT EXISTS (SELECT 1 FROM Sales s WHERE s.product_id = p.product_id) expresses the same and avoids NOT IN's NULL trap." }
+            ],
+            "followUpsQA": [
+              { "q": "Why does IS NULL find unsold products?", "a": "Unmatched left rows get NULL on the right after a LEFT JOIN." },
+              { "q": "Performance of LEFT JOIN vs NOT EXISTS?", "a": "Often similar; NOT EXISTS can short-circuit and is NULL-safe." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-015",
+          "q": "Identify the most-selling product by total quantity. Sales(product_id, quantity). (Asked at Walmart.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "top-n", "group-by", "order-by"],
+          "answer": {
+            "oneLiner": "Aggregate quantity per product, order descending, and take the top one (WITH TIES if you want all leaders).",
+            "keyPoints": [
+              "SUM(quantity) GROUP BY product_id.",
+              "ORDER BY total DESC, then TOP 1 / LIMIT 1.",
+              "TOP 1 WITH TIES surfaces multiple equal leaders."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT TOP 1 product_id, SUM(quantity) AS total_qty\nFROM Sales\nGROUP BY product_id\nORDER BY total_qty DESC;",
+              "note": "Use TOP 1 WITH TIES if leaders can tie"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Most-selling product." },
+              { "role": "me", "text": "SUM(quantity) per product, ORDER BY that descending, TOP 1." },
+              { "role": "interviewer", "text": "What if two products tie for first?" },
+              { "role": "me", "text": "TOP 1 picks one arbitrarily; TOP 1 WITH TIES (or a rank = 1 filter) returns both." }
+            ],
+            "followUpsQA": [
+              { "q": "By revenue instead of quantity?", "a": "SUM(quantity * price) as the ordering key." },
+              { "q": "Top product per category?", "a": "ROW_NUMBER() OVER (PARTITION BY category ORDER BY total DESC) = 1." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-016",
+          "q": "Get the total revenue and number of orders per region. Orders(region, total_amount). (Asked at Meta.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "group-by", "aggregate"],
+          "answer": {
+            "oneLiner": "Group by region and compute SUM(amount) and COUNT(*) in one pass.",
+            "keyPoints": [
+              "Both metrics come from a single GROUP BY region.",
+              "SUM for revenue, COUNT(*) for order volume."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT region,\n       SUM(total_amount) AS total_revenue,\n       COUNT(*)          AS order_count\nFROM Orders\nGROUP BY region;",
+              "note": "Multiple aggregates, one grouping"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Revenue and order count per region." },
+              { "role": "me", "text": "GROUP BY region with SUM(total_amount) and COUNT(*) together." },
+              { "role": "interviewer", "text": "Add average order value too?" },
+              { "role": "me", "text": "Include AVG(total_amount), or compute SUM/COUNT, in the same grouped query." }
+            ],
+            "followUpsQA": [
+              { "q": "Can you compute several aggregates at once?", "a": "Yes — any number of aggregates share one GROUP BY scan." },
+              { "q": "Only regions above a revenue threshold?", "a": "Add HAVING SUM(total_amount) > X." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-017",
+          "q": "Count how many customers placed more than 5 orders. Orders(customer_id). (Asked at Amazon.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "having", "subquery", "count"],
+          "answer": {
+            "oneLiner": "Find customers with more than 5 orders in a grouped subquery, then count those customers.",
+            "keyPoints": [
+              "Inner: GROUP BY customer HAVING COUNT(*) > 5.",
+              "Outer: COUNT(*) over that result set."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT COUNT(*) AS customer_count\nFROM (\n    SELECT customer_id\n    FROM Orders\n    GROUP BY customer_id\n    HAVING COUNT(*) > 5\n) AS sub;",
+              "note": "Count the groups that pass HAVING"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "How many customers placed more than 5 orders?" },
+              { "role": "me", "text": "I get the qualifying customers with GROUP BY + HAVING COUNT(*) > 5, then COUNT them in an outer query." },
+              { "role": "interviewer", "text": "Why the nested query?" },
+              { "role": "me", "text": "HAVING filters groups, but I need a count of those groups, which requires a second aggregation over the subquery." }
+            ],
+            "followUpsQA": [
+              { "q": "Can you avoid the subquery?", "a": "Not cleanly — you're counting groups, which is an aggregate over an aggregate." },
+              { "q": "List them instead of counting?", "a": "Drop the outer query and select customer_id." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-018",
+          "q": "Retrieve customers (orders) with a value above the overall average order value. Orders(order_id, total_amount). (Asked at PayPal.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "subquery", "average", "filter"],
+          "answer": {
+            "oneLiner": "Compare each order's amount to a scalar subquery returning the global average.",
+            "keyPoints": [
+              "The subquery (SELECT AVG(total_amount) FROM Orders) runs once.",
+              "WHERE total_amount > that average keeps above-average orders."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT *\nFROM Orders\nWHERE total_amount > (SELECT AVG(total_amount) FROM Orders);",
+              "note": "Non-correlated scalar subquery, evaluated once"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Orders above the average order value." },
+              { "role": "me", "text": "WHERE total_amount > (SELECT AVG(total_amount) FROM Orders) — a non-correlated subquery evaluated once." },
+              { "role": "interviewer", "text": "Is the average recomputed per row?" },
+              { "role": "me", "text": "No — it's non-correlated, so the optimizer computes it once and reuses it." }
+            ],
+            "followUpsQA": [
+              { "q": "Correlated vs non-correlated here?", "a": "This is non-correlated; per-customer averages would correlate on customer_id." },
+              { "q": "Above each customer's own average?", "a": "Correlate the subquery on customer_id (or use AVG() OVER (PARTITION BY customer_id))." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-019",
+          "q": "Find all employees hired on weekends. Employee(id, hire_date). (Asked at Google.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "low",
+          "tags": ["sql", "date", "weekday"],
+          "answer": {
+            "oneLiner": "Filter on the weekday name of hire_date being Saturday or Sunday (DATENAME in T-SQL).",
+            "keyPoints": [
+              "DATENAME(WEEKDAY, hire_date) IN ('Saturday','Sunday') in SQL Server.",
+              "DATEPART(WEEKDAY,...) is locale-dependent on what day is 1; DATENAME avoids that ambiguity."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT *\nFROM Employee\nWHERE DATENAME(WEEKDAY, hire_date) IN ('Saturday', 'Sunday');",
+              "note": "DATENAME is clearer than DATEPART's locale-sensitive number"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Employees hired on a weekend." },
+              { "role": "me", "text": "Filter where DATENAME(WEEKDAY, hire_date) is Saturday or Sunday." },
+              { "role": "interviewer", "text": "Why not DATEPART(WEEKDAY, ...) = 1 or 7?" },
+              { "role": "me", "text": "DATEPART's numbering depends on DATEFIRST/locale, so DATENAME by name is safer; in MySQL I'd use DAYOFWEEK or WEEKDAY." }
+            ],
+            "followUpsQA": [
+              { "q": "Cross-engine equivalents?", "a": "MySQL WEEKDAY() (5,6) or DAYOFWEEK() (1,7); Postgres EXTRACT(DOW...) (0,6)." },
+              { "q": "Is this predicate sargable?", "a": "No — the function on the column blocks index use; a computed/persisted column would help." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-020",
+          "q": "Find all employees with a salary between 50000 and 100000. Employee(id, salary). (Asked at Microsoft.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "between", "filter"],
+          "answer": {
+            "oneLiner": "Use BETWEEN, remembering it is inclusive of both bounds.",
+            "keyPoints": [
+              "BETWEEN 50000 AND 100000 includes both endpoints.",
+              "Equivalent to salary >= 50000 AND salary <= 100000."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT *\nFROM Employee\nWHERE salary BETWEEN 50000 AND 100000;",
+              "note": "BETWEEN is inclusive on both ends"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Employees earning 50k to 100k." },
+              { "role": "me", "text": "WHERE salary BETWEEN 50000 AND 100000, which is inclusive of both bounds." },
+              { "role": "interviewer", "text": "If they wanted exclusive bounds?" },
+              { "role": "me", "text": "I'd switch to salary > 50000 AND salary < 100000 instead of BETWEEN." }
+            ],
+            "followUpsQA": [
+              { "q": "Is BETWEEN inclusive?", "a": "Yes, both endpoints are included." },
+              { "q": "BETWEEN with dates?", "a": "Be careful — 'BETWEEN date1 AND date2' includes midnight of date2 only, missing later times that day." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-021",
+          "q": "Get monthly sales revenue and order count. Orders(order_id, date, amount). (Asked at Google.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "group-by", "date-format", "aggregate"],
+          "answer": {
+            "oneLiner": "Bucket by year-month and aggregate revenue and order count per bucket.",
+            "keyPoints": [
+              "FORMAT(date,'yyyy-MM') keeps year and month together.",
+              "SUM(amount) and COUNT(order_id) per bucket; GROUP BY the same expression."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT FORMAT(date, 'yyyy-MM') AS month,\n       SUM(amount)        AS total_revenue,\n       COUNT(order_id)    AS order_count\nFROM Orders\nGROUP BY FORMAT(date, 'yyyy-MM')\nORDER BY month;",
+              "note": "Group by year-month string"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Monthly revenue and order counts." },
+              { "role": "me", "text": "Group by FORMAT(date,'yyyy-MM') and take SUM(amount) and COUNT(order_id)." },
+              { "role": "interviewer", "text": "Why include the year in the bucket?" },
+              { "role": "me", "text": "Grouping by month alone would merge the same month across different years." }
+            ],
+            "followUpsQA": [
+              { "q": "Portable bucketing?", "a": "MySQL DATE_FORMAT(date,'%Y-%m'); Postgres TO_CHAR(date,'YYYY-MM')." },
+              { "q": "Order chronologically?", "a": "The 'yyyy-MM' string sorts correctly lexicographically." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-022",
+          "q": "Rank employees by salary within each department. Employee(employee_id, department_id, salary). (Asked at Amazon.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "window", "rank", "partition"],
+          "answer": {
+            "oneLiner": "Use RANK() OVER (PARTITION BY department_id ORDER BY salary DESC) to rank within each department independently.",
+            "keyPoints": [
+              "PARTITION BY restarts the ranking per department.",
+              "RANK leaves gaps after ties; DENSE_RANK doesn't; ROW_NUMBER forces uniqueness."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT employee_id, department_id, salary,\n       RANK() OVER (PARTITION BY department_id ORDER BY salary DESC) AS salary_rk\nFROM Employee;",
+              "note": "PARTITION BY = per-department ranking"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Rank employees by salary within each department." },
+              { "role": "me", "text": "RANK() OVER (PARTITION BY department_id ORDER BY salary DESC); the partition restarts ranks per department." },
+              { "role": "interviewer", "text": "RANK vs DENSE_RANK vs ROW_NUMBER?" },
+              { "role": "me", "text": "RANK skips numbers after ties, DENSE_RANK keeps them contiguous, and ROW_NUMBER assigns a unique sequence regardless of ties." }
+            ],
+            "followUpsQA": [
+              { "q": "When would you pick ROW_NUMBER?", "a": "When you need exactly one row per position, e.g. picking a single top earner." },
+              { "q": "Top earner per department from this?", "a": "Wrap it and filter salary_rk = 1." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-023",
+          "q": "Find customers who placed orders in every month of 2023. Orders(customer_id, order_date). (Asked at Meta.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "group-by", "having", "count-distinct"],
+          "answer": {
+            "oneLiner": "Restrict to 2023, then keep customers whose count of distinct months equals 12.",
+            "keyPoints": [
+              "Filter YEAR(order_date) = 2023.",
+              "HAVING COUNT(DISTINCT month) = 12 enforces all twelve months."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT customer_id\nFROM Orders\nWHERE YEAR(order_date) = 2023\nGROUP BY customer_id\nHAVING COUNT(DISTINCT FORMAT(order_date, 'yyyy-MM')) = 12;",
+              "note": "12 distinct months = ordered every month"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Customers who ordered in all 12 months of 2023." },
+              { "role": "me", "text": "Filter to 2023, group by customer, and keep those with COUNT(DISTINCT month) = 12." },
+              { "role": "interviewer", "text": "Why DISTINCT on the month?" },
+              { "role": "me", "text": "A customer could place many orders in one month; DISTINCT counts months covered, not orders." }
+            ],
+            "followUpsQA": [
+              { "q": "Why FORMAT vs MONTH()?", "a": "Within a single year MONTH() also works; FORMAT generalizes across years." },
+              { "q": "At least N distinct months?", "a": "Change the HAVING comparison to >= N." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-024",
+          "q": "Find the moving average of sales over the last 3 days. Orders(order_date, total_amount). (Asked at Microsoft.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "window", "moving-average", "frame"],
+          "answer": {
+            "oneLiner": "Average over a window frame of the current row plus the two preceding rows ordered by date.",
+            "keyPoints": [
+              "AVG(...) OVER (ORDER BY order_date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW).",
+              "ROWS frames by row position; RANGE would frame by value and merge same-date rows."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT order_date,\n       AVG(total_amount) OVER (\n           ORDER BY order_date\n           ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\n       ) AS moving_avg\nFROM Orders;",
+              "note": "3-row trailing window via ROWS frame"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "3-day moving average of sales." },
+              { "role": "me", "text": "AVG(total_amount) OVER (ORDER BY order_date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) — current plus two prior." },
+              { "role": "interviewer", "text": "Difference between ROWS and RANGE here?" },
+              { "role": "me", "text": "ROWS counts physical rows; RANGE groups peers with equal order_date, so with multiple rows per day they behave differently." }
+            ],
+            "followUpsQA": [
+              { "q": "Aggregate to one row per day first?", "a": "Yes, if 'last 3 days' means calendar days rather than 3 rows." },
+              { "q": "Why is the default frame a trap?", "a": "With ORDER BY and no explicit frame, it's RANGE UNBOUNDED PRECEDING — a running total, not a moving window." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-025",
+          "q": "Identify the first and last order date for each customer. Orders(customer_id, order_date). (Asked at Uber.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "min-max", "group-by"],
+          "answer": {
+            "oneLiner": "Group by customer and take MIN and MAX of order_date.",
+            "keyPoints": [
+              "MIN(order_date) = first, MAX(order_date) = last.",
+              "Both come from one grouped scan."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT customer_id,\n       MIN(order_date) AS first_order,\n       MAX(order_date) AS last_order\nFROM Orders\nGROUP BY customer_id;",
+              "note": "MIN/MAX in one pass"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "First and last order date per customer." },
+              { "role": "me", "text": "GROUP BY customer_id with MIN(order_date) and MAX(order_date)." },
+              { "role": "interviewer", "text": "Also want the amounts of those first/last orders?" },
+              { "role": "me", "text": "Then I'd switch to window functions (FIRST_VALUE/LAST_VALUE or ROW_NUMBER) to carry the matching row's other columns." }
+            ],
+            "followUpsQA": [
+              { "q": "Customer lifespan in days?", "a": "DATEDIFF(DAY, MIN(order_date), MAX(order_date))." },
+              { "q": "Why can't MIN/MAX return the amount too?", "a": "They aggregate independently and aren't tied to one row." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-026",
+          "q": "Show product sales distribution as a percentage of total revenue. Sales(product_id, quantity, price). (Asked at PayPal.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "cte", "cross-join", "percentage"],
+          "answer": {
+            "oneLiner": "Compute total revenue once in a CTE, CROSS JOIN it to each product's revenue, and divide (using 100.0 to force decimal math).",
+            "keyPoints": [
+              "CTE holds the single grand total.",
+              "CROSS JOIN attaches that total to every product group.",
+              "Multiply by 100.0 so integer division doesn't truncate."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH TotalRevenue AS (\n    SELECT SUM(quantity * price) AS total FROM Sales\n)\nSELECT s.product_id,\n       SUM(s.quantity * s.price) AS revenue,\n       SUM(s.quantity * s.price) * 100.0 / t.total AS revenue_pct\nFROM Sales s\nCROSS JOIN TotalRevenue t\nGROUP BY s.product_id, t.total;",
+              "note": "100.0 avoids integer-division truncation"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Each product's share of total revenue." },
+              { "role": "me", "text": "I compute the grand total once in a CTE, cross join it in, and divide each product's revenue by it times 100.0." },
+              { "role": "interviewer", "text": "Why 100.0 rather than 100?" },
+              { "role": "me", "text": "With integer columns, * 100 / total would do integer division and truncate; the decimal literal promotes the expression to floating point." }
+            ],
+            "followUpsQA": [
+              { "q": "Window alternative to the CROSS JOIN?", "a": "revenue * 100.0 / SUM(revenue) OVER () after aggregating per product." },
+              { "q": "Why GROUP BY t.total?", "a": "It's a constant, but SQL requires every non-aggregated SELECT column in GROUP BY." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-027",
+          "q": "Retrieve customers who made purchases on two consecutive days. Orders(id, order_date). (Asked at Walmart.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "window", "lag", "consecutive"],
+          "answer": {
+            "oneLiner": "Use LAG to bring each customer's previous order date alongside the current and keep rows exactly one day apart.",
+            "keyPoints": [
+              "LAG(order_date) OVER (PARTITION BY customer ORDER BY order_date) is the prior date.",
+              "DATEDIFF(DAY, prev, current) = 1 marks consecutive days.",
+              "DISTINCT collapses customers with several such pairs."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH cte AS (\n    SELECT customer_id, order_date,\n           LAG(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS prev_date\n    FROM Orders\n)\nSELECT DISTINCT customer_id\nFROM cte\nWHERE DATEDIFF(DAY, prev_date, order_date) = 1;",
+              "note": "LAG + 1-day diff = consecutive purchases"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Customers who bought on two consecutive days." },
+              { "role": "me", "text": "LAG the previous order date per customer, then keep rows where the day difference is exactly 1." },
+              { "role": "interviewer", "text": "Why LAG over a self-join?" },
+              { "role": "me", "text": "LAG reads the prior row directly in one ordered pass, avoiding a self-join and its O(n^2) risk." }
+            ],
+            "followUpsQA": [
+              { "q": "Duplicate orders on the same day?", "a": "Dedupe to one row per (customer, day) first, or the diff could be 0." },
+              { "q": "Three-plus consecutive days?", "a": "A gaps-and-islands grouping on date minus a row sequence." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-028",
+          "q": "Find churned customers — those with no orders in the last 6 months. Orders(customer_id, order_date). (Asked at Amazon.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "having", "date-math"],
+          "answer": {
+            "oneLiner": "Group by customer and keep those whose most recent order is older than 6 months ago.",
+            "keyPoints": [
+              "MAX(order_date) per customer is their last activity.",
+              "Compare to DATEADD(MONTH, -6, GETDATE()) for the cutoff."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT customer_id\nFROM Orders\nGROUP BY customer_id\nHAVING MAX(order_date) < DATEADD(MONTH, -6, GETDATE());",
+              "note": "Last order older than the 6-month cutoff"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Define and find churned customers (no order in 6 months)." },
+              { "role": "me", "text": "Group by customer and keep those whose MAX(order_date) is before DATEADD(MONTH,-6,GETDATE())." },
+              { "role": "interviewer", "text": "Why use HAVING with MAX rather than a WHERE filter?" },
+              { "role": "me", "text": "A WHERE on order_date would test individual orders; I need the customer's latest order overall, which is an aggregate." }
+            ],
+            "followUpsQA": [
+              { "q": "Cross-engine date math?", "a": "MySQL DATE_SUB(NOW(), INTERVAL 6 MONTH); Postgres NOW() - INTERVAL '6 months'." },
+              { "q": "Customers who never ordered?", "a": "They aren't in Orders; LEFT JOIN from Customers to include them as churned." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-029",
+          "q": "Calculate cumulative (running) revenue by day. Orders(order_date, total_amount). (Asked at Adobe.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "window", "running-total"],
+          "answer": {
+            "oneLiner": "A running SUM ordered by date — the default window frame (unbounded preceding to current row) is exactly a cumulative total.",
+            "keyPoints": [
+              "SUM(total_amount) OVER (ORDER BY order_date).",
+              "Aggregate to daily totals first if there are several rows per day."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT order_date,\n       SUM(total_amount) OVER (ORDER BY order_date) AS cumulative_revenue\nFROM Orders;",
+              "note": "Default frame with ORDER BY = running total"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Cumulative revenue by day." },
+              { "role": "me", "text": "SUM(total_amount) OVER (ORDER BY order_date); the implicit frame makes it a running total." },
+              { "role": "interviewer", "text": "What if multiple orders share a date?" },
+              { "role": "me", "text": "With RANGE (the default) same-date rows share a cumulative value; I'd pre-aggregate to one row per day for a clean daily curve." }
+            ],
+            "followUpsQA": [
+              { "q": "What's the default frame with ORDER BY?", "a": "RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW." },
+              { "q": "Running total per customer?", "a": "Add PARTITION BY customer_id to the window." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-030",
+          "q": "Identify top-performing departments by average salary. Employee(department_id, salary). (Asked at Google.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "group-by", "average", "order-by"],
+          "answer": {
+            "oneLiner": "Average salary per department and order descending; add TOP/LIMIT if you only want the leaders.",
+            "keyPoints": [
+              "AVG(salary) GROUP BY department_id.",
+              "ORDER BY the average DESC for ranking."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT department_id, AVG(salary) AS avg_salary\nFROM Employee\nGROUP BY department_id\nORDER BY avg_salary DESC;",
+              "note": "Add TOP N for just the top departments"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Departments ranked by average salary." },
+              { "role": "me", "text": "GROUP BY department_id with AVG(salary), ordered descending; TOP N if they only want the best few." },
+              { "role": "interviewer", "text": "Include the department name?" },
+              { "role": "me", "text": "Join a Department table on department_id and add its name to SELECT and GROUP BY." }
+            ],
+            "followUpsQA": [
+              { "q": "Only departments above company-wide average?", "a": "HAVING AVG(salary) > (SELECT AVG(salary) FROM Employee)." },
+              { "q": "Ties at the top?", "a": "Use TOP N WITH TIES or a rank-based filter." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-031",
+          "q": "Find customers who ordered more than the average number of orders per customer. Orders(customer_id). (Asked at Meta.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "cte", "subquery", "average"],
+          "answer": {
+            "oneLiner": "Compute per-customer order counts in a CTE, then keep customers whose count beats the average of those counts.",
+            "keyPoints": [
+              "CTE: COUNT(*) per customer.",
+              "Compare each to (SELECT AVG(order_count) FROM the CTE)."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH customer_orders AS (\n    SELECT customer_id, COUNT(*) AS order_count\n    FROM Orders\n    GROUP BY customer_id\n)\nSELECT *\nFROM customer_orders\nWHERE order_count > (SELECT AVG(order_count) FROM customer_orders);",
+              "note": "Average is over per-customer counts, not raw rows"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Customers ordering more than the average customer." },
+              { "role": "me", "text": "First a CTE of per-customer counts, then keep those above the average of those counts." },
+              { "role": "interviewer", "text": "Why not AVG over the Orders table directly?" },
+              { "role": "me", "text": "That would average rows, not customers; the average must be taken over the per-customer aggregates." }
+            ],
+            "followUpsQA": [
+              { "q": "Is AVG(order_count) integer or decimal?", "a": "AVG of integers can truncate in some engines; cast to decimal to be safe." },
+              { "q": "Reuse the CTE twice — is that a problem?", "a": "No; the optimizer can materialize or inline it as needed." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-032",
+          "q": "Calculate revenue generated from new customers (their first-time orders). Orders(customer_id, order_date, total_amount). (Asked at Microsoft.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "cte", "join", "first-order"],
+          "answer": {
+            "oneLiner": "Find each customer's first order date in a CTE, join back to Orders on that date, and sum those first orders' amounts.",
+            "keyPoints": [
+              "CTE: MIN(order_date) per customer = first order.",
+              "Join Orders to the CTE on customer and that first date.",
+              "SUM(total_amount) over the matched first orders."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH first_orders AS (\n    SELECT customer_id, MIN(order_date) AS first_order_date\n    FROM Orders\n    GROUP BY customer_id\n)\nSELECT SUM(o.total_amount) AS new_revenue\nFROM Orders o\nJOIN first_orders f\n  ON o.customer_id = f.customer_id\n AND o.order_date  = f.first_order_date;",
+              "note": "Sum only each customer's first order"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Revenue from customers' first-ever orders." },
+              { "role": "me", "text": "A CTE gets each customer's MIN(order_date); I join Orders back on that date and SUM the amounts." },
+              { "role": "interviewer", "text": "What if a customer placed two orders on their first day?" },
+              { "role": "me", "text": "Both would match the first date and sum in; if only the very first order counts, I'd rank by a timestamp and keep rank 1." }
+            ],
+            "followUpsQA": [
+              { "q": "Window alternative?", "a": "ROW_NUMBER() OVER (PARTITION BY customer ORDER BY order_date) = 1, then SUM." },
+              { "q": "New customers in a given month?", "a": "Filter first_order_date to that month before summing." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-033",
+          "q": "Find the percentage of employees in each department. Employee(department_id). (Asked at Uber.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "group-by", "percentage", "subquery"],
+          "answer": {
+            "oneLiner": "Per-department count divided by the company-wide count, scaled with 100.0 to keep decimals.",
+            "keyPoints": [
+              "COUNT(*) per department.",
+              "Divide by (SELECT COUNT(*) FROM Employee), multiplied by 100.0."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT department_id,\n       COUNT(*) AS emp_count,\n       COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Employee) AS pct\nFROM Employee\nGROUP BY department_id;",
+              "note": "100.0 forces decimal division"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Percentage of employees per department." },
+              { "role": "me", "text": "COUNT(*) per department times 100.0 divided by the total employee count from a scalar subquery." },
+              { "role": "interviewer", "text": "Window-function version?" },
+              { "role": "me", "text": "COUNT(*) * 100.0 / SUM(COUNT(*)) OVER () after grouping, which avoids the separate subquery." }
+            ],
+            "followUpsQA": [
+              { "q": "Why 100.0?", "a": "Integer division would truncate the ratio to 0; the decimal literal promotes it." },
+              { "q": "Do the percentages sum to 100?", "a": "Yes, up to rounding." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-034",
+          "q": "Retrieve the maximum salary difference within each department. Employee(department_id, salary). (Asked at PayPal.)",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "group-by", "min-max"],
+          "answer": {
+            "oneLiner": "Per department, the spread is MAX(salary) minus MIN(salary).",
+            "keyPoints": [
+              "MAX - MIN per group is the salary range.",
+              "Single GROUP BY department_id."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT department_id,\n       MAX(salary) - MIN(salary) AS salary_diff\nFROM Employee\nGROUP BY department_id;",
+              "note": "Range = MAX minus MIN"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Largest salary gap within each department." },
+              { "role": "me", "text": "MAX(salary) - MIN(salary) grouped by department_id." },
+              { "role": "interviewer", "text": "What if a department has one employee?" },
+              { "role": "me", "text": "MAX and MIN are equal, so the difference is 0, which is correct." }
+            ],
+            "followUpsQA": [
+              { "q": "Identify who earns the max and min?", "a": "Use window MAX/MIN OVER (PARTITION BY dept) and compare each row." },
+              { "q": "Departments with the widest spread first?", "a": "ORDER BY salary_diff DESC." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-035",
+          "q": "Find products that contribute to the top 80% of revenue (Pareto / 80-20). Sales(product_id, qty, price). (Asked at Walmart.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "low",
+          "tags": ["sql", "window", "running-total", "pareto"],
+          "answer": {
+            "oneLiner": "Rank products by revenue, compute a running total of revenue, and keep those whose running total is within 80% of the grand total. The running-total filter must live outside WHERE (window functions aren't allowed there).",
+            "keyPoints": [
+              "Per-product revenue in a CTE.",
+              "Running SUM ordered by revenue DESC, plus the grand total via SUM() OVER ().",
+              "Filter running_total <= 0.8 * total in an outer query."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH sales_cte AS (\n    SELECT product_id, SUM(qty * price) AS revenue\n    FROM Sales\n    GROUP BY product_id\n),\nranked AS (\n    SELECT product_id, revenue,\n           SUM(revenue) OVER (ORDER BY revenue DESC\n                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total,\n           SUM(revenue) OVER () AS total\n    FROM sales_cte\n)\nSELECT product_id, revenue\nFROM ranked\nWHERE running_total <= 0.8 * total;",
+              "note": "Window functions can't sit in WHERE — filter in an outer query"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Which products make up the top 80% of revenue?" },
+              { "role": "me", "text": "I rank products by revenue, keep a running total and the grand total via window sums, then in an outer query keep rows where running_total <= 0.8 * total." },
+              { "role": "interviewer", "text": "Why can't the running-total comparison go in WHERE?" },
+              { "role": "me", "text": "Window functions are computed after WHERE, so referencing one there is illegal; I push the filter to an outer SELECT." }
+            ],
+            "followUpsQA": [
+              { "q": "Include the product that crosses 80%?", "a": "Compare the previous running total (LAG) to 0.8*total to include the boundary product." },
+              { "q": "Why ORDER BY revenue DESC in the running sum?", "a": "Pareto accumulates from the biggest contributors first." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-036",
+          "q": "Calculate the average time between two consecutive purchases for each customer. Orders(customer_id, order_date). (Asked at Meta.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "window", "lag", "datediff"],
+          "answer": {
+            "oneLiner": "Use LAG to pair each order with the previous one, then average the day gaps per customer (ignoring the first order's NULL gap).",
+            "keyPoints": [
+              "LAG(order_date) per customer ordered by date.",
+              "AVG(DATEDIFF(DAY, prev, current)) where prev is not NULL."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH cte AS (\n    SELECT customer_id, order_date,\n           LAG(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS prev_date\n    FROM Orders\n)\nSELECT customer_id,\n       AVG(DATEDIFF(DAY, prev_date, order_date)) AS avg_gap_days\nFROM cte\nWHERE prev_date IS NOT NULL\nGROUP BY customer_id;",
+              "note": "Exclude the first order's NULL gap"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Average days between purchases per customer." },
+              { "role": "me", "text": "LAG the previous order date, take DATEDIFF to the current, and AVG those gaps per customer, skipping the first order's NULL." },
+              { "role": "interviewer", "text": "Why exclude prev_date IS NULL?" },
+              { "role": "me", "text": "The first order has no predecessor, so its gap is NULL; including it is harmless for AVG but I filter it for clarity." }
+            ],
+            "followUpsQA": [
+              { "q": "Customers with one order?", "a": "They have only NULL gaps and drop out of the result." },
+              { "q": "Median gap instead of average?", "a": "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY gap)." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-037",
+          "q": "Show the last purchase for each customer along with its order amount. Orders(customer_id, order_id, order_date, total_amount). (Asked at Google.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "window", "row-number", "latest-row"],
+          "answer": {
+            "oneLiner": "Number each customer's orders by date descending and keep row number 1 — this returns the whole latest row, amount included.",
+            "keyPoints": [
+              "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC).",
+              "Filter rn = 1 to keep the most recent order.",
+              "Unlike MAX(date), this carries the order_id and amount."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH ranked_orders AS (\n    SELECT customer_id, order_id, total_amount,\n           ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) AS rn\n    FROM Orders\n)\nSELECT customer_id, order_id, total_amount\nFROM ranked_orders\nWHERE rn = 1;",
+              "note": "ROW_NUMBER keeps the full latest row"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Each customer's last purchase with its amount." },
+              { "role": "me", "text": "ROW_NUMBER per customer ordered by date desc, then keep rn = 1, which carries the amount along." },
+              { "role": "interviewer", "text": "Why not GROUP BY with MAX(order_date)?" },
+              { "role": "me", "text": "MAX gives the date but not the amount from that row; the window approach preserves the whole latest record." }
+            ],
+            "followUpsQA": [
+              { "q": "Ties on the latest date?", "a": "Add a tiebreaker like order_id DESC inside the ORDER BY for determinism." },
+              { "q": "ROW_NUMBER vs RANK?", "a": "ROW_NUMBER guarantees one row; RANK could keep multiple on a tie." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-038",
+          "q": "Calculate year-over-year (YoY) growth in revenue. Orders(order_date, total_amount). (Asked at Microsoft.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "window", "lag", "yoy"],
+          "answer": {
+            "oneLiner": "Aggregate revenue per year, then subtract the previous year's revenue via LAG ordered by year.",
+            "keyPoints": [
+              "Yearly revenue in a derived table.",
+              "LAG(revenue) OVER (ORDER BY year) is the prior year.",
+              "Current minus previous is the YoY change."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT yr,\n       revenue,\n       revenue - LAG(revenue) OVER (ORDER BY yr) AS yoy_growth\nFROM (\n    SELECT YEAR(order_date) AS yr, SUM(total_amount) AS revenue\n    FROM Orders\n    GROUP BY YEAR(order_date)\n) t\nORDER BY yr;",
+              "note": "LAG over yearly totals"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Year-over-year revenue growth." },
+              { "role": "me", "text": "I total revenue per year, then LAG the previous year's value and subtract; the first year is NULL with no prior." },
+              { "role": "interviewer", "text": "Express it as a percentage?" },
+              { "role": "me", "text": "(revenue - prev) * 100.0 / prev, guarding against a zero or NULL prior year." }
+            ],
+            "followUpsQA": [
+              { "q": "Why aggregate before LAG?", "a": "LAG needs one row per year; otherwise it compares individual orders." },
+              { "q": "Gap years with no orders?", "a": "LAG compares to the previous present year; a calendar table fills true gaps." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-039",
+          "q": "Detect customers whose order amount is higher than their own historical 90th percentile. Orders(customer_id, order_id, total_amount). (Asked at Amazon.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "low",
+          "tags": ["sql", "window", "ntile", "percentile"],
+          "answer": {
+            "oneLiner": "Bucket each customer's orders into deciles by amount with NTILE(10) and keep the top decile (decile 10 ≈ above the 90th percentile).",
+            "keyPoints": [
+              "NTILE(10) OVER (PARTITION BY customer_id ORDER BY total_amount).",
+              "Decile 10 is the top 10% of that customer's orders.",
+              "NTILE is an approximation; PERCENTILE_CONT(0.9) is exact."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH ranked_orders AS (\n    SELECT customer_id, order_id, total_amount,\n           NTILE(10) OVER (PARTITION BY customer_id ORDER BY total_amount) AS decile\n    FROM Orders\n)\nSELECT customer_id, order_id, total_amount\nFROM ranked_orders\nWHERE decile = 10;",
+              "note": "Top decile per customer via NTILE(10)"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Orders above each customer's 90th percentile." },
+              { "role": "me", "text": "I NTILE the customer's orders into 10 buckets by amount and keep decile 10 — the top tenth." },
+              { "role": "interviewer", "text": "Is NTILE exactly the 90th percentile?" },
+              { "role": "me", "text": "Not exactly; NTILE splits by row count and is approximate with few orders. For precision I'd compare against PERCENTILE_CONT(0.9) per customer." }
+            ],
+            "followUpsQA": [
+              { "q": "Exact percentile approach?", "a": "Compute PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY total_amount) OVER (PARTITION BY customer_id) and compare." },
+              { "q": "When does NTILE skew?", "a": "When a customer has very few orders, buckets are uneven." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-040",
+          "q": "Retrieve the longest gap (in days) between consecutive orders for each customer. Orders(customer_id, order_date). (Asked at Amazon.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "window", "lag", "datediff", "max"],
+          "answer": {
+            "oneLiner": "LAG the previous order date per customer, take the day difference, and MAX it per customer.",
+            "keyPoints": [
+              "LAG(order_date) per customer ordered by date.",
+              "MAX(DATEDIFF(DAY, prev, current)) over the non-NULL gaps."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH cte AS (\n    SELECT customer_id, order_date,\n           LAG(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS prev_order_date\n    FROM Orders\n)\nSELECT customer_id,\n       MAX(DATEDIFF(DAY, prev_order_date, order_date)) AS max_gap\nFROM cte\nWHERE prev_order_date IS NOT NULL\nGROUP BY customer_id;",
+              "note": "MAX of consecutive day gaps"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Longest gap between orders per customer." },
+              { "role": "me", "text": "LAG the previous date, DATEDIFF to the current, and take the MAX gap per customer, ignoring the first order's NULL." },
+              { "role": "interviewer", "text": "Single-order customers?" },
+              { "role": "me", "text": "They only have a NULL gap, so they're filtered out; I could LEFT JOIN them back as NULL/0 if needed." }
+            ],
+            "followUpsQA": [
+              { "q": "Why MAX after the per-row gaps?", "a": "Each row holds one gap; MAX collapses them to the longest per customer." },
+              { "q": "Also return when the gap occurred?", "a": "Keep the row achieving the MAX via a top-1-per-customer window." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-041",
+          "q": "Identify customers with total revenue below the 10th percentile. Orders(customer_id, total_amount). (Asked at Google.)",
+          "level": "senior",
+          "type": "code",
+          "freq": "low",
+          "tags": ["sql", "percentile", "cte", "window"],
+          "answer": {
+            "oneLiner": "Total revenue per customer, then compare each to the 10th-percentile cutoff computed with PERCENTILE_CONT (a window function in SQL Server, so it needs OVER ()).",
+            "keyPoints": [
+              "CTE: SUM(total_amount) per customer.",
+              "PERCENTILE_CONT(0.1) WITHIN GROUP (ORDER BY total_revenue) OVER () gives the cutoff.",
+              "Keep customers below that cutoff."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "WITH cte AS (\n    SELECT customer_id, SUM(total_amount) AS total_revenue\n    FROM Orders\n    GROUP BY customer_id\n),\np AS (\n    SELECT DISTINCT PERCENTILE_CONT(0.1) WITHIN GROUP (ORDER BY total_revenue) OVER () AS p10\n    FROM cte\n)\nSELECT c.customer_id, c.total_revenue\nFROM cte c\nCROSS JOIN p\nWHERE c.total_revenue < p.p10;",
+              "note": "PERCENTILE_CONT is a window function in T-SQL (needs OVER ())"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Customers in the bottom 10% by total revenue." },
+              { "role": "me", "text": "I total revenue per customer, compute the 10th-percentile cutoff with PERCENTILE_CONT, and keep customers below it." },
+              { "role": "interviewer", "text": "Why the OVER () and DISTINCT around PERCENTILE_CONT?" },
+              { "role": "me", "text": "In SQL Server PERCENTILE_CONT is a window function returning the value on every row, so I take a single DISTINCT value to use as a scalar cutoff." }
+            ],
+            "followUpsQA": [
+              { "q": "PERCENTILE_CONT vs PERCENTILE_DISC?", "a": "CONT interpolates between values; DISC returns an actual existing value." },
+              { "q": "Engine differences?", "a": "Postgres exposes percentile_cont as a plain ordered-set aggregate usable in a scalar subquery." }
+            ]
+          }
         }
       ]
     },
@@ -1243,6 +2363,932 @@
               { "q": "Why DENSE_RANK over ROW_NUMBER?", "a": "DENSE_RANK collapses tied salaries; ROW_NUMBER would not.", "relatedId": "coding-sql-001" },
               { "q": "Why DISTINCT before LIMIT/OFFSET?", "a": "So duplicate salaries don't push the offset onto the wrong value." },
               { "q": "What happens when N exceeds the distinct count?", "a": "No row, returned as NULL.", "relatedId": "coding-sql-002" }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-021",
+          "q": "Monthly Transactions I. Transactions(id, country, state ENUM('approved','declined'), amount, trans_date). For each month and country report total transaction count and amount, plus approved count and approved amount.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "group-by", "conditional-aggregate"],
+          "answer": {
+            "oneLiner": "Group by month and country, then use conditional aggregation (SUM over a boolean) to fold the approved subset into the same scan.",
+            "keyPoints": [
+              "Bucket the month with DATE_FORMAT(trans_date,'%Y-%m').",
+              "SUM(state='approved') counts approved rows; SUM(IF(state='approved',amount,0)) totals their amount.",
+              "One GROUP BY pass produces all four metrics."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT DATE_FORMAT(trans_date, '%Y-%m') AS month,\n       country,\n       COUNT(*)                                   AS trans_count,\n       SUM(state = 'approved')                    AS approved_count,\n       SUM(amount)                                AS trans_total_amount,\n       SUM(IF(state = 'approved', amount, 0))     AS approved_total_amount\nFROM Transactions\nGROUP BY month, country;",
+              "note": "Conditional aggregation avoids a second pass"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Per month and country, give total and approved transaction counts and amounts." },
+              { "role": "me", "text": "I group by the formatted month and country, then use conditional sums so approved metrics come from the same scan." },
+              { "role": "interviewer", "text": "How do you count just the approved ones without a separate query?" },
+              { "role": "me", "text": "SUM(state='approved') treats the boolean as 1/0, and SUM(IF(state='approved',amount,0)) totals only approved amounts." }
+            ],
+            "followUpsQA": [
+              { "q": "Why DATE_FORMAT instead of MONTH()?", "a": "MONTH() drops the year, so different years would collide into the same bucket." },
+              { "q": "Portable alternative to IF?", "a": "CASE WHEN state='approved' THEN amount ELSE 0 END works on any engine." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-022",
+          "q": "Immediate Food Delivery II. Delivery(delivery_id PK, customer_id, order_date, customer_pref_delivery_date). An order is immediate when the preferred date equals the order date. Find the percentage of immediate orders among each customer's first order, rounded to 2 decimals.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "subquery", "percentage"],
+          "answer": {
+            "oneLiner": "Restrict to each customer's earliest order, then average a boolean (immediate?) and scale to a percentage.",
+            "keyPoints": [
+              "First order = MIN(order_date) per customer, matched with an IN tuple.",
+              "AVG(order_date = pref_date) is the immediate fraction.",
+              "Multiply by 100 and ROUND to 2 decimals."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT ROUND(AVG(order_date = customer_pref_delivery_date) * 100, 2) AS immediate_percentage\nFROM Delivery\nWHERE (customer_id, order_date) IN (\n    SELECT customer_id, MIN(order_date)\n    FROM Delivery\n    GROUP BY customer_id\n);",
+              "note": "Filter to first orders, then average the boolean"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "What share of customers' first orders are immediate?" },
+              { "role": "me", "text": "I filter to each customer's MIN(order_date), then AVG the boolean order_date = preferred_date and multiply by 100." },
+              { "role": "interviewer", "text": "Why average a boolean instead of COUNT/COUNT?" },
+              { "role": "me", "text": "AVG of a 1/0 boolean is exactly the fraction of true rows, so it collapses the count-over-count into one expression." }
+            ],
+            "followUpsQA": [
+              { "q": "Could a window function replace the subquery?", "a": "Yes — ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date) and keep rn = 1." },
+              { "q": "What if a customer has two orders on the same earliest date?", "a": "The tuple-IN would keep both; the problem guarantees one first order, but ROW_NUMBER would force a single row." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-023",
+          "q": "Game Play Analysis IV. Activity(player_id, device_id, event_date, games_played), PK (player_id, event_date). Report the fraction of players who logged in again the day immediately after their first login, rounded to 2 decimals.",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "self-join", "date-math"],
+          "answer": {
+            "oneLiner": "Find each player's first login, then count how many also have a row exactly one day later; divide by the total distinct players.",
+            "keyPoints": [
+              "First login = MIN(event_date) per player.",
+              "Check existence of first_date + 1 day via a tuple IN / self-match.",
+              "Denominator is COUNT(DISTINCT player_id) over the whole table."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT ROUND(\n         COUNT(DISTINCT a.player_id) /\n         (SELECT COUNT(DISTINCT player_id) FROM Activity),\n       2) AS fraction\nFROM Activity a\nWHERE (a.player_id, a.event_date) IN (\n    SELECT player_id, DATE_ADD(MIN(event_date), INTERVAL 1 DAY)\n    FROM Activity\n    GROUP BY player_id\n);",
+              "note": "Match consecutive-day logins against first login + 1"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "What fraction of players come back the day after their first login?" },
+              { "role": "me", "text": "I compute each player's first date, then keep activity rows that fall on first_date + 1 day, and divide that count by total players." },
+              { "role": "interviewer", "text": "Why the tuple (player_id, event_date) in the IN?" },
+              { "role": "me", "text": "It ties the +1-day check to the same player, so a return login by a different player can't be miscounted." }
+            ],
+            "followUpsQA": [
+              { "q": "How would you generalize to N-day retention?", "a": "Replace INTERVAL 1 DAY with INTERVAL N DAY in the match." },
+              { "q": "Window alternative?", "a": "LEAD(event_date) OVER (PARTITION BY player_id ORDER BY event_date) and compare to first date + 1." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-024",
+          "q": "Number of Unique Subjects Taught by Each Teacher. Teacher(teacher_id, subject_id, dept_id), PK (subject_id, dept_id). Count the distinct subjects each teacher teaches.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "count-distinct", "group-by"],
+          "answer": {
+            "oneLiner": "Group by teacher and COUNT(DISTINCT subject_id) so the same subject in two departments isn't double-counted.",
+            "keyPoints": [
+              "DISTINCT inside COUNT dedupes subject across departments.",
+              "Group by teacher_id."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT teacher_id, COUNT(DISTINCT subject_id) AS cnt\nFROM Teacher\nGROUP BY teacher_id;",
+              "note": "COUNT(DISTINCT ...) is the whole trick"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "How many unique subjects does each teacher teach?" },
+              { "role": "me", "text": "Group by teacher_id and COUNT(DISTINCT subject_id), since one subject can appear under multiple departments." },
+              { "role": "interviewer", "text": "What if you forgot DISTINCT?" },
+              { "role": "me", "text": "You'd count subject/department rows, overstating teachers who teach the same subject in several departments." }
+            ],
+            "followUpsQA": [
+              { "q": "Why is plain COUNT(subject_id) wrong here?", "a": "It counts rows, so a subject taught in two depts counts twice." },
+              { "q": "Does the composite PK matter?", "a": "Yes — it's why duplicates by department exist, making DISTINCT necessary." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-025",
+          "q": "User Activity for the Past 30 Days I. Activity(user_id, session_id, activity_date, activity_type). Find the daily active user count for the 30-day window ending 2019-07-27 inclusive (a user is active if they did anything that day).",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "date-range", "count-distinct"],
+          "answer": {
+            "oneLiner": "Filter to the half-open 30-day window, then group by date and COUNT(DISTINCT user_id).",
+            "keyPoints": [
+              "Window: activity_date > '2019-06-27' AND <= '2019-07-27' (30 days inclusive of the end).",
+              "DISTINCT user_id so multiple sessions in a day count once.",
+              "Days with zero activity simply don't appear."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT activity_date AS day,\n       COUNT(DISTINCT user_id) AS active_users\nFROM Activity\nWHERE activity_date > '2019-06-27'\n  AND activity_date <= '2019-07-27'\nGROUP BY activity_date;",
+              "note": "Half-open range gives exactly 30 days"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Daily active users for the 30 days ending 2019-07-27." },
+              { "role": "me", "text": "I bound activity_date to that 30-day window and group by date with COUNT(DISTINCT user_id)." },
+              { "role": "interviewer", "text": "Why DISTINCT?" },
+              { "role": "me", "text": "A user can open several sessions a day; without DISTINCT they'd be counted multiple times as 'active'." }
+            ],
+            "followUpsQA": [
+              { "q": "Why '> 2019-06-27' rather than '>= 2019-06-28'?", "a": "Both express the same 30-day window; the strict form mirrors 'end minus 29 days'." },
+              { "q": "How to also show zero-activity days?", "a": "Left join against a generated calendar/date table." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-026",
+          "q": "Product Sales Analysis III. Sales(sale_id, product_id, year, quantity, price), Product(product_id PK, product_name). For each product report the first year it sold, plus that year's quantity and price.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "subquery", "first-row"],
+          "answer": {
+            "oneLiner": "Keep the row whose (product_id, year) matches the product's MIN(year); a tuple-IN handles ties when a product first sold in one year across multiple rows.",
+            "keyPoints": [
+              "First year = MIN(year) per product_id.",
+              "Match the full row with a (product_id, year) IN subquery.",
+              "Window RANK() OVER (PARTITION BY product_id ORDER BY year) is an equivalent approach."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT s.product_id, s.year AS first_year, s.quantity, s.price\nFROM Sales s\nWHERE (s.product_id, s.year) IN (\n    SELECT product_id, MIN(year)\n    FROM Sales\n    GROUP BY product_id\n);",
+              "note": "Tuple-IN keeps every row from the first selling year"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Give each product's first selling year with that year's quantity and price." },
+              { "role": "me", "text": "I find MIN(year) per product and keep rows matching the (product_id, year) tuple, which preserves multiple sales in that first year." },
+              { "role": "interviewer", "text": "Why not just GROUP BY and MIN the columns?" },
+              { "role": "me", "text": "MIN(quantity)/MIN(price) wouldn't be tied to the first year's actual row; the tuple match keeps the correct values." }
+            ],
+            "followUpsQA": [
+              { "q": "Window-function version?", "a": "RANK() OVER (PARTITION BY product_id ORDER BY year) then filter rank = 1." },
+              { "q": "Why RANK over ROW_NUMBER here?", "a": "RANK keeps all first-year rows; ROW_NUMBER would arbitrarily keep one." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-027",
+          "q": "Classes More Than 5 Students. Courses(student, class), PK (student, class). List classes that have at least 5 students.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "group-by", "having"],
+          "answer": {
+            "oneLiner": "Group by class and keep groups whose student count is at least 5 with HAVING.",
+            "keyPoints": [
+              "HAVING filters aggregated groups, WHERE can't.",
+              "PK means (student,class) is unique, so COUNT(student) = distinct students."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT class\nFROM Courses\nGROUP BY class\nHAVING COUNT(student) >= 5;",
+              "note": "HAVING for post-aggregation filtering"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Which classes have 5 or more students?" },
+              { "role": "me", "text": "Group by class and keep those with COUNT(student) >= 5 via HAVING." },
+              { "role": "interviewer", "text": "Why HAVING and not WHERE?" },
+              { "role": "me", "text": "WHERE filters individual rows before grouping; the count only exists after aggregation, so HAVING is required." }
+            ],
+            "followUpsQA": [
+              { "q": "Do you need COUNT(DISTINCT student)?", "a": "Not here — the composite PK already makes each (student,class) unique." },
+              { "q": "Difference between WHERE and HAVING?", "a": "WHERE is pre-aggregation per row; HAVING is post-aggregation per group." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-028",
+          "q": "Find Followers Count. Followers(user_id, follower_id), PK (user_id, follower_id). For each user output the number of followers, ordered by user_id.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "group-by", "count"],
+          "answer": {
+            "oneLiner": "Group by user_id and COUNT the follower rows; order by user_id.",
+            "keyPoints": [
+              "Composite PK guarantees no duplicate follower, so plain COUNT works.",
+              "ORDER BY user_id for the required ordering."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT user_id, COUNT(follower_id) AS followers_count\nFROM Followers\nGROUP BY user_id\nORDER BY user_id;",
+              "note": "Straight COUNT per group"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Count followers per user, sorted by user_id." },
+              { "role": "me", "text": "Group by user_id with COUNT(follower_id) and ORDER BY user_id." },
+              { "role": "interviewer", "text": "Any risk of double counting?" },
+              { "role": "me", "text": "No — the (user_id, follower_id) primary key prevents duplicate follower rows." }
+            ],
+            "followUpsQA": [
+              { "q": "When would COUNT(DISTINCT follower_id) matter?", "a": "Only if duplicates were allowed; the PK rules that out here." },
+              { "q": "Users with zero followers?", "a": "They won't appear; you'd need a left join from a Users table to include them." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-029",
+          "q": "Biggest Single Number. MyNumbers(num) — may contain duplicates. Return the largest number that appears exactly once, or NULL if none.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "having", "null"],
+          "answer": {
+            "oneLiner": "Keep values with COUNT = 1 in a subquery, then take MAX; MAX over an empty set yields NULL automatically.",
+            "keyPoints": [
+              "HAVING COUNT(*) = 1 isolates the singletons.",
+              "Wrapping in MAX returns NULL when there are no singletons."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT MAX(num) AS num\nFROM (\n    SELECT num\n    FROM MyNumbers\n    GROUP BY num\n    HAVING COUNT(*) = 1\n) t;",
+              "note": "MAX of empty set => NULL, satisfying the edge case"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Largest number appearing exactly once, else NULL." },
+              { "role": "me", "text": "I group by num, keep those with COUNT = 1, then MAX the result; the MAX wrapper gives NULL when none qualify." },
+              { "role": "interviewer", "text": "Why does the NULL case work without extra handling?" },
+              { "role": "me", "text": "Aggregating MAX over zero rows returns NULL by definition, which is exactly the required output." }
+            ],
+            "followUpsQA": [
+              { "q": "Why the subquery instead of HAVING + ORDER BY LIMIT 1?", "a": "ORDER BY LIMIT 1 returns no row (not NULL) when empty; MAX guarantees a NULL row." },
+              { "q": "Could you use a window function?", "a": "Yes, COUNT(*) OVER (PARTITION BY num), but it's heavier than GROUP BY here." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-030",
+          "q": "Customers Who Bought All Products. Customer(customer_id, product_key), Product(product_key PK). Find customers who bought every product.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "group-by", "having", "division"],
+          "answer": {
+            "oneLiner": "Group by customer and keep those whose distinct product count equals the total number of products (relational division).",
+            "keyPoints": [
+              "COUNT(DISTINCT product_key) per customer.",
+              "Compare to (SELECT COUNT(*) FROM Product).",
+              "DISTINCT guards against a customer buying the same product twice."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT customer_id\nFROM Customer\nGROUP BY customer_id\nHAVING COUNT(DISTINCT product_key) = (SELECT COUNT(*) FROM Product);",
+              "note": "Classic relational division"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Which customers bought all products?" },
+              { "role": "me", "text": "Per customer I count distinct products and keep those matching the total product count — relational division." },
+              { "role": "interviewer", "text": "Why COUNT(DISTINCT ...)?" },
+              { "role": "me", "text": "A customer may buy the same product multiple times; DISTINCT ensures we compare unique products to the catalog size." }
+            ],
+            "followUpsQA": [
+              { "q": "What's relational division?", "a": "Finding rows on one side that match every value on the other — 'for all' semantics." },
+              { "q": "NOT EXISTS alternative?", "a": "Customers with no product that they haven't bought — a double-negation form of the same idea." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-031",
+          "q": "The Number of Employees Which Report to Each Employee. Employees(employee_id PK, name, manager_id, age). For each manager with at least one direct report, output reports_count and the rounded average age of reports, ordered by employee_id.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "self-join", "aggregate"],
+          "answer": {
+            "oneLiner": "Self-join managers to their reports on manager_id = employee_id, then aggregate count and average age per manager.",
+            "keyPoints": [
+              "Two aliases: m (manager) and e (report).",
+              "INNER JOIN naturally excludes managers with zero reports.",
+              "ROUND(AVG(e.age)) for the average age."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT m.employee_id,\n       m.name,\n       COUNT(e.employee_id) AS reports_count,\n       ROUND(AVG(e.age))    AS average_age\nFROM Employees m\nJOIN Employees e ON e.manager_id = m.employee_id\nGROUP BY m.employee_id, m.name\nORDER BY m.employee_id;",
+              "note": "Self-join + aggregate"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "For each manager, how many report to them and their reports' average age?" },
+              { "role": "me", "text": "I self-join Employees, matching each report's manager_id to the manager's employee_id, then COUNT and AVG per manager." },
+              { "role": "interviewer", "text": "How are managers with no reports excluded?" },
+              { "role": "me", "text": "The INNER JOIN only produces rows where a report exists, so zero-report managers drop out automatically." }
+            ],
+            "followUpsQA": [
+              { "q": "Why ROUND the average age?", "a": "The problem expects a whole-number average; ROUND() to default 0 decimals." },
+              { "q": "What enforces 'at least one report'?", "a": "The INNER JOIN — only managers with matching reports survive." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-032",
+          "q": "Primary Department for Each Employee. Employee(employee_id, department_id, primary_flag), PK (employee_id, department_id). An employee in a single department has it as primary regardless of the flag; otherwise the row with primary_flag = 'Y' is primary. Report each employee's primary department.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "union", "group-by"],
+          "answer": {
+            "oneLiner": "UNION the explicitly flagged 'Y' rows with employees who have exactly one department (so no flag is set).",
+            "keyPoints": [
+              "Branch 1: primary_flag = 'Y'.",
+              "Branch 2: employees with COUNT(*) = 1 department.",
+              "UNION dedupes the rare overlap."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT employee_id, department_id\nFROM Employee\nWHERE primary_flag = 'Y'\nUNION\nSELECT employee_id, department_id\nFROM Employee\nGROUP BY employee_id\nHAVING COUNT(*) = 1;",
+              "note": "Two cases combined with UNION"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Find each employee's primary department, given the single-department rule." },
+              { "role": "me", "text": "I take rows flagged 'Y', then UNION employees who belong to exactly one department since those have no explicit flag." },
+              { "role": "interviewer", "text": "Why does the GROUP BY branch return department_id safely?" },
+              { "role": "me", "text": "Because COUNT(*) = 1 means there's a single row per employee, so the bare department_id is unambiguous." }
+            ],
+            "followUpsQA": [
+              { "q": "Why UNION rather than UNION ALL?", "a": "To dedupe in case a single-department employee is also flagged 'Y'." },
+              { "q": "Window alternative?", "a": "COUNT(*) OVER (PARTITION BY employee_id) and pick rows where flag='Y' OR the count is 1." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-033",
+          "q": "Triangle Judgement. Triangle(x, y, z). For each row decide whether the three lengths can form a triangle (output 'Yes'/'No').",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "case", "logic"],
+          "answer": {
+            "oneLiner": "Apply the triangle inequality (each pair's sum exceeds the third side) inside a CASE expression.",
+            "keyPoints": [
+              "All three conditions must hold: x+y>z, x+z>y, y+z>x.",
+              "CASE returns 'Yes'/'No' per row."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT x, y, z,\n       CASE WHEN x + y > z AND x + z > y AND y + z > x\n            THEN 'Yes' ELSE 'No' END AS triangle\nFROM Triangle;",
+              "note": "Triangle inequality in a CASE"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Can each triple form a triangle?" },
+              { "role": "me", "text": "Yes only if every pair of sides sums to more than the third, expressed with three AND-ed comparisons in a CASE." },
+              { "role": "interviewer", "text": "Is checking the two smaller sides against the largest enough?" },
+              { "role": "me", "text": "Logically yes, but without sorting I just test all three pairs, which is equivalent and simpler in SQL." }
+            ],
+            "followUpsQA": [
+              { "q": "Why all three inequalities?", "a": "Without sorting you don't know which side is largest, so testing all three is safe." },
+              { "q": "Degenerate triangle (sum equals third)?", "a": "Strict > correctly rejects collinear points as 'No'." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-034",
+          "q": "Consecutive Numbers. Logs(id PK, num). Find all numbers that appear at least three times consecutively (by increasing id).",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "self-join", "consecutive"],
+          "answer": {
+            "oneLiner": "Self-join the table to its next two ids and require all three to share the same num.",
+            "keyPoints": [
+              "Join l2 on id+1 and l3 on id+2.",
+              "All three nums equal => a run of 3.",
+              "DISTINCT collapses overlapping windows of the same value."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT DISTINCT l1.num AS ConsecutiveNums\nFROM Logs l1\nJOIN Logs l2 ON l2.id = l1.id + 1 AND l2.num = l1.num\nJOIN Logs l3 ON l3.id = l1.id + 2 AND l3.num = l1.num;",
+              "note": "Triple self-join on consecutive ids"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Which numbers appear three times in a row?" },
+              { "role": "me", "text": "I self-join each row to the next two ids and require identical num across all three, then DISTINCT the result." },
+              { "role": "interviewer", "text": "Does this assume ids are gap-free?" },
+              { "role": "me", "text": "Yes — it relies on id+1/id+2 being contiguous; with gaps I'd use LEAD()/window framing instead." }
+            ],
+            "followUpsQA": [
+              { "q": "Window-function version?", "a": "Compare num to LEAD(num,1) and LEAD(num,2) OVER (ORDER BY id)." },
+              { "q": "How to generalize to k-in-a-row?", "a": "Track a 'group' via row_number minus a per-value row_number (gaps-and-islands)." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-035",
+          "q": "Product Price at a Given Date. Products(product_id, new_price, change_date), PK (product_id, change_date). Find the price of every product on 2019-08-16; products with no change on/before that date default to 10.",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "correlated-subquery", "coalesce"],
+          "answer": {
+            "oneLiner": "For each product take the latest change on or before the target date; COALESCE to 10 when there's none.",
+            "keyPoints": [
+              "Latest applicable change = MAX(change_date) <= target, per product.",
+              "COALESCE(..., 10) supplies the default starting price.",
+              "Drive the list from DISTINCT product_id so untouched products still appear."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT p.product_id,\n       COALESCE((\n           SELECT pr.new_price\n           FROM Products pr\n           WHERE pr.product_id = p.product_id\n             AND pr.change_date <= '2019-08-16'\n           ORDER BY pr.change_date DESC\n           LIMIT 1\n       ), 10) AS price\nFROM (SELECT DISTINCT product_id FROM Products) p;",
+              "note": "Latest-change-before-date with a default"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Price of each product on 2019-08-16, defaulting to 10." },
+              { "role": "me", "text": "Per product I grab the most recent change_date on or before the target; if none exists, COALESCE supplies 10." },
+              { "role": "interviewer", "text": "Why iterate over DISTINCT product_id separately?" },
+              { "role": "me", "text": "So products whose only changes are after the date — or which I'd otherwise miss — still show up with the default price." }
+            ],
+            "followUpsQA": [
+              { "q": "Window-function approach?", "a": "RANK by change_date DESC within products filtered to <= date, then union the never-changed defaults." },
+              { "q": "Why ORDER BY DESC LIMIT 1?", "a": "It picks the latest change effective on the target date." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-036",
+          "q": "Last Person to Fit in the Bus. Queue(person_id, person_name, weight, turn). People board in turn order; the bus holds 1000 kg. Return the name of the last person who can board.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "window", "running-total"],
+          "answer": {
+            "oneLiner": "Compute a running weight by boarding order, keep rows where the cumulative weight is within 1000, and take the heaviest cumulative (last to board).",
+            "keyPoints": [
+              "SUM(weight) OVER (ORDER BY turn) is the running total.",
+              "Filter cum <= 1000.",
+              "The max cumulative among survivors is the last person on."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT person_name\nFROM (\n    SELECT person_name,\n           SUM(weight) OVER (ORDER BY turn) AS cum\n    FROM Queue\n) t\nWHERE cum <= 1000\nORDER BY cum DESC\nLIMIT 1;",
+              "note": "Running total via window frame"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Who is the last person able to board within 1000 kg?" },
+              { "role": "me", "text": "I build a running weight ordered by turn, keep rows at or under 1000, and pick the one with the largest cumulative — the last to fit." },
+              { "role": "interviewer", "text": "Why does ORDER BY cum DESC LIMIT 1 give the last boarder?" },
+              { "role": "me", "text": "The valid boarders form a prefix of the queue; the maximum cumulative weight among them is exactly the final person admitted." }
+            ],
+            "followUpsQA": [
+              { "q": "Default window frame caveat?", "a": "With ORDER BY, the default frame is RANGE UNBOUNDED PRECEDING TO CURRENT ROW — fine here since turns are unique." },
+              { "q": "What if no one fits?", "a": "The result is empty; the lightest first person normally fits, so it's rarely empty." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-037",
+          "q": "Count Salary Categories. Accounts(account_id, income). Count accounts in three buckets: Low (< 20000), Average ([20000, 50000]), High (> 50000). All three categories must appear even with a count of 0.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "union", "conditional-count"],
+          "answer": {
+            "oneLiner": "UNION ALL three one-row aggregates, each summing a boolean range test, so every category appears regardless of count.",
+            "keyPoints": [
+              "SUM(income < 20000) etc. counts rows in each band.",
+              "UNION ALL guarantees all three category rows exist.",
+              "BETWEEN is inclusive for the Average band."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT 'Low Salary' AS category, SUM(income < 20000) AS accounts_count\nFROM Accounts\nUNION ALL\nSELECT 'Average Salary', SUM(income BETWEEN 20000 AND 50000)\nFROM Accounts\nUNION ALL\nSELECT 'High Salary', SUM(income > 50000)\nFROM Accounts;",
+              "note": "Fixed category rows via UNION ALL"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Count accounts per salary band, always showing all three bands." },
+              { "role": "me", "text": "I write three one-row queries, each SUMming a boolean band test, and UNION ALL them so empty bands still report 0." },
+              { "role": "interviewer", "text": "Why not GROUP BY a CASE category?" },
+              { "role": "me", "text": "GROUP BY only emits bands that have rows, so an empty category would vanish; the UNION ALL skeleton avoids that." }
+            ],
+            "followUpsQA": [
+              { "q": "Why UNION ALL not UNION?", "a": "The three category labels are distinct, and ALL avoids a needless dedupe sort." },
+              { "q": "Is BETWEEN inclusive?", "a": "Yes, so 20000 and 50000 fall into Average as required." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-038",
+          "q": "Employees Whose Manager Left the Company. Employees(employee_id PK, name, manager_id, salary). Find employees earning under 30000 whose manager_id is non-null but no longer exists in the table. Order by employee_id.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "not-in", "anti-join"],
+          "answer": {
+            "oneLiner": "Filter salary < 30000 and a non-null manager_id that is absent from the set of existing employee_ids.",
+            "keyPoints": [
+              "manager_id IS NOT NULL excludes top-level employees.",
+              "manager_id NOT IN (SELECT employee_id ...) is the 'manager left' test.",
+              "employee_id values are non-null, so NOT IN is safe."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT employee_id\nFROM Employees\nWHERE salary < 30000\n  AND manager_id IS NOT NULL\n  AND manager_id NOT IN (SELECT employee_id FROM Employees)\nORDER BY employee_id;",
+              "note": "Anti-join via NOT IN on a non-null key"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Low-paid employees whose manager has left." },
+              { "role": "me", "text": "I keep salary < 30000, require a non-null manager_id, and check that manager_id isn't among current employee_ids." },
+              { "role": "interviewer", "text": "Is NOT IN safe here given NULL pitfalls?" },
+              { "role": "me", "text": "Yes — employee_id is the primary key so the subquery has no NULLs, which is what makes NOT IN reliable." }
+            ],
+            "followUpsQA": [
+              { "q": "Why is NOT IN risky in general?", "a": "If the subquery returns any NULL, NOT IN yields no rows; a PK column avoids that." },
+              { "q": "Equivalent with LEFT JOIN?", "a": "LEFT JOIN self on manager and keep rows where the manager row IS NULL." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-039",
+          "q": "Exchange Seats. Seat(id PK, student) with consecutive ids. Swap seats of every pair of adjacent students; if the count is odd, the last student stays put.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "case", "parity"],
+          "answer": {
+            "oneLiner": "Remap ids by parity: odd id moves to id+1, even moves to id-1, except a final odd id (the max) stays.",
+            "keyPoints": [
+              "Odd id and not the last => id + 1.",
+              "Even id => id - 1.",
+              "Odd id equal to MAX(id) => unchanged.",
+              "ORDER BY the computed id."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT\n    CASE\n        WHEN id % 2 = 1 AND id = (SELECT MAX(id) FROM Seat) THEN id\n        WHEN id % 2 = 1 THEN id + 1\n        ELSE id - 1\n    END AS id,\n    student\nFROM Seat\nORDER BY id;",
+              "note": "Parity remap with an odd-tail exception"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Swap adjacent students' seats, leaving a trailing odd seat in place." },
+              { "role": "me", "text": "I recompute id by parity — odd to id+1, even to id-1 — but a final odd id keeps its value, then order by the new id." },
+              { "role": "interviewer", "text": "How do you detect the trailing odd seat?" },
+              { "role": "me", "text": "It's the odd id equal to MAX(id); that branch returns id unchanged." }
+            ],
+            "followUpsQA": [
+              { "q": "Why ORDER BY the new id?", "a": "Swapping only changes the id label; the output must be sorted by the final seat number." },
+              { "q": "Alternative without MAX?", "a": "Use COALESCE(LEAD/LAG(student) OVER (ORDER BY id), student) to pull the neighbor's name." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-040",
+          "q": "Movie Rating. Movies(movie_id, title), Users(user_id, name), MovieRating(movie_id, user_id, rating, created_at). Output (1) the user who rated the most movies — ties broken by lexicographically smaller name — and (2) the movie with the highest average rating in Feb 2020 — ties broken by lexicographically smaller title.",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "union-all", "order-by", "tie-break"],
+          "answer": {
+            "oneLiner": "Two ranked one-row queries UNION ALL'd: top rater by count then name, top Feb-2020 movie by average rating then title.",
+            "keyPoints": [
+              "Part 1: GROUP BY user, ORDER BY COUNT(*) DESC, name ASC, LIMIT 1.",
+              "Part 2: filter created_at to Feb 2020, GROUP BY movie, ORDER BY AVG(rating) DESC, title ASC, LIMIT 1.",
+              "UNION ALL stacks both single-column results."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "(SELECT u.name AS results\n FROM MovieRating mr\n JOIN Users u ON u.user_id = mr.user_id\n GROUP BY mr.user_id\n ORDER BY COUNT(*) DESC, u.name\n LIMIT 1)\nUNION ALL\n(SELECT m.title\n FROM MovieRating mr\n JOIN Movies m ON m.movie_id = mr.movie_id\n WHERE mr.created_at >= '2020-02-01' AND mr.created_at < '2020-03-01'\n GROUP BY mr.movie_id\n ORDER BY AVG(mr.rating) DESC, m.title\n LIMIT 1);",
+              "note": "Two ranked queries combined"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Find the busiest rater and February's best-rated movie." },
+              { "role": "me", "text": "Two parts: top rater by rating count then name; and the Feb-2020 movie with the highest average rating, ties by title — both LIMIT 1, combined with UNION ALL." },
+              { "role": "interviewer", "text": "Why parenthesize each SELECT?" },
+              { "role": "me", "text": "So each ORDER BY/LIMIT binds to its own subquery rather than to the whole UNION." }
+            ],
+            "followUpsQA": [
+              { "q": "Why UNION ALL not UNION?", "a": "The two strings could coincide; ALL preserves both and skips a dedupe." },
+              { "q": "Why the half-open Feb range?", "a": "created_at < '2020-03-01' cleanly includes all of February regardless of time-of-day." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-041",
+          "q": "Restaurant Growth. Customer(customer_id, name, visited_on, amount). Compute the 7-day moving total and 7-day moving average (rounded to 2 decimals) of daily amounts, starting from the 7th day onward, ordered by date.",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "moving-average", "window"],
+          "answer": {
+            "oneLiner": "Aggregate to one row per day, sum each day with the prior six via a self-join (or window frame), and only emit days at least 6 days after the first.",
+            "keyPoints": [
+              "Collapse to daily totals first (multiple customers per day).",
+              "Sum the trailing 7-day window per day.",
+              "Skip the first 6 days where a full window doesn't exist; divide by 7 for the average."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT visited_on, amount, ROUND(amount / 7, 2) AS average_amount\nFROM (\n    SELECT a.visited_on,\n           SUM(b.amount) AS amount,\n           DATEDIFF(a.visited_on, (SELECT MIN(visited_on) FROM Customer)) AS day_diff\n    FROM (SELECT visited_on, SUM(amount) AS amount FROM Customer GROUP BY visited_on) a\n    JOIN Customer b\n      ON b.visited_on BETWEEN DATE_SUB(a.visited_on, INTERVAL 6 DAY) AND a.visited_on\n    GROUP BY a.visited_on\n) t\nWHERE day_diff >= 6\nORDER BY visited_on;",
+              "note": "Trailing 7-day window, first full window on day 7"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Give the 7-day moving sum and average of daily revenue." },
+              { "role": "me", "text": "I first total amount per day, then for each day sum the window of that day and the six before it, emitting only days at least 6 days after the first." },
+              { "role": "interviewer", "text": "Why start on the 7th day?" },
+              { "role": "me", "text": "Earlier days don't have a full 7-day history, so a moving average would be based on fewer than 7 days." }
+            ],
+            "followUpsQA": [
+              { "q": "Pure window-function version?", "a": "SUM(amount) OVER (ORDER BY visited_on ROWS 6 PRECEDING) over the daily-totals CTE, then filter the first 6 days." },
+              { "q": "Why aggregate to daily totals first?", "a": "Multiple customers can visit the same day; the window must operate on per-day sums." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-042",
+          "q": "Friend Requests II: Who Has the Most Friends. RequestAccepted(requester_id, accepter_id, accept_date). A friendship counts for both people. Return the id with the most friends and that count (single answer guaranteed).",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "union-all", "group-by"],
+          "answer": {
+            "oneLiner": "Treat both columns as friend endpoints by UNION ALL-ing them into one id column, then group and take the top count.",
+            "keyPoints": [
+              "UNION ALL requester_id and accepter_id into a single id list.",
+              "GROUP BY id, COUNT(*) = number of friendships.",
+              "ORDER BY count DESC LIMIT 1."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT id, COUNT(*) AS num\nFROM (\n    SELECT requester_id AS id FROM RequestAccepted\n    UNION ALL\n    SELECT accepter_id      FROM RequestAccepted\n) t\nGROUP BY id\nORDER BY num DESC\nLIMIT 1;",
+              "note": "Flatten both endpoints, then count"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Who has the most friends?" },
+              { "role": "me", "text": "Each accepted request gives both people a friend, so I UNION ALL the two id columns, group, count, and take the maximum." },
+              { "role": "interviewer", "text": "Why UNION ALL and not UNION?" },
+              { "role": "me", "text": "UNION would dedupe identical ids across the two halves and undercount; ALL keeps every endpoint occurrence." }
+            ],
+            "followUpsQA": [
+              { "q": "What if there were ties?", "a": "LIMIT 1 returns one; to show all leaders you'd compare against the max count instead." },
+              { "q": "Does direction of the request matter?", "a": "No — friendship is mutual, so both endpoints count equally." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-043",
+          "q": "Investments in 2016. Insurance(pid, tiv_2015, tiv_2016, lat, lon). Sum tiv_2016 for policyholders whose tiv_2015 is shared with at least one other holder AND whose (lat, lon) location is unique. Round to 2 decimals.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "group-by", "having", "subquery"],
+          "answer": {
+            "oneLiner": "Keep rows whose tiv_2015 appears more than once and whose (lat,lon) appears exactly once, then SUM tiv_2016.",
+            "keyPoints": [
+              "Shared tiv_2015: GROUP BY tiv_2015 HAVING COUNT(*) > 1.",
+              "Unique location: GROUP BY lat, lon HAVING COUNT(*) = 1.",
+              "Combine both as IN filters, then SUM and ROUND."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT ROUND(SUM(tiv_2016), 2) AS tiv_2016\nFROM Insurance\nWHERE tiv_2015 IN (\n        SELECT tiv_2015 FROM Insurance GROUP BY tiv_2015 HAVING COUNT(*) > 1\n      )\n  AND (lat, lon) IN (\n        SELECT lat, lon FROM Insurance GROUP BY lat, lon HAVING COUNT(*) = 1\n      );",
+              "note": "Two HAVING-based membership filters"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Total 2016 investment for the qualifying policyholders." },
+              { "role": "me", "text": "I select rows whose tiv_2015 is shared (count > 1) and whose location is unique (count = 1), then SUM tiv_2016." },
+              { "role": "interviewer", "text": "Why a composite (lat, lon) in the second IN?" },
+              { "role": "me", "text": "Uniqueness is about the location pair, not either coordinate alone, so I group by both columns together." }
+            ],
+            "followUpsQA": [
+              { "q": "Window alternative?", "a": "COUNT(*) OVER (PARTITION BY tiv_2015) > 1 and COUNT(*) OVER (PARTITION BY lat,lon) = 1." },
+              { "q": "Why ROUND to 2 decimals?", "a": "Monetary totals are expected to two decimal places per the spec." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-044",
+          "q": "Department Top Three Salaries. Employee(id, name, salary, departmentId), Department(id, name). List employees who are among the top three distinct salaries in their department (high earners).",
+          "level": "senior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "window", "dense-rank"],
+          "answer": {
+            "oneLiner": "DENSE_RANK salaries within each department descending and keep ranks 1–3, then join to department names.",
+            "keyPoints": [
+              "DENSE_RANK() OVER (PARTITION BY departmentId ORDER BY salary DESC).",
+              "DENSE_RANK so tied salaries share a rank (top-3 distinct salaries).",
+              "Filter rank <= 3 and join Department for the name."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT d.name AS Department, e.name AS Employee, e.salary AS Salary\nFROM (\n    SELECT name, salary, departmentId,\n           DENSE_RANK() OVER (PARTITION BY departmentId ORDER BY salary DESC) AS rk\n    FROM Employee\n) e\nJOIN Department d ON d.id = e.departmentId\nWHERE e.rk <= 3;",
+              "note": "Top-3 distinct salaries via DENSE_RANK"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Show the top three earners per department." },
+              { "role": "me", "text": "I DENSE_RANK salaries within each department descending, keep ranks up to 3, and join Department for its name." },
+              { "role": "interviewer", "text": "Why DENSE_RANK rather than ROW_NUMBER?" },
+              { "role": "me", "text": "Two employees on the same salary should share a rank and both count toward 'top three salaries'; ROW_NUMBER would split them." }
+            ],
+            "followUpsQA": [
+              { "q": "Could two people share rank 1?", "a": "Yes — equal top salaries both get rank 1 with DENSE_RANK, so more than three rows can appear." },
+              { "q": "What about RANK vs DENSE_RANK?", "a": "RANK leaves gaps after ties, which would shrink the top-3 distinct salaries; DENSE_RANK doesn't." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-045",
+          "q": "Fix Names in a Table. Users(user_id PK, name). Normalize each name so the first letter is uppercase and the rest lowercase. Order by user_id.",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "string-functions"],
+          "answer": {
+            "oneLiner": "Concatenate the uppercased first character with the lowercased remainder.",
+            "keyPoints": [
+              "UPPER(LEFT(name,1)) for the initial.",
+              "LOWER(SUBSTRING(name,2)) for the tail.",
+              "CONCAT joins them; ORDER BY user_id."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT user_id,\n       CONCAT(UPPER(LEFT(name, 1)), LOWER(SUBSTRING(name, 2))) AS name\nFROM Users\nORDER BY user_id;",
+              "note": "Title-case with LEFT/SUBSTRING"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Capitalize the first letter and lowercase the rest of each name." },
+              { "role": "me", "text": "I CONCAT the uppercased first character with the lowercased substring from position 2 onward, ordered by user_id." },
+              { "role": "interviewer", "text": "Does SUBSTRING from position 2 handle single-character names?" },
+              { "role": "me", "text": "Yes — for a one-letter name the substring is empty, so the result is just the uppercased letter." }
+            ],
+            "followUpsQA": [
+              { "q": "1-based or 0-based SUBSTRING?", "a": "SQL SUBSTRING is 1-based, so position 2 starts at the second character." },
+              { "q": "Unicode/locale concerns?", "a": "UPPER/LOWER are locale-dependent; for ASCII names here it's straightforward." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-046",
+          "q": "Patients With a Condition. Patients(patient_id, patient_name, conditions) where conditions is a space-separated list of codes. Find patients who have Type I Diabetes, whose code starts with the prefix 'DIAB1'.",
+          "level": "junior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "like", "string-match"],
+          "answer": {
+            "oneLiner": "Match the prefix at the start of the string or after a space, so 'DIAB1...' is found but not a code that merely contains DIAB1 mid-token.",
+            "keyPoints": [
+              "conditions LIKE 'DIAB1%' covers the first token.",
+              "OR conditions LIKE '% DIAB1%' covers later tokens.",
+              "The leading space prevents matching e.g. 'SADIAB1' substrings."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT patient_id, patient_name, conditions\nFROM Patients\nWHERE conditions LIKE 'DIAB1%'\n   OR conditions LIKE '% DIAB1%';",
+              "note": "Anchor the prefix to a word boundary"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Find patients with a Type I diabetes code (DIAB1 prefix)." },
+              { "role": "me", "text": "I match conditions LIKE 'DIAB1%' for the first code or '% DIAB1%' for a later code, anchoring to a word boundary." },
+              { "role": "interviewer", "text": "Why the leading space in the second pattern?" },
+              { "role": "me", "text": "Without it, a code like 'XDIAB1' would falsely match; the space ensures DIAB1 begins a token." }
+            ],
+            "followUpsQA": [
+              { "q": "Why two LIKE patterns?", "a": "DIAB1 can be the first token (no preceding space) or a later one (preceded by a space)." },
+              { "q": "Regex alternative?", "a": "conditions REGEXP '(^|\\\\s)DIAB1' captures both cases in one predicate." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-047",
+          "q": "Delete Duplicate Emails. Person(id PK, email). Delete duplicate emails, keeping only the row with the smallest id per email. (This is a DELETE, not a SELECT.)",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "delete", "self-join"],
+          "answer": {
+            "oneLiner": "Self-join Person on equal email and a larger id, then delete the higher-id side so the minimum id survives.",
+            "keyPoints": [
+              "Join condition: same email, p1.id > p2.id.",
+              "DELETE p1 removes every non-minimal duplicate.",
+              "Only the smallest id per email remains."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "DELETE p1\nFROM Person p1\nJOIN Person p2\n  ON p1.email = p2.email AND p1.id > p2.id;",
+              "note": "Delete the higher-id duplicates"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Remove duplicate emails, keeping the lowest id." },
+              { "role": "me", "text": "I self-join on equal email where p1.id is greater, then DELETE p1 — that strips every duplicate except the minimum id." },
+              { "role": "interviewer", "text": "Why is the smallest id guaranteed to survive?" },
+              { "role": "me", "text": "A row is only deleted if some smaller-id row shares its email; the minimum has none smaller, so it's never deleted." }
+            ],
+            "followUpsQA": [
+              { "q": "Window-based alternative?", "a": "DELETE rows where ROW_NUMBER() OVER (PARTITION BY email ORDER BY id) > 1." },
+              { "q": "Why DELETE p1 specifically?", "a": "p1 is the higher-id alias, so naming it deletes the duplicates, not the keeper." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-048",
+          "q": "Second Highest Salary. Employee(id PK, salary). Return the second highest distinct salary, or NULL if it doesn't exist.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "limit-offset", "null"],
+          "answer": {
+            "oneLiner": "Order distinct salaries descending and take OFFSET 1; wrapping in a subquery makes the empty case return NULL instead of no row.",
+            "keyPoints": [
+              "DISTINCT so duplicate top salaries don't occupy the second slot.",
+              "LIMIT 1 OFFSET 1 picks the runner-up.",
+              "The outer SELECT (...) yields NULL when there's no second salary."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT (\n    SELECT DISTINCT salary\n    FROM Employee\n    ORDER BY salary DESC\n    LIMIT 1 OFFSET 1\n) AS SecondHighestSalary;",
+              "note": "Subquery wrapper guarantees a NULL row"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Return the second highest distinct salary, NULL if none." },
+              { "role": "me", "text": "I take DISTINCT salaries ordered descending with LIMIT 1 OFFSET 1, wrapped in a scalar subquery so the empty case is NULL." },
+              { "role": "interviewer", "text": "Why the outer SELECT wrapper?" },
+              { "role": "me", "text": "A bare LIMIT/OFFSET returns zero rows when there's no second salary; wrapping it produces a single NULL row as required." }
+            ],
+            "followUpsQA": [
+              { "q": "Why DISTINCT?", "a": "Without it, two top-paid employees would make the second row equal the maximum." },
+              { "q": "Generalize to N-th highest?", "a": "Use OFFSET N-1, or DENSE_RANK() = N.", "relatedId": "coding-sql50-020" }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-049",
+          "q": "Group Sold Products By The Date. Activities(sell_date, product) — may contain duplicates. For each date, report the number of distinct products sold and a comma-separated, alphabetically sorted list of those product names.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "group-concat", "distinct"],
+          "answer": {
+            "oneLiner": "Group by date, COUNT(DISTINCT product) for the tally, and GROUP_CONCAT(DISTINCT product ORDER BY product) for the sorted list.",
+            "keyPoints": [
+              "DISTINCT inside both aggregates dedupes repeated sales.",
+              "GROUP_CONCAT ... ORDER BY product gives alphabetical names.",
+              "ORDER BY sell_date for output order."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT sell_date,\n       COUNT(DISTINCT product) AS num_sold,\n       GROUP_CONCAT(DISTINCT product ORDER BY product SEPARATOR ',') AS products\nFROM Activities\nGROUP BY sell_date\nORDER BY sell_date;",
+              "note": "GROUP_CONCAT with DISTINCT + ORDER BY"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Per date, count distinct products and list them alphabetically." },
+              { "role": "me", "text": "Group by sell_date, COUNT(DISTINCT product), and GROUP_CONCAT(DISTINCT product ORDER BY product) for the comma-separated list." },
+              { "role": "interviewer", "text": "Why DISTINCT inside GROUP_CONCAT?" },
+              { "role": "me", "text": "The table can repeat a product on a date; DISTINCT ensures each name appears once in the list and the count." }
+            ],
+            "followUpsQA": [
+              { "q": "Engine portability of GROUP_CONCAT?", "a": "Postgres uses STRING_AGG(product, ',' ORDER BY product); SQL Server uses STRING_AGG too." },
+              { "q": "Default separator?", "a": "MySQL GROUP_CONCAT defaults to comma, but stating SEPARATOR ',' is explicit." }
+            ]
+          }
+        },
+        {
+          "id": "coding-sql50-050",
+          "q": "Find Users With Valid Emails. Users(user_id, name, mail). A valid email's prefix may contain letters, digits, underscore, dot, or dash, must start with a letter, and is followed by the literal domain '@leetcode.com'. Return the valid rows.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "leetcode", "regexp", "validation"],
+          "answer": {
+            "oneLiner": "Validate with a single anchored regular expression: a leading letter, allowed prefix characters, then the exact @leetcode.com domain.",
+            "keyPoints": [
+              "^[A-Za-z] forces a leading letter.",
+              "[A-Za-z0-9_.-]* allows the rest of the prefix.",
+              "@leetcode\\.com$ matches the literal domain (escaped dot), anchored to the end."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT *\nFROM Users\nWHERE mail REGEXP '^[A-Za-z][A-Za-z0-9_.-]*@leetcode\\\\.com$';",
+              "note": "Anchored regex; escape the dot in the domain"
+            },
+            "dialogue": [
+              { "role": "interviewer", "text": "Keep only the rows with valid @leetcode.com emails." },
+              { "role": "me", "text": "One anchored REGEXP: start with a letter, allow letters/digits/underscore/dot/dash in the prefix, then the literal @leetcode.com to the end." },
+              { "role": "interviewer", "text": "Why escape the dot in the domain?" },
+              { "role": "me", "text": "An unescaped '.' matches any character, so '\\\\.' forces a literal dot, preventing things like '@leetcodeXcom'." }
+            ],
+            "followUpsQA": [
+              { "q": "Why anchor with ^ and $?", "a": "Without anchors, a partial match anywhere in the string would wrongly validate." },
+              { "q": "Why put '-' last in the character class?", "a": "A trailing dash is treated literally rather than as a range operator." }
             ]
           }
         }
