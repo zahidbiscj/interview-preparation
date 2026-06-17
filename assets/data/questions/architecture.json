@@ -1,0 +1,765 @@
+{
+  "topicId": "architecture",
+  "topicName": "System Design & Architecture",
+  "subtopics": [
+    {
+      "subtopicId": "patterns",
+      "subtopicName": "Architecture Patterns",
+      "order": 1,
+      "questions": [
+        {
+          "id": "architecture-patterns-001",
+          "q": "What is Clean Architecture (Onion Architecture), and what is the Dependency Rule?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["clean-architecture", "onion", "dependency-rule", "solid", "layers"],
+          "answer": {
+            "oneLiner": "Clean Architecture organises code into concentric rings (Domain → Application → Infrastructure → Presentation) where all dependencies point inward — outer layers depend on inner layers, never the reverse.",
+            "keyPoints": [
+              "**Domain layer** (innermost): entities, value objects, domain events — zero external dependencies.",
+              "**Application layer**: use-cases / interactors, interfaces (IRepository, IEmailSender) — no knowledge of EF or HTTP.",
+              "**Infrastructure layer**: EF DbContext, file I/O, email, external APIs — implements Application interfaces.",
+              "**Presentation layer** (outermost): ASP.NET Core controllers, gRPC endpoints, Razor pages.",
+              "The **Dependency Rule**: source code dependencies must point inward only; a circle can never know about anything in an outer circle.",
+              "Interfaces are defined in inner layers and implemented in outer layers — classic **Dependency Inversion Principle**."
+            ],
+            "detail": "Clean Architecture (Robert C. Martin) and Onion Architecture (Jeffrey Palermo) share the same core insight: business logic must not depend on delivery mechanisms or infrastructure. By inverting dependencies through interfaces, you can swap databases, message brokers, or UI frameworks without touching domain code.\n\n**Why it matters in practice:** Unit tests for use-cases run in milliseconds because they operate against in-memory fakes, not a real SQL Server. Replacing EF with Dapper becomes a one-layer change. Migrating from REST to gRPC touches only the Presentation layer.\n\n**Typical project structure:**\n```\nMyApp.Domain          — entities, value objects, domain events\nMyApp.Application     — use-cases, DTOs, interface contracts\nMyApp.Infrastructure  — EF, Azure Blob, SendGrid implementations\nMyApp.Api             — ASP.NET Core, controllers, DI wiring\n```\n\n**Common pitfall:** leaking EF `IQueryable<T>` out of Infrastructure into Application. This violates the dependency rule because Application then indirectly depends on EF's query translation logic.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Application layer — defines the contract (inner ring)\npublic interface IOrderRepository\n{\n    Task<Order?> GetByIdAsync(Guid id, CancellationToken ct);\n    Task AddAsync(Order order, CancellationToken ct);\n}\n\n// Infrastructure layer — implements it (outer ring)\npublic class EfOrderRepository : IOrderRepository\n{\n    private readonly AppDbContext _db;\n    public EfOrderRepository(AppDbContext db) => _db = db;\n\n    public Task<Order?> GetByIdAsync(Guid id, CancellationToken ct)\n        => _db.Orders.FindAsync(new object[] { id }, ct).AsTask();\n\n    public async Task AddAsync(Order order, CancellationToken ct)\n    {\n        _db.Orders.Add(order);\n        await _db.SaveChangesAsync(ct);\n    }\n}",
+              "note": "The Application layer defines IOrderRepository; Infrastructure implements it. Dependency flows inward."
+            },
+            "analogy": "Think of an onion: no matter which outer layer you peel off, the core stays intact. The business rules at the centre never 'know' whether they are being called by a web browser or a CLI.",
+            "followUps": [
+              "How does Clean Architecture differ from traditional N-Tier / layered architecture?",
+              "What is the role of MediatR in a Clean Architecture project?",
+              "How do you handle cross-cutting concerns (logging, validation) without polluting the domain?"
+            ],
+            "redFlags": [
+              "Defining repositories in the Infrastructure layer and referencing them directly from Application or API.",
+              "Putting business logic in controllers or EF entity classes.",
+              "Treating Clean Architecture as 'just folders' without enforcing the dependency rule via project references."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-002",
+          "q": "Explain the Repository Pattern — what it is, why you use it, and the criticisms when used with Entity Framework.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["repository-pattern", "entity-framework", "abstraction", "unit-testing"],
+          "answer": {
+            "oneLiner": "The Repository Pattern wraps data access behind a collection-like interface so the rest of the app does not care whether data comes from SQL, a file, or a mock — but when using EF Core, it can add unnecessary abstraction because DbContext already is a unit-of-work + repository.",
+            "keyPoints": [
+              "Provides a **single place** to centralise query logic, reducing duplication of LINQ across controllers/services.",
+              "Enables **unit testing** by swapping the real implementation for an in-memory fake without spinning up a database.",
+              "**Criticism 1 — EF already has it:** `DbSet<T>` is essentially a repository; `DbContext` is a Unit of Work. Wrapping it adds a layer with no net gain.",
+              "**Criticism 2 — leaky abstraction:** Repositories that return `IQueryable<T>` expose EF internals; repositories that return `IEnumerable<T>` hide them but force all filtering to happen in-memory.",
+              "**Criticism 3 — test realism:** Mocking a repository hides subtle EF behaviours (lazy loading, query translation failures). Integration tests against a real DB (e.g., Testcontainers) are more reliable.",
+              "**When it pays off:** large teams, multiple data sources, or strict Clean Architecture boundaries where the domain must remain infrastructure-agnostic."
+            ],
+            "detail": "A Repository provides a domain-oriented API for accessing aggregates: `GetByIdAsync`, `FindByEmailAsync`, `AddAsync`, `RemoveAsync`. Callers see a simple collection; the implementation talks to the database.\n\n**The EF criticism in depth:** EF Core's `DbContext` tracks changes (Unit of Work) and `DbSet<T>` supports LINQ queries (Repository). Wrapping this in yet another generic `IRepository<T>` gives you:\n- An extra interface to maintain.\n- A facade that you then have to re-test anyway via integration tests.\n- Difficulty exposing EF-specific features (`.Include()`, `.AsNoTracking()`) without coupling the interface to EF.\n\n**Pragmatic middle ground:** many senior .NET teams skip the generic repository and instead create **query objects** or **specification objects** that encapsulate complex LINQ and are executed directly against `DbContext` in the Application layer — keeping testability without the leaky wrapper.\n\nIf you do use repositories, favour **specific** repositories (`IOrderRepository`) over generic ones (`IRepository<T>`) so the interface communicates domain intent.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Specific repository — domain-intent clear\npublic interface IOrderRepository\n{\n    Task<Order?> GetByIdAsync(Guid id, CancellationToken ct);\n    Task<IReadOnlyList<Order>> GetPendingOrdersAsync(CancellationToken ct);\n    Task AddAsync(Order order, CancellationToken ct);\n}\n\n// Avoid: leaky generic repository exposing IQueryable\npublic interface IRepository<T>  // <- anti-pattern when IQueryable is exposed\n{\n    IQueryable<T> Query(); // exposes EF internals to Application layer\n}",
+              "note": "Specific repositories communicate domain language; generic IQueryable-based ones leak infrastructure concerns."
+            },
+            "analogy": "A repository is like a librarian — you ask for 'all books by Tolkien published after 1960' and get a list back, not access to the storeroom itself.",
+            "followUps": [
+              "What is the Specification Pattern and how does it complement repositories?",
+              "Would you use a generic repository or a specific one — why?",
+              "How do you test data access without a real database?"
+            ],
+            "redFlags": [
+              "Saying 'repositories are always necessary with EF' without acknowledging DbContext already provides this abstraction.",
+              "Returning IQueryable from a repository defined in the Application layer.",
+              "Never having heard the criticism — suggests shallow experience."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-003",
+          "q": "What is the Unit of Work pattern, and how does EF Core implement it?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["unit-of-work", "entity-framework", "transactions", "dbcontext"],
+          "answer": {
+            "oneLiner": "Unit of Work tracks all changes made during a business transaction and flushes them to the database in a single atomic commit — EF Core's DbContext is the canonical .NET implementation.",
+            "keyPoints": [
+              "Collects all **inserts, updates, deletes** in memory during a logical operation before issuing a single `SaveChanges`.",
+              "Guarantees **atomicity**: all changes succeed or all roll back together.",
+              "**EF Core's DbContext** is a UoW: `ChangeTracker` records mutations; `SaveChangesAsync` commits everything in one transaction.",
+              "When you have multiple repositories, they should share the **same DbContext instance** (scoped lifetime in ASP.NET Core) so their changes commit together.",
+              "For cross-aggregate or cross-database transactions, you need **IDbContextTransaction** or a distributed transaction / saga.",
+              "Explicit UoW interfaces (`IUnitOfWork`) are useful when you want the Application layer to control commit timing without exposing DbContext directly."
+            ],
+            "detail": "The pattern separates the *tracking* of changes from the *persisting* of them. During a web request an EF DbContext is registered as `Scoped` — every repository injected in the same request shares the same instance. You call `AddAsync` on an order, update a customer, then call `unitOfWork.CommitAsync()` once. EF wraps all of it in one SQL transaction.\n\n**Explicit IUnitOfWork pattern:**\n```csharp\npublic interface IUnitOfWork\n{\n    Task<int> CommitAsync(CancellationToken ct = default);\n}\n```\nThe Infrastructure implementation simply delegates to `DbContext.SaveChangesAsync`. The Application use-case calls `_unitOfWork.CommitAsync()` at the end, keeping it unaware of EF.\n\n**Pitfall — double SaveChanges:** if two services each call `SaveChangesAsync` independently you get partial commits. Always commit once at the boundary of the use-case.\n\n**Pitfall — long-running UoW:** holding a DbContext open for a long-running operation risks stale data and long-held DB connections. Scope the UoW tightly.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Application layer\npublic class PlaceOrderHandler\n{\n    private readonly IOrderRepository _orders;\n    private readonly IInventoryRepository _inventory;\n    private readonly IUnitOfWork _uow;\n\n    public async Task HandleAsync(PlaceOrderCommand cmd, CancellationToken ct)\n    {\n        var order = Order.Create(cmd.CustomerId, cmd.Items);\n        var item = await _inventory.GetAsync(cmd.Items[0].ProductId, ct);\n        item.Reserve(cmd.Items[0].Quantity);\n\n        await _orders.AddAsync(order, ct);\n        // Both changes commit atomically:\n        await _uow.CommitAsync(ct);\n    }\n}",
+              "note": "Single CommitAsync at the use-case boundary ensures order + inventory change in one transaction."
+            },
+            "followUps": [
+              "How do you handle transactions that span multiple microservices?",
+              "What is the difference between IDbContextTransaction and ambient transactions (TransactionScope)?",
+              "Why should DbContext be registered as Scoped, not Singleton?"
+            ],
+            "redFlags": [
+              "Calling SaveChangesAsync inside the repository rather than at the use-case boundary.",
+              "Registering DbContext as Singleton — causes shared state across requests.",
+              "Confusing Unit of Work with Repository — they solve different problems."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-004",
+          "q": "What is CQRS and when should you use it?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["cqrs", "commands", "queries", "mediatr", "read-write-separation"],
+          "answer": {
+            "oneLiner": "CQRS (Command Query Responsibility Segregation) separates write operations (Commands) from read operations (Queries) so each side can be optimised, scaled, and maintained independently.",
+            "keyPoints": [
+              "**Commands** mutate state and return minimal data (an ID or void); **Queries** return data and must not mutate state.",
+              "Simplest form: two separate service classes / handlers — no event sourcing required.",
+              "**Read-side optimisation:** queries can hit a denormalised read model, a cache, or a read replica — bypassing domain rules and ORM overhead.",
+              "**Write-side optimisation:** commands go through full domain validation, aggregates, and domain events.",
+              "**MediatR** is the dominant .NET library implementing the mediator pattern to dispatch commands and queries to handlers.",
+              "Full CQRS with **event sourcing** is powerful but complex — avoid until the domain justifies it."
+            ],
+            "detail": "CQRS originates from Bertrand Meyer's Command-Query Separation principle ('a method should either do something or answer something, not both') applied at the architectural level.\n\n**Why it helps at scale:**\n- Read traffic commonly dwarfs write traffic (10:1 or more). With CQRS you can scale the read side independently, add a Redis cache, or use a read replica.\n- Complex domain logic stays in the command handlers without being polluted by the projection concerns of reporting queries.\n\n**MediatR in practice:**\n```csharp\n// Command\npublic record PlaceOrderCommand(Guid CustomerId, List<OrderItem> Items) : IRequest<Guid>;\n\n// Query\npublic record GetOrderSummaryQuery(Guid OrderId) : IRequest<OrderSummaryDto>;\n```\nControllers send commands/queries through `IMediator.Send()`; handlers are discovered by DI. This also enables pipeline behaviours (logging, validation, caching) via `IPipelineBehavior<,>`.\n\n**When NOT to use CQRS:** simple CRUD apps gain nothing and pay in ceremony. Introduce it when you see read/write scaling asymmetry, complex domain invariants, or need independent deployment of read vs. write components.\n\n**CQRS + Event Sourcing:** storing domain events as the source of truth rather than current state. Powerful for audit trails and temporal queries but adds significant operational complexity (projection rebuilds, snapshot strategies).",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Handler — write side (Command)\npublic class PlaceOrderHandler : IRequestHandler<PlaceOrderCommand, Guid>\n{\n    private readonly IOrderRepository _repo;\n    private readonly IUnitOfWork _uow;\n    public PlaceOrderHandler(IOrderRepository repo, IUnitOfWork uow)\n        => (_repo, _uow) = (repo, uow);\n\n    public async Task<Guid> Handle(PlaceOrderCommand cmd, CancellationToken ct)\n    {\n        var order = Order.Create(cmd.CustomerId, cmd.Items);\n        await _repo.AddAsync(order, ct);\n        await _uow.CommitAsync(ct);\n        return order.Id;\n    }\n}\n\n// Handler — read side (Query) — skips domain layer, hits DB directly\npublic class GetOrderSummaryHandler : IRequestHandler<GetOrderSummaryQuery, OrderSummaryDto>\n{\n    private readonly AppDbContext _db;\n    public GetOrderSummaryHandler(AppDbContext db) => _db = db;\n\n    public Task<OrderSummaryDto> Handle(GetOrderSummaryQuery q, CancellationToken ct)\n        => _db.Orders\n              .AsNoTracking()\n              .Where(o => o.Id == q.OrderId)\n              .Select(o => new OrderSummaryDto(o.Id, o.Status, o.TotalAmount))\n              .FirstOrDefaultAsync(ct)!;\n}",
+              "note": "Query handler bypasses repository and domain layer entirely — reads directly from DbContext for performance."
+            },
+            "analogy": "A restaurant kitchen: orders (commands) go to the chef for complex preparation; the menu display (query) reads from a printed board without disturbing the chef.",
+            "followUps": [
+              "What is eventual consistency and how does it relate to CQRS with a separate read store?",
+              "How do you handle validation in a CQRS pipeline?",
+              "What is the difference between CQRS and Event Sourcing — must they be used together?"
+            ],
+            "redFlags": [
+              "Thinking CQRS always requires a separate read database or event sourcing.",
+              "Returning full entities from Query handlers — breaks the read/write separation intent.",
+              "Applying CQRS to simple CRUD endpoints without justification."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-005",
+          "q": "Monolith vs Microservices — how do you choose, and what are the real trade-offs?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["microservices", "monolith", "distributed-systems", "architecture-decision"],
+          "answer": {
+            "oneLiner": "A monolith is simpler to build and operate but becomes a bottleneck at scale; microservices enable independent scaling and deployment but introduce distributed-system complexity — choose based on team size, domain maturity, and operational capability.",
+            "keyPoints": [
+              "**Monolith strengths:** single deployment, simple debugging, no network latency between components, ACID transactions across the whole domain.",
+              "**Microservices strengths:** independent deployability, technology heterogeneity, fault isolation, targeted scaling of hot services.",
+              "**Microservices costs:** network calls, distributed transactions (eventual consistency), service discovery, observability overhead, polyglot persistence complexity.",
+              "**Team size heuristic:** Conway's Law — system architecture mirrors team communication structure. Microservices make sense when teams are large enough to own independent services end-to-end.",
+              "**Modular monolith first:** enforce module boundaries within one process via projects/assemblies; extract services only when you have a proven scaling or team ownership reason.",
+              "Key question: can your team operate Kubernetes, distributed tracing, and multi-service CI/CD pipelines? If not, microservices hurt more than they help."
+            ],
+            "detail": "The monolith vs microservices debate is often framed as a maturity question, but it is really an **operational capability** and **domain complexity** question.\n\n**When monolith wins:**\n- Early-stage product where requirements are still changing rapidly.\n- Small team (< 8 developers).\n- Domain boundaries are not yet well understood — premature decomposition creates wrong-seamed services that are painful to refactor.\n\n**When microservices win:**\n- Distinct bounded contexts with genuinely different scaling needs (e.g., order processing vs. image thumbnail generation).\n- Multiple large teams that need to deploy independently without coordinating releases.\n- Fault isolation is critical — a payment service crashing must not take down the catalogue.\n\n**The modular monolith path:** define clear module boundaries with internal interfaces, separate databases per module (same server, different schemas), and enforce no cross-module direct DB access. This gives you most microservices benefits without the network overhead. Later, if one module needs independent scaling, you extract it with confidence because the boundary is already clean.\n\n**Distributed system fallacies:** network is reliable, latency is zero, bandwidth is infinite, the network is secure — microservices force you to handle all these. Add retry policies, circuit breakers, timeouts, and idempotency keys to every service boundary.",
+            "followUps": [
+              "What is a Modular Monolith and how does it differ from a Big Ball of Mud?",
+              "How do you handle transactions that span microservices?",
+              "What is the Strangler Fig pattern for migrating a monolith to microservices?"
+            ],
+            "redFlags": [
+              "Saying 'microservices are always better' without considering team and operational maturity.",
+              "Not being able to describe the specific pain points that microservices introduce.",
+              "Never having heard of the modular monolith as a middle path."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-006",
+          "q": "How do you design for scalability and fault tolerance? Explain horizontal vs vertical scaling, retries, and the circuit breaker pattern.",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["scalability", "fault-tolerance", "circuit-breaker", "retries", "polly", "horizontal-scaling"],
+          "answer": {
+            "oneLiner": "Scalability and fault tolerance require horizontal scaling behind a load balancer, stateless services, retry policies with exponential backoff, and circuit breakers to stop cascade failures — all wired together in .NET with Polly or Microsoft.Extensions.Http.Resilience.",
+            "keyPoints": [
+              "**Vertical scaling** (scale up): larger VM/container — quick but has a ceiling and is expensive; **Horizontal scaling** (scale out): more instances behind a load balancer — requires stateless services.",
+              "**Stateless services:** session state in a distributed cache (Redis), no in-process caching that differs per instance.",
+              "**Retry with exponential backoff + jitter:** transient failures (timeouts, 503) should be retried; jitter prevents thundering-herd (all instances retrying simultaneously).",
+              "**Circuit Breaker:** after N consecutive failures, 'open' the circuit for T seconds — fail fast instead of queueing requests to a broken downstream, giving it time to recover.",
+              "**Timeout:** every outbound call must have a timeout; otherwise a slow downstream holds your thread pool.",
+              "**Bulkhead:** limit concurrent calls to a downstream so a slow dependency does not exhaust shared resources."
+            ],
+            "detail": "**Horizontal scaling prerequisites:**\n1. Stateless application code — no in-memory session, no local file storage.\n2. Shared, distributed state — SQL with connection pooling, Redis for cache/session.\n3. Health checks — `/health` endpoint so the load balancer can drain unhealthy instances.\n4. Graceful shutdown — drain in-flight requests before terminating (ASP.NET Core `IHostedService.StopAsync`).\n\n**Polly (and Microsoft Resilience) in .NET 8:**\n```csharp\nservices.AddHttpClient<ICatalogClient, CatalogClient>()\n    .AddStandardResilienceHandler(); // retry + circuit breaker + timeout built in\n```\nOr compose manually:\n```csharp\nvar pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()\n    .AddRetry(new RetryStrategyOptions<HttpResponseMessage>\n    {\n        MaxRetryAttempts = 3,\n        BackoffType = DelayBackoffType.Exponential,\n        UseJitter = true\n    })\n    .AddCircuitBreaker(new CircuitBreakerStrategyOptions<HttpResponseMessage>\n    {\n        FailureRatio = 0.5,\n        SamplingDuration = TimeSpan.FromSeconds(10),\n        BreakDuration = TimeSpan.FromSeconds(30)\n    })\n    .AddTimeout(TimeSpan.FromSeconds(5))\n    .Build();\n```\n\n**Circuit Breaker states:**\n- **Closed** — normal; calls pass through, failures counted.\n- **Open** — circuit tripped; calls fail immediately (fast fail).\n- **Half-Open** — probe request allowed; if it succeeds, circuit closes; if not, stays open.\n\n**Azure-specific:** Azure Service Bus dead-letter queues, Azure Front Door health probes, App Service autoscale rules, and Azure Load Balancer all contribute to a fault-tolerant architecture.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// .NET 8 — Microsoft.Extensions.Http.Resilience\nbuilder.Services.AddHttpClient<IPaymentClient, PaymentClient>()\n    .AddResilienceHandler(\"payment\", pipeline =>\n    {\n        pipeline.AddRetry(new HttpRetryStrategyOptions\n        {\n            MaxRetryAttempts = 3,\n            BackoffType = DelayBackoffType.Exponential,\n            UseJitter = true,\n            ShouldHandle = args => ValueTask.FromResult(\n                args.Outcome.Result?.StatusCode is\n                    HttpStatusCode.ServiceUnavailable or\n                    HttpStatusCode.TooManyRequests)\n        });\n        pipeline.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions\n        {\n            BreakDuration = TimeSpan.FromSeconds(30)\n        });\n        pipeline.AddTimeout(TimeSpan.FromSeconds(5));\n    });",
+              "note": "Order matters: timeout wraps circuit breaker wraps retry — innermost policy executes first."
+            },
+            "analogy": "A circuit breaker is like the fuse in a house's electrical panel — it trips to protect the whole system when one appliance overloads the circuit, rather than letting the wiring burn.",
+            "followUps": [
+              "What is the difference between a retry and an idempotency key?",
+              "How do you implement a health check endpoint in ASP.NET Core?",
+              "What is the Bulkhead pattern and when would you use it?"
+            ],
+            "redFlags": [
+              "Retrying non-idempotent operations (e.g., payment POST) without idempotency keys.",
+              "Not adding jitter to retries — leads to thundering herd.",
+              "Implementing retries without a circuit breaker — can amplify load on a failing service."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-007",
+          "q": "What is an API Gateway and how do services communicate with each other in a microservices architecture?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["api-gateway", "service-mesh", "grpc", "http", "service-communication", "azure-apim"],
+          "answer": {
+            "oneLiner": "An API Gateway is the single entry point for external clients that handles routing, auth, rate limiting, and SSL termination; services communicate internally via synchronous HTTP/gRPC or asynchronous messaging depending on coupling and latency requirements.",
+            "keyPoints": [
+              "**API Gateway responsibilities:** request routing, authentication/JWT validation, rate limiting, SSL offloading, response aggregation, API versioning.",
+              "**Azure options:** Azure API Management (APIM) for enterprise features; Azure Application Gateway for L7 load balancing; YARP (Yet Another Reverse Proxy) for in-process .NET gateways.",
+              "**Sync communication (HTTP/gRPC):** use when the caller needs an immediate response. gRPC is preferred for internal service-to-service calls (binary, typed contracts via Protobuf, HTTP/2).",
+              "**Async communication (message broker):** use Azure Service Bus, RabbitMQ, or Kafka when the operation can be fire-and-forget or when services should be decoupled from each other's availability.",
+              "**Service discovery:** in Kubernetes, DNS-based discovery (ClusterIP services); in Azure Container Apps, built-in service discovery.",
+              "**Backend for Frontend (BFF):** a dedicated gateway per client type (mobile, web, partner API) that aggregates and tailors responses for that client."
+            ],
+            "detail": "**When to use sync vs async:**\n- **Sync (HTTP/gRPC):** user is waiting for the response (login, product search, checkout availability check).\n- **Async (messaging):** work can be deferred (send email, generate report, propagate an event to other bounded contexts).\n\n**gRPC for internal calls:** strongly typed contracts (`.proto` files), binary serialisation (smaller payloads than JSON), built-in streaming, and HTTP/2 multiplexing. In .NET 8, Grpc.AspNetCore and Grpc.Net.Client are mature and production-ready.\n\n**Service Mesh (Dapr / Istio):** adds mTLS between services, observability (distributed tracing), and retry/circuit-breaker policies at the infrastructure layer — services do not need to know about each other's locations. Dapr is particularly popular in Azure Container Apps.\n\n**YARP example:** a lightweight in-process .NET reverse proxy configured via JSON — useful for simple gateway scenarios without the cost of APIM.\n\n**Avoiding the 'chatty' anti-pattern:** when ServiceA calls ServiceB which calls ServiceC synchronously, you create a dependency chain. If ServiceC is slow, the latency stacks. Prefer event-driven flows for non-critical paths.",
+            "followUps": [
+              "What is the difference between an API Gateway and a Service Mesh?",
+              "How do you secure service-to-service communication (mTLS, service accounts)?",
+              "What is YARP and when would you choose it over Azure APIM?"
+            ],
+            "redFlags": [
+              "Saying HTTP is always the right choice for service communication without considering async alternatives.",
+              "Forgetting that the API Gateway is a potential single point of failure — it needs redundancy.",
+              "Conflating an API Gateway with a load balancer."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-008",
+          "q": "What is CORS, and how does ASP.NET Core handle it? How does it relate to event-driven design?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["cors", "security", "aspnet-core", "event-driven", "browser-security"],
+          "answer": {
+            "oneLiner": "CORS (Cross-Origin Resource Sharing) is a browser security mechanism that blocks web pages from making requests to a different origin unless the server explicitly allows it via HTTP headers — ASP.NET Core has built-in middleware to configure this.",
+            "keyPoints": [
+              "**Same-Origin Policy:** browsers block `fetch`/XHR to a different origin (scheme + domain + port) by default.",
+              "**CORS headers:** `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers` sent by the server tell the browser which cross-origin requests are permitted.",
+              "**Preflight request:** for non-simple requests (custom headers, PUT/DELETE), the browser sends an `OPTIONS` request first; the server must respond with the appropriate CORS headers.",
+              "**ASP.NET Core:** configure via `builder.Services.AddCors()` + `app.UseCors(policy)` — never use wildcard `*` with credentials.",
+              "**Event-driven design** sidesteps CORS for backend-to-backend messaging (Service Bus, Kafka) — CORS only applies to browser-to-server HTTP calls.",
+              "In event-driven architectures, the browser may use a dedicated BFF API (which you own and can configure CORS on) rather than calling internal services directly."
+            ],
+            "detail": "CORS is a browser enforcement mechanism — it has no effect on server-to-server API calls (curl, HttpClient, Postman). It only matters when a browser JavaScript app on `https://app.contoso.com` calls an API on `https://api.contoso.com`.\n\n**ASP.NET Core configuration:**\n```csharp\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"AllowFrontend\", policy =>\n        policy.WithOrigins(\"https://app.contoso.com\")\n              .AllowAnyHeader()\n              .AllowAnyMethod()\n              .AllowCredentials());\n});\napp.UseCors(\"AllowFrontend\"); // must be before UseRouting / UseAuthorization\n```\n\n**In event-driven architectures:** services emit events to a broker (Service Bus, Kafka). Consumers are server processes, not browsers — CORS is irrelevant. The browser only talks to a single BFF or API gateway endpoint (same origin or explicitly CORS-enabled), which then publishes events internally. This is cleaner separation of concerns.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Program.cs\nbuilder.Services.AddCors(options =>\n    options.AddPolicy(\"Spa\", p =>\n        p.WithOrigins(\"https://localhost:4200\", \"https://myapp.azurestaticapps.net\")\n         .AllowAnyHeader()\n         .AllowAnyMethod()));\n\nvar app = builder.Build();\napp.UseCors(\"Spa\"); // Before UseAuthentication / UseAuthorization",
+              "note": "Always specify explicit origins in production — never use AllowAnyOrigin() with AllowCredentials()."
+            },
+            "followUps": [
+              "What is the difference between a simple request and a preflight request?",
+              "How do you handle CORS in Azure API Management?",
+              "Why does CORS not protect against CSRF?"
+            ],
+            "redFlags": [
+              "Using `AllowAnyOrigin()` with `AllowCredentials()` — this is a browser security error and will be rejected.",
+              "Thinking CORS protects server-to-server calls.",
+              "Placing `UseCors` after `UseAuthorization` — the CORS preflight OPTIONS request will be rejected by the auth middleware."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-009",
+          "q": "Compare Layered (N-Tier) Architecture with Clean Architecture — when would you choose each?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["n-tier", "layered-architecture", "clean-architecture", "dependency-direction"],
+          "answer": {
+            "oneLiner": "Traditional N-Tier flows top-to-bottom (UI → Business Logic → Data), with higher layers depending on lower ones including the database; Clean Architecture inverts this so the domain at the centre depends on nothing — choosing between them depends on project size, team skill, and testability requirements.",
+            "keyPoints": [
+              "**N-Tier:** UI → Business Logic → Data Access → Database. The business layer directly references the data access layer's concrete classes.",
+              "**Clean Architecture:** Domain ← Application ← Infrastructure/Presentation. Business logic depends only on abstractions it defines itself.",
+              "**N-Tier advantage:** simpler mental model, less ceremony, appropriate for small CRUD apps.",
+              "**N-Tier disadvantage:** business logic depends on the database layer, making unit testing hard without a real DB or complex mocking.",
+              "**Clean Architecture advantage:** domain and application layers testable in isolation, infrastructure swappable.",
+              "**Clean Architecture disadvantage:** more projects, more interfaces, steeper onboarding — overkill for simple CRUD."
+            ],
+            "detail": "In a classic N-Tier architecture the dependency arrow points downward: the Business Logic Layer references `DataAccessLayer.OrderRepository` (a concrete class). This means to unit-test the BLL you must either instantiate the DAL (which needs a DB connection) or use a mocking framework to intercept concrete types.\n\nClean Architecture solves this by defining the `IOrderRepository` interface in the Application layer and having Infrastructure implement it. The Application layer has zero knowledge of EF, SQL, or any specific technology. You can test the entire business logic with a dictionary-backed fake.\n\n**Practical guidance:**\n- Small API with 5 entities and one developer → N-Tier with a service layer is fine.\n- Domain-rich app, medium/large team, long maintenance horizon → Clean Architecture pays for itself within months.\n- Brownfield N-Tier app → introduce interfaces gradually; do not try to migrate the whole codebase at once.",
+            "followUps": [
+              "What is a Vertical Slice Architecture and how does it differ from both?",
+              "Can you mix N-Tier and Clean Architecture in the same solution?",
+              "What is the role of the Application layer in Clean Architecture?"
+            ],
+            "redFlags": [
+              "Thinking Clean Architecture is always superior — for a small CRUD app it adds unnecessary complexity.",
+              "Describing N-Tier without mentioning the downward dependency direction.",
+              "Not knowing that the key difference is where abstractions (interfaces) are defined."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-010",
+          "q": "What is the Mediator Pattern? How does MediatR implement it in .NET, and what are its benefits and downsides?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["mediator", "mediatr", "cqrs", "pipeline-behaviour", "design-patterns"],
+          "answer": {
+            "oneLiner": "The Mediator Pattern routes messages between objects through a central hub so senders and receivers do not know about each other; MediatR implements this in .NET by dispatching Command/Query objects to registered handlers, and adding pipeline behaviours for cross-cutting concerns.",
+            "keyPoints": [
+              "Reduces **direct coupling** between components — a controller sends a `CreateOrderCommand` without knowing which class handles it.",
+              "**MediatR** discovers handlers via DI; `IMediator.Send()` routes a request to the single registered `IRequestHandler<TRequest, TResponse>`.",
+              "**Pipeline behaviours** (`IPipelineBehavior<,>`) add cross-cutting concerns — validation (FluentValidation), logging, caching, transactions — in a composable pipeline.",
+              "**Notification/Event pattern:** `INotification` + `INotificationHandler<T>` — multiple handlers can subscribe to one event (domain event dispatching).",
+              "**Downside:** hides dependencies — a controller with `IMediator` could handle anything; static analysis and IDE navigation become harder.",
+              "**Downside:** over-engineering for simple CRUD — adding MediatR adds ceremony that a direct service call avoids."
+            ],
+            "detail": "MediatR is so commonly associated with Clean Architecture + CQRS in .NET that many teams adopt it by default. It is worth understanding both what it solves and where it adds noise.\n\n**Pipeline behaviour example — validation:**\n```csharp\npublic class ValidationBehaviour<TRequest, TResponse>\n    : IPipelineBehavior<TRequest, TResponse>\n    where TRequest : IRequest<TResponse>\n{\n    private readonly IEnumerable<IValidator<TRequest>> _validators;\n\n    public async Task<TResponse> Handle(\n        TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)\n    {\n        var failures = _validators\n            .SelectMany(v => v.Validate(request).Errors)\n            .Where(f => f is not null)\n            .ToList();\n\n        if (failures.Any())\n            throw new ValidationException(failures);\n\n        return await next();\n    }\n}\n```\nThis runs before every handler without the handler knowing validation exists. The pipeline also naturally supports logging request/response times, wrapping handlers in a `TransactionScope`, or short-circuiting with a cached response.\n\n**When to avoid MediatR:** simple services with 3-5 endpoints gain nothing. Direct constructor injection of a service is cleaner, more navigable, and easier to onboard new developers.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// 1. Request + Handler\npublic record GetProductQuery(Guid Id) : IRequest<ProductDto>;\n\npublic class GetProductHandler : IRequestHandler<GetProductQuery, ProductDto>\n{\n    private readonly IProductRepository _repo;\n    public GetProductHandler(IProductRepository repo) => _repo = repo;\n\n    public async Task<ProductDto> Handle(GetProductQuery q, CancellationToken ct)\n    {\n        var product = await _repo.GetByIdAsync(q.Id, ct);\n        return product is null\n            ? throw new NotFoundException(nameof(Product), q.Id)\n            : new ProductDto(product.Id, product.Name, product.Price);\n    }\n}\n\n// 2. Controller\n[HttpGet(\"{id}\")]\npublic Task<ProductDto> Get(Guid id, CancellationToken ct)\n    => _mediator.Send(new GetProductQuery(id), ct);",
+              "note": "Controller depends only on IMediator — completely decoupled from the handler implementation."
+            },
+            "followUps": [
+              "How do you register MediatR pipeline behaviours in .NET 8?",
+              "What is the difference between IRequest and INotification in MediatR?",
+              "How would you implement a caching pipeline behaviour?"
+            ],
+            "redFlags": [
+              "Saying MediatR IS CQRS — it is a tool that facilitates CQRS, not the pattern itself.",
+              "Not knowing what IPipelineBehavior does — it is the main value-add beyond simple dispatch.",
+              "Using MediatR without any pipeline behaviours — misses the key benefit."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-011",
+          "q": "What are the core concepts of Domain-Driven Design (DDD) relevant to a senior .NET developer?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["ddd", "domain-driven-design", "aggregates", "value-objects", "bounded-context", "domain-events"],
+          "answer": {
+            "oneLiner": "DDD structures software around the business domain using Bounded Contexts, Aggregates, Entities, Value Objects, and Domain Events — giving teams a shared language (Ubiquitous Language) and clear consistency boundaries.",
+            "keyPoints": [
+              "**Ubiquitous Language:** domain terms used consistently in code, tests, and conversations with domain experts.",
+              "**Bounded Context:** a boundary within which a domain model is defined and consistent — `Order` in the Sales context differs from `Order` in the Fulfilment context.",
+              "**Aggregate:** a cluster of objects treated as a unit for data changes; has one **Aggregate Root** through which all modifications must flow.",
+              "**Entity:** has identity (an ID) that persists over time. **Value Object:** defined by its attributes, has no identity, is immutable (`Money`, `Address`).",
+              "**Domain Event:** something significant that happened in the domain (`OrderPlaced`, `PaymentFailed`) — emitted by aggregates and handled to trigger side effects.",
+              "**Repository:** retrieves and saves Aggregate Roots — never individual child entities within an aggregate."
+            ],
+            "detail": "DDD is most valuable in complex domains with rich business rules. For CRUD-heavy apps it adds ceremony without benefit.\n\n**Aggregate design rules:**\n1. Reference other aggregates by ID only, not by object reference.\n2. Only the Aggregate Root enforces invariants — child entities cannot be modified directly from outside.\n3. Aggregates should be small — large aggregates cause lock contention.\n\n**Value Objects in C# (record types):**\n```csharp\npublic record Money(decimal Amount, string Currency)\n{\n    public static Money operator +(Money a, Money b)\n    {\n        if (a.Currency != b.Currency) throw new InvalidOperationException(\"Currency mismatch\");\n        return new Money(a.Amount + b.Amount, a.Currency);\n    }\n}\n```\n\n**Domain Events:** aggregates raise events internally; after `SaveChangesAsync` the application layer dispatches them via MediatR `INotification`. This allows side effects (send email, update read model) to be handled outside the aggregate without coupling.\n\n**Bounded Contexts and microservices:** each microservice is ideally one Bounded Context. The **Context Map** documents relationships between contexts (Shared Kernel, Customer-Supplier, Anti-Corruption Layer).",
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class Order : AggregateRoot  // AggregateRoot is a base class that holds domain events\n{\n    private readonly List<OrderLine> _lines = new();\n    public IReadOnlyList<OrderLine> Lines => _lines.AsReadOnly();\n    public OrderStatus Status { get; private set; } = OrderStatus.Draft;\n\n    public void AddLine(ProductId productId, int quantity, Money unitPrice)\n    {\n        if (Status != OrderStatus.Draft)\n            throw new InvalidOperationException(\"Cannot modify a confirmed order.\");\n        _lines.Add(new OrderLine(productId, quantity, unitPrice));\n    }\n\n    public void Confirm()\n    {\n        if (!_lines.Any()) throw new DomainException(\"Order must have at least one line.\");\n        Status = OrderStatus.Confirmed;\n        RaiseDomainEvent(new OrderConfirmedEvent(Id, DateTime.UtcNow));\n    }\n}",
+              "note": "Aggregate root encapsulates invariants; only it can raise domain events. Child entities (OrderLine) are not accessible for direct modification externally."
+            },
+            "followUps": [
+              "How do you implement domain events with EF Core and MediatR?",
+              "What is an Anti-Corruption Layer and when do you need one?",
+              "How do you model a Bounded Context boundary in a .NET solution?"
+            ],
+            "redFlags": [
+              "Treating every table as an aggregate — most tables should be entities within aggregates.",
+              "Not knowing the difference between an Entity and a Value Object.",
+              "Using DDD tactical patterns (aggregates, events) without understanding the strategic patterns (bounded contexts, context maps)."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-012",
+          "q": "What is the SAGA pattern for distributed transactions, and how does it differ from two-phase commit?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["saga", "distributed-transactions", "choreography", "orchestration", "eventual-consistency"],
+          "answer": {
+            "oneLiner": "A SAGA is a sequence of local transactions where each step publishes an event or command to trigger the next; if a step fails, compensating transactions undo the prior steps — providing eventual consistency without a distributed lock.",
+            "keyPoints": [
+              "**Two-phase commit (2PC):** a coordinator locks resources across multiple services until all agree to commit — strong consistency but couples services and is a distributed lock, catastrophic if the coordinator fails.",
+              "**SAGA:** each service executes a local transaction and emits an event; the next service reacts — no shared lock, each DB is only locally consistent.",
+              "**Compensating transactions:** if step N fails, steps N-1, N-2,... issue compensation (e.g., cancel a reservation, refund a payment) — these must be idempotent.",
+              "**Choreography:** services react to each other's events with no central coordinator — simpler, but hard to track overall workflow state.",
+              "**Orchestration:** a central SAGA orchestrator (or workflow engine like Azure Durable Functions) issues commands and handles failures — easier to reason about.",
+              "**Eventual consistency:** during a SAGA the system is temporarily inconsistent — UI must handle this (show 'processing', poll for completion)."
+            ],
+            "detail": "**Order processing example (orchestrated SAGA):**\n1. Create Order (Order service) → emit `OrderCreated`\n2. Reserve Inventory (Inventory service) → emit `InventoryReserved` or `InventoryFailed`\n3. Charge Payment (Payment service) → emit `PaymentCharged` or `PaymentFailed`\n4. Confirm Order (Order service)\n\nIf PaymentFailed → compensate: release inventory reservation → cancel order.\n\n**Azure Durable Functions** implement orchestrated SAGAs naturally — the orchestrator function calls activity functions and handles retries, timeouts, and compensation via the fan-out/fan-in pattern.\n\n**Idempotency is mandatory:** because SAGAs use async messaging and retries, every step must be idempotent — processing the same `PaymentCharge` command twice must not double-charge.\n\n**When SAGAs get complex:** long-running sagas with many compensation paths are hard to test and reason about. Consider whether the business process can be simplified before modelling it as a SAGA.",
+            "followUps": [
+              "How do you implement idempotency in a SAGA step?",
+              "What is the difference between choreography and orchestration in a SAGA?",
+              "How do Azure Durable Functions help implement the SAGA pattern?"
+            ],
+            "redFlags": [
+              "Suggesting 2PC as the default solution for distributed transactions — it is an anti-pattern in microservices.",
+              "Not knowing what a compensating transaction is.",
+              "Thinking eventual consistency means 'data will be consistent at some random future point' — it means 'given no new updates, the system will converge to a consistent state'."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-013",
+          "q": "Synchronous vs asynchronous communication in microservices — how do you decide?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["sync", "async", "messaging", "service-bus", "http", "grpc", "coupling"],
+          "answer": {
+            "oneLiner": "Use synchronous (HTTP/gRPC) when the caller needs an immediate result and latency chains are short; use asynchronous messaging (Service Bus, Kafka) when operations can be deferred, services should be decoupled, or reliability across failures is needed.",
+            "keyPoints": [
+              "**Sync (HTTP/gRPC):** simple, familiar, easy to trace; tightly couples availability — if downstream is down, caller fails immediately.",
+              "**Async (message broker):** producer continues regardless of consumer availability; broker acts as a buffer; enables retry without caller involvement.",
+              "**Latency chains:** three sync hops of 100ms each = 300ms minimum; one hop + async = 100ms + deferred.",
+              "**Use async for:** order placement events, notifications, audit logs, eventual read model updates, cross-bounded-context integration events.",
+              "**Use sync for:** real-time user queries (product search), authentication, availability checks that must be current.",
+              "**Dead-letter queues (DLQ):** messages that fail repeatedly are moved to a DLQ for manual inspection — a critical operational safety net."
+            ],
+            "detail": "**Decision matrix:**\n\n| Factor | Sync | Async |\n|---|---|---|\n| Response needed now | Yes | No |\n| Downstream may be down | Bad fit | Good fit |\n| High throughput bursts | Risky (backpressure) | Broker absorbs spikes |\n| Cross-bounded-context | Risky (coupling) | Good (event contract) |\n| Simple CRUD | Good fit | Overkill |\n\n**Azure Service Bus vs Event Grid vs Event Hubs:**\n- **Service Bus:** reliable ordered message delivery, queues + topics, sessions, dead-lettering — enterprise messaging.\n- **Event Grid:** push-based event routing (Azure resource events, webhooks) — low volume, notification-style.\n- **Event Hubs:** high-throughput event streaming (telemetry, logs, real-time analytics) — Kafka-compatible.\n\n**The dual-write problem:** updating the DB and publishing to a broker in two separate operations risks inconsistency if one fails. Solutions: **Transactional Outbox Pattern** (write event to DB in the same transaction, a background worker publishes it) or **Change Data Capture (CDC)** via Debezium.",
+            "followUps": [
+              "What is the Transactional Outbox Pattern?",
+              "How do you guarantee message ordering in Azure Service Bus?",
+              "What is the difference between a queue and a topic in Azure Service Bus?"
+            ],
+            "redFlags": [
+              "Defaulting to async for everything — some operations genuinely need synchronous responses.",
+              "Not knowing about the dual-write problem when combining DB writes with message publishing.",
+              "Treating async communication as simply 'fire and forget' without discussing retry, DLQ, and idempotency."
+            ]
+          }
+        },
+        {
+          "id": "architecture-patterns-014",
+          "q": "What is idempotency in distributed systems, and how do you implement it in a .NET API?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["idempotency", "distributed-systems", "retry", "api-design", "idempotency-key"],
+          "answer": {
+            "oneLiner": "An operation is idempotent if performing it multiple times produces the same result as performing it once — critical in distributed systems where retries and at-least-once delivery are the norm.",
+            "keyPoints": [
+              "**HTTP idempotency by spec:** GET, PUT, DELETE are idempotent; POST is not by default.",
+              "**Idempotency key:** client generates a unique key (UUID) per logical operation; API stores the first result; if the same key arrives again, return the stored result without re-executing.",
+              "**Storage options for keys:** Redis with TTL (fast, evicts automatically), or a dedicated DB table — choose based on required retention.",
+              "**Payment APIs:** Stripe and PayPal use `Idempotency-Key` request headers as the industry standard pattern.",
+              "**Message consumer idempotency:** check if a message ID was already processed before doing work; Service Bus provides `MessageId` for this purpose.",
+              "**Natural idempotency:** design operations so they can safely re-run — `UPDATE orders SET status='Confirmed' WHERE status='Draft'` is naturally idempotent."
+            ],
+            "detail": "**Why retries break non-idempotent operations:**\nSuppose a client POSTs a payment request and gets a network timeout. It retries. If the server processed the first request but the response was lost, the customer is charged twice. An idempotency key prevents this.\n\n**Implementation pattern in ASP.NET Core:**\n```csharp\n[HttpPost(\"charges\")]\npublic async Task<IActionResult> CreateCharge(\n    [FromHeader(Name = \"Idempotency-Key\")] string idempotencyKey,\n    [FromBody] ChargeRequest request)\n{\n    var cached = await _cache.GetAsync<ChargeResponse>(idempotencyKey);\n    if (cached is not null) return Ok(cached);\n\n    var result = await _paymentService.ChargeAsync(request);\n\n    await _cache.SetAsync(idempotencyKey, result, TimeSpan.FromHours(24));\n    return Ok(result);\n}\n```\n\n**Message consumer (Azure Service Bus):**\n```csharp\npublic async Task ProcessMessageAsync(ServiceBusReceivedMessage msg)\n{\n    var messageId = msg.MessageId;\n    if (await _processedIds.ExistsAsync(messageId)) return; // already handled\n\n    await HandleEventAsync(msg);\n    await _processedIds.MarkAsync(messageId, TimeSpan.FromDays(7));\n}\n```\n\n**Distributed caching for keys:** use Redis `SET key value EX 86400 NX` (SET if Not eXists) atomically to avoid race conditions where two identical requests arrive simultaneously.",
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Redis-backed idempotency middleware sketch\npublic async Task InvokeAsync(HttpContext ctx, IDistributedCache cache)\n{\n    if (!ctx.Request.Headers.TryGetValue(\"Idempotency-Key\", out var key))\n    {\n        await _next(ctx);\n        return;\n    }\n\n    var cached = await cache.GetStringAsync(key!);\n    if (cached is not null)\n    {\n        ctx.Response.ContentType = \"application/json\";\n        ctx.Response.StatusCode = 200;\n        await ctx.Response.WriteAsync(cached);\n        return;\n    }\n\n    // Capture response body for storage\n    var originalBody = ctx.Response.Body;\n    using var ms = new MemoryStream();\n    ctx.Response.Body = ms;\n    await _next(ctx);\n\n    ms.Seek(0, SeekOrigin.Begin);\n    var body = await new StreamReader(ms).ReadToEndAsync();\n    await cache.SetStringAsync(key!, body,\n        new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24) });\n\n    ms.Seek(0, SeekOrigin.Begin);\n    await ms.CopyToAsync(originalBody);\n}",
+              "note": "Middleware approach applies idempotency across all POST endpoints without handler-level code."
+            },
+            "followUps": [
+              "How do you handle concurrent duplicate requests arriving simultaneously?",
+              "What is the difference between idempotency and at-most-once vs at-least-once delivery?",
+              "How does Azure Service Bus handle duplicate detection?"
+            ],
+            "redFlags": [
+              "Thinking GET requests need idempotency keys — they are already idempotent by definition.",
+              "Storing idempotency keys in the same DB table as the resource without considering the atomicity of storing both.",
+              "Not knowing that idempotency key storage needs a TTL — keys cannot be retained forever."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "realworld",
+      "subtopicName": "Real-World Scenarios",
+      "order": 2,
+      "questions": [
+        {
+          "id": "architecture-realworld-001",
+          "q": "How do you decide on a project's architecture and key design decisions?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["architecture-decision", "trade-offs", "design-process", "adr", "stakeholders"],
+          "answer": {
+            "oneLiner": "Frame every architectural decision as a trade-off analysis: understand quality attributes (scalability, maintainability, security), constraints (team size, timeline, existing infra), and document decisions as ADRs — choose the simplest architecture that satisfies the key requirements.",
+            "keyPoints": [
+              "**Gather quality attribute requirements first:** is this system read-heavy? write-heavy? latency-sensitive? high-availability? — these drive architecture more than feature lists.",
+              "**Understand constraints:** team experience, budget, existing infrastructure, time to market, compliance requirements (GDPR, PCI).",
+              "**Start with the simplest thing:** a modular monolith is usually the right starting point — premature decomposition into microservices is one of the most common costly mistakes.",
+              "**Architecture Decision Records (ADRs):** document each significant decision with context, options considered, chosen option, and consequences — creates an institutional memory.",
+              "**Involve the team:** architecture is not a solo decision; engineers closest to the code often surface the most important constraints.",
+              "**Plan for change:** design extension points but do not over-engineer for hypothetical requirements — YAGNI applies to architecture."
+            ],
+            "detail": "**A structured approach I use:**\n\n1. **Define quality attributes (NFRs):** using the ATAM (Architecture Tradeoff Analysis Method) model — availability, performance, security, maintainability, deployability. Ask: which of these can we NOT compromise on?\n\n2. **Map business capabilities:** identify the bounded contexts and their relationships — which are core domain (competitive advantage), supporting, or generic (buy vs build).\n\n3. **Generate 2-3 candidate architectures:** e.g., (a) modular monolith, (b) 3 microservices, (c) event-driven — sketch each and stress-test against the NFRs and constraints.\n\n4. **Evaluate trade-offs explicitly:** present these to stakeholders. Do not hide the costs of microservices (operational complexity, distributed transactions) just to sound modern.\n\n5. **Decide and document:** write an ADR within 24 hours while the reasoning is fresh. Format: Context → Decision → Consequences.\n\n6. **Revisit:** architecture is not set in stone. Monthly or quarterly, check if decisions still hold — a team that doubles in size may justify extracting a service.\n\n**Example ADR:**\n> Context: We need to decide whether to separate the reporting module into its own service. Current read load is 10 req/s and projected to 100 req/s in 6 months.\n> Decision: Keep reporting in the monolith but add a read replica. Extract only if we hit 500 req/s sustained.\n> Consequences: Simpler deployment now; extraction plan is documented if needed.",
+            "followUps": [
+              "How do you get buy-in from stakeholders for an architectural decision they initially resist?",
+              "What is the Strangler Fig pattern and when have you used it?",
+              "How do you evaluate if an existing architecture needs to change?"
+            ],
+            "redFlags": [
+              "Choosing microservices 'because it's what companies do now' without a concrete justification.",
+              "Making architectural decisions alone without involving the team or documenting reasoning.",
+              "Not having heard of ADRs — suggests architecture decisions are made ad-hoc and untracked."
+            ]
+          }
+        },
+        {
+          "id": "architecture-realworld-002",
+          "q": "Describe a significant technical challenge you faced and how you resolved it.",
+          "level": "senior",
+          "type": "behavioral",
+          "freq": "high",
+          "tags": ["behavioral", "problem-solving", "star-method", "communication", "leadership"],
+          "answer": {
+            "oneLiner": "Use the STAR method (Situation, Task, Action, Result) with technical depth — describe the constraint clearly, the options you evaluated, the tradeoffs you weighed, and the measurable outcome.",
+            "keyPoints": [
+              "**Situation:** set the context concisely — what system, what scale, what team size, what business pressure.",
+              "**Task:** your specific responsibility — were you the decision-maker, the implementer, or the advisor?",
+              "**Action:** this is 60-70% of the answer — describe your reasoning, the options you considered and discarded, the technical approach you chose and why.",
+              "**Result:** quantify — 'reduced p95 latency from 2s to 180ms', 'eliminated 3 production incidents per month', 'saved £40k/year in infrastructure costs'.",
+              "**Show technical breadth:** mention what you would do differently in retrospect — demonstrates growth mindset.",
+              "**Team credit:** acknowledge collaborators without diminishing your own contribution."
+            ],
+            "detail": "**Worked example answer:**\n\n'At [Company], we had an Azure Functions-based order processing pipeline that was intermittently dropping messages during peak load. The business was losing approximately 0.3% of orders silently — no retry, no dead-letter handling.\n\nMy task was to diagnose and fix this within two weeks before the peak shopping season.\n\nI started by enabling Application Insights on all functions and adding structured logging with correlation IDs. Within 24 hours I identified that the issue was a combination of: (1) functions timing out at the default 5-minute limit under load, and (2) the Service Bus trigger's lock duration (60s) expiring before processing completed — causing messages to reappear and re-process until they hit max delivery count and were dropped.\n\nI evaluated three options: increase lock duration (quick but doesn't fix root cause), refactor to async processing with a completion signal (correct but risky during peak season), or add message renewal inside the function (pragmatic fix). I chose lock renewal as the immediate fix and scheduled the async refactor for post-season.\n\nResult: zero lost orders in the following peak period, message processing time measured and SLAs established, and the async refactor was completed the following quarter.\n\nIn retrospect, I would have added observability from day one — the 0.3% loss had been happening for three months before it was noticed.'",
+            "followUps": [
+              "What did you learn from this that changed how you approach new projects?",
+              "How did you communicate the risk and timeline to non-technical stakeholders?",
+              "If you had to make the same decision again, what would you do differently?"
+            ],
+            "redFlags": [
+              "Vague answer: 'I solved a performance problem by optimising the database' with no specifics.",
+              "Not quantifying the result — 'things got better' is not an answer.",
+              "Describing only what the team did with no clarity on your specific contribution.",
+              "No mention of alternatives considered — suggests you just implemented the first idea."
+            ]
+          }
+        },
+        {
+          "id": "architecture-realworld-003",
+          "q": "How do you frame an answer about a performance improvement you've implemented?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["performance", "profiling", "sql", "caching", "star-method", "metrics"],
+          "answer": {
+            "oneLiner": "Frame performance improvements as: baseline measurement → bottleneck identification (profiling, not guessing) → solution chosen with trade-offs explained → measured improvement — never 'I just added an index and it got faster'.",
+            "keyPoints": [
+              "**Always start with measurement:** what was the baseline? p50/p95/p99 latency, throughput, CPU, memory — you cannot improve what you did not measure.",
+              "**Identify the bottleneck scientifically:** Application Insights, dotTrace, MiniProfiler, SQL Query Store, EF Core query logging — the bottleneck is rarely where you assume.",
+              "**Common .NET performance wins:** N+1 queries (add `.Include()` or use a join), missing DB indexes, synchronous blocking (`Result`/`.Wait()` on async), large object heap pressure, string concatenation in loops, over-eager loading.",
+              "**Caching:** right layer (CDN, Redis, in-memory, HTTP cache headers), right invalidation strategy — cache invalidation is hard; describe what you chose and why.",
+              "**Trade-offs:** caching adds staleness; parallelism adds complexity; denormalisation adds maintenance overhead — acknowledge them.",
+              "**Measured result:** 'reduced p95 from 1.8s to 220ms', 'cut DB CPU from 80% to 30%', 'removed 15,000 unnecessary queries per minute'."
+            ],
+            "detail": "**Structure for the interview answer:**\n\n'We noticed our product listing API had degraded to ~2s p95 over six months as the catalogue grew. I added MiniProfiler to the development environment and EF Core query logging to staging.\n\nI found three issues:\n1. An N+1 query — we were loading products then separately fetching each product's category in a loop. Fixed with `.Include(p => p.Category)`.\n2. A missing composite index on `(CategoryId, IsActive, Price)` — the query plan showed a full table scan on 500k rows.\n3. We were loading full product entities including large Description fields for the listing page. Changed the LINQ projection to a DTO with only the fields the UI needed.\n\nI applied all three changes, measured in staging with realistic data volume, and then deployed to production. p95 dropped from 2.1s to 190ms. DB CPU dropped from 65% to 22%.\n\nWe also added a 5-minute Redis cache on the top-level category listing (changes rarely) which further reduced DB load during traffic spikes.'",
+            "followUps": [
+              "How do you identify an N+1 query in production without bringing the system down?",
+              "What is the difference between eager loading, lazy loading, and explicit loading in EF Core?",
+              "How would you decide whether to add a cache vs optimise the query?"
+            ],
+            "redFlags": [
+              "'I just added some indexes and it got faster' — no measurement, no profiling, no methodology.",
+              "Claiming to have optimised performance without being able to name the tool used to identify the bottleneck.",
+              "Ignoring trade-offs of the chosen solution (e.g., cache without discussing invalidation)."
+            ]
+          }
+        },
+        {
+          "id": "architecture-realworld-004",
+          "q": "How do you handle a production incident? Walk me through your process.",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["incident-response", "production", "observability", "post-mortem", "sre"],
+          "answer": {
+            "oneLiner": "Production incidents follow a four-phase lifecycle: detect (monitoring/alerting), triage and mitigate (restore service first, investigate later), root-cause analysis (5 Whys, timeline), and prevent recurrence (code fix + process improvement + post-mortem).",
+            "keyPoints": [
+              "**Detect:** alerts before customers do — Application Insights, Azure Monitor, PagerDuty. Track error rate, latency p95, dependency failures.",
+              "**Triage:** what is the user impact? Is it total outage or partial degradation? Assign an incident commander to coordinate communication.",
+              "**Mitigate first:** rolling back a deployment takes 5 minutes; debugging may take 5 hours. If a recent deployment correlates with the incident, roll back first, investigate later.",
+              "**Root-cause analysis:** use structured 5 Whys or fishbone diagram; build a timeline of events using logs and traces; avoid blame.",
+              "**Post-mortem (blameless):** written document within 48 hours — timeline, impact, root cause, contributing factors, action items with owners and due dates.",
+              "**Prevent recurrence:** the fix is rarely just the code change; add tests, add alerting for the specific failure mode, review the on-call runbook."
+            ],
+            "detail": "**Live example walkthrough:**\n\n*Detect:* Azure Monitor alert fires at 02:15 — error rate on `/api/orders` exceeds 5% for 3 minutes.\n\n*Triage:* check Application Insights Live Metrics — dependency failures on Azure SQL. Check Azure SQL portal — DTU at 100%. Recent deployment at 01:40.\n\n*Mitigate:* roll back the 01:40 deployment via Azure DevOps — error rate returns to baseline in 3 minutes. Customer impact: ~200 failed order attempts.\n\n*Investigate:* the deployment introduced a new query without a covering index. Under load, the full table scan spiked DTU.\n\n*Root cause:* developer tested with 1,000-row dataset; production has 2M rows. No load test before deployment.\n\n*Post-mortem actions:*\n1. Add the missing index and deploy with proper change management.\n2. Add a query performance test in CI using a representative data volume.\n3. Add a DTU alert threshold at 70% to give earlier warning.\n4. Update the deployment checklist to require query plan review for new queries.\n\n**Communication during the incident:** keep a dedicated Slack/Teams channel, post updates every 10-15 minutes even if there is nothing new, designate one person to talk to stakeholders so engineers can focus on resolution.",
+            "followUps": [
+              "What is a blameless post-mortem and why does it matter?",
+              "How do you distinguish between a symptom and a root cause during RCA?",
+              "What is your on-call rotation setup and how do you avoid alert fatigue?"
+            ],
+            "redFlags": [
+              "Jumping straight to debugging root cause without first mitigating user impact.",
+              "Not writing a post-mortem — incident learnings evaporate without documentation.",
+              "'We fixed it and moved on' — no discussion of prevention, process improvement, or testing gaps.",
+              "Blaming a colleague rather than focusing on systemic causes."
+            ]
+          }
+        },
+        {
+          "id": "architecture-realworld-005",
+          "q": "An API's response time jumped from 200ms to 3 seconds overnight. Walk me through how you would debug it.",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["debugging", "performance", "application-insights", "sql", "n+1", "production-issue"],
+          "answer": {
+            "oneLiner": "Systematically isolate the layer: check deployment history, examine application traces to find where time is spent, drill into DB query plans and lock waits, then check external dependencies — never guess without data.",
+            "keyPoints": [
+              "**Check deployment history first:** did something change? Git log, Azure DevOps release history, infrastructure changes (SQL tier, connection pool size).",
+              "**Application Insights / distributed trace:** find a slow request trace — which span is slow? App code, SQL, external HTTP call, Service Bus?",
+              "**If SQL is slow:** check Query Store in Azure SQL for newly regressed queries; look for missing index warnings, parameter sniffing issues, lock waits, blocking queries.",
+              "**If app code is slow:** check for synchronous blocking (`Task.Result`, `Thread.Sleep`), thread pool starvation, excessive memory allocation causing GC pressure.",
+              "**Check external dependencies:** downstream API slow? CDN miss rate spike? Azure Service Bus throttling?",
+              "**Data volume change:** did a dataset cross a threshold (index tipping point, in-memory sort becomes disk sort)?"
+            ],
+            "detail": "**Step-by-step investigation:**\n\n1. **Check Azure Monitor / App Insights** — is it all endpoints or one? Is it intermittent or consistent? Is error rate also elevated?\n\n2. **Correlate with changes** — `git log --since='24 hours ago'`, release history, infrastructure events (e.g., Azure SQL maintenance window).\n\n3. **Open a slow request trace in App Insights** — expand the dependency calls. If you see:\n   - SQL call taking 2.8s → go to step 4.\n   - HTTP call to downstream API taking 2.8s → check if downstream is the issue.\n   - Many small calls summing to 3s → N+1 query pattern.\n\n4. **SQL investigation:**\n   ```sql\n   SELECT TOP 10 qs.total_elapsed_time / qs.execution_count AS avg_elapsed_time,\n          qs.execution_count, qt.text\n   FROM sys.dm_exec_query_stats qs\n   CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) qt\n   ORDER BY avg_elapsed_time DESC;\n   ```\n   Check Query Store: `sys.query_store_query`, compare today vs yesterday's execution stats. Look for parameter sniffing: run `DBCC FREEPROCCACHE` on a test DB and observe if performance recovers.\n\n5. **Check for lock contention:** `sys.dm_exec_requests` for blocking chains.\n\n6. **If EF Core:** enable sensitive data logging in dev, or check slow query log. Look for `SELECT *` instead of projected DTOs, missing `.AsNoTracking()` on read-only queries.\n\n7. **GC pressure:** if CPU is high and latency is high without a SQL cause, check dotnet-counters: `gen2-gc-count`, `time-in-gc` — large object allocations or missing ArrayPool usage.\n\n**Resolution examples:**\n- Missing index after a data volume crossing a threshold → `CREATE INDEX CONCURRENTLY`.\n- Parameter sniffing → `OPTION (OPTIMIZE FOR UNKNOWN)` or query hint.\n- N+1 introduced by a new navigation property → add `.Include()` or projection.\n- Downstream API degraded → add circuit breaker, return cached data.",
+            "followUps": [
+              "What is parameter sniffing in SQL Server and how do you fix it?",
+              "How do you detect thread pool starvation in .NET?",
+              "What is Application Insights Live Metrics and when would you use it over the portal?"
+            ],
+            "redFlags": [
+              "Immediately restarting the server without capturing any diagnostics.",
+              "'I would add logging' — without specifying what you would log or what you are looking for.",
+              "Not checking for recent deployments or infrastructure changes.",
+              "Only blaming the database without checking the application layer."
+            ]
+          }
+        },
+        {
+          "id": "architecture-realworld-006",
+          "q": "How would you design a notification system (email, SMS, push) for a large-scale .NET application?",
+          "level": "senior",
+          "type": "design",
+          "freq": "medium",
+          "tags": ["notification-system", "system-design", "service-bus", "email", "push", "sms", "azure"],
+          "answer": {
+            "oneLiner": "Design a notification system as an asynchronous, channel-agnostic pipeline: event producers publish notification-intent messages to a broker; a notification service routes them to channel-specific handlers (email, SMS, push) with retry, deduplication, and user preference enforcement.",
+            "keyPoints": [
+              "**Decouple producers from channels:** order service emits `OrderShipped` event, not `SendOrderShippedEmail` — the notification service decides which channels to use based on user preferences.",
+              "**Azure Service Bus topics with subscriptions:** one topic `notifications`, three subscriptions filtered by channel — email subscription, SMS subscription, push subscription.",
+              "**Notification service responsibilities:** resolve user preferences (opt-in/opt-out per channel), template rendering, rate limiting (don't send 50 emails in 5 minutes), and deduplication.",
+              "**Channel providers:** Azure Communication Services (email + SMS), SendGrid, Twilio, Firebase FCM for push — abstract behind `INotificationChannel` interface so providers can be swapped.",
+              "**Retry and DLQ:** failed sends retry with exponential backoff; after max retries, message goes to DLQ for investigation — do not silently drop failures.",
+              "**Audit log:** every notification attempt (sent/failed/suppressed) written to a store for support queries ('did my email get sent?')."
+            ],
+            "detail": "**Architecture overview:**\n\n```\nOrder Service  ──publishes──►  Service Bus Topic: domain-events\n                                       │\n                              Notification Service (subscriber)\n                                       │\n                    ┌──────────────────┼──────────────────┐\n                    ▼                  ▼                  ▼\n              Email Handler      SMS Handler        Push Handler\n            (ACS / SendGrid)    (Twilio / ACS)      (FCM / APNs)\n```\n\n**User preference enforcement:** before dispatching to a channel, query the user's preferences: has the user opted out of marketing emails? Is their phone verified? Are push notifications enabled for their device token?\n\n**Template rendering:** use a template engine (Scriban, Fluid, or a managed service like SendGrid Dynamic Templates) so templates can be updated without code deployment.\n\n**Rate limiting and idempotency:** store `(userId, eventType, windowStart)` in Redis with an expiry to prevent notification storms. Use `MessageId` from Service Bus as the idempotency key to prevent duplicate sends during retries.\n\n**Scalability:** the notification service can scale out horizontally — Service Bus competing consumers pattern means multiple instances process messages in parallel without duplication (Service Bus guarantees at-most-once delivery with peek-lock).\n\n**Azure Communication Services:** combines email, SMS, and chat in a single Azure-native service — simplifies credential management and billing. For push notifications, use Azure Notification Hubs to fan out to FCM/APNs without maintaining device registration logic yourself.",
+            "followUps": [
+              "How do you handle unsubscribe / opt-out in compliance with GDPR and CAN-SPAM?",
+              "How do you handle device token staleness for push notifications?",
+              "What is Azure Notification Hubs and when would you use it over direct FCM/APNs?"
+            ],
+            "redFlags": [
+              "Sending notifications synchronously inside the request handler — blocks the user, fails if email provider is down.",
+              "Hard-coding channel logic in the business service instead of using an event-driven notification service.",
+              "No mention of user preferences, opt-out, or GDPR compliance.",
+              "No retry or dead-letter handling — silent failures are the worst kind in a notification system."
+            ]
+          }
+        },
+        {
+          "id": "architecture-realworld-007",
+          "q": "How do you decide on a caching strategy for a .NET application?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["caching", "redis", "in-memory", "cache-aside", "invalidation", "cdn", "performance"],
+          "answer": {
+            "oneLiner": "Choose the cache layer and strategy based on data freshness requirements, access patterns, and sharing needs: in-process for single-instance hot data, Redis for distributed state, CDN for static/public responses — and always define an explicit invalidation strategy before adding a cache.",
+            "keyPoints": [
+              "**Cache layers:** browser/CDN (public, static) → API response cache (`ResponseCaching` / CDN) → in-process `IMemoryCache` → distributed `IDistributedCache` (Redis) → DB query cache.",
+              "**Cache-Aside pattern (most common):** application checks cache; on miss, loads from DB, stores in cache, returns to caller.",
+              "**TTL-based expiry** is the simplest invalidation; **event-driven invalidation** (cache key deleted on write) is more precise but complex.",
+              "**Redis use-cases:** distributed cache shared across scaled-out instances, session storage, rate-limiting counters, distributed locks, pub/sub for cache invalidation broadcast.",
+              "**Cache stampede / thundering herd:** when many requests miss simultaneously and flood the DB. Mitigation: lazy loading with a lock (`SemaphoreSlim`), probabilistic early refresh, or a 'stale-while-revalidate' pattern.",
+              "**Cache poisoning risk:** always validate data before caching; do not cache error responses or partial data."
+            ],
+            "detail": "**Decision matrix:**\n\n| Data characteristic | Cache choice |\n|---|---|\n| Public, rarely changes (product images, JS bundles) | CDN (Azure CDN / Front Door) |\n| Per-user data, multiple instances | Redis distributed cache |\n| Computed aggregate, single instance OK | IMemoryCache |\n| High read, low write, eventual consistency OK | Redis with long TTL |\n| Must be always fresh | No cache — optimise the query instead |\n\n**ASP.NET Core IMemoryCache example (Cache-Aside):**\n```csharp\npublic async Task<ProductDto?> GetProductAsync(Guid id, CancellationToken ct)\n{\n    var cacheKey = $\"product:{id}\";\n    if (!_cache.TryGetValue(cacheKey, out ProductDto? product))\n    {\n        product = await _db.Products.AsNoTracking()\n            .Where(p => p.Id == id)\n            .Select(p => new ProductDto(p.Id, p.Name, p.Price))\n            .FirstOrDefaultAsync(ct);\n\n        if (product is not null)\n            _cache.Set(cacheKey, product, TimeSpan.FromMinutes(10));\n    }\n    return product;\n}\n```\n\n**Cache invalidation on write:**\n```csharp\npublic async Task UpdateProductAsync(UpdateProductCommand cmd, CancellationToken ct)\n{\n    // ... update in DB ...\n    await _uow.CommitAsync(ct);\n    _cache.Remove($\"product:{cmd.Id}\");  // explicit invalidation\n}\n```\n\n**Redis IDistributedCache:** same pattern but survives instance restarts and is shared across pods — use for session, user-specific data, or any multi-instance scenario.\n\n**What NOT to cache:** financial totals that must be real-time, personalised data without TTL safeguards, or anything that changes on every write.",
+            "followUps": [
+              "What is the difference between IMemoryCache and IDistributedCache in ASP.NET Core?",
+              "How do you handle cache stampede (thundering herd) in a high-traffic application?",
+              "What is the Write-Through cache pattern and when would you use it over Cache-Aside?"
+            ],
+            "redFlags": [
+              "Caching everything without defining a TTL or invalidation strategy.",
+              "'Just use Redis' without considering whether the data is shared across instances or what the freshness requirement is.",
+              "Not considering the double-write consistency problem (cache updated but DB write fails, or vice versa).",
+              "Caching user-specific data under a shared key — data leakage between users."
+            ]
+          }
+        },
+        {
+          "id": "architecture-realworld-008",
+          "q": "How do you handle a memory leak discovered in a production .NET application?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["memory-leak", "gc", "dotnet-diagnostics", "heap-dump", "profiling", "production"],
+          "answer": {
+            "oneLiner": "Confirm the leak with memory trend metrics, capture a memory dump in production, analyse it with a heap profiler to find the largest object graphs, identify the retention path (what is holding the objects), then fix the root cause — common causes are static dictionaries, event handler subscriptions, and IDisposable not disposed.",
+            "keyPoints": [
+              "**Confirm it is a real leak:** working set growing over hours/days with no GC recovery is a leak; a spike that GC reclaims is not.",
+              "**dotnet-counters:** `dotnet-counters monitor --process-id <pid> --counters System.Runtime` — watch `gc-heap-size`, `gen2-gc-count`, `time-in-gc`.",
+              "**Capture a dump:** `dotnet-dump collect -p <pid>` (or `procdump` on Windows). Analyse with `dotnet-dump analyze` or open in Visual Studio / PerfView.",
+              "**Common .NET memory leak causes:** static collections that grow unbounded, event handlers not unsubscribed (`EventHandler` holds a reference to the subscriber), `IDisposable` objects not disposed (HttpClient, DbContext), captured closures in long-lived objects.",
+              "**Remediation steps:** fix root cause, add a memory alert (alert if working set > X MB for Y minutes), add a canary metric to confirm the fix holds.",
+              "**In Azure:** App Service has 'Memory usage' in Diagnose and Solve Problems; Azure Monitor alerts on memory percentage; collect profiler trace via App Service Diagnostics."
+            ],
+            "detail": "**Investigation walkthrough:**\n\n1. **Confirm:** check Azure Monitor — is `PrivateBytes` or working set trending upward over 24 hours with no plateau? If yes, likely a leak.\n\n2. **Capture dump without restart:** `dotnet-dump collect -p $(pgrep -f MyApp) -o /tmp/dump.dmp` on Linux (zero downtime). On Windows, Task Manager or `procdump -ma <pid>`.\n\n3. **Analyse with dotnet-dump:**\n   ```\n   dotnet-dump analyze /tmp/dump.dmp\n   > dumpheap -stat                  # top types by total bytes\n   > dumpheap -type System.String   # how many strings are alive\n   > gcroot <object-address>         # what's keeping this object alive?\n   ```\n\n4. **Identify retention path:** `gcroot` shows the chain from a GC root (static field, thread stack) to the leaking object. A common finding: `static Dictionary<Guid, LargeObject>` growing without eviction.\n\n5. **Common fixes:**\n   - Static collection → use `IMemoryCache` with TTL or size limit.\n   - Event handler leak → unsubscribe in `Dispose()` or use weak event patterns.\n   - IDisposable not disposed → `using` statement or DI lifetime fix (Singleton capturing a Scoped dependency).\n   - `HttpClient` created per request → use `IHttpClientFactory`.\n\n6. **Validate fix:** deploy, monitor memory for 24 hours, confirm plateau rather than growth.",
+            "followUps": [
+              "What is the difference between a memory leak and high memory usage in .NET?",
+              "How do you detect that a Singleton is capturing a Scoped DbContext?",
+              "What is PerfView and when would you use it over dotnet-dump?"
+            ],
+            "redFlags": [
+              "Restarting the server on a schedule to 'fix' the leak — treats the symptom, not the cause.",
+              "Not capturing a dump before restarting — you lose all diagnostic information.",
+              "Blaming the GC without checking what objects are actually on the heap.",
+              "Not knowing the difference between Gen0/Gen1/Gen2 heap and why Gen2 growth indicates a true leak."
+            ]
+          }
+        },
+        {
+          "id": "architecture-realworld-009",
+          "q": "How do you scale a read-heavy API that is approaching its capacity limit?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["scaling", "read-heavy", "caching", "read-replica", "horizontal-scaling", "cdn", "azure"],
+          "answer": {
+            "oneLiner": "Scale a read-heavy API in layers: first add caching at the right level (response/Redis/CDN), then add a DB read replica for read-only queries, then scale the API horizontally — each layer multiplies capacity without requiring expensive vertical scaling.",
+            "keyPoints": [
+              "**Profile first:** understand which endpoints account for the majority of load — the top 20% of endpoints usually generate 80% of read traffic.",
+              "**Response caching / CDN:** for public, cacheable responses add `Cache-Control` headers and put Azure Front Door or CDN in front — reduces load to near-zero for those endpoints.",
+              "**Redis cache (Cache-Aside):** for authenticated or per-user data that is expensive to compute, cache in Redis with an appropriate TTL.",
+              "**DB read replica:** Azure SQL supports geo-replicas and read scale-out; EF Core supports `UseSecondaryDatabase` or explicit connection string routing for read queries.",
+              "**Horizontal API scaling:** ensure the API is stateless (no in-process session, shared Redis for distributed cache), then add instances behind Azure Application Gateway or Azure Container Apps autoscaling.",
+              "**CQRS read models:** for complex aggregated views, maintain a pre-computed read model (updated by events) that is trivially fast to query."
+            ],
+            "detail": "**Escalation ladder (cheapest first):**\n\n1. **CDN / Response caching** — zero cost at the API level; CDN serves the response.\n2. **In-process IMemoryCache** — microsecond response for single-instance hot paths.\n3. **Redis IDistributedCache** — millisecond response across all scaled instances.\n4. **DB read replica** — offload SELECT traffic; Azure SQL Hyperscale supports up to 4 high-performance replicas.\n5. **Horizontal API scaling** — add pods/instances; Azure Container Apps scales on HTTP request queue depth.\n6. **CQRS read model** — pre-materialise complex queries in a separate store (Azure Cosmos DB, Elasticsearch) for sub-10ms reads at scale.\n\n**EF Core read replica routing:**\n```csharp\n// In query handler — use read-optimised connection\nservices.AddDbContext<ReadDbContext>(options =>\n    options.UseSqlServer(Configuration[\"ConnectionStrings:ReadReplica\"]));\n\n// Query handler\npublic class GetProductListHandler : IRequestHandler<GetProductListQuery, List<ProductDto>>\n{\n    private readonly ReadDbContext _db;\n    // ...\n    public Task<List<ProductDto>> Handle(GetProductListQuery q, CancellationToken ct)\n        => _db.Products.AsNoTracking()\n              .Where(p => p.CategoryId == q.CategoryId && p.IsActive)\n              .OrderBy(p => p.Price)\n              .Select(p => new ProductDto(p.Id, p.Name, p.Price))\n              .ToListAsync(ct);\n}\n```\n\n**Azure-specific options:**\n- Azure SQL read scale-out (ApplicationIntent=ReadOnly in connection string).\n- Azure Cache for Redis with geo-replication for global reads.\n- Azure CDN / Front Door for edge caching.\n- Azure Container Apps or AKS with KEDA for HTTP-driven autoscaling.",
+            "followUps": [
+              "How do you handle cache invalidation when data on the write side changes?",
+              "What is Azure SQL Hyperscale and when would you choose it?",
+              "How do you ensure a read replica does not serve stale data for time-sensitive queries?"
+            ],
+            "redFlags": [
+              "Immediately jumping to 'add more servers' without first checking if caching or query optimisation can solve the problem.",
+              "Not knowing that read replicas have replication lag — a read after a write may see stale data.",
+              "Adding Redis caching without a TTL or invalidation strategy."
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
