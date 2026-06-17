@@ -7,9 +7,11 @@
     { "id": "angular",      "name": "Angular & Frontend",            "icon": "🅰️", "file": "angular.json",      "order": 5 },
     { "id": "javascript",   "name": "JavaScript & React",            "icon": "🟨", "file": "javascript.json",   "order": 6 },
     { "id": "azure",        "name": "Azure & Cloud Integration",     "icon": "☁️", "file": "azure.json",        "order": 7 },
-    { "id": "architecture", "name": "System Design & Architecture",  "icon": "🏗️", "file": "architecture.json", "order": 8 },
-    { "id": "devops",       "name": "DevOps & Git",                  "icon": "🔧", "file": "devops.json",       "order": 9 },
-    { "id": "coding",       "name": "Coding & DSA",                  "icon": "🧩", "file": "coding.json",       "order": 10 },
-    { "id": "behavioral",   "name": "Project & Experience",          "icon": "💼", "file": "behavioral.json",   "order": 11 }
+    { "id": "security",     "name": "Security",                      "icon": "🔐", "file": "security.json",     "order": 8 },
+    { "id": "architecture", "name": "System Design & Architecture",  "icon": "🏗️", "file": "architecture.json", "order": 9 },
+    { "id": "devops",       "name": "DevOps & Git",                  "icon": "🔧", "file": "devops.json",       "order": 10 },
+    { "id": "testing",      "name": "Testing",                       "icon": "🧪", "file": "testing.json",      "order": 11 },
+    { "id": "coding",       "name": "Coding & DSA",                  "icon": "🧩", "file": "coding.json",       "order": 12 },
+    { "id": "behavioral",   "name": "Project & Experience",          "icon": "💼", "file": "behavioral.json",   "order": 13 }
   ]
 }

@@ -830,6 +830,223 @@
           }
         }
       ]
+    },
+    {
+      "subtopicId": "advanced",
+      "subtopicName": "Advanced EF Core",
+      "order": 4,
+      "questions": [
+        {
+          "id": "efcore-advanced-001",
+          "q": "What are shadow properties in EF Core and when would you use them?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["shadow properties", "Fluent API", "Property", "EntityEntry"],
+          "answer": {
+            "oneLiner": "Shadow properties exist in the EF model and map to a column but have no corresponding property on the C# class — you read/write them via the change tracker.",
+            "keyPoints": [
+              "Defined in OnModelCreating with `Property<T>(\"Name\")`, no class member.",
+              "Great for audit columns (CreatedAt, LastModified) you don't want on the domain model.",
+              "Access via `ctx.Entry(e).Property(\"Name\").CurrentValue`.",
+              "EF also uses them automatically for conventional foreign keys."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Declare a shadow property\nmodelBuilder.Entity<Order>()\n    .Property<DateTime>(\"LastModified\");\n\n// Set it (e.g. in SaveChanges override)\nctx.Entry(order).Property(\"LastModified\").CurrentValue = DateTime.UtcNow;\n\n// Query on it\nvar recent = ctx.Orders\n    .Where(o => EF.Property<DateTime>(o, \"LastModified\") > cutoff)\n    .ToList();",
+              "note": "Use EF.Property<T>() to reference a shadow property inside a LINQ query."
+            },
+            "followUps": [
+              "How does EF use shadow properties for foreign keys?",
+              "How do you query a shadow property in LINQ?"
+            ],
+            "redFlags": [
+              "Thinking shadow properties live on the C# class.",
+              "Not knowing they are accessed through the change tracker."
+            ]
+          }
+        },
+        {
+          "id": "efcore-advanced-002",
+          "q": "How do you implement soft deletes in EF Core using global query filters?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["soft delete", "global query filter", "HasQueryFilter", "IgnoreQueryFilters"],
+          "answer": {
+            "oneLiner": "Add an IsDeleted flag and register a global query filter with HasQueryFilter so EF automatically appends a WHERE on every query for that entity.",
+            "keyPoints": [
+              "`HasQueryFilter(e => !e.IsDeleted)` auto-filters every query.",
+              "Override delete: set IsDeleted = true instead of removing (often in SaveChanges).",
+              "Use `IgnoreQueryFilters()` to see soft-deleted rows (admin/restore).",
+              "Filters compose with multi-tenancy filters on the same entity."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Register the filter\nmodelBuilder.Entity<Product>().HasQueryFilter(p => !p.IsDeleted);\n\n// Turn deletes into soft deletes in SaveChanges\nforeach (var entry in ChangeTracker.Entries<ISoftDelete>())\n    if (entry.State == EntityState.Deleted)\n    {\n        entry.State = EntityState.Modified;\n        entry.Entity.IsDeleted = true;\n    }\n\n// Bypass the filter when needed\nvar all = ctx.Products.IgnoreQueryFilters().ToList();",
+              "note": "A query filter applies to direct queries; be careful it does not unexpectedly hide rows reached via required navigations."
+            },
+            "followUps": [
+              "How do query filters interact with Include and required navigations?",
+              "How do you bypass a global query filter for an admin view?"
+            ],
+            "redFlags": [
+              "Hard-deleting rows when the requirement is soft delete.",
+              "Not knowing IgnoreQueryFilters() exists."
+            ]
+          }
+        },
+        {
+          "id": "efcore-advanced-003",
+          "q": "How do you optimize bulk insert, update, and delete operations in EF Core?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["bulk operations", "ExecuteUpdate", "ExecuteDelete", "BulkExtensions", "SqlBulkCopy", "performance"],
+          "answer": {
+            "oneLiner": "Avoid loading and tracking thousands of entities — use ExecuteUpdate/ExecuteDelete (EF7+) for set-based changes, or EFCore.BulkExtensions / SqlBulkCopy for high-volume inserts.",
+            "keyPoints": [
+              "EF7+ `ExecuteUpdate`/`ExecuteDelete` run one SQL statement, no tracking, no SaveChanges.",
+              "For large inserts use EFCore.BulkExtensions (BulkInsert) or raw SqlBulkCopy.",
+              "Classic SaveChanges loop = one round-trip per row; batches help but still slow at scale.",
+              "ExecuteUpdate/Delete bypass the change tracker, so loaded entities can go stale."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// EF Core 7+ set-based update — single UPDATE statement\nawait ctx.Products\n    .Where(p => p.CategoryId == 5)\n    .ExecuteUpdateAsync(s => s\n        .SetProperty(p => p.Price, p => p.Price * 1.1m)\n        .SetProperty(p => p.UpdatedAt, _ => DateTime.UtcNow));\n\n// Set-based delete\nawait ctx.Logs.Where(l => l.CreatedAt < cutoff).ExecuteDeleteAsync();\n\n// High-volume insert via EFCore.BulkExtensions\nawait ctx.BulkInsertAsync(tenThousandProducts);",
+              "note": "ExecuteUpdate/ExecuteDelete do not call SaveChanges and do not update tracked entities in memory."
+            },
+            "followUps": [
+              "Why can ExecuteUpdate leave tracked entities stale?",
+              "When would you reach for SqlBulkCopy over BulkExtensions?"
+            ],
+            "redFlags": [
+              "Looping SaveChanges per row for tens of thousands of rows.",
+              "Not knowing EF7 added ExecuteUpdate/ExecuteDelete."
+            ]
+          }
+        },
+        {
+          "id": "efcore-advanced-004",
+          "q": "What is the difference between Code First, Database First, and Migrations in EF Core?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["code first", "database first", "migrations", "scaffold", "workflow"],
+          "answer": {
+            "oneLiner": "Code First means you define the model in C# and EF generates the schema; Database First scaffolds C# from an existing DB; Migrations is the mechanism that incrementally evolves the schema in a Code First workflow.",
+            "keyPoints": [
+              "Code First: C# model is the source of truth, schema generated from it.",
+              "Database First: existing schema is the source of truth, scaffold entities from it.",
+              "Migrations isn't a third 'approach' — it's how Code First versions schema changes.",
+              "EF Core has no designer/EDMX; Code First + Migrations is the mainstream path."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Code First + Migrations\n// dotnet ef migrations add AddProducts\n// dotnet ef database update\n\n// Database First (scaffold from an existing DB)\n// dotnet ef dbcontext scaffold \"<conn>\" Microsoft.EntityFrameworkCore.SqlServer -o Models",
+              "note": "Migrations is the change-tracking tool for Code First; Database First is a one-time (or repeated) scaffolding step."
+            },
+            "followUps": [
+              "Can you switch from Database First to Code First migrations?",
+              "Why does EF Core have no EDMX designer like EF6?"
+            ],
+            "redFlags": [
+              "Treating Migrations as a separate approach equal to Code/DB First.",
+              "Thinking Code First can't work against an existing database."
+            ]
+          }
+        },
+        {
+          "id": "efcore-advanced-005",
+          "q": "Owned entities vs value objects vs shadow properties — how do these concepts differ in EF Core?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "low",
+          "tags": ["owned entities", "value objects", "shadow properties", "DDD", "modeling"],
+          "answer": {
+            "oneLiner": "A value object is a DDD concept (no identity, equality by value); an owned entity is EF's mechanism to map one to columns; a shadow property is a single mapped column with no C# member at all.",
+            "keyPoints": [
+              "Value object = domain concept; owned entity = the EF mapping for it.",
+              "Owned types are configured with OwnsOne/OwnsMany and stored in the owner's table by default.",
+              "Shadow property = one column, no C# property, accessed via the change tracker.",
+              "Use owned types for multi-field value objects (Address); shadow props for single hidden columns (audit dates)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Value object mapped as an owned entity (multiple columns)\nbuilder.OwnsOne(o => o.ShippingAddress, a => {\n    a.Property(x => x.Street);\n    a.Property(x => x.City);\n});\n\n// Shadow property (single column, no C# member)\nbuilder.Property<DateTime>(\"CreatedAt\");",
+              "note": "Owned types add a complex type; shadow properties add a single column not exposed on the class."
+            },
+            "followUps": [
+              "Can an owned entity contain shadow properties?",
+              "How do you map a value object as a single column instead of multiple?"
+            ],
+            "redFlags": [
+              "Equating 'value object' with 'owned entity' as the same thing.",
+              "Thinking shadow properties can hold a multi-field value object."
+            ]
+          }
+        },
+        {
+          "id": "efcore-advanced-006",
+          "q": "How do you handle a transaction that spans multiple SaveChanges calls or multiple operations in EF Core?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["transactions", "BeginTransaction", "TransactionScope", "SaveChanges", "rollback"],
+          "answer": {
+            "oneLiner": "A single SaveChanges is already transactional; to span multiple SaveChanges or operations, use Database.BeginTransaction() and commit explicitly, or TransactionScope for ambient/cross-resource transactions.",
+            "keyPoints": [
+              "`ctx.Database.BeginTransaction()` then Commit/Rollback wraps several SaveChanges.",
+              "Always commit in the happy path; the using block rolls back if you don't.",
+              "`TransactionScope` gives an ambient transaction across contexts/connections.",
+              "With retrying execution strategies, wrap the work in `strategy.ExecuteAsync(...)`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "await using var tx = await ctx.Database.BeginTransactionAsync();\ntry\n{\n    ctx.Orders.Add(order);\n    await ctx.SaveChangesAsync();\n\n    ctx.Payments.Add(payment);\n    await ctx.SaveChangesAsync();\n\n    await tx.CommitAsync();\n}\ncatch\n{\n    await tx.RollbackAsync();\n    throw;\n}",
+              "note": "If EnableRetryOnFailure is on, run manual transactions inside ctx.Database.CreateExecutionStrategy().ExecuteAsync(...)."
+            },
+            "followUps": [
+              "How do explicit transactions interact with EnableRetryOnFailure?",
+              "When would you choose TransactionScope over BeginTransaction?"
+            ],
+            "redFlags": [
+              "Forgetting to call Commit so the transaction silently rolls back.",
+              "Using a manual transaction with a retrying strategy without ExecuteAsync."
+            ]
+          }
+        },
+        {
+          "id": "efcore-advanced-007",
+          "q": "When should you use AsSplitQuery versus a single query for multiple Includes?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["AsSplitQuery", "single query", "Include", "Cartesian explosion", "performance"],
+          "answer": {
+            "oneLiner": "Single query JOINs everything in one round-trip but can cause a Cartesian explosion with multiple collection Includes; AsSplitQuery issues one SELECT per collection, trading more round-trips for far fewer duplicated rows.",
+            "keyPoints": [
+              "One collection Include: single query is usually fine.",
+              "Multiple collection Includes: split query avoids N x M row duplication.",
+              "Split query = more round-trips and no single-snapshot consistency by default.",
+              "Set per query with `AsSplitQuery()`/`AsSingleQuery()` or globally."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "var blogs = await ctx.Blogs\n    .Include(b => b.Posts)\n    .Include(b => b.Contributors)\n    .AsSplitQuery()   // avoids Posts x Contributors Cartesian product\n    .ToListAsync();",
+              "note": "Split queries are not wrapped in one transaction by default, so data can shift between the separate SELECTs."
+            },
+            "followUps": [
+              "What consistency risk does AsSplitQuery introduce?",
+              "How do you set the splitting behavior globally?"
+            ],
+            "redFlags": [
+              "Always using single query and hitting Cartesian explosion.",
+              "Ignoring the consistency caveat of split queries."
+            ]
+          }
+        }
+      ]
     }
   ]
 }

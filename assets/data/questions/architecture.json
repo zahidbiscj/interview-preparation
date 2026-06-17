@@ -734,6 +734,185 @@
           }
         }
       ]
+    },
+    {
+      "subtopicId": "patterns-advanced",
+      "subtopicName": "Advanced Patterns",
+      "order": 3,
+      "questions": [
+        {
+          "id": "architecture-patterns-advanced-001",
+          "q": "Explain DDD building blocks: aggregates, entities, value objects, and bounded contexts.",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["ddd", "aggregate", "entity", "value-object", "bounded-context"],
+          "answer": {
+            "oneLiner": "Entities have identity and a lifecycle; value objects are immutable and compared by value; an aggregate is a cluster of those with one root that guards invariants; a bounded context is the boundary where a model and its language stay consistent.",
+            "keyPoints": [
+              "Entity — identity persists even as attributes change (e.g. Order)",
+              "Value object — immutable, equality by value (e.g. Money, Address)",
+              "Aggregate root — single entry point that enforces invariants; reference others by ID",
+              "Bounded context — one consistent model per boundary, often one per microservice"
+            ],
+            "followUps": ["Why reference other aggregates by ID, not navigation?", "How small should an aggregate be?"],
+            "redFlags": ["Treating every table as an aggregate", "Confusing entity with value object"]
+          }
+        },
+        {
+          "id": "architecture-patterns-advanced-002",
+          "q": "Event sourcing vs traditional CRUD — what's the difference and the trade-offs?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["event-sourcing", "crud", "event-store", "audit", "cqrs"],
+          "answer": {
+            "oneLiner": "CRUD stores only the current state and overwrites it; event sourcing stores an append-only log of every state change and rebuilds current state by replaying events, giving a full audit history at the cost of complexity.",
+            "keyPoints": [
+              "CRUD — simple, current state only, history is lost on update",
+              "Event sourcing — append-only events are the source of truth",
+              "Benefits: full audit, time-travel, natural fit with CQRS read models",
+              "Costs: schema/versioning of events, replay cost, steep learning curve"
+            ],
+            "followUps": ["What are snapshots in event sourcing?", "Does event sourcing require CQRS?"],
+            "redFlags": ["Using event sourcing for simple CRUD", "Not knowing how to handle event schema evolution"]
+          }
+        },
+        {
+          "id": "architecture-patterns-advanced-003",
+          "q": "Caching strategies: cache-aside vs write-through vs write-behind — and where does Redis fit?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["caching", "cache-aside", "write-through", "write-behind", "redis"],
+          "answer": {
+            "oneLiner": "Cache-aside has the app load and populate the cache on a miss; write-through writes to cache and DB together (consistent, slower writes); write-behind writes to cache and flushes to the DB asynchronously (fast, risk of loss). Redis is the common distributed store for all three.",
+            "keyPoints": [
+              "Cache-aside — app manages it; lazy-loaded; most common default",
+              "Write-through — write cache+DB synchronously; strong consistency, slower",
+              "Write-behind — write cache now, persist later; fast but can lose data on crash",
+              "Redis serves as the distributed cache across instances for any of these"
+            ],
+            "followUps": ["What is cache stampede and how do you prevent it?", "Why is cache-aside the usual default?"],
+            "redFlags": ["Thinking write-behind is safe without durability handling", "No invalidation/TTL strategy"]
+          }
+        },
+        {
+          "id": "architecture-patterns-advanced-004",
+          "q": "Modular monolith vs monolith vs microservices — what are the missing distinctions?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["modular-monolith", "monolith", "microservices", "modularity"],
+          "answer": {
+            "oneLiner": "A modular monolith is a single deployable with strongly enforced internal module boundaries — it gives you the maintainability of microservices without the distributed-systems and deployment overhead.",
+            "keyPoints": [
+              "Traditional monolith — one deploy, but often tangled (big ball of mud)",
+              "Modular monolith — one deploy, but clean module boundaries + in-process calls",
+              "Microservices — independent deploy/scale, but network + ops complexity",
+              "Modular monolith is the recommended starting point; extract services later"
+            ],
+            "followUps": ["How do you enforce module boundaries in a monolith?", "How does it ease migration to microservices?"],
+            "redFlags": ["Equating modular monolith with a plain monolith", "Jumping to microservices with no proven need"]
+          }
+        },
+        {
+          "id": "architecture-patterns-advanced-005",
+          "q": "What are the main multi-tenant architecture approaches (DB-per-tenant vs shared schema)?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["multi-tenancy", "db-per-tenant", "shared-schema", "isolation", "saas"],
+          "answer": {
+            "oneLiner": "On a spectrum of isolation vs cost: database-per-tenant gives strongest isolation but high cost; schema-per-tenant is a middle ground; a shared schema with a TenantId column is cheapest and most scalable but needs strict query filtering.",
+            "keyPoints": [
+              "DB-per-tenant — best isolation/compliance, costly, harder to scale to thousands",
+              "Schema-per-tenant — moderate isolation, moderate operational cost",
+              "Shared schema (TenantId) — cheapest and densest, but risk of data leakage",
+              "Shared schema needs enforced tenant filters (e.g. EF global query filters)"
+            ],
+            "followUps": ["How do you prevent cross-tenant data leakage in a shared schema?", "How do you handle a noisy-neighbour tenant?"],
+            "redFlags": ["Forgetting tenant filtering on shared-schema queries", "Ignoring per-tenant scaling/cost trade-offs"]
+          }
+        },
+        {
+          "id": "architecture-patterns-advanced-006",
+          "q": "How do you maintain backward compatibility when evolving a public API?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["backward-compatibility", "api-evolution", "versioning", "public-api"],
+          "answer": {
+            "oneLiner": "Make only additive, non-breaking changes where possible (new optional fields/endpoints), version the API when you must break, and deprecate gracefully with notice and a migration window before removal.",
+            "keyPoints": [
+              "Additive changes are safe; removing/renaming/retyping fields breaks clients",
+              "Tolerant reader: clients should ignore unknown fields",
+              "Version (v1/v2) only for genuine breaking changes",
+              "Deprecate with headers/docs and a sunset timeline, never remove abruptly"
+            ],
+            "followUps": ["What counts as a breaking change?", "How do you communicate a deprecation?"],
+            "redFlags": ["Renaming/removing fields in place", "Breaking changes with no version bump or notice"]
+          }
+        },
+        {
+          "id": "architecture-patterns-advanced-007",
+          "q": "What is the Bulkhead pattern and what problem does it solve?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["bulkhead", "resilience", "isolation", "fault-tolerance"],
+          "answer": {
+            "oneLiner": "Like watertight compartments in a ship, the bulkhead pattern isolates resources (thread pools, connection pools) per dependency so a single slow or failing dependency can't exhaust shared resources and sink the whole app.",
+            "keyPoints": [
+              "Partition resources per dependency instead of one shared pool",
+              "A slow downstream consumes only its own quota, not everything",
+              "Complements circuit breaker and timeout in a resilience strategy",
+              "In .NET, configurable via Polly's bulkhead/concurrency limiter"
+            ],
+            "followUps": ["How does bulkhead differ from circuit breaker?", "How do you size each bulkhead?"],
+            "redFlags": ["Confusing it with circuit breaker", "Using a single shared pool for all dependencies"]
+          }
+        },
+        {
+          "id": "architecture-patterns-advanced-008",
+          "q": "Vertical vs horizontal scaling — how does the choice affect your design?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["vertical-scaling", "horizontal-scaling", "stateless", "scalability"],
+          "answer": {
+            "oneLiner": "Vertical scaling adds power to one machine (simple, but a hard ceiling and a single point of failure); horizontal scaling adds more instances behind a load balancer, which scales further but forces you to design stateless services.",
+            "keyPoints": [
+              "Vertical — bigger box, no code changes, but limited and risky (SPOF)",
+              "Horizontal — more instances, near-limitless, but needs statelessness",
+              "Move session/cache out of process (Redis), avoid in-memory request state",
+              "Horizontal also enables rolling deploys and fault isolation"
+            ],
+            "followUps": ["Why does horizontal scaling require stateless services?", "Where do you put session state then?"],
+            "redFlags": ["Holding session/state in-process while scaling out", "Thinking vertical scaling has no ceiling"]
+          }
+        },
+        {
+          "id": "architecture-patterns-advanced-009",
+          "q": "How do you design for zero-downtime deployment (blue-green, canary, rolling, feature flags)?",
+          "level": "senior",
+          "type": "design",
+          "freq": "medium",
+          "tags": ["zero-downtime", "blue-green", "canary", "rolling", "feature-flags"],
+          "answer": {
+            "oneLiner": "Deploy a new version alongside the old and shift traffic gradually or instantly with a fallback: rolling replaces instances batch by batch, blue-green swaps two full environments, canary sends a small % first, and feature flags decouple release from deploy.",
+            "keyPoints": [
+              "Rolling — replace instances in batches; cheap, slower rollback",
+              "Blue-green — two environments, instant switch and instant rollback",
+              "Canary — route a small % to the new version, watch metrics, then ramp",
+              "Feature flags — ship code dark, turn features on independently of deploy"
+            ],
+            "detail": "All of these require backward-compatible changes — especially DB migrations must work with both old and new code running at once (expand/contract pattern).",
+            "followUps": ["Why must DB migrations be backward compatible during rollout?", "What is the expand/contract migration pattern?"],
+            "redFlags": ["Breaking DB schema changes that old instances can't tolerate", "No rollback plan"]
+          }
+        }
+      ]
     }
   ]
 }
