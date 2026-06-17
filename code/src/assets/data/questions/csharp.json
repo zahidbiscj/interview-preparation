@@ -1358,6 +1358,405 @@
               "Slower than static dispatch."
             ]
           }
+        },
+        {
+          "id": "csharp-advanced-014",
+          "q": "Explain the IOptions pattern: IOptions vs IOptionsSnapshot vs IOptionsMonitor.",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "ioptions",
+            "configuration",
+            "di",
+            "asp.net-core"
+          ],
+          "answer": {
+            "oneLiner": "The options pattern binds a config section to a strongly-typed class injected via DI; the three interfaces differ in when they pick up config changes.",
+            "keyPoints": [
+              "`IOptions<T>` — singleton, value read once, never refreshes.",
+              "`IOptionsSnapshot<T>` — scoped, fresh value per request.",
+              "`IOptionsMonitor<T>` — singleton, live reload + `OnChange` callback.",
+              "Register with `services.Configure<T>(config.GetSection(\"X\"))`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "builder.Services.Configure<SmtpOptions>(\n    builder.Configuration.GetSection(\"Smtp\"));\n\npublic class Mailer\n{\n    private readonly SmtpOptions _opt;\n    public Mailer(IOptions<SmtpOptions> opt) => _opt = opt.Value;\n}",
+              "note": "Use IOptionsSnapshot in scoped services that need reloaded config"
+            },
+            "followUps": [
+              "Why can't you inject IOptionsSnapshot into a singleton?",
+              "How do you validate options on startup?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-015",
+          "q": "What is a partial class (and partial method) in C#?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "partial",
+            "code-generation",
+            "syntax"
+          ],
+          "answer": {
+            "oneLiner": "`partial` splits one class (or method) across multiple files, merged by the compiler into a single type — mainly for separating generated code from hand-written code.",
+            "keyPoints": [
+              "All parts must use `partial` and the same accessibility.",
+              "Common for designer/generated code (EF, Razor, source generators).",
+              "Partial methods: declaration in one part, optional body in another.",
+              "If a partial method has no body, calls to it are removed by the compiler."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// File1.cs (generated)\npublic partial class Customer { public int Id { get; set; } }\n// File2.cs (hand-written)\npublic partial class Customer { public string FullName => $\"{Id}\"; }",
+              "note": "Both files compile into one Customer type"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-016",
+          "q": "What is the difference between `throw` and `throw ex`?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [
+            "exceptions",
+            "stack-trace",
+            "throw"
+          ],
+          "answer": {
+            "oneLiner": "`throw;` rethrows preserving the original stack trace; `throw ex;` resets the stack trace to the current line, hiding where the error actually originated.",
+            "keyPoints": [
+              "`throw;` — preserves the original throw point (use this).",
+              "`throw ex;` — overwrites the stack trace (avoid).",
+              "To wrap, use `throw new MyException(\"...\", ex)` (inner exception).",
+              "`ExceptionDispatchInfo.Capture(ex).Throw()` preserves across boundaries."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "try { DoWork(); }\ncatch (Exception ex)\n{\n    _log.Error(ex);\n    throw;            // GOOD: keeps original stack trace\n    // throw ex;      // BAD: stack trace points here\n}",
+              "note": "Always prefer bare 'throw;' when rethrowing"
+            },
+            "redFlags": [
+              "Using `throw ex;` and losing the origin of the bug."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-017",
+          "q": "What is the difference between `const`, `readonly`, and `static readonly`?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [
+            "const",
+            "readonly",
+            "immutability"
+          ],
+          "answer": {
+            "oneLiner": "`const` is a compile-time constant baked into callers; `readonly` is set once at runtime (ctor); `static readonly` is one shared runtime constant for the type.",
+            "keyPoints": [
+              "`const` — implicitly static, compile-time, only primitives/strings.",
+              "`const` value is inlined into referencing assemblies (versioning risk).",
+              "`readonly` — set in declaration or constructor, per instance.",
+              "`static readonly` — set once for the type; can hold any computed value."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public const double Pi = 3.14159;        // compile-time, inlined\npublic static readonly DateTime Start = DateTime.UtcNow; // runtime\npublic readonly int Id;                   // per-instance, set in ctor\npublic Thing(int id) => Id = id;",
+              "note": "Use static readonly (not const) for values that may change across versions"
+            },
+            "followUps": [
+              "Why can changing a public const be a breaking change?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-018",
+          "q": "What is the difference between First() and FirstOrDefault()?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [
+            "linq",
+            "first",
+            "firstordefault"
+          ],
+          "answer": {
+            "oneLiner": "`First()` throws `InvalidOperationException` if no element matches; `FirstOrDefault()` returns the type's default (null for reference types, 0 for int) instead.",
+            "keyPoints": [
+              "`First()` — use when an element must exist; throws otherwise.",
+              "`FirstOrDefault()` — use when empty is valid; returns default.",
+              "Same applies to `Single`/`SingleOrDefault`, `Last`/`LastOrDefault`.",
+              "`Single` also throws if more than one element matches."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "var a = list.First(x => x.Id == 5);          // throws if none\nvar b = list.FirstOrDefault(x => x.Id == 5); // null if none\nif (b is null) { /* handle missing */ }",
+              "note": "FirstOrDefault returns null for classes — guard against NRE afterward"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-019",
+          "q": "Compare IEnumerable, ICollection, IList, and IQueryable.",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "collections",
+            "ienumerable",
+            "ilist",
+            "icollection",
+            "iqueryable"
+          ],
+          "answer": {
+            "oneLiner": "They form a hierarchy of capability: IEnumerable (iterate) < ICollection (count/add/remove) < IList (indexer); IQueryable is IEnumerable plus an expression tree for out-of-process (SQL) querying.",
+            "keyPoints": [
+              "`IEnumerable<T>` — forward iteration only, lazy, no Count.",
+              "`ICollection<T>` — adds `Count`, `Add`, `Remove`, `Contains`.",
+              "`IList<T>` — adds index access `this[i]` and `Insert`.",
+              "`IQueryable<T>` — IEnumerable + expression tree (LINQ-to-SQL)."
+            ],
+            "followUps": [
+              "Which should a method return for maximum flexibility?",
+              "Why does Count() on IEnumerable enumerate the whole sequence?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-020",
+          "q": "What is a global using directive (C# 10)?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "global-using",
+            "csharp-10",
+            "syntax"
+          ],
+          "answer": {
+            "oneLiner": "`global using` (C# 10) declares a using once for the entire project, removing repeated imports from every file.",
+            "keyPoints": [
+              "Put `global using System.Linq;` in any one file (e.g. GlobalUsings.cs).",
+              "Implicit usings (`<ImplicitUsings>enable</ImplicitUsings>`) auto-add common ones.",
+              "Combine with `global using static` and aliases.",
+              "Keep them in one central file for discoverability."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// GlobalUsings.cs\nglobal using System.Collections.Generic;\nglobal using static System.Math;",
+              "note": "Applies to all files in the compilation"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-021",
+          "q": "What causes a NullReferenceException ('Object reference not set to an instance of an object') and how do you avoid it?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": [
+            "nullreferenceexception",
+            "null",
+            "null-safety"
+          ],
+          "answer": {
+            "oneLiner": "It's thrown when you dereference (call a member on) a reference that is null; avoid it with null checks, `?.`, `??`, and nullable reference types.",
+            "keyPoints": [
+              "Cause: accessing `.Member` on a null object (uninitialized field, empty query result, etc.).",
+              "`?.` null-conditional short-circuits to null instead of throwing.",
+              "`??` / `??=` supply a fallback value.",
+              "Enable nullable reference types so the compiler warns at build time."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "string? name = GetName();\nint len = name?.Length ?? 0;     // safe\nname ??= \"unknown\";              // assign if null\nif (name is not null) Use(name); // explicit guard",
+              "note": "Most NREs come from method results that can return null (e.g. FirstOrDefault)"
+            },
+            "redFlags": [
+              "Catching NullReferenceException instead of fixing the null.",
+              "Sprinkling `!` (null-forgiving) to silence warnings."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-022",
+          "q": "Are null and an empty string the same thing in C#?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "string",
+            "null",
+            "empty"
+          ],
+          "answer": {
+            "oneLiner": "No — `null` means no string object at all, while `\"\"` (same as `string.Empty`) is a valid zero-length string; use `string.IsNullOrEmpty` to handle both.",
+            "keyPoints": [
+              "`null` has no instance; calling `.Length` on it throws NRE.",
+              "`\"\"` and `string.Empty` are the same interned empty instance, `.Length == 0`.",
+              "`string.IsNullOrEmpty(s)` checks both.",
+              "`string.IsNullOrWhiteSpace(s)` also treats spaces/tabs as empty."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "string? a = null;\nstring b = \"\";\nConsole.WriteLine(a == b);                  // False\nConsole.WriteLine(string.IsNullOrEmpty(a)); // True\nConsole.WriteLine(b.Length);                // 0 (a.Length would throw)",
+              "note": "Prefer string.IsNullOrWhiteSpace for user input validation"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-023",
+          "q": "Can an enum use inheritance in C#?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "low",
+          "tags": [
+            "enum",
+            "inheritance"
+          ],
+          "answer": {
+            "oneLiner": "No — every enum implicitly derives from `System.Enum` and is sealed, so you cannot inherit from an enum or extend it with more values.",
+            "keyPoints": [
+              "Enums are sealed value types; no `enum B : A` for two enums.",
+              "You can only specify the underlying integral type (`enum E : byte`).",
+              "To extend behavior, use extension methods or a smart-enum class.",
+              "`[Flags]` enables bitwise combination, not inheritance."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-024",
+          "q": "Explain the ternary operator and the null-coalescing operators (?? and ??=).",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "ternary",
+            "null-coalescing",
+            "operators"
+          ],
+          "answer": {
+            "oneLiner": "`cond ? a : b` picks one of two values by a boolean; `a ?? b` returns `a` unless it's null (then `b`); `a ??= b` assigns `b` to `a` only if `a` is null.",
+            "keyPoints": [
+              "Ternary works on any condition; `??` works specifically on null.",
+              "`??` is right-associative and chainable: `x ?? y ?? z`.",
+              "`??=` is the compound assignment form of `??`.",
+              "Pairs well with `?.`: `obj?.Name ?? \"N/A\"`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "int max = a > b ? a : b;          // ternary\nstring name = input ?? \"default\"; // null-coalescing\ncache ??= LoadFromDb();           // assign only if null",
+              "note": "?? and ??= only react to null, not to false/empty"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-025",
+          "q": "What is the difference between early binding and late binding?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "early-binding",
+            "late-binding",
+            "dynamic",
+            "reflection"
+          ],
+          "answer": {
+            "oneLiner": "Early (static) binding resolves members at compile time with full type checking; late binding resolves them at runtime via `dynamic` or reflection.",
+            "keyPoints": [
+              "Early binding — compile-time checks, IntelliSense, faster.",
+              "Late binding — runtime resolution via `dynamic` / `Type.InvokeMember`.",
+              "Late binding errors surface only at runtime.",
+              "Use late binding for COM, plugins, or unknown-shape data."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "var s = \"hi\"; s.ToUpper();        // early binding\ndynamic d = \"hi\"; d.ToUpper();    // late binding (runtime resolve)\nd.NoSuchMethod();                 // compiles, throws at runtime",
+              "note": "Virtual dispatch is still 'early bound' (compile-time known signature)"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-026",
+          "q": "How do you add new methods to a sealed class you cannot modify?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "extension-methods",
+            "sealed",
+            "design"
+          ],
+          "answer": {
+            "oneLiner": "Use extension methods — you can't inherit a sealed class, but a static extension method adds instance-like methods without modifying or subclassing it.",
+            "keyPoints": [
+              "`sealed` blocks inheritance, so subclassing is out.",
+              "Extension method: `static` method, `this` first parameter, in a static class.",
+              "Only sees public members — no access to private state.",
+              "All LINQ extends sealed/interface types this way."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static class StringExt\n{\n    public static bool IsEmail(this string s) => s.Contains('@');\n}\n// string is sealed, but:\nbool ok = \"a@b.com\".IsEmail();",
+              "note": "Extension methods are the standard answer for extending sealed/third-party types"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-027",
+          "q": "Is the index accessible inside a foreach loop?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "foreach",
+            "loop",
+            "index",
+            "linq"
+          ],
+          "answer": {
+            "oneLiner": "No — `foreach` exposes only the element, not its index; use a `for` loop, a manual counter, or `Select((item, i) => ...)` if you need the index.",
+            "keyPoints": [
+              "`foreach` has no built-in index variable.",
+              "Use `for (int i = 0; i < arr.Length; i++)` for index access.",
+              "Or `.Select((x, i) => (x, i))` to project index pairs.",
+              "Track a manual `int i = 0; ... i++;` inside the loop as a last resort."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "foreach (var (item, i) in items.Select((x, i) => (x, i)))\n    Console.WriteLine($\"{i}: {item}\");",
+              "note": "Select with index is the idiomatic LINQ way"
+            }
+          }
+        },
+        {
+          "id": "csharp-advanced-028",
+          "q": "Name a few notable features added in C# 10, 11, and 13.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "low",
+          "tags": [
+            "csharp-10",
+            "csharp-11",
+            "csharp-13",
+            "language-features"
+          ],
+          "answer": {
+            "oneLiner": "C# 10 brought global usings, file-scoped namespaces and record structs; C# 11 added raw string literals, required members and list patterns; C# 13 added params collections, a new lock type and the ref/index ^ improvements.",
+            "keyPoints": [
+              "C# 10: global usings, file-scoped namespaces, `record struct`.",
+              "C# 11: raw string literals (`\"\"\"`), `required` members, list patterns, generic math.",
+              "C# 12: primary constructors, collection expressions `[..]`.",
+              "C# 13: `params` collections, `System.Threading.Lock`, `\\e` escape."
+            ],
+            "note": "Versions map to .NET releases: C# 10/.NET 6, 11/.NET 7, 12/.NET 8, 13/.NET 9"
+          }
         }
       ]
     },
@@ -1867,6 +2266,181 @@
               "snippet": "class Animal { public virtual void Speak() => Console.WriteLine(\"animal speak\"); }\nclass Dog : Animal { public override void Speak() => Console.WriteLine(\"dog speak\"); }\n\nAnimal a = new Dog();\na.Speak();   // ?",
               "note": "Contrast with the non-virtual version which prints 'animal speak'"
             }
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "mvc-misc",
+      "subtopicName": "MVC & Misc",
+      "order": 6,
+      "questions": [
+        {
+          "id": "csharp-mvc-misc-001",
+          "q": "Explain the MVC architecture and how a request flows through Model-View-Controller.",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": [
+            "mvc",
+            "architecture",
+            "asp.net"
+          ],
+          "answer": {
+            "oneLiner": "MVC separates concerns into Model (data/business logic), View (UI), and Controller (handles requests, coordinates the two) — improving testability and separation.",
+            "keyPoints": [
+              "Request hits routing, which maps URL to a controller action.",
+              "Controller calls the Model (services/data) and builds a result.",
+              "Controller passes a model to the View, which renders HTML.",
+              "Separation makes each part independently testable."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class ProductController : Controller\n{\n    private readonly IProductService _svc;\n    public ProductController(IProductService svc) => _svc = svc;\n    public IActionResult Details(int id)\n    {\n        var product = _svc.Get(id);   // Model\n        return View(product);          // View\n    }\n}",
+              "note": "Controller is the coordinator; keep business logic in the Model/service layer"
+            },
+            "redFlags": [
+              "Putting business logic in the controller or view ('fat controller')."
+            ]
+          }
+        },
+        {
+          "id": "csharp-mvc-misc-002",
+          "q": "Compare ViewBag, ViewData, TempData, and a ViewModel for passing data to a view.",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [
+            "mvc",
+            "viewbag",
+            "viewdata",
+            "tempdata",
+            "viewmodel"
+          ],
+          "answer": {
+            "oneLiner": "ViewModel is a strongly-typed class (preferred); ViewData/ViewBag are dynamic dictionaries for the current request only; TempData survives one redirect.",
+            "keyPoints": [
+              "`ViewModel` — strongly typed, compile-checked, IntelliSense (best practice).",
+              "`ViewData` — dictionary `ViewData[\"key\"]`, current request only.",
+              "`ViewBag` — dynamic wrapper over ViewData; same lifetime, no type safety.",
+              "`TempData` — backed by session/cookie, persists across one redirect."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "ViewData[\"Title\"] = \"Home\";          // dictionary\nViewBag.Title = \"Home\";              // dynamic, same store\nTempData[\"Msg\"] = \"Saved\";           // survives redirect\nreturn View(new ProductViewModel());  // strongly typed (preferred)",
+              "note": "Prefer a ViewModel; use TempData for post-redirect flash messages"
+            },
+            "redFlags": [
+              "Using ViewBag everywhere instead of strongly-typed ViewModels."
+            ]
+          }
+        },
+        {
+          "id": "csharp-mvc-misc-003",
+          "q": "What is a partial view and how do you pass data from it back to a controller?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "mvc",
+            "partial-view",
+            "razor"
+          ],
+          "answer": {
+            "oneLiner": "A partial view is a reusable Razor fragment (`.cshtml`) rendered inside other views; to send its data to a controller, wrap its fields in a form that POSTs to an action.",
+            "keyPoints": [
+              "Rendered via `<partial name=\"_Item\" model=\"x\" />` or `Html.Partial`.",
+              "A partial view itself doesn't post — a form does.",
+              "Put form inputs in the partial; the surrounding `<form>` POSTs to an action.",
+              "Model binding maps posted fields to the action's parameter."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// _Comment.cshtml partial inside a form\n@model CommentVm\n<input asp-for=\"Text\" />\n// Controller action receiving the POST\n[HttpPost]\npublic IActionResult Add(CommentVm vm) { /* vm.Text bound */ return RedirectToAction(\"Index\"); }",
+              "note": "Data flows back via form POST + model binding, not the partial itself"
+            }
+          }
+        },
+        {
+          "id": "csharp-mvc-misc-004",
+          "q": "What is the difference between a Razor View (MVC) and a Razor Page?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "razor-pages",
+            "mvc",
+            "razor"
+          ],
+          "answer": {
+            "oneLiner": "MVC Razor views are driven by separate controllers; Razor Pages bundle the page and its handler logic together in a `.cshtml` + `.cshtml.cs` PageModel — simpler for page-focused apps.",
+            "keyPoints": [
+              "MVC: controller actions return views; one controller, many views.",
+              "Razor Pages: each page has its own `PageModel` with `OnGet`/`OnPost` handlers.",
+              "Razor Pages reduce ceremony for CRUD/page-centric scenarios.",
+              "Both use the same Razor syntax and can coexist in one app."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Index.cshtml.cs (Razor Page)\npublic class IndexModel : PageModel\n{\n    public void OnGet() { /* load data */ }\n    public IActionResult OnPost() => RedirectToPage();\n}",
+              "note": "Razor Pages suit page-based UIs; MVC suits APIs and complex routing"
+            }
+          }
+        },
+        {
+          "id": "csharp-mvc-misc-005",
+          "q": "What are the common IActionResult return types in ASP.NET Core MVC?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": [
+            "iactionresult",
+            "mvc",
+            "asp.net-core"
+          ],
+          "answer": {
+            "oneLiner": "`IActionResult` lets an action return different result types — views, redirects, JSON, or status codes — resolved and executed by the framework.",
+            "keyPoints": [
+              "`View()` → `ViewResult` (renders Razor).",
+              "`RedirectToAction()`/`Redirect()` → redirect responses (302).",
+              "`Ok()`, `NotFound()`, `BadRequest()` → status-code results (APIs).",
+              "`Json()` → JSON; `File()` → file download."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public IActionResult Save(Item i)\n{\n    if (!ModelState.IsValid) return View(i);   // ViewResult\n    _svc.Save(i);\n    return RedirectToAction(nameof(Index));     // RedirectToActionResult\n}\n// API style\npublic IActionResult Get(int id) =>\n    _svc.Find(id) is { } x ? Ok(x) : NotFound();",
+              "note": "Return IActionResult when an action can return more than one result type"
+            }
+          }
+        },
+        {
+          "id": "csharp-mvc-misc-006",
+          "q": "Scenario: a date posted from a form makes the entire bound model null. What's going on?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": [
+            "model-binding",
+            "datetime",
+            "culture",
+            "mvc"
+          ],
+          "answer": {
+            "oneLiner": "A wrongly-formatted/culture-mismatched date can't be parsed during model binding; the binding fails and (depending on setup) the model comes back null or with a ModelState error rather than the parsed object.",
+            "keyPoints": [
+              "Model binding parses dates using the request culture — `dd/MM` vs `MM/dd` mismatch fails.",
+              "A failed bind adds a ModelState error; always check `ModelState.IsValid`.",
+              "Fix: send ISO 8601 (`yyyy-MM-dd`) which is culture-invariant.",
+              "Set request localization or `[BindRequired]`/custom binders to control parsing."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "[HttpPost]\npublic IActionResult Save(BookingVm vm)\n{\n    if (!ModelState.IsValid)        // catches the bad date\n        return View(vm);\n    // ...\n}",
+              "note": "Use ISO date format from the client to dodge culture-specific parsing entirely"
+            },
+            "redFlags": [
+              "Not checking ModelState.IsValid and assuming the model bound correctly."
+            ]
           }
         }
       ]

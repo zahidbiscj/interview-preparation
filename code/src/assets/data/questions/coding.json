@@ -1,0 +1,489 @@
+{
+  "topicId": "coding",
+  "topicName": "Coding & DSA",
+  "subtopics": [
+    {
+      "subtopicId": "arrays-strings",
+      "subtopicName": "Arrays & Strings",
+      "order": 1,
+      "questions": [
+        {
+          "id": "coding-arr-001",
+          "q": "Reverse a string WITHOUT using a built-in Reverse(). Implement it yourself.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["strings", "two-pointer", "in-place"],
+          "answer": {
+            "oneLiner": "Convert to a char array and swap from both ends toward the middle with two pointers. O(n) time, O(n) space (strings are immutable in C#).",
+            "keyPoints": [
+              "Two pointers: `left` at start, `right` at end.",
+              "Swap, then move both inward until they cross.",
+              "Strings are immutable, so work on a `char[]`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static string Reverse(string s)\n{\n    char[] c = s.ToCharArray();\n    int left = 0, right = c.Length - 1;\n    while (left < right)\n    {\n        (c[left], c[right]) = (c[right], c[left]); // tuple swap\n        left++;\n        right--;\n    }\n    return new string(c);\n}\n\n// Reverse(\"hello\") => \"olleh\"",
+              "note": "O(n) time, O(n) space for the char array"
+            },
+            "followUps": [
+              "Reverse in place over a char[] (then it's O(1) extra space).",
+              "How would you reverse only the words, not the characters?",
+              "Handle Unicode surrogate pairs / combining characters?"
+            ]
+          }
+        },
+        {
+          "id": "coding-arr-002",
+          "q": "Given an integer array of size n, find all elements that appear more than ⌊n/3⌋ times. Constraints: 1 <= n <= 5*10^4, -10^9 <= nums[i] <= 10^9. Try O(n) time and O(1) space.",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["arrays", "boyer-moore", "voting", "majority"],
+          "answer": {
+            "oneLiner": "Boyer-Moore voting extended to n/3: there can be at most two elements above ⌊n/3⌋, so track two candidates with two counters, then a second pass verifies their real counts. O(n) time, O(1) space.",
+            "keyPoints": [
+              "Above n/3 means at most 2 winners (3 would need >n votes).",
+              "Pass 1: maintain (cand1,count1) and (cand2,count2) via voting.",
+              "Pass 2: re-count both candidates and keep only those > n/3.",
+              "Match an existing candidate first, then fill an empty one, else decrement both."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static IList<int> MajorityElement(int[] nums)\n{\n    int cand1 = 0, cand2 = 1, c1 = 0, c2 = 0; // cand2 != cand1 initially\n    foreach (int x in nums)\n    {\n        if (x == cand1) c1++;\n        else if (x == cand2) c2++;\n        else if (c1 == 0) { cand1 = x; c1 = 1; }\n        else if (c2 == 0) { cand2 = x; c2 = 1; }\n        else { c1--; c2--; }\n    }\n\n    c1 = 0; c2 = 0;\n    foreach (int x in nums)\n    {\n        if (x == cand1) c1++;\n        else if (x == cand2) c2++;\n    }\n\n    var res = new List<int>();\n    if (c1 > nums.Length / 3) res.Add(cand1);\n    if (c2 > nums.Length / 3) res.Add(cand2);\n    return res;\n}\n\n// {3,2,3,1,1,1,2,2,3}: n=9, n/3=3.\n// counts -> 3 appears 3x, 2 appears 3x, 1 appears 3x; none is > 3, so result is empty.\n// Note: the classic answer people expect is 3, but strictly > floor(n/3) excludes all here.",
+              "note": "O(n) time, O(1) space"
+            },
+            "followUps": [
+              "Why are there at most 2 answers for the n/3 case?",
+              "Generalize to elements appearing more than n/k times (k candidates).",
+              "What if you used a Dictionary instead -> O(n) space but simpler."
+            ]
+          }
+        },
+        {
+          "id": "coding-arr-003",
+          "q": "Count how many times each element occurs in an array using a Dictionary.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["arrays", "dictionary", "hashing", "frequency"],
+          "answer": {
+            "oneLiner": "Iterate once and accumulate counts in a Dictionary<T,int>. O(n) time, O(k) space where k is the number of distinct values.",
+            "keyPoints": [
+              "Dictionary key = element, value = running count.",
+              "`TryGetValue` or the `dict[x] = dict.GetValueOrDefault(x) + 1` idiom.",
+              "Average O(1) per lookup/insert."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static Dictionary<int, int> CountOccurrences(int[] nums)\n{\n    var counts = new Dictionary<int, int>();\n    foreach (int x in nums)\n    {\n        counts.TryGetValue(x, out int c);\n        counts[x] = c + 1;\n    }\n    return counts;\n}\n\n// {1,2,2,3,3,3} => {1:1, 2:2, 3:3}",
+              "note": "O(n) time, O(k) space"
+            },
+            "followUps": [
+              "LINQ one-liner: nums.GroupBy(x => x).ToDictionary(g => g.Key, g => g.Count()).",
+              "How to get the most frequent element from this?"
+            ]
+          }
+        },
+        {
+          "id": "coding-arr-004",
+          "q": "Find all duplicate elements in an array.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["arrays", "hashset", "duplicates"],
+          "answer": {
+            "oneLiner": "Walk the array using a HashSet of seen values; if Add returns false, it's a duplicate. O(n) time, O(n) space.",
+            "keyPoints": [
+              "`HashSet.Add` returns false when the value already exists.",
+              "Use a second set for results to avoid reporting a value twice.",
+              "One pass, average O(1) per operation."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static IList<int> FindDuplicates(int[] nums)\n{\n    var seen = new HashSet<int>();\n    var dups = new HashSet<int>();\n    foreach (int x in nums)\n        if (!seen.Add(x)) dups.Add(x);\n    return dups.ToList();\n}\n\n// {1,2,3,2,4,1} => {2,1}",
+              "note": "O(n) time, O(n) space"
+            },
+            "followUps": [
+              "If values are in range [1..n], can you do it in O(1) extra space by index marking?",
+              "Return the count of each duplicate too."
+            ]
+          }
+        },
+        {
+          "id": "coding-arr-005",
+          "q": "Find the second largest element in an array in a single pass.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["arrays", "single-pass", "max"],
+          "answer": {
+            "oneLiner": "Track the largest and second-largest as you scan once; update both correctly on each element. O(n) time, O(1) space.",
+            "keyPoints": [
+              "Initialize both to long.MinValue (handles int.MinValue inputs).",
+              "If x > first: second = first; first = x.",
+              "Else if x > second and x != first: second = x.",
+              "Guard against arrays with fewer than 2 distinct values."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static int? SecondLargest(int[] nums)\n{\n    long first = long.MinValue, second = long.MinValue;\n    foreach (int x in nums)\n    {\n        if (x > first) { second = first; first = x; }\n        else if (x > second && x != first) second = x;\n    }\n    return second == long.MinValue ? (int?)null : (int)second;\n}\n\n// {3,1,4,4,5,2} => 4",
+              "note": "O(n) time, O(1) space"
+            },
+            "followUps": [
+              "Should duplicates of the max count as second largest?",
+              "Generalize to the k-th largest (heap or QuickSelect)."
+            ]
+          }
+        },
+        {
+          "id": "coding-arr-006",
+          "q": "Merge two sorted arrays into one sorted array.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["arrays", "two-pointer", "merge", "sorting"],
+          "answer": {
+            "oneLiner": "Two pointers, one per array; repeatedly take the smaller front element into the result, then drain the remainder. O(m+n) time, O(m+n) space.",
+            "keyPoints": [
+              "This is the merge step of merge sort.",
+              "Compare a[i] vs b[j], copy the smaller, advance that pointer.",
+              "After the loop, copy whatever is left in either array."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static int[] Merge(int[] a, int[] b)\n{\n    var result = new int[a.Length + b.Length];\n    int i = 0, j = 0, k = 0;\n    while (i < a.Length && j < b.Length)\n        result[k++] = a[i] <= b[j] ? a[i++] : b[j++];\n    while (i < a.Length) result[k++] = a[i++];\n    while (j < b.Length) result[k++] = b[j++];\n    return result;\n}\n\n// {1,3,5} + {2,4,6} => {1,2,3,4,5,6}",
+              "note": "O(m+n) time, O(m+n) space; stable"
+            },
+            "followUps": [
+              "Merge in place when one array has trailing capacity (fill from the back).",
+              "How does this relate to the overall O(n log n) of merge sort?"
+            ]
+          }
+        },
+        {
+          "id": "coding-arr-007",
+          "q": "Given a sentence, reverse the order of the words and count how many times each word occurs.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["strings", "split", "dictionary", "frequency"],
+          "answer": {
+            "oneLiner": "Split on whitespace, reverse the word array (or iterate back to front) to rebuild the sentence, and tally counts in a Dictionary. O(n) time, O(w) space.",
+            "keyPoints": [
+              "`Split` with RemoveEmptyEntries to ignore extra spaces.",
+              "Reverse the array, then String.Join to rebuild.",
+              "Count case-insensitively if required (use a case-insensitive comparer)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static (string reversed, Dictionary<string,int> counts) ReverseWords(string sentence)\n{\n    string[] words = sentence.Split((char[])null!,\n        StringSplitOptions.RemoveEmptyEntries);\n\n    var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);\n    foreach (var w in words)\n    {\n        counts.TryGetValue(w, out int c);\n        counts[w] = c + 1;\n    }\n\n    Array.Reverse(words); // manual: swap two-pointer if Reverse is banned\n    return (string.Join(' ', words), counts);\n}\n\n// \"the cat the dog\" => reversed: \"dog the cat the\", counts: {the:2, cat:1, dog:1}",
+              "note": "O(n) time over characters, O(w) space for word map"
+            },
+            "followUps": [
+              "Reverse the words without Array.Reverse (two-pointer swap).",
+              "Reverse characters within each word as well.",
+              "Return the most frequent word."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "algorithms",
+      "subtopicName": "Algorithms & Math",
+      "order": 2,
+      "questions": [
+        {
+          "id": "coding-alg-001",
+          "q": "Generate the first n numbers of the Fibonacci series iteratively.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["math", "iteration", "fibonacci", "dp"],
+          "answer": {
+            "oneLiner": "Keep the last two values and roll forward in a loop, no recursion. O(n) time, O(1) space (O(n) if you store the whole series).",
+            "keyPoints": [
+              "Iterative avoids the exponential blowup of naive recursion.",
+              "Track `a` and `b`, update `(a, b) = (b, a + b)`.",
+              "Use `long` to delay overflow."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static IEnumerable<long> Fibonacci(int n)\n{\n    long a = 0, b = 1;\n    for (int i = 0; i < n; i++)\n    {\n        yield return a;\n        (a, b) = (b, a + b);\n    }\n}\n\n// Fibonacci(8) => 0 1 1 2 3 5 8 13",
+              "note": "O(n) time, O(1) extra space"
+            },
+            "followUps": [
+              "Why is naive recursion O(2^n)? How does memoization fix it?",
+              "Compute the n-th Fibonacci in O(log n) (matrix exponentiation)."
+            ]
+          }
+        },
+        {
+          "id": "coding-alg-002",
+          "q": "Print all prime numbers up to n efficiently.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["math", "primes", "sieve", "eratosthenes"],
+          "answer": {
+            "oneLiner": "Use the Sieve of Eratosthenes: mark multiples of each prime as composite starting from p*p. O(n log log n) time, O(n) space.",
+            "keyPoints": [
+              "Boolean array; index = number, false = still prime.",
+              "Start crossing out at p*p (smaller multiples already crossed).",
+              "Only loop p up to sqrt(n)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static List<int> Primes(int n)\n{\n    var isComposite = new bool[n + 1];\n    var primes = new List<int>();\n    for (int p = 2; p <= n; p++)\n    {\n        if (isComposite[p]) continue;\n        primes.Add(p);\n        for (long m = (long)p * p; m <= n; m += p)\n            isComposite[m] = true;\n    }\n    return primes;\n}\n\n// Primes(20) => 2 3 5 7 11 13 17 19",
+              "note": "O(n log log n) time, O(n) space"
+            },
+            "followUps": [
+              "Trial division check for a single number (O(sqrt n)).",
+              "Segmented sieve for very large ranges to bound memory."
+            ]
+          }
+        },
+        {
+          "id": "coding-alg-003",
+          "q": "Count the number of trailing zeros in n! (factorial of n).",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["math", "factorial", "counting"],
+          "answer": {
+            "oneLiner": "Trailing zeros come from factors of 10 = 2*5, and 5s are scarcer than 2s, so just count factors of 5: n/5 + n/25 + n/125 + ... O(log n) time, O(1) space.",
+            "keyPoints": [
+              "Never compute n! itself (overflows fast).",
+              "Each multiple of 5 contributes one 5; multiples of 25 contribute an extra, etc.",
+              "Sum floor(n / 5^k) until the term is 0."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public static int TrailingZeros(int n)\n{\n    int count = 0;\n    for (long p = 5; p <= n; p *= 5)\n        count += (int)(n / p);\n    return count;\n}\n\n// TrailingZeros(25) => 6  (25/5=5, 25/25=1)\n// TrailingZeros(100) => 24",
+              "note": "O(log_5 n) time, O(1) space"
+            },
+            "followUps": [
+              "Why count 5s and not 2s?",
+              "Count trailing zeros in base b (factor b into primes)."
+            ]
+          }
+        },
+        {
+          "id": "coding-alg-004",
+          "q": "What sorting algorithm is preferred for linked lists, and why?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["linked-list", "sorting", "merge-sort"],
+          "answer": {
+            "oneLiner": "Merge sort: it's O(n log n), doesn't need random access, and merges by relinking nodes, so it works on lists with O(1) extra space (bottom-up) unlike quicksort which relies on indexing.",
+            "keyPoints": [
+              "Quicksort/heapsort need O(1) random access -> bad for lists.",
+              "Merge sort only walks nodes sequentially and splices pointers.",
+              "Stable and a guaranteed O(n log n) (no worst-case degradation like quicksort).",
+              "Bottom-up merge sort avoids recursion stack -> O(1) auxiliary space."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Merge sort on a singly linked list (top-down)\npublic class Node { public int Val; public Node? Next; }\n\npublic static Node? Sort(Node? head)\n{\n    if (head?.Next == null) return head;\n    // split with slow/fast pointers\n    Node slow = head, fast = head.Next;\n    while (fast?.Next != null) { slow = slow.Next!; fast = fast.Next.Next; }\n    Node mid = slow.Next!; slow.Next = null;\n    return Merge(Sort(head), Sort(mid));\n}\n\nstatic Node? Merge(Node? a, Node? b)\n{\n    var dummy = new Node(); var tail = dummy;\n    while (a != null && b != null)\n    {\n        if (a.Val <= b.Val) { tail.Next = a; a = a.Next; }\n        else { tail.Next = b; b = b.Next; }\n        tail = tail.Next;\n    }\n    tail.Next = a ?? b;\n    return dummy.Next;\n}",
+              "note": "O(n log n) time; relinks nodes, no random access"
+            },
+            "followUps": [
+              "Why is quicksort poor for linked lists?",
+              "How does bottom-up merge sort reach O(1) extra space?"
+            ]
+          }
+        },
+        {
+          "id": "coding-alg-005",
+          "q": "Compare singly, doubly, and circular linked lists. Which would you use to implement browser tab/page switching, and why?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["linked-list", "data-structures", "design"],
+          "answer": {
+            "oneLiner": "Singly = one forward pointer; doubly = prev+next (O(1) bidirectional move/delete); circular = tail links back to head. For browser back/forward navigation use a doubly linked list (move both directions in O(1)); for round-robin tab cycling a circular list fits.",
+            "keyPoints": [
+              "Singly: less memory, forward traversal only, O(n) to find prev.",
+              "Doubly: prev+next pointers, O(1) insert/delete given a node, both directions.",
+              "Circular: last node points to first -> natural cycling / round-robin.",
+              "Back/forward history = doubly linked (or two stacks); endless tab cycling = circular."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Doubly linked node for back/forward navigation\npublic class Page\n{\n    public string Url = \"\";\n    public Page? Prev, Next;\n}\n\npublic class History\n{\n    private Page? current;\n    public void Visit(string url)\n    {\n        var p = new Page { Url = url, Prev = current };\n        if (current != null) current.Next = p; // forward history truncated\n        current = p;\n    }\n    public string? Back()    => (current?.Prev != null) ? (current = current.Prev).Url : null;\n    public string? Forward() => (current?.Next != null) ? (current = current.Next).Url : null;\n}",
+              "note": "Doubly linked -> O(1) Back/Forward"
+            },
+            "followUps": [
+              "When would two stacks be simpler than a doubly linked list here?",
+              "How does an LRU cache combine a doubly linked list with a hash map?",
+              "Trade-off: extra prev pointer memory vs O(1) reverse traversal."
+            ]
+          }
+        },
+        {
+          "id": "coding-alg-006",
+          "q": "What is the difference between a Tuple and a List in C#? When would you use each?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["collections", "tuple", "list", "concepts"],
+          "answer": {
+            "oneLiner": "A Tuple is a fixed-size, heterogeneous group of values (different types, accessed by position/name); a List<T> is a resizable, homogeneous sequence (one type, indexable, growable). Use a tuple to return multiple values; use a list for collections you iterate or grow.",
+            "keyPoints": [
+              "Tuple: fixed length, mixed types, great for returning multiple values.",
+              "List<T>: dynamic length, single element type, index + iterate.",
+              "ValueTuple `(int, string)` is a value type with named members; List<T> is a reference type.",
+              "Tuples are not meant to be iterated; lists are."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Tuple: return several values of different types\n(int count, string name) GetStats() => (3, \"Alice\");\nvar s = GetStats();\nConsole.WriteLine($\"{s.name}: {s.count}\");\n\n// List: a growable homogeneous collection\nvar nums = new List<int> { 1, 2, 3 };\nnums.Add(4);\nint third = nums[2];",
+              "note": "Tuple = fixed heterogeneous; List = dynamic homogeneous"
+            },
+            "followUps": [
+              "ValueTuple vs the older System.Tuple reference type?",
+              "When prefer a small record/class over a tuple for readability?"
+            ]
+          }
+        },
+        {
+          "id": "coding-alg-007",
+          "q": "Explain the difference between the stack and the heap in .NET memory management.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["memory", "stack", "heap", "gc"],
+          "answer": {
+            "oneLiner": "The stack is a fast, LIFO region for method call frames, local value types, and references, automatically reclaimed when a method returns; the heap is a larger region for reference-type objects, managed by the garbage collector. Value types live on the stack (or inline), reference types live on the heap.",
+            "keyPoints": [
+              "Stack: per-thread, LIFO, very fast, holds locals/parameters/return addresses; freed on return.",
+              "Heap: shared, holds objects (class instances, arrays); cleaned by the GC.",
+              "A reference-type variable sits on the stack but points to heap data.",
+              "Boxing moves a value type onto the heap (allocation cost)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "void Demo()\n{\n    int x = 5;                 // value type -> stack\n    var p = new Person();      // 'p' (reference) on stack, object on heap\n    object boxed = x;          // boxing -> new heap allocation\n}\n\nclass Person { public string Name = \"\"; }",
+              "note": "Stack: auto-freed locals; Heap: GC-managed objects"
+            },
+            "followUps": [
+              "What causes a StackOverflowException vs an OutOfMemoryException?",
+              "How do generational GC (gen 0/1/2) and the LOH work?",
+              "Why can stackalloc / Span<T> reduce heap pressure?"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "sql-coding",
+      "subtopicName": "SQL Coding",
+      "order": 3,
+      "questions": [
+        {
+          "id": "coding-sql-001",
+          "q": "Write a query to find the second highest salary from an Employee(Id, Name, Salary) table.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "ranking", "dense-rank", "salary"],
+          "answer": {
+            "oneLiner": "Rank distinct salaries with DENSE_RANK() descending and pick rank 2; this handles ties cleanly and returns NULL when there's no second salary.",
+            "keyPoints": [
+              "DENSE_RANK gives equal salaries the same rank (no gaps).",
+              "Filter the ranked result to rank = 2.",
+              "Subquery approach (MAX where salary < overall MAX) also works."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Using DENSE_RANK\nSELECT MAX(Salary) AS SecondHighestSalary\nFROM (\n    SELECT Salary, DENSE_RANK() OVER (ORDER BY Salary DESC) AS rnk\n    FROM Employee\n) t\nWHERE rnk = 2;\n\n-- Equivalent subquery form (returns NULL if none)\nSELECT MAX(Salary) AS SecondHighestSalary\nFROM Employee\nWHERE Salary < (SELECT MAX(Salary) FROM Employee);",
+              "note": "DENSE_RANK handles duplicate salaries correctly"
+            },
+            "followUps": [
+              "Why DENSE_RANK over ROW_NUMBER here (ties)?",
+              "What does each return when only one salary exists?"
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-002",
+          "q": "Generalize: write a query (or function) to find the N-th highest salary.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "ranking", "dense-rank", "nth"],
+          "answer": {
+            "oneLiner": "Use DENSE_RANK() OVER (ORDER BY Salary DESC) and filter rnk = N; wrap in a function so N is a parameter. O(n log n) due to the sort.",
+            "keyPoints": [
+              "Same DENSE_RANK pattern, parameterized by N.",
+              "OFFSET/FETCH also works but doesn't dedupe ties.",
+              "Return NULL gracefully when fewer than N distinct salaries exist."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Parameterized query (T-SQL)\nDECLARE @N INT = 3;\n\nSELECT MAX(Salary) AS NthHighestSalary\nFROM (\n    SELECT Salary, DENSE_RANK() OVER (ORDER BY Salary DESC) AS rnk\n    FROM Employee\n) t\nWHERE rnk = @N;\n\n-- As a reusable function\nCREATE FUNCTION dbo.GetNthSalary(@N INT)\nRETURNS INT AS\nBEGIN\n    RETURN (\n        SELECT DISTINCT Salary\n        FROM (\n            SELECT Salary, DENSE_RANK() OVER (ORDER BY Salary DESC) AS rnk\n            FROM Employee\n        ) t\n        WHERE rnk = @N\n    );\nEND;",
+              "note": "Sort-bound: O(n log n)"
+            },
+            "followUps": [
+              "How would OFFSET @N-1 ROWS FETCH NEXT 1 differ with duplicate salaries?",
+              "Per-department N-th highest (PARTITION BY DepartmentId)?"
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-003",
+          "q": "Give an example of a correlated subquery and explain how it differs from a plain subquery.",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["sql", "correlated-subquery", "subquery"],
+          "answer": {
+            "oneLiner": "A correlated subquery references a column from the outer query, so it is logically re-evaluated per outer row; here we find employees earning more than their own department's average.",
+            "keyPoints": [
+              "Inner query depends on the outer row (the correlation, e.g. e.DeptId).",
+              "Plain (non-correlated) subqueries run once, independently.",
+              "Often rewritable as a JOIN / window function for performance."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Correlated: inner query uses outer alias e\nSELECT e.Name, e.Salary, e.DepartmentId\nFROM Employee e\nWHERE e.Salary > (\n    SELECT AVG(e2.Salary)\n    FROM Employee e2\n    WHERE e2.DepartmentId = e.DepartmentId   -- correlation\n);\n\n-- Window-function rewrite (usually faster)\nSELECT Name, Salary, DepartmentId\nFROM (\n    SELECT Name, Salary, DepartmentId,\n           AVG(Salary) OVER (PARTITION BY DepartmentId) AS deptAvg\n    FROM Employee\n) t\nWHERE Salary > deptAvg;",
+              "note": "Correlated subquery references the outer row"
+            },
+            "followUps": [
+              "Why can correlated subqueries be slow (row-by-row evaluation)?",
+              "When does EXISTS read better than IN here?"
+            ]
+          }
+        },
+        {
+          "id": "coding-sql-004",
+          "q": "Write a self join: list each employee alongside their manager's name from an Employee(Id, Name, ManagerId) table.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "self-join", "joins"],
+          "answer": {
+            "oneLiner": "Join the Employee table to itself with two aliases, matching employee.ManagerId to manager.Id; use a LEFT JOIN so the top boss (NULL manager) is still listed.",
+            "keyPoints": [
+              "Two aliases of the same table: e (employee) and m (manager).",
+              "Join condition: e.ManagerId = m.Id.",
+              "LEFT JOIN keeps employees with no manager (CEO)."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT e.Name AS Employee,\n       m.Name AS Manager\nFROM Employee e\nLEFT JOIN Employee m ON e.ManagerId = m.Id\nORDER BY e.Name;\n\n-- Sample:\n-- Alice (ManagerId NULL) -> Manager: NULL (she's the boss)\n-- Bob   (ManagerId = Alice.Id) -> Manager: Alice",
+              "note": "LEFT JOIN keeps the manager-less top of the hierarchy"
+            },
+            "followUps": [
+              "INNER vs LEFT join: who gets dropped?",
+              "Traverse the full hierarchy with a recursive CTE.",
+              "Count direct reports per manager (GROUP BY m.Id)."
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

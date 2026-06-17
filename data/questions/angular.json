@@ -1074,6 +1074,296 @@
               "Not knowing DevTools or bundle analyser"
             ]
           }
+        },
+        {
+          "id": "angular-advanced-013",
+          "q": "What is ViewEncapsulation (Emulated, None, ShadowDom), and how does viewProviders differ from it?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["ViewEncapsulation", "viewProviders", "styles", "shadow DOM", "scoping"],
+          "answer": {
+            "oneLiner": "ViewEncapsulation controls how a component's CSS is scoped; viewProviders is unrelated — it scopes DI providers to the component's view only (not its projected content).",
+            "keyPoints": [
+              "**Emulated** (default) — Angular adds attributes to scope CSS to the component",
+              "**None** — styles are global, leak everywhere",
+              "**ShadowDom** — uses native Shadow DOM for true isolation",
+              "`viewProviders` — DI scoping (services for the view, not ng-content children), NOT styling"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "@Component({\n  selector: 'app-card',\n  encapsulation: ViewEncapsulation.Emulated,\n  viewProviders: [CardStateService], // available to view, not projected content\n  template: `...`\n})\nexport class CardComponent {}",
+              "note": "encapsulation = style scoping; viewProviders = DI scoping — different concerns."
+            },
+            "followUps": ["Emulated vs ShadowDom trade-offs?", "providers vs viewProviders?"],
+            "redFlags": ["Conflating viewProviders with style encapsulation", "Using None and wondering why styles leak"]
+          }
+        },
+        {
+          "id": "angular-advanced-014",
+          "q": "How do you write a custom directive, and what makes a directive structural vs attribute?",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["custom directive", "structural directive", "attribute directive", "selector", "TemplateRef"],
+          "answer": {
+            "oneLiner": "A directive is an @Directive class with a CSS selector; attribute directives change an element via ElementRef/HostBinding, while structural directives inject TemplateRef + ViewContainerRef to add/remove DOM.",
+            "keyPoints": [
+              "Selector in `[]` makes it an attribute selector (e.g. `[appHighlight]`)",
+              "Attribute directive: manipulate the host element",
+              "Structural directive: inject `TemplateRef` and `ViewContainerRef`",
+              "The `*` prefix is sugar that wraps the element in an `<ng-template>`"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "@Directive({ selector: '[appUnless]', standalone: true })\nexport class UnlessDirective {\n  constructor(private tpl: TemplateRef<any>, private vcr: ViewContainerRef) {}\n  @Input() set appUnless(cond: boolean) {\n    cond ? this.vcr.clear() : this.vcr.createEmbeddedView(this.tpl);\n  }\n}",
+              "note": "Structural directive: TemplateRef + ViewContainerRef to conditionally render."
+            },
+            "followUps": ["Why only one structural directive per element?", "How does *appUnless expand?"],
+            "redFlags": ["Not knowing structural directives use TemplateRef/ViewContainerRef", "Confusing the * sugar"]
+          }
+        },
+        {
+          "id": "angular-advanced-015",
+          "q": "What are @HostListener and @HostBinding used for?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["HostListener", "HostBinding", "directive", "host element", "DOM events"],
+          "answer": {
+            "oneLiner": "@HostListener subscribes to events on the host element; @HostBinding binds a property/attribute/class/style of the host element — both commonly used inside directives.",
+            "keyPoints": [
+              "`@HostListener('click', ['$event'])` — react to host events",
+              "`@HostBinding('class.active')` — drive host class/style/attr reactively",
+              "Avoids manual ElementRef/Renderer wiring",
+              "Idiomatic way to build interactive attribute directives"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "@Directive({ selector: '[appHover]', standalone: true })\nexport class HoverDirective {\n  @HostBinding('class.hovered') hovered = false;\n  @HostListener('mouseenter') onEnter() { this.hovered = true; }\n  @HostListener('mouseleave') onLeave() { this.hovered = false; }\n}",
+              "note": "HostListener reacts to events; HostBinding reflects state onto the host."
+            },
+            "followUps": ["HostBinding vs Renderer2?", "How to pass $event to a HostListener?"],
+            "redFlags": ["Manipulating the DOM directly instead of HostBinding", "Not knowing they work in directives"]
+          }
+        },
+        {
+          "id": "angular-advanced-016",
+          "q": "How do you create a component manually, without the Angular CLI?",
+          "level": "junior",
+          "type": "code",
+          "freq": "low",
+          "tags": ["component", "manual", "decorator", "no CLI", "bootstrap"],
+          "answer": {
+            "oneLiner": "Write a TypeScript class, decorate it with @Component (selector, template/templateUrl, styles), make it standalone or declare it in a module, then use its selector in a parent template.",
+            "keyPoints": [
+              "Create a `.ts` file with an exported class",
+              "Add `@Component({ selector, standalone: true, template })`",
+              "Import it in the parent's `imports: [...]` (standalone)",
+              "Reference it via its selector tag in the parent template"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "import { Component } from '@angular/core';\n\n@Component({\n  selector: 'app-badge',\n  standalone: true,\n  template: `<span class=\"badge\">{{ label }}</span>`\n})\nexport class BadgeComponent { label = 'New'; }",
+              "note": "No CLI needed — the @Component decorator is all that defines a component."
+            },
+            "followUps": ["What does the CLI actually generate beyond this?", "How to register it without standalone?"],
+            "redFlags": ["Thinking the CLI is required to make a component", "Forgetting to import a standalone component"]
+          }
+        },
+        {
+          "id": "angular-advanced-017",
+          "q": "How do you scope styles to a particular component, and what does encapsulation guarantee?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["styles", "ViewEncapsulation", "scoped CSS", "component styles", "host"],
+          "answer": {
+            "oneLiner": "Put styles in the component's `styles`/`styleUrls`; with default Emulated encapsulation Angular rewrites selectors with a unique attribute so they only apply to that component's own elements.",
+            "keyPoints": [
+              "Component styles are scoped to the component by default (Emulated)",
+              "`:host` targets the component's own host element",
+              "`:host-context(...)` reacts to ancestor classes",
+              "`::ng-deep` (deprecated) pierces into children — avoid"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "@Component({\n  selector: 'app-panel',\n  styles: [`:host { display: block; } .title { color: navy; }`],\n  template: `<h2 class=\"title\">Panel</h2>`\n})\nexport class PanelComponent {}",
+              "note": ".title here won't affect any other component's .title elements."
+            },
+            "followUps": ["What does :host do?", "Why avoid ::ng-deep?"],
+            "redFlags": ["Using ::ng-deep as the default tool", "Not knowing styles are scoped by default"]
+          }
+        },
+        {
+          "id": "angular-advanced-018",
+          "q": "Why shouldn't the constructor do heavy work, and what belongs in ngOnChanges instead?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["constructor", "ngOnChanges", "ngOnInit", "lifecycle", "inputs"],
+          "answer": {
+            "oneLiner": "The constructor runs before @Inputs are set and is for DI only; logic that reacts to inputs belongs in ngOnChanges (every input change) or ngOnInit (after first inputs are bound).",
+            "keyPoints": [
+              "Constructor: @Inputs are still undefined — only inject dependencies",
+              "`ngOnChanges` — runs on every @Input change with the old/new values",
+              "`ngOnInit` — runs once after the first inputs are set",
+              "Heavy/async work in the constructor hurts testability and timing"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "ngOnChanges(changes: SimpleChanges) {\n  if (changes['userId']) {\n    this.loadUser(this.userId); // react to input changes here, not in ctor\n  }\n}",
+              "note": "Inputs are guaranteed set in ngOnChanges/ngOnInit, never in the constructor."
+            },
+            "followUps": ["Why are @Inputs undefined in the constructor?", "ngOnChanges vs ngOnInit?"],
+            "redFlags": ["Reading @Input values in the constructor", "Doing HTTP in the constructor"]
+          }
+        },
+        {
+          "id": "angular-advanced-019",
+          "q": "How do you restrict a service so it has a single instance per component (component-level providers)?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["providers", "component scope", "DI", "service instance", "hierarchical injector"],
+          "answer": {
+            "oneLiner": "Add the service to the component's `providers: []` array — Angular's hierarchical injector then creates a fresh instance per component instance, destroyed with the component.",
+            "keyPoints": [
+              "`providedIn: 'root'` = app-wide singleton; component `providers` = per-component",
+              "Each instance of the component gets its own service instance",
+              "Instance is destroyed when the component is destroyed",
+              "Good for per-component state isolation"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "@Component({\n  selector: 'app-widget',\n  standalone: true,\n  providers: [WidgetStateService], // new instance per <app-widget>\n  template: `...`\n})\nexport class WidgetComponent {\n  private state = inject(WidgetStateService);\n}",
+              "note": "Component-level providers scope and isolate the service to that component subtree."
+            },
+            "followUps": ["providers vs viewProviders?", "What happens to the instance on destroy?"],
+            "redFlags": ["Thinking providedIn:'root' can be per-component", "Not knowing the hierarchical injector"]
+          }
+        },
+        {
+          "id": "angular-advanced-020",
+          "q": "How do you preserve form data when the user navigates away and comes back?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["forms", "state", "CanDeactivate", "service", "navigation", "UX"],
+          "answer": {
+            "oneLiner": "Lift the form state out of the component into a shared service (or a store), and optionally use a CanDeactivate guard to warn before discarding unsaved changes.",
+            "keyPoints": [
+              "Store form values in a singleton service so they survive component destruction",
+              "Rehydrate the form from the service in ngOnInit",
+              "`CanDeactivate` guard — confirm before leaving with unsaved changes",
+              "For persistence across reloads, use sessionStorage/localStorage"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "export const unsavedGuard: CanDeactivateFn<FormComponent> =\n  (cmp) => cmp.form.pristine || confirm('Discard unsaved changes?');",
+              "note": "Guard prevents accidental data loss; a service preserves data on intentional navigation."
+            },
+            "followUps": ["Service state vs sessionStorage trade-off?", "How does CanDeactivate get the component?"],
+            "redFlags": ["Keeping all state inside the component (lost on destroy)", "No warning before discarding edits"]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "react-micro",
+      "subtopicName": "React & Micro-frontends",
+      "order": 4,
+      "questions": [
+        {
+          "id": "angular-react-micro-001",
+          "q": "What is Module Federation / micro-frontends, and when would you use them?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["micro-frontends", "module federation", "webpack", "architecture", "scaling"],
+          "answer": {
+            "oneLiner": "Micro-frontends split a UI into independently built and deployed apps; Module Federation (webpack) lets one app load another's code at runtime, even sharing dependencies.",
+            "keyPoints": [
+              "Independent teams own, build, and deploy their slice separately",
+              "Module Federation: a host loads remote chunks at runtime",
+              "Shared deps (Angular, React) deduped via the `shared` config",
+              "Use when scaling many teams; overkill for a small single-team app"
+            ],
+            "code": {
+              "lang": "javascript",
+              "snippet": "// webpack.config — Module Federation remote\nnew ModuleFederationPlugin({\n  name: 'checkout',\n  exposes: { './Cart': './src/app/cart/cart.component.ts' },\n  shared: ['@angular/core', '@angular/common']\n});",
+              "note": "Host imports remote modules at runtime; shared singletons avoid duplicate framework loads."
+            },
+            "followUps": ["What are the downsides of micro-frontends?", "How are shared dependencies handled?"],
+            "redFlags": ["Adopting micro-frontends for a tiny single-team app", "Not knowing about shared deps"]
+          }
+        },
+        {
+          "id": "angular-react-micro-002",
+          "q": "What is the virtual DOM in React, and how does it differ from Angular's approach?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["react", "virtual DOM", "reconciliation", "diffing", "rendering"],
+          "answer": {
+            "oneLiner": "React keeps an in-memory virtual DOM tree, diffs the new tree against the old (reconciliation), and patches only the changed real DOM nodes; Angular uses incremental DOM with no virtual tree.",
+            "keyPoints": [
+              "VDOM = lightweight JS representation of the UI",
+              "On state change, React renders a new VDOM and diffs it",
+              "Only the minimal real-DOM changes are applied",
+              "Angular's Ivy compiles templates to instructions — no intermediate tree"
+            ],
+            "followUps": ["What is reconciliation?", "Why do keys matter in React lists?"],
+            "redFlags": ["Saying the VDOM is always faster than the real DOM", "Not knowing Angular has no VDOM"]
+          }
+        },
+        {
+          "id": "angular-react-micro-003",
+          "q": "What are useMemo and useRef in React, and when do you use each?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["react", "hooks", "useMemo", "useRef", "memoization"],
+          "answer": {
+            "oneLiner": "useMemo caches an expensive computed value between renders until its dependencies change; useRef holds a mutable value (or a DOM node) that persists across renders without causing re-renders.",
+            "keyPoints": [
+              "`useMemo(fn, deps)` — memoise a costly calculation",
+              "`useRef(initial)` — mutable `.current` that survives renders, no re-render on change",
+              "useRef is also how you grab a DOM element",
+              "Don't overuse useMemo — it has its own cost"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "const sorted = useMemo(() => items.sort(cmp), [items]);\nconst inputRef = useRef<HTMLInputElement>(null);\n// inputRef.current?.focus();",
+              "note": "useMemo recomputes only when deps change; useRef.current mutates silently."
+            },
+            "followUps": ["useMemo vs useCallback?", "Why doesn't updating a ref re-render?"],
+            "redFlags": ["Using state for a value that shouldn't trigger renders", "Memoising trivial computations"]
+          }
+        },
+        {
+          "id": "angular-react-micro-004",
+          "q": "What is React's Context API, and how does it solve deep prop passing?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["react", "context", "prop drilling", "state sharing", "provider"],
+          "answer": {
+            "oneLiner": "Context lets you provide a value at a high level and consume it anywhere below without threading props through every intermediate component — it solves prop drilling.",
+            "keyPoints": [
+              "`createContext` → `<Provider value>` → `useContext` to read",
+              "Avoids passing props through components that don't need them",
+              "Good for theme, auth, locale — relatively stable values",
+              "Frequent context changes re-render all consumers (perf caveat)"
+            ],
+            "code": {
+              "lang": "typescript",
+              "snippet": "const ThemeCtx = createContext('light');\n// <ThemeCtx.Provider value={theme}>...</ThemeCtx.Provider>\nconst theme = useContext(ThemeCtx); // read anywhere below",
+              "note": "Conceptually similar to an Angular service provided high in the injector tree."
+            },
+            "followUps": ["When use a state library over Context?", "Why can Context hurt performance?"],
+            "redFlags": ["Using Context for high-frequency updates", "Not knowing it solves prop drilling"]
+          }
         }
       ]
     }

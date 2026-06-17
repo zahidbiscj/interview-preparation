@@ -516,6 +516,222 @@
           }
         }
       ]
+    },
+    {
+      "subtopicId": "realtime-perf",
+      "subtopicName": "Realtime & Performance",
+      "order": 5,
+      "questions": [
+        {
+          "id": "aspnet-realtime-perf-001",
+          "q": "How does rate limiting work in ASP.NET Core, and what are the built-in algorithms?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["rate-limiting", "throttling", "performance"],
+          "answer": {
+            "oneLiner": "ASP.NET Core 7+ ships a built-in rate limiter middleware with four algorithms: fixed window, sliding window, token bucket, and concurrency.",
+            "keyPoints": [
+              "**Fixed window** — N requests per fixed time block; cheap but bursty at edges",
+              "**Sliding window** — smooths the edge bursts with sub-windows",
+              "**Token bucket** — refills tokens over time, allows controlled bursts",
+              "Add `UseRateLimiter()` and attach policies to endpoints"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "builder.Services.AddRateLimiter(o =>\n    o.AddFixedWindowLimiter(\"fixed\", opt => {\n        opt.PermitLimit = 100;\n        opt.Window = TimeSpan.FromMinutes(1);\n    }));\n// app.UseRateLimiter();\n// [EnableRateLimiting(\"fixed\")] on a controller/endpoint",
+              "note": "Returns 429 Too Many Requests when the limit is exceeded."
+            },
+            "followUps": ["Fixed vs sliding window?", "What status code does it return?"],
+            "redFlags": ["Not knowing 429 is the rejection code", "Thinking fixed window has no burst problem"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-002",
+          "q": "What is SignalR, when would you use it, and what transports does it use?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["signalr", "realtime", "websockets"],
+          "answer": {
+            "oneLiner": "SignalR is a library for real-time, bidirectional server-to-client messaging — use it for chat, live dashboards, notifications, and collaborative apps.",
+            "keyPoints": [
+              "Server can **push** to clients, not just respond to requests",
+              "Prefers **WebSockets**, falls back to Server-Sent Events then long polling",
+              "Hubs expose methods both sides can call (RPC-style)",
+              "Scale out across servers with a backplane (Redis/Azure SignalR)"
+            ],
+            "followUps": ["Why is a backplane needed when scaling out?", "WebSockets vs SSE?"],
+            "redFlags": ["Using polling when push is needed", "Not knowing the transport fallback order"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-003",
+          "q": "Should you use session-based authentication in a REST API? Why is REST ideally stateless?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["rest", "session", "stateless", "auth"],
+          "answer": {
+            "oneLiner": "REST is ideally stateless — each request carries everything needed — so token-based auth (JWT) fits better than server-side sessions, which add server state and hurt horizontal scaling.",
+            "keyPoints": [
+              "Sessions store state on the server → sticky sessions or shared store needed",
+              "Stateless tokens scale freely across instances",
+              "Sessions suit server-rendered web apps, not pure APIs",
+              "Trade-off: tokens are hard to revoke; sessions are easy to invalidate"
+            ],
+            "followUps": ["How do you revoke a stateless JWT?", "When is a session still appropriate?"],
+            "redFlags": ["Saying sessions scale as well as tokens", "Not knowing why statelessness matters"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-004",
+          "q": "When do you return 404 vs 500, and what's the general 4xx vs 5xx distinction?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["status-codes", "http", "404", "500"],
+          "answer": {
+            "oneLiner": "4xx means the client did something wrong (the request is the problem); 5xx means the server failed while processing an otherwise valid request.",
+            "keyPoints": [
+              "**404 Not Found** — resource doesn't exist (client-side)",
+              "**500 Internal Server Error** — unhandled exception on the server",
+              "Common 4xx: 400 bad request, 401 unauthorized, 403 forbidden, 409 conflict",
+              "Common 5xx: 500 internal, 502 bad gateway, 503 unavailable"
+            ],
+            "redFlags": ["Returning 500 for a missing record (should be 404)", "Returning 200 with an error body"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-005",
+          "q": "How do you do parallel processing in a Web API, and how do you throttle it?",
+          "level": "mid",
+          "type": "code",
+          "freq": "medium",
+          "tags": ["parallel", "task-whenall", "throttling", "async"],
+          "answer": {
+            "oneLiner": "Run independent async work concurrently with `Task.WhenAll`, and throttle the degree of parallelism with `SemaphoreSlim` or `Parallel.ForEachAsync` so you don't overwhelm downstreams.",
+            "keyPoints": [
+              "`Task.WhenAll` awaits many tasks together instead of one-by-one",
+              "Don't fire unbounded concurrency at a DB/API — throttle it",
+              "`SemaphoreSlim` or `Parallel.ForEachAsync(MaxDegreeOfParallelism)` to cap",
+              "`Parallel.For` is for CPU-bound work, not I/O-bound async"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "await Parallel.ForEachAsync(ids,\n    new ParallelOptions { MaxDegreeOfParallelism = 5 },\n    async (id, ct) => await _client.GetAsync($\"/items/{id}\", ct));",
+              "note": "Caps concurrency at 5 in-flight requests."
+            },
+            "followUps": ["Why throttle instead of unbounded WhenAll?", "Task.WhenAll vs Parallel.ForEachAsync?"],
+            "redFlags": ["Firing thousands of concurrent calls with no limit", "Using Parallel.For for I/O-bound work"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-006",
+          "q": "What causes a deadlock in async code, and how do you prevent it?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["deadlock", "async", "configureawait", "blocking"],
+          "answer": {
+            "oneLiner": "Blocking on async code with `.Result` or `.Wait()` while the captured synchronization context is needed to resume the continuation causes a classic deadlock — go async all the way and use `ConfigureAwait(false)` in libraries.",
+            "keyPoints": [
+              "Cause: sync code blocks the context thread the awaited continuation needs",
+              "Never call `.Result` / `.Wait()` on async methods — `await` instead",
+              "`ConfigureAwait(false)` in library code avoids capturing the context",
+              "ASP.NET Core has no SynchronizationContext, but blocking still causes thread-pool starvation"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Deadlock-prone:\nvar data = GetDataAsync().Result;\n\n// Correct:\nvar data = await GetDataAsync();\n\n// In library code:\nawait SomeAsync().ConfigureAwait(false);",
+              "note": "Async all the way down; reserve ConfigureAwait(false) for non-context-dependent library code."
+            },
+            "followUps": ["Why does ConfigureAwait(false) help?", "Does ASP.NET Core have a SynchronizationContext?"],
+            "redFlags": ["Calling .Result/.Wait() in request handling", "Not knowing async-all-the-way"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-007",
+          "q": "What is a refresh token for, and can it live on the frontend?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["refresh-token", "jwt", "httponly-cookie", "security"],
+          "answer": {
+            "oneLiner": "A refresh token lets the client silently obtain a new short-lived access token without re-login; it should be stored in an httpOnly, secure cookie — never in JS-accessible storage.",
+            "keyPoints": [
+              "Purpose: keep access tokens short-lived while avoiding constant logins",
+              "Store in **httpOnly cookie** so JavaScript (and XSS) can't read it",
+              "localStorage is XSS-vulnerable — avoid for refresh tokens",
+              "Should be revocable and rotated on each use"
+            ],
+            "followUps": ["Why httpOnly cookie over localStorage?", "What is refresh token rotation?"],
+            "redFlags": ["Storing refresh tokens in localStorage", "Never expiring/rotating them"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-008",
+          "q": "What is the difference between IActionResult and ActionResult<T>?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["iactionresult", "actionresult", "return-types"],
+          "answer": {
+            "oneLiner": "`IActionResult` only describes the HTTP result (status + body) with no compile-time body type; `ActionResult<T>` lets you return either a typed `T` or any action result, improving API clarity and Swagger output.",
+            "keyPoints": [
+              "`IActionResult` — flexible, but the response type isn't expressed",
+              "`ActionResult<T>` — return `T` directly or `NotFound()`, `BadRequest()`, etc.",
+              "`ActionResult<T>` gives better OpenAPI/Swagger metadata",
+              "Implicit conversion lets you `return product;` or `return NotFound();`"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public ActionResult<Product> Get(int id)\n{\n    var p = _repo.Find(id);\n    if (p is null) return NotFound();\n    return p; // implicit 200 with Product\n}",
+              "note": "ActionResult<T> documents the success type and still allows error results."
+            },
+            "followUps": ["Why does ActionResult<T> help Swagger?", "When is plain IActionResult fine?"],
+            "redFlags": ["Thinking they behave identically for API documentation"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-009",
+          "q": "What's the difference between an Action Filter and Middleware, which runs first, and is [Authorize] an action filter?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["action-filter", "middleware", "authorize", "pipeline-order"],
+          "answer": {
+            "oneLiner": "Middleware runs first on the raw HTTP pipeline; action filters run later inside MVC with access to the action and model state. `[Authorize]` is NOT an action filter — it's an authorization filter, which runs even earlier than action filters.",
+            "keyPoints": [
+              "Order: middleware → routing → authorization filter → resource → action filter → action",
+              "Middleware is MVC-unaware; filters know the action and arguments",
+              "`[Authorize]` = authorization filter (runs before action filters)",
+              "Use middleware for cross-cutting HTTP concerns, filters for MVC concerns"
+            ],
+            "followUps": ["Where does [Authorize] sit in the filter pipeline?", "When pick middleware over a filter?"],
+            "redFlags": ["Calling [Authorize] an action filter", "Thinking filters run before middleware"]
+          }
+        },
+        {
+          "id": "aspnet-realtime-perf-010",
+          "q": "What is the difference between a resource filter and an action filter?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "low",
+          "tags": ["resource-filter", "action-filter", "filters", "pipeline-order"],
+          "answer": {
+            "oneLiner": "Resource filters run earlier — around model binding (before and after it) — making them ideal for caching or short-circuiting; action filters run after model binding, around the action method, with access to bound arguments.",
+            "keyPoints": [
+              "Resource filter — wraps model binding; can short-circuit to skip it (caching)",
+              "Action filter — runs after binding, sees the action's arguments and result",
+              "Pipeline order: Authorization → **Resource** → (binding) → **Action**",
+              "Pick resource for cross-cutting work before binding, action for model-aware logic"
+            ],
+            "followUps": ["Why is a resource filter good for caching?", "Which sees bound model arguments?"],
+            "redFlags": ["Reversing their order", "Thinking both run after model binding"]
+          }
+        }
+      ]
     }
   ]
 }

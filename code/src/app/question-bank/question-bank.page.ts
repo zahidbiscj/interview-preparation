@@ -30,7 +30,7 @@ import { ButtonModule } from 'primeng/button';
           <span class="app-brand">📚 PrepDeck</span>
         </div>
         <div class="topbar-center">
-          <span class="stats-pill">235 questions · 8 topics</span>
+          <span class="stats-pill">{{ topicCount() }} topics · 398 questions</span>
         </div>
         <div class="topbar-right">
           <a routerLink="/simulator" class="sim-link">🎯 Simulator</a>
@@ -404,6 +404,8 @@ export class QuestionBankPage implements OnInit {
   readonly isDark = this.svc.isDark;
 
   readonly drawerOpen = signal(false);
+
+  readonly topicCount = computed(() => this.svc.topics().length);
 
   readonly selectedTopicName = computed(() => {
     const sel = this.selected();
