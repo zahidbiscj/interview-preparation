@@ -54,6 +54,21 @@ export interface Answer {
   followUps?: string[];
   redFlags?: string[];
   related?: string[];
+  dialogue?: DialogueTurn[];
+  followUpsQA?: FollowUpQA[];
+}
+
+/** One turn of a mock interview dialogue. */
+export interface DialogueTurn {
+  role: 'interviewer' | 'me';
+  text: string;
+}
+
+/** A follow-up question with its one-line answer; relatedId links to another question. */
+export interface FollowUpQA {
+  q: string;
+  a: string;
+  relatedId?: string;
 }
 
 export interface CodeSample {

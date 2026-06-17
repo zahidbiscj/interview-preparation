@@ -81,3 +81,24 @@ For contiguous subarray/substring problems (longest/shortest/sum/distinct).
 - **Correlated subquery**: inner query references the **outer row** (e.g. `WHERE e2.DeptId = e.DeptId`); re-evaluated per row. Often rewritable as a JOIN or window function for speed.
 - **Self join**: join a table to itself with two aliases (`e` / `m`), `e.ManagerId = m.Id`; use **LEFT JOIN** to keep the manager-less top of the hierarchy.
 - **Per-group ranking / averages**: add `PARTITION BY DepartmentId`.
+- **Anti-join (rows with no match)**: `LEFT JOIN ... WHERE other.key IS NULL` (or `NOT EXISTS`). Used for "visited but no transaction".
+- **NULL-aware filtering**: `col <> x` drops NULLs (`NULL <> x` is UNKNOWN); add `OR col IS NULL` or use `COALESCE(col, default) <> x`.
+- **All combinations + zero counts**: `CROSS JOIN` the two dimensions, `LEFT JOIN` the facts, `COUNT(fact_col)` (ignores NULLs → 0).
+- **Boolean aggregate**: `AVG(cond)` = fraction true (MySQL `cond` → 1/0); `* 100` for a percentage. Wrap in `IFNULL(..., 0)`.
+- **Weighted average**: `SUM(price*units)/SUM(units)`, often with a `purchase_date BETWEEN start AND end` range join.
+- **Percentage of a whole**: numerator `COUNT(DISTINCT ...)`, denominator a **scalar subquery** `(SELECT COUNT(*) FROM Users)`; multiply by `100.0` before dividing.
+- **Consecutive days**: self-join on `DATEDIFF(d1, d2) = 1` or compare to `LAG(col) OVER (ORDER BY date)`.
+- **CHAR_LENGTH** counts characters (multibyte-safe); `LENGTH` counts bytes; SQL Server uses `LEN`.
+
+---
+
+## Quick-Recall Checklist (say this out loud)
+
+1. **Restate** the problem + constraints (size of n, value range, NULLs, ties).
+2. **Brute force first** — state it and its complexity, then optimize.
+3. **Name the pattern**: two-pointer / hashing / voting / sliding window / sieve / math trick.
+4. **State complexity before coding** (time AND space).
+5. **Edge cases**: empty, single element, all-equal, duplicates, overflow (use `long`/BigInteger), `int.MinValue`, NULLs (SQL).
+6. **Second pass to verify** for voting candidates.
+7. **SQL**: pick join type by who must survive (LEFT to keep, INNER to drop); WHERE filters rows, HAVING filters aggregates; handle NULL explicitly.
+8. **Dry-run** a tiny example before declaring done.

@@ -27,10 +27,18 @@
               "snippet": "# Fetch only — safe, non-destructive\ngit fetch origin\n\n# Inspect difference before merging\ngit log HEAD..origin/main --oneline\n\n# Now explicitly merge\ngit merge origin/main\n\n# Or: pull with rebase (linear history)\ngit pull --rebase origin main\n\n# Set rebase as default pull strategy globally\ngit config --global pull.rebase true",
               "note": "Always fetch first on long-running branches to see what you are merging"
             },
-            "followUps": [
-              "What happens if you git pull with uncommitted changes?",
-              "How does `pull --rebase` differ from a regular pull?",
-              "What is `git fetch --prune` for?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What's the difference between git pull and git fetch?" },
+              { "role": "me", "text": "`fetch` only downloads remote changes and updates remote-tracking refs like `origin/main` — it doesn't touch my branch. `pull` does a `fetch` and then merges those changes into my current branch." },
+              { "role": "interviewer", "text": "So after a fetch, where do the changes live?" },
+              { "role": "me", "text": "In the remote-tracking branch, e.g. `origin/main`. My local `main` is untouched until I explicitly merge or rebase." },
+              { "role": "interviewer", "text": "Say you fetch and see origin/main has 5 commits you don't — how do you safely review before merging?" },
+              { "role": "me", "text": "I'd run `git log HEAD..origin/main --oneline` to see exactly what's incoming, then `git merge origin/main` — or `git pull --rebase` if I want linear history." }
+            ],
+            "followUpsQA": [
+              { "q": "What happens if you git pull with uncommitted changes?", "a": "Git aborts the merge if it would overwrite local changes; otherwise it merges, but it can leave you with conflicts to resolve." },
+              { "q": "How does `pull --rebase` differ from a regular pull?", "a": "It replays your local commits on top of the fetched changes instead of creating a merge commit, keeping history linear." },
+              { "q": "What is `git fetch --prune` for?", "a": "It deletes local remote-tracking refs for branches that no longer exist on the remote." }
             ],
             "redFlags": [
               "Saying fetch updates your working directory — it does not",
@@ -60,10 +68,18 @@
               "snippet": "# --- Merge approach ---\ngit checkout main\ngit merge feature/my-feature          # creates merge commit\ngit merge --no-ff feature/my-feature  # forces merge commit even if fast-forward possible\n\n# --- Rebase approach (local branch cleanup) ---\ngit checkout feature/my-feature\ngit rebase main                        # replay feature commits on top of main\n# resolve any conflicts, then:\ngit rebase --continue\n\n# --- Interactive rebase: squash last 3 commits ---\ngit rebase -i HEAD~3",
               "note": "The --no-ff flag ensures a merge commit is always created, making it easier to revert a feature atomically"
             },
-            "followUps": [
-              "What is a fast-forward merge?",
-              "How do you abort a rebase gone wrong?",
-              "Difference between `merge --squash` and `rebase -i`?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Merge vs rebase — what's the difference?" },
+              { "role": "me", "text": "Merge ties two branches together with a merge commit and keeps the full history. Rebase replays my commits on top of the target, giving a linear history but rewriting the commit SHAs." },
+              { "role": "interviewer", "text": "When do you reach for each?" },
+              { "role": "me", "text": "I rebase my own local feature branch to clean it up before a PR, and I merge to integrate into shared branches like `main`." },
+              { "role": "interviewer", "text": "Your teammate already pulled your feature branch and you rebase it and force-push — what breaks?" },
+              { "role": "me", "text": "Their history diverges from mine because the SHAs changed, so they get nasty conflicts. That's the golden rule — never rebase commits others have already pulled." }
+            ],
+            "followUpsQA": [
+              { "q": "What is a fast-forward merge?", "a": "When the target hasn't diverged, Git just slides its pointer to the feature tip — no merge commit.", "relatedId": "devops-git-006" },
+              { "q": "How do you abort a rebase gone wrong?", "a": "`git rebase --abort` restores the branch to its pre-rebase state." },
+              { "q": "Difference between `merge --squash` and `rebase -i`?", "a": "`merge --squash` stages all changes as one uncommitted change; `rebase -i` lets you fold and reword individual commits interactively.", "relatedId": "devops-git-009" }
             ],
             "redFlags": [
               "Rebasing a shared branch like main — rewrites public history",
@@ -93,10 +109,18 @@
               "snippet": "# Check which files conflict\ngit status\n\n# Open conflict markers in file — edit manually, then:\ngit add src/MyService.cs\n\n# Complete the merge\ngit merge --continue\n# or if you were rebasing:\ngit rebase --continue\n\n# Abort and go back to pre-merge state\ngit merge --abort\ngit rebase --abort\n\n# Use VS Code as merge tool\ngit config --global merge.tool vscode\ngit mergetool",
               "note": "Always run `git diff --staged` after resolving to confirm the file looks correct before committing"
             },
-            "followUps": [
-              "How do you use `git diff` around a conflict?",
-              "What is 'ours' vs 'theirs'?",
-              "How do you reduce conflict frequency on a team?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Walk me through resolving a merge conflict." },
+              { "role": "me", "text": "First `git status` to find conflicted files. Git marks them with `<<<<<<< HEAD`, `=======`, and `>>>>>>>` — I edit each to the correct final state and remove the markers." },
+              { "role": "interviewer", "text": "Then what?" },
+              { "role": "me", "text": "I `git add` the resolved file and run `git merge --continue` — or `git rebase --continue` if I was rebasing." },
+              { "role": "interviewer", "text": "Halfway through a big merge it's a mess and you want out — what do you do?" },
+              { "role": "me", "text": "`git merge --abort` puts me right back to the pre-merge state. To avoid this I merge from `main` often so conflicts stay small." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you use `git diff` around a conflict?", "a": "`git diff` shows the conflicted hunks; `git diff --staged` confirms the resolution before committing." },
+              { "q": "What is 'ours' vs 'theirs'?", "a": "'Ours' is the current branch's side, 'theirs' is the incoming branch's side — you can take one wholesale with `git checkout --ours/--theirs`." },
+              { "q": "How do you reduce conflict frequency on a team?", "a": "Smaller PRs, merging main in often, and short-lived branches so changes integrate before they drift." }
             ],
             "redFlags": [
               "Deleting markers without actually choosing/combining content",
@@ -126,10 +150,18 @@
               "snippet": "# GitHub Flow in practice\ngit checkout main && git pull\ngit checkout -b feature/user-authentication\n# ... work, commit ...\ngit push -u origin feature/user-authentication\n# Open PR → review → merge to main → CI deploys\n\n# Git Flow — start a feature\ngit flow feature start user-authentication\n# ... work ...\ngit flow feature finish user-authentication   # merges back to develop\n\n# Trunk-Based — short-lived branch\ngit checkout -b feat/add-login-button         # lives < 1 day\ngit push && gh pr create --base main\n# Merge same day",
               "note": "The git-flow CLI tool automates the branch naming and merging conventions of Git Flow"
             },
-            "followUps": [
-              "How would you implement a feature flag in a .NET API?",
-              "What are DORA metrics and how does branching affect them?",
-              "How do you handle hotfixes in trunk-based?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What branching strategy would you pick for a .NET SaaS app and why?" },
+              { "role": "me", "text": "For frequent deploys I'd go GitHub Flow or trunk-based — branch off `main`, PR, merge, deploy. Git Flow's long-lived develop/release branches add merge debt that doesn't pay off when you deploy daily." },
+              { "role": "interviewer", "text": "What does trunk-based need to work safely?" },
+              { "role": "me", "text": "Short-lived branches merged within a day, strong automated tests, and feature flags to hide work-in-progress so `main` stays always-deployable." },
+              { "role": "interviewer", "text": "When would Git Flow actually be the right call?" },
+              { "role": "me", "text": "Versioned software with scheduled releases and formal QA gates — like desktop or app-store products where you maintain multiple released versions and ship hotfixes to each." }
+            ],
+            "followUpsQA": [
+              { "q": "How would you implement a feature flag in a .NET API?", "a": "Use `Microsoft.FeatureManagement` with a config/Azure App Configuration source and gate code with `IFeatureManager.IsEnabledAsync`." },
+              { "q": "What are DORA metrics and how does branching affect them?", "a": "Deploy frequency, lead time, change-fail rate, MTTR — short-lived branches improve lead time and deploy frequency." },
+              { "q": "How do you handle hotfixes in trunk-based?", "a": "Fix on a tiny branch off main, merge and deploy fast, often behind or via a flag — no separate hotfix branch needed." }
             ],
             "redFlags": [
               "Only knowing Git Flow, unaware of trunk-based",
@@ -159,10 +191,18 @@
               "snippet": "# Undo last commit, keep changes staged\ngit reset --soft HEAD~1\n\n# Undo last commit, keep changes in working dir (unstaged)\ngit reset --mixed HEAD~1   # or just: git reset HEAD~1\n\n# Undo last commit, discard all changes (DESTRUCTIVE)\ngit reset --hard HEAD~1\n\n# Safely undo a pushed commit (creates new commit)\ngit revert abc1234\ngit push\n\n# Recover a SHA after accidental hard reset\ngit reflog\ngit checkout -b recovery abc1234",
               "note": "Never hard-reset commits that exist on a remote shared branch"
             },
-            "followUps": [
-              "How do you undo a merge commit with revert?",
-              "What is reflog and how long does it retain?",
-              "Difference between `reset HEAD <file>` and `restore --staged`?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Explain the three reset modes versus revert." },
+              { "role": "me", "text": "`reset` moves the branch pointer back: `--soft` keeps changes staged, `--mixed` unstages them, `--hard` discards them entirely. `revert` instead adds a new commit that inverts an old one." },
+              { "role": "interviewer", "text": "So which is safe on a shared branch?" },
+              { "role": "me", "text": "`revert`, because it preserves history. `reset` rewrites history, so it's only safe on local commits you haven't pushed." },
+              { "role": "interviewer", "text": "You ran `git reset --hard` and lost a commit you needed — recoverable?" },
+              { "role": "me", "text": "Yes — `git reflog` shows the old SHA, and I can `git checkout -b recovery <sha>` to get it back. Reflog keeps entries about 30 days." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you undo a merge commit with revert?", "a": "`git revert -m 1 <merge-sha>` to revert relative to the first (mainline) parent.", "relatedId": "devops-git-011" },
+              { "q": "What is reflog and how long does it retain?", "a": "A local log of where HEAD has been; entries are kept ~30 days (90 for reachable) before gc." },
+              { "q": "Difference between `reset HEAD <file>` and `restore --staged`?", "a": "They do the same thing — unstage a file; `restore --staged` is the newer, clearer command." }
             ],
             "redFlags": [
               "Hard reset + force push on a shared branch — destroys history",
@@ -192,9 +232,18 @@
               "snippet": "# Normal merge — fast-forwards if possible\ngit checkout main\ngit merge feature/login\n\n# Force a merge commit even if fast-forward is possible\ngit merge --no-ff feature/login\n\n# Fail if fast-forward is not possible (CI guard)\ngit merge --ff-only feature/login",
               "note": "GitHub's 'Squash and merge' and 'Rebase and merge' buttons both produce fast-forward-style linear history"
             },
-            "followUps": [
-              "Why might a team always use --no-ff on main?",
-              "How does GitHub's 'Rebase and merge' relate to fast-forward?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What's a fast-forward merge?" },
+              { "role": "me", "text": "When the target branch hasn't gained any commits since I branched off, Git just slides its pointer forward to my feature tip — no merge commit, and history stays linear." },
+              { "role": "interviewer", "text": "How do you force a merge commit anyway?" },
+              { "role": "me", "text": "`git merge --no-ff` always creates a merge commit, which gives an explicit record of when the feature landed." },
+              { "role": "interviewer", "text": "In CI you want to reject a merge unless it's a clean fast-forward — how?" },
+              { "role": "me", "text": "`git merge --ff-only` — it fails if a fast-forward isn't possible, forcing the branch to be rebased/updated first." }
+            ],
+            "followUpsQA": [
+              { "q": "Why might a team always use --no-ff on main?", "a": "To keep an explicit merge commit per feature, making `git log --merges` useful for auditing and easy atomic reverts." },
+              { "q": "How does GitHub's 'Rebase and merge' relate to fast-forward?", "a": "It replays commits onto the base so the result is linear, fast-forward-style history with no merge commit." },
+              { "q": "What does --ff-only protect against?", "a": "Accidental merge commits — it only proceeds if the branch can be fast-forwarded cleanly." }
             ],
             "redFlags": [
               "Thinking fast-forward creates a new commit — it does not",
@@ -223,10 +272,18 @@
               "snippet": "# Stash current changes\ngit stash push -m \"WIP: user authentication\"\n\n# List all stashes\ngit stash list\n\n# Apply most recent stash and remove it\ngit stash pop\n\n# Apply a specific stash without removing it\ngit stash apply stash@{1}\n\n# Include untracked files\ngit stash push -u -m \"includes new files\"\n\n# Drop a specific stash\ngit stash drop stash@{0}\n\n# Clear all stashes\ngit stash clear",
               "note": "Use named stashes (`-m`) when you might accumulate several; numbers alone are easy to confuse"
             },
-            "followUps": [
-              "What happens to stashes when you switch branches?",
-              "How do you stash only specific files?",
-              "Difference between stash pop and apply?"
+            "dialogue": [
+              { "role": "interviewer", "text": "When would you use git stash?" },
+              { "role": "me", "text": "When I'm mid-change and need to switch context fast — a hotfix on another branch, say. `git stash` shelves my staged and unstaged changes and resets the working tree to the last commit." },
+              { "role": "interviewer", "text": "How do you get the changes back?" },
+              { "role": "me", "text": "`git stash pop` restores the latest stash and removes it from the stack; `git stash apply` restores it but keeps it on the stack." },
+              { "role": "interviewer", "text": "You stash, but a brand-new untracked file you created is still there — why?" },
+              { "role": "me", "text": "Stash excludes untracked files by default. I'd use `git stash push -u` to include them." }
+            ],
+            "followUpsQA": [
+              { "q": "What happens to stashes when you switch branches?", "a": "They persist — the stash stack is global to the repo, not tied to a branch." },
+              { "q": "How do you stash only specific files?", "a": "`git stash push <paths>` stashes just those files, or `git stash -p` to pick hunks interactively." },
+              { "q": "Difference between stash pop and apply?", "a": "`pop` restores and drops the stash; `apply` restores but leaves it on the stack." }
             ],
             "redFlags": [
               "Not knowing untracked files are excluded by default",
@@ -255,10 +312,18 @@
               "snippet": "# Apply a single commit to current branch\ngit cherry-pick abc1234\n\n# Cherry-pick a range (exclusive of A, inclusive of B)\ngit cherry-pick abc1234..def5678\n\n# Cherry-pick without auto-committing (to edit before committing)\ngit cherry-pick --no-commit abc1234\ngit commit -m \"backport: fix null ref in PaymentService\"\n\n# Abort a cherry-pick in conflict\ngit cherry-pick --abort",
               "note": "After cherry-picking a fix into main, don't forget to also merge main back into the feature branch so the fix is not duplicated on merge"
             },
-            "followUps": [
-              "Problems from cherry-picking the same commit into multiple branches?",
-              "How is cherry-pick different from `git apply`?",
-              "When would you cherry-pick over a full merge?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What does git cherry-pick do?" },
+              { "role": "me", "text": "`git cherry-pick <sha>` applies the diff from one specific commit onto my current branch, without merging the whole source branch. It creates a new commit with the same changes but a different SHA." },
+              { "role": "interviewer", "text": "Give me a real use case." },
+              { "role": "me", "text": "Backporting a single urgent fix to a release branch when the rest of the feature isn't ready to ship." },
+              { "role": "interviewer", "text": "You cherry-pick a fix from a feature branch to main, then later merge that feature branch — any issue?" },
+              { "role": "me", "text": "You can get a duplicate commit since the same change exists under two SHAs. I'd merge `main` back into the feature branch so Git knows the change is already there." }
+            ],
+            "followUpsQA": [
+              { "q": "Problems from cherry-picking the same commit into multiple branches?", "a": "Duplicate commits with different SHAs and diverging history that complicates later merges." },
+              { "q": "How is cherry-pick different from `git apply`?", "a": "Cherry-pick records a new commit with authorship; `git apply` just applies a patch to the working tree with no commit." },
+              { "q": "When would you cherry-pick over a full merge?", "a": "When you need exactly one commit's change now and don't want the rest of the source branch." }
             ],
             "redFlags": [
               "Cherry-picking large sets instead of a proper merge",
@@ -287,9 +352,18 @@
               "snippet": "# Interactive rebase to squash last 3 commits\ngit rebase -i HEAD~3\n# In the editor:\n# pick abc1111 Add login form\n# squash bcd2222 Fix validation\n# squash cde3333 WIP cleanup\n# Save → edit combined commit message\n\n# Alternative: merge --squash (stages all changes as one, you commit manually)\ngit checkout main\ngit merge --squash feature/login\ngit commit -m \"feat: add login with validation\"",
               "note": "git merge --squash does NOT create a merge commit — you must run git commit yourself"
             },
-            "followUps": [
-              "Difference between `merge --squash` and `rebase -i` squash?",
-              "After squash-merging a PR, what happens to branch commits in remote history?"
+            "dialogue": [
+              { "role": "interviewer", "text": "How do you squash commits and why?" },
+              { "role": "me", "text": "To turn noisy WIP commits into one meaningful commit for a clean history. I'd run `git rebase -i HEAD~3` and change `pick` to `squash` on the commits I want folded in." },
+              { "role": "interviewer", "text": "Any easier way on a PR?" },
+              { "role": "me", "text": "Yes — GitHub and Azure DevOps both have a 'Squash and merge' button that collapses the whole PR into one commit on `main` automatically." },
+              { "role": "interviewer", "text": "What's the downside of always squashing?" },
+              { "role": "me", "text": "You lose the fine-grained per-commit history, which matters for bisecting or auditing large multi-developer features." }
+            ],
+            "followUpsQA": [
+              { "q": "Difference between `merge --squash` and `rebase -i` squash?", "a": "`merge --squash` stages all the branch's changes as one uncommitted change; `rebase -i` squash folds your own commits and lets you reword.", "relatedId": "devops-git-002" },
+              { "q": "After squash-merging a PR, what happens to branch commits in remote history?", "a": "The individual branch commits aren't on main — only the single squashed commit; the branch is usually deleted." },
+              { "q": "Why avoid squashing directly on main?", "a": "It rewrites shared history, breaking everyone who has pulled it." }
             ],
             "redFlags": [
               "Squashing commits on main directly (rewrites shared history)",
@@ -318,9 +392,18 @@
               "snippet": "# Check where HEAD points\ncat .git/HEAD\n# → ref: refs/heads/main   (normal)\n# → a1b2c3d4...             (detached)\n\n# Enter detached HEAD (inspect old commit)\ngit checkout a1b2c3d4\n\n# Save work from detached HEAD\ngit checkout -b feature/experiment\n\n# Navigate relative to HEAD\ngit log HEAD~3..HEAD   # last 3 commits\ngit diff HEAD~1        # diff against previous commit",
               "note": "HEAD~1 = one commit back; HEAD~3 = three commits back; HEAD^ is equivalent to HEAD~1"
             },
-            "followUps": [
-              "Difference between HEAD, ORIG_HEAD, and MERGE_HEAD?",
-              "How do you get back to a branch from detached HEAD?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What is HEAD in Git?" },
+              { "role": "me", "text": "HEAD is a pointer to my current commit, normally indirectly through a branch name — `.git/HEAD` usually holds `ref: refs/heads/main`." },
+              { "role": "interviewer", "text": "And a detached HEAD?" },
+              { "role": "me", "text": "That's when HEAD points straight at a commit SHA instead of a branch — it happens when you `git checkout <sha>` or check out a tag." },
+              { "role": "interviewer", "text": "You commit some work in detached HEAD, then checkout main — what happened to that work?" },
+              { "role": "me", "text": "It's now orphaned and unreachable from any branch, so it can be garbage-collected. I should have run `git checkout -b new-branch` first to keep it — or recover it via reflog." }
+            ],
+            "followUpsQA": [
+              { "q": "Difference between HEAD, ORIG_HEAD, and MERGE_HEAD?", "a": "HEAD is current; ORIG_HEAD is where HEAD was before a risky op (merge/reset); MERGE_HEAD is the commit being merged in." },
+              { "q": "How do you get back to a branch from detached HEAD?", "a": "`git checkout main` (or `git switch main`); create a branch first if you want to keep detached work." },
+              { "q": "What is origin/HEAD?", "a": "A remote-tracking ref pointing to the remote's default branch, not your local HEAD." }
             ],
             "redFlags": [
               "Not knowing detached-HEAD commits can be lost",
@@ -349,10 +432,18 @@
               "snippet": "# Safe: revert a pushed commit (creates new commit)\ngit revert abc1234\ngit push\n\n# Revert a merge commit (specify mainline parent = 1)\ngit revert -m 1 abc1234merge\ngit push\n\n# Dangerous: force push (only if truly necessary, e.g. secrets)\ngit reset --hard HEAD~1\ngit push --force-with-lease origin main\n# Teammates must then:\ngit fetch origin\ngit reset --hard origin/main",
               "note": "Always prefer --force-with-lease over --force to avoid overwriting concurrent pushes"
             },
-            "followUps": [
-              "How do you remove a secret from entire git history?",
-              "How does `--force-with-lease` differ from `--force`?",
-              "How do you revert a revert?"
+            "dialogue": [
+              { "role": "interviewer", "text": "How do you undo a commit that's already pushed to a shared branch?" },
+              { "role": "me", "text": "`git revert <sha>` — it adds a new commit that inverts the bad one and I just push it. History is preserved, so nobody else gets disrupted." },
+              { "role": "interviewer", "text": "Why not just reset and force-push?" },
+              { "role": "me", "text": "Because that rewrites history everyone else has already pulled, causing diverging branches and conflicts. Force-push on shared branches is almost never the right answer." },
+              { "role": "interviewer", "text": "What if the pushed commit was a merge, or it leaked a secret?" },
+              { "role": "me", "text": "For a merge: `git revert -m 1 <merge-sha>`. For a leaked secret I'd scrub history with `git filter-repo`, force-push with `--force-with-lease`, have everyone re-sync, and rotate the secret since it's already compromised." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you remove a secret from entire git history?", "a": "Use `git filter-repo` (or BFG) to purge it, force-push, re-sync the team, and rotate the secret." },
+              { "q": "How does `--force-with-lease` differ from `--force`?", "a": "`--force-with-lease` refuses to overwrite if the remote moved since your last fetch, protecting concurrent pushes." },
+              { "q": "How do you revert a revert?", "a": "Run `git revert` on the revert commit to reapply the original change." }
             ],
             "redFlags": [
               "Suggesting force push as the first solution",
@@ -389,10 +480,18 @@
               "snippet": "# Simplified GitHub Actions CI pipeline for .NET\n# .github/workflows/ci.yml\n# on: [push, pull_request]\n# jobs:\n#   build:\n#     runs-on: ubuntu-latest\n#     steps:\n#       - uses: actions/checkout@v4\n#       - uses: actions/setup-dotnet@v4\n#         with: { dotnet-version: '8.x' }\n#       - run: dotnet restore\n#       - run: dotnet build --no-restore\n#       - run: dotnet test --no-build --verbosity normal\n#       - run: dotnet publish -c Release -o ./publish\n#       - uses: actions/upload-artifact@v4\n#         with: { name: app, path: ./publish }",
               "note": "The artifact uploaded at the end is what gets promoted through staging and production — never rebuild between environments"
             },
-            "followUps": [
-              "Difference between a build artifact and a release?",
-              "How do you handle DB migrations in CI/CD?",
-              "What metrics show CI/CD health?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Explain CI, Continuous Delivery, and Continuous Deployment." },
+              { "role": "me", "text": "CI auto-builds and tests every change so integration bugs surface early. Continuous Delivery keeps that build always release-ready, but a human triggers the prod deploy. Continuous Deployment removes that gate — every green build ships to prod automatically." },
+              { "role": "interviewer", "text": "What are the typical pipeline stages?" },
+              { "role": "me", "text": "Source → Build → Test → Scan → Package → Deploy → Verify, promoting the same immutable artifact through each environment." },
+              { "role": "interviewer", "text": "What has to be in place before you'd trust Continuous Deployment to prod?" },
+              { "role": "me", "text": "Strong automated tests, feature flags to decouple deploy from release, monitoring, and fast automated rollback — otherwise a bad commit hits users with no safety net." }
+            ],
+            "followUpsQA": [
+              { "q": "Difference between a build artifact and a release?", "a": "An artifact is the built output; a release is a specific artifact version promoted and deployed to an environment.", "relatedId": "devops-cicd-002" },
+              { "q": "How do you handle DB migrations in CI/CD?", "a": "Run backward-compatible migrations as a separate step before deploy, using expand/contract so old and new code coexist.", "relatedId": "devops-cicd-007" },
+              { "q": "What metrics show CI/CD health?", "a": "The DORA four — deploy frequency, lead time, change-fail rate, and MTTR." }
             ],
             "redFlags": [
               "Confusing Continuous Delivery with Continuous Deployment",
@@ -422,10 +521,18 @@
               "snippet": "# Build and tag Docker image with git SHA\nGIT_SHA=$(git rev-parse --short HEAD)\ndocker build -t myapp:$GIT_SHA -t myapp:latest .\n\n# Push to Azure Container Registry\ndocker push myregistry.azurecr.io/myapp:$GIT_SHA\n\n# Deploy the SAME image to staging, then prod\n# Deploy to staging:\nkubectl set image deployment/myapp myapp=myregistry.azurecr.io/myapp:$GIT_SHA -n staging\n\n# Promote SAME image to production (no rebuild)\nkubectl set image deployment/myapp myapp=myregistry.azurecr.io/myapp:$GIT_SHA -n production",
               "note": "Environment config is passed as Kubernetes secrets or environment variables — never baked into the image"
             },
-            "followUps": [
-              "How would you version a NuGet package in CI?",
-              "What is semantic versioning?",
-              "How do you clean up old artifacts?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What's a build artifact?" },
+              { "role": "me", "text": "It's the compiled, versioned output of a build — a Docker image, a published .NET zip, a NuGet package. It should be immutable and tagged, usually with the git SHA or a semver." },
+              { "role": "interviewer", "text": "Why promote the same artifact across environments instead of rebuilding?" },
+              { "role": "me", "text": "Because rebuilding can pull different dependency versions or timing, so what you tested isn't exactly what runs in prod. 'Build once, deploy many' guarantees parity." },
+              { "role": "interviewer", "text": "Where does environment-specific config go, then?" },
+              { "role": "me", "text": "Injected at deploy time as env vars or secrets — never baked into the artifact, so the same image runs everywhere." }
+            ],
+            "followUpsQA": [
+              { "q": "How would you version a NuGet package in CI?", "a": "Derive the version from git tags/GitVersion or the build number and pass it to `dotnet pack --version`." },
+              { "q": "What is semantic versioning?", "a": "MAJOR.MINOR.PATCH — major for breaking changes, minor for features, patch for fixes." },
+              { "q": "How do you clean up old artifacts?", "a": "Retention policies in the registry/feed — keep recent and tagged releases, prune old untagged builds." }
             ],
             "redFlags": [
               "Rebuilding from source per environment",
@@ -455,10 +562,18 @@
               "snippet": "# --- Blue-Green: Azure App Service Deployment Slots ---\n# Deploy to staging slot\naz webapp deployment source config-zip \\\n  --resource-group myRG --name myApp \\\n  --slot staging --src app.zip\n\n# Smoke test staging slot\ncurl https://myapp-staging.azurewebsites.net/health\n\n# Swap slots (atomic, instant rollback available)\naz webapp deployment slot swap \\\n  --resource-group myRG --name myApp \\\n  --slot staging --target-slot production\n\n# --- Canary: Kubernetes with weighted ingress ---\n# Route 10% to canary deployment\n# nginx.ingress.kubernetes.io/canary: \"true\"\n# nginx.ingress.kubernetes.io/canary-weight: \"10\"",
               "note": "Azure deployment slot swaps are atomic and warm — the slot is pre-warmed before swap, avoiding cold-start latency"
             },
-            "followUps": [
-              "How do you handle DB migrations in blue-green?",
-              "What metrics do you watch during a canary?",
-              "How does a rolling deployment differ from canary?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Blue-green versus canary — what's the difference?" },
+              { "role": "me", "text": "Blue-green runs two identical prod environments and flips all traffic from blue to green at once. Canary gradually routes a small percentage of users to the new version and ramps up if it stays healthy." },
+              { "role": "interviewer", "text": "What's the tradeoff?" },
+              { "role": "me", "text": "Blue-green gives instant rollback but costs double infra during the switch. Canary limits blast radius but needs smart traffic routing and solid monitoring to decide whether to proceed." },
+              { "role": "interviewer", "text": "Both run two versions at once — what does that demand from your DB and APIs?" },
+              { "role": "me", "text": "Backward compatibility — schemas and APIs must serve both versions simultaneously, so I'd use expand/contract migrations rather than breaking changes." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you handle DB migrations in blue-green?", "a": "Make them backward-compatible (expand/contract) so both blue and green run against the same schema.", "relatedId": "devops-cicd-007" },
+              { "q": "What metrics do you watch during a canary?", "a": "Error rate, latency, and key business metrics on the canary versus baseline before ramping up." },
+              { "q": "How does a rolling deployment differ from canary?", "a": "Rolling replaces instances one-by-one for everyone; canary deliberately routes only a subset of traffic to the new version." }
             ],
             "redFlags": [
               "Ignoring DB schema compatibility in blue-green",
@@ -488,10 +603,18 @@
               "snippet": "# GitHub Actions — using repository secrets\n# steps:\n#   - name: Deploy to Azure\n#     env:\n#       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}\n#     run: az login --service-principal ...\n\n# Better: Use OIDC (no stored credentials)\n# - uses: azure/login@v2\n#   with:\n#     client-id: ${{ secrets.AZURE_CLIENT_ID }}\n#     tenant-id: ${{ secrets.AZURE_TENANT_ID }}\n#     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}\n\n# .NET: Read secrets from Azure Key Vault at runtime\n# builder.Configuration.AddAzureKeyVault(\n#     new Uri(\"https://myvault.vault.azure.net/\"),\n#     new DefaultAzureCredential());  // uses Managed Identity\n\n# Scan for secrets in git history\ngit log --all | docker run --rm -i zricethezav/gitleaks detect --pipe",
               "note": "OIDC federation (workload identity) eliminates the need to store long-lived Azure credentials in GitHub Secrets"
             },
-            "followUps": [
-              "What is OIDC federation and why prefer it over SP secrets?",
-              "How do you scope prod secrets to the prod pipeline only?",
-              "What do you do if a secret leaks into git history?"
+            "dialogue": [
+              { "role": "interviewer", "text": "How do you manage secrets in a CI/CD pipeline?" },
+              { "role": "me", "text": "Never in source. Build-time tokens live in the CI platform's encrypted secret store, masked in logs. Prod connection strings and keys live in a vault like Azure Key Vault, read at runtime via Managed Identity." },
+              { "role": "interviewer", "text": "How do you authenticate the pipeline to Azure without storing a credential?" },
+              { "role": "me", "text": "OIDC federation — GitHub Actions exchanges a short-lived token for Azure access, so there's no long-lived service-principal secret sitting in GitHub Secrets." },
+              { "role": "interviewer", "text": "Someone accidentally committed a connection string last week — what now?" },
+              { "role": "me", "text": "Rotate it immediately, assume it's compromised, then scrub it from history with `git filter-repo` and add a scanner like gitleaks to CI to catch it next time." }
+            ],
+            "followUpsQA": [
+              { "q": "What is OIDC federation and why prefer it over SP secrets?", "a": "Workload identity exchanges a short-lived token for cloud access — no long-lived stored credential to leak." },
+              { "q": "How do you scope prod secrets to the prod pipeline only?", "a": "Use environment-scoped secrets with approval gates so only the protected prod environment can read them." },
+              { "q": "What do you do if a secret leaks into git history?", "a": "Rotate it first, then purge history with git filter-repo/BFG and force-push.", "relatedId": "devops-git-011" }
             ],
             "redFlags": [
               "Committing .env files even in private repos",
@@ -521,10 +644,18 @@
               "snippet": "# Simplified .github/workflows/ci-cd.yml structure\n#\n# name: CI/CD\n# on:\n#   push:\n#     branches: [main]\n#\n# jobs:\n#   backend:\n#     runs-on: ubuntu-latest\n#     steps:\n#       - uses: actions/checkout@v4\n#       - uses: actions/setup-dotnet@v4\n#         with: { dotnet-version: '8.x' }\n#       - run: dotnet restore && dotnet build --no-restore\n#       - run: dotnet test --no-build\n#       - run: dotnet publish -c Release -o publish\n#       - uses: actions/upload-artifact@v4\n#         with: { name: backend, path: publish }\n#\n#   frontend:\n#     runs-on: ubuntu-latest\n#     steps:\n#       - uses: actions/checkout@v4\n#       - uses: actions/setup-node@v4\n#         with: { node-version: '20' }\n#       - run: npm ci && npx ng build --configuration production\n#       - uses: actions/upload-artifact@v4\n#         with: { name: frontend, path: dist }\n#\n#   deploy-staging:\n#     needs: [backend, frontend]\n#     environment: staging\n#     runs-on: ubuntu-latest\n#     steps:\n#       - uses: azure/login@v2  # OIDC\n#       - uses: actions/download-artifact@v4\n#       - uses: azure/webapps-deploy@v3\n#\n#   deploy-production:\n#     needs: deploy-staging\n#     environment: production   # requires approval\n#     runs-on: ubuntu-latest\n#     steps:\n#       - uses: azure/webapps-deploy@v3  # same artifact",
               "note": "Backend and frontend jobs run in parallel, cutting total pipeline time roughly in half"
             },
-            "followUps": [
-              "How would you handle EF Core migrations safely here?",
-              "How do you block prod deploy if integration tests fail?",
-              "How would you add SonarCloud analysis?"
+            "dialogue": [
+              { "role": "interviewer", "text": "How would you structure a GitHub Actions pipeline for a .NET API plus Angular frontend?" },
+              { "role": "me", "text": "Two parallel jobs that fail fast — backend does restore → build → test → publish, frontend does `npm ci` → `ng build --prod` → upload dist. Both publish artifacts." },
+              { "role": "interviewer", "text": "How does deployment flow from there?" },
+              { "role": "me", "text": "On merge to main, auto-deploy the artifacts to Azure staging, then promote the same artifact to prod through a GitHub Environment with reviewer approval. Auth to Azure is via OIDC, no stored creds." },
+              { "role": "interviewer", "text": "Where do EF Core migrations fit so a deploy doesn't break running pods?" },
+              { "role": "me", "text": "As a separate, backward-compatible step before the app deploy — expand/contract so the old version still works during the rollout, and rollback is a slot swap or re-deploying the previous artifact." }
+            ],
+            "followUpsQA": [
+              { "q": "How would you handle EF Core migrations safely here?", "a": "Run them as a pre-deploy step using expand/contract so old and new code both work during rollout.", "relatedId": "devops-cicd-007" },
+              { "q": "How do you block prod deploy if integration tests fail?", "a": "Make the prod job `needs` the test job and gate the environment so it can't run unless tests pass." },
+              { "q": "How would you add SonarCloud analysis?", "a": "Add a scan step in the build job with the SonarCloud action and fail the build on quality-gate failure." }
             ],
             "redFlags": [
               "Building backend and frontend sequentially",
@@ -555,10 +686,18 @@
               "snippet": "# GitHub Actions environment promotion (conceptual)\n# deploy-dev:\n#   environment: dev\n#   # auto-deploys on every push\n#\n# deploy-staging:\n#   needs: [test]\n#   environment: staging          # auto, no approval\n#   # runs integration tests after deploy\n#\n# deploy-production:\n#   needs: [deploy-staging, integration-tests]\n#   environment: production       # requires manual approval\n#   # Uses SAME artifact as staging\n\n# Azure CLI: promote same image through environments\nIMAGE=\"myregistry.azurecr.io/myapp:$GIT_SHA\"\naz webapp config container set --name myapp-staging   --resource-group rg --docker-custom-image-name $IMAGE\n# After approval:\naz webapp config container set --name myapp-production --resource-group rg --docker-custom-image-name $IMAGE",
               "note": "The $GIT_SHA image tag ensures you can trace exactly which code is running in each environment"
             },
-            "followUps": [
-              "How do you handle PII differences between staging and prod data?",
-              "What is a 'release train'?",
-              "How do you coordinate promotion with DB migrations?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What's an environment promotion strategy?" },
+              { "role": "me", "text": "Advancing the same immutable artifact through increasingly production-like environments — dev auto on commit, staging auto on merge, prod behind a manual approval — with gates validating quality at each step." },
+              { "role": "interviewer", "text": "Why keep staging as production-like as possible?" },
+              { "role": "me", "text": "So integration, E2E, and UAT in staging actually predict prod behavior; if staging differs, 'it passed in staging' means nothing." },
+              { "role": "interviewer", "text": "A bug slips to prod despite the gates — how does this setup help you recover?" },
+              { "role": "me", "text": "I keep the previous artifact, so rollback is a slot swap or `kubectl rollout undo` to the last known-good version, with no rebuild." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you handle PII differences between staging and prod data?", "a": "Use anonymized or synthetic data in staging so it mirrors prod shape without exposing real PII." },
+              { "q": "What is a 'release train'?", "a": "A fixed schedule where whatever's ready by the cutoff ships together, decoupling release timing from feature completion." },
+              { "q": "How do you coordinate promotion with DB migrations?", "a": "Run backward-compatible migrations ahead of the app promotion so each environment's schema supports both versions.", "relatedId": "devops-cicd-007" }
             ],
             "redFlags": [
               "Rebuilding per environment",
@@ -588,10 +727,18 @@
               "snippet": "# Azure App Service slot rollback (instant)\naz webapp deployment slot swap \\\n  --resource-group myRG \\\n  --name myApp \\\n  --slot staging \\\n  --target-slot production\n\n# Kubernetes rollback\nkubectl rollout undo deployment/myapp -n production\nkubectl rollout status deployment/myapp -n production\n\n# Re-deploy specific previous artifact (GitHub Actions)\n# Trigger workflow_dispatch with the previous git SHA:\n# IMAGE=myregistry.azurecr.io/myapp:abc1234-prev\naz webapp config container set \\\n  --name myapp-production \\\n  --resource-group myRG \\\n  --docker-custom-image-name myregistry.azurecr.io/myapp:abc1234-prev\n\n# Check rollout history\nkubectl rollout history deployment/myapp",
               "note": "Always test your rollback procedure in staging — a rollback plan you have never rehearsed is not a plan"
             },
-            "followUps": [
-              "What is the expand/contract migration pattern?",
-              "How do you decide roll back vs. roll forward?",
-              "How would feature flags disable functionality without redeploy?"
+            "dialogue": [
+              { "role": "interviewer", "text": "A prod deploy goes wrong — what's your rollback strategy?" },
+              { "role": "me", "text": "Get back to the last known-good state in minutes — Azure slot swap, `kubectl rollout undo`, or re-deploying the previous versioned artifact. The app side is fast because I keep that prior artifact around." },
+              { "role": "interviewer", "text": "What's the hard part of a rollback?" },
+              { "role": "me", "text": "The database. A backward-incompatible schema change can't just be reversed, so I use expand/contract — add the new column first, drop the old one a release later — keeping rollback safe." },
+              { "role": "interviewer", "text": "You need to disable a broken feature in seconds without a redeploy — how?" },
+              { "role": "me", "text": "A feature flag — flip it off and the code path is disabled instantly, no rebuild or redeploy needed. And I rehearse rollbacks in staging so they actually work under pressure." }
+            ],
+            "followUpsQA": [
+              { "q": "What is the expand/contract migration pattern?", "a": "Add new schema, migrate to use it, then remove the old schema in a later release — so each step is backward-compatible." },
+              { "q": "How do you decide roll back vs. roll forward?", "a": "Roll back if the fix is unknown or risky; roll forward if you have a quick, verified patch ready." },
+              { "q": "How would feature flags disable functionality without redeploy?", "a": "The flag is read at runtime, so toggling it off in config instantly skips the code path.", "relatedId": "devops-git-004" }
             ],
             "redFlags": [
               "'Just redeploy old code' ignoring DB schema incompatibilities",

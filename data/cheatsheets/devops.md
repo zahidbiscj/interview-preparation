@@ -2,140 +2,114 @@
 
 Git is a distributed VCS; DevOps wraps it in pipelines, branching contracts, and deployment automation.
 
----
-
-## Must-Know One-Liners
-
-| Concept | Answer |
-|---|---|
-| What is a commit? | Immutable snapshot of the index with a SHA-1 hash and parent pointer |
-| HEAD | Pointer to the current branch tip (or a detached commit) |
-| Index / staging area | Buffer between working tree and next commit |
-| Fast-forward merge | No divergence — Git just moves the branch pointer forward |
-| Detached HEAD | HEAD points to a commit, not a branch — new commits are orphaned unless you branch |
-| `origin` | Default alias for the remote repository URL |
+Two subtopics below: **Git & Version Control** (11 Qs) and **CI/CD** (7 Qs).
 
 ---
 
-## git pull vs git fetch
+## Subtopic 1 — Git & Version Control
 
-| | `git fetch` | `git pull` |
+| # | Question | Recall hook |
 |---|---|---|
-| What it does | Downloads remote refs, **does not touch working tree** | `fetch` + `merge` (or `--rebase`) in one step |
-| When to use | Before rebasing; inspect first with `git log origin/main` | Quick sync when your branch is clean and fast-forward is safe |
-| Risk | None | Can create an unwanted merge commit on dirty branches |
+| 001 | pull vs fetch | fetch = download only; pull = fetch + merge/rebase |
+| 002 | merge vs rebase | merge keeps history + merge commit; rebase = linear, rewrites SHAs; never rebase shared |
+| 003 | resolve merge conflicts | status → edit `<<< === >>>` → add → continue; `--abort` to bail |
+| 004 | branching strategy | Git Flow (versioned), GitHub Flow (SaaS PRs), Trunk-Based (flags + CI) |
+| 005 | reset vs revert | reset moves pointer (local); revert = new inverse commit (safe on shared) |
+| 006 | fast-forward merge | no divergence → pointer slides; `--no-ff` forces commit, `--ff-only` guards |
+| 007 | git stash | shelve WIP; pop removes, apply keeps; `-u` for untracked |
+| 008 | git cherry-pick | apply one commit's diff (new SHA); backport fixes |
+| 009 | squash commits | `rebase -i` or 'Squash and merge'; clean history, loses granularity |
+| 010 | HEAD / detached HEAD | HEAD → current commit (via branch); detached = points at SHA, commits orphaned |
+| 011 | undo a pushed commit | `git revert` (safe); never reset + force-push shared; rotate leaked secrets |
 
----
+### reset modes vs revert
 
-## Merge vs Rebase
-
-| | `git merge` | `git rebase` |
-|---|---|---|
-| History | Preserves full branch history; adds merge commit | Linear — replays commits on top of target |
-| When to use | Integrating feature into `main`; shared/public branches | Cleaning up a local feature branch before PR |
-| **Golden rule** | Safe on public branches | **Never rebase shared/public branches** |
-| Conflict point | Once, at merge commit | At each replayed commit |
-
-```bash
-git merge feature/login          # merge into current branch
-git rebase main                  # replay current branch on top of main
-git rebase -i HEAD~3             # interactive: squash/reorder last 3 commits
-```
-
----
-
-## Conflict Resolution — Steps
-
-1. `git status` — identify conflicted files (`both modified`)
-2. Open file — resolve between `<<<<<<< HEAD`, `=======`, `>>>>>>> branch`
-3. `git add <file>` — mark resolved
-4. `git commit` (merge) **or** `git rebase --continue` (rebase)
-5. Abort at any point: `git merge --abort` / `git rebase --abort`
-
----
-
-## reset vs revert
-
-| Mode | Moves HEAD | Changes Index | Changes Working Tree | Use When |
+| Mode | Moves HEAD | Index | Working Tree | Use When |
 |---|---|---|---|---|
-| `git reset --soft SHA` | Yes | No | No | Re-commit differently; changes stay staged |
-| `git reset --mixed SHA` | Yes | Yes (unstaged) | No | Undo commit, keep changes to edit |
-| `git reset --hard SHA` | Yes | Yes | Yes | **Discard completely** — destructive |
-| `git revert SHA` | New commit | Yes | Yes | **Undo a pushed commit safely** — history preserved |
+| `reset --soft` | Yes | No | No | Re-commit; changes stay staged |
+| `reset --mixed` (default) | Yes | Yes (unstaged) | No | Undo commit, keep changes to edit |
+| `reset --hard` | Yes | Yes | Yes | **Discard** — destructive (reflog to recover) |
+| `revert` | New commit | Yes | Yes | **Undo a pushed commit safely** |
 
-> Rule: `reset` rewrites history (local only); `revert` appends an undo commit (safe for remotes).
-
----
-
-## Handy Git Commands
-
-```bash
-# Stash
-git stash                        # save WIP
-git stash pop                    # restore latest stash
-git stash list                   # see all stashes
-
-# Cherry-pick
-git cherry-pick <SHA>            # apply a single commit to current branch
-
-# Squash (via interactive rebase)
-git rebase -i HEAD~N             # mark N-1 commits as 'squash' or 's'
-
-# Undo a pushed commit (safe)
-git revert <SHA>                 # creates inverse commit
-git push                         # push the revert
-
-# Undo last local commit (keep changes)
-git reset --soft HEAD~1
-
-# Fix last commit message
-git commit --amend -m "new msg"  # only if not yet pushed
-
-# See what changed
-git log --oneline --graph --all
-git diff main...feature/x        # diff since branch point
-```
-
----
-
-## Branching Strategies
+### Branching strategies
 
 | Strategy | One-liner |
 |---|---|
-| **Git Flow** | Long-lived `develop` + `release` branches; rigid; suits versioned software with scheduled releases |
-| **GitHub Flow** | `main` is always deployable; short-lived feature branches → PR → merge → deploy immediately |
-| **Trunk-Based Development** | Everyone commits to `main` (or very short-lived branches); requires feature flags; enables true CI |
+| **Git Flow** | Long-lived develop/release/hotfix; versioned, scheduled releases |
+| **GitHub Flow** | main always deployable; branch → PR → merge → deploy |
+| **Trunk-Based** | Tiny short-lived branches to main + feature flags; true CI/DORA favourite |
 
 ---
 
-## CI/CD
+## Subtopic 2 — CI/CD
 
-| Term | Definition |
-|---|---|
-| **Continuous Integration (CI)** | Auto-build + test on every push; catches integration bugs early |
-| **Continuous Delivery (CD)** | Every passing build is *releasable* to production; deployment is a manual trigger |
-| **Continuous Deployment** | Every passing build is *automatically deployed* to production — no human gate |
+| # | Question | Recall hook |
+|---|---|---|
+| 001 | What is CI/CD | CI = build+test; Delivery = releasable (manual gate); Deployment = auto to prod |
+| 002 | build artifact / promotion | immutable versioned output; build once, deploy many; config injected at deploy |
+| 003 | blue-green vs canary | blue-green = instant flip + rollback (2x infra); canary = % traffic ramp + monitor |
+| 004 | manage secrets | vault + Managed Identity/OIDC; never in source; mask, rotate, gitleaks |
+| 005 | .NET + Angular pipeline | parallel jobs, OIDC auth, staging auto + prod approval, same artifact |
+| 006 | environment promotion | dev → staging → prod; same artifact, staging prod-like, gates between |
+| 007 | rollback strategy | slot swap / `rollout undo` / re-deploy prev; expand-contract DB; feature flags |
 
-### Typical Pipeline Stages
+### Pipeline stages
 `Source → Build → Unit Test → Code Analysis → Integration Test → Artifact Publish → Deploy (staging) → Smoke Test → Deploy (prod)`
 
-### Deployment Patterns
+### Deployment patterns
 
-| Pattern | How it works | When to use |
+| Pattern | How | When |
 |---|---|---|
-| **Blue-Green** | Two identical envs; switch router from blue→green instantly; instant rollback | Zero-downtime releases; easy rollback needed |
-| **Canary** | Route small % of traffic to new version; ramp up if healthy | Reduce blast radius; validate with real traffic gradually |
-| **Rolling** | Replace instances one-by-one | Simple; no extra infra but rollback is slower |
+| **Blue-Green** | Two identical envs; flip router instantly; instant rollback | Zero-downtime, easy rollback |
+| **Canary** | Small % traffic to new version, ramp if healthy | Limit blast radius, real-traffic validation |
+| **Rolling** | Replace instances one-by-one | Simple, no extra infra, slower rollback |
+
+> Both blue-green and canary run two versions at once → keep DB/API **backward-compatible** (expand/contract).
+
+---
+
+## Common Git Commands
+
+| Task | Command |
+|---|---|
+| Fetch only (safe) | `git fetch origin` |
+| Inspect incoming | `git log HEAD..origin/main --oneline` |
+| Pull with rebase | `git pull --rebase origin main` |
+| Prune dead remote refs | `git fetch --prune` |
+| Merge (force commit) | `git merge --no-ff feature/x` |
+| Merge (FF-only guard) | `git merge --ff-only feature/x` |
+| Rebase onto main | `git rebase main` |
+| Interactive squash | `git rebase -i HEAD~3` |
+| Abort merge / rebase | `git merge --abort` / `git rebase --abort` |
+| Undo commit, keep staged | `git reset --soft HEAD~1` |
+| Undo commit, discard (destructive) | `git reset --hard HEAD~1` |
+| Undo a pushed commit (safe) | `git revert <SHA>` |
+| Revert a merge commit | `git revert -m 1 <merge-SHA>` |
+| Recover lost commit | `git reflog` → `git checkout -b rescue <SHA>` |
+| Stash WIP (incl. untracked) | `git stash push -u -m "msg"` |
+| Restore stash | `git stash pop` / `git stash apply` |
+| Cherry-pick a commit | `git cherry-pick <SHA>` |
+| Save detached-HEAD work | `git checkout -b new-branch` |
+| Fix last commit message | `git commit --amend -m "msg"` (pre-push only) |
+| Safe force push | `git push --force-with-lease` |
+| Visual history | `git log --oneline --graph --all` |
 
 ---
 
 ## Quick-Recall Checklist
 
-- [ ] `fetch` before rebase, `pull` for fast merges
-- [ ] Never `rebase` a branch others have checked out
-- [ ] Prefer `revert` over `reset --hard` on pushed commits
-- [ ] Squash noise commits before merging PRs
-- [ ] CI = build+test automatically; CD = releasable; Continuous Deployment = auto to prod
-- [ ] Blue-green = instant cutover + rollback; canary = gradual traffic shift
-- [ ] Git Flow for versioned releases; trunk-based for high-cadence teams
-- [ ] `git log --oneline --graph --all` is your visual sanity check
+- [ ] `fetch` before rebase; `pull` for clean fast-forward syncs
+- [ ] Never `rebase` (or squash on) a branch others have pulled — rewrites shared history
+- [ ] Prefer `revert` over `reset --hard` + force-push on pushed commits
+- [ ] `reset --soft` keeps staged, `--mixed` keeps unstaged, `--hard` discards
+- [ ] `reflog` rescues lost commits (~30 days)
+- [ ] Detached-HEAD commits are orphaned — branch first to keep them
+- [ ] `stash` excludes untracked unless `-u`; pop removes, apply keeps
+- [ ] Squash noise commits before merging PRs; keep granular history for big features
+- [ ] Git Flow = versioned releases; GitHub Flow/Trunk-Based = high cadence (need flags)
+- [ ] CI = auto build+test; Delivery = releasable; Deployment = auto to prod
+- [ ] Build once, deploy many — promote the **same immutable artifact**; inject config at deploy
+- [ ] Blue-green = instant cutover + rollback; canary = gradual traffic shift + monitoring
+- [ ] Keep DB changes backward-compatible (expand/contract) for safe rollback
+- [ ] Secrets in a vault via Managed Identity/OIDC; rotate on leak; never in source
+- [ ] Rollback = slot swap / `kubectl rollout undo` / re-deploy prev artifact; feature flags = instant off

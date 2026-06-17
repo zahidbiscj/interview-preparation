@@ -29,6 +29,7 @@ export class QuestionBankService {
   private _error = signal<string | null>(null);
   private _isDark = signal<boolean>(this.loadTheme());
   private _daily = signal<Record<string, DailyStat>>(this.loadDaily());
+  private _focusQuestionId = signal<string | null>(null);
 
   private topicCache = new Map<string, TopicFile>();
   private cheatSheetCache = new Map<string, string>();
@@ -40,6 +41,8 @@ export class QuestionBankService {
   readonly error = this._error.asReadonly();
   readonly isDark = this._isDark.asReadonly();
   readonly daily = this._daily.asReadonly();
+  /** When set, the matching question card should scroll into view and expand. */
+  readonly focusQuestionId = this._focusQuestionId.asReadonly();
 
   /** Total questions self-graded across all days. */
   readonly totalAnswered = computed(() =>
@@ -169,6 +172,48 @@ export class QuestionBankService {
   select(topicId: string, subtopicId: string): void {
     this._selected.set({ topicId, subtopicId });
     this._filter.set({ ...EMPTY_FILTER });
+  }
+
+  /**
+   * Jump to a specific question by id (used by clickable follow-ups):
+   * loads its topic, expands the node, selects its subtopic, and flags it to
+   * scroll into view + auto-expand.
+   */
+  async goToQuestion(id: string): Promise<boolean> {
+    const topic = this._topics().find(t => id.startsWith(t.id + '-'));
+    if (!topic) return false;
+
+    const file = await this.ensureTopicLoaded(topic.id);
+    if (!file) return false;
+
+    // make sure the sidebar node is marked loaded + expanded
+    this._topics.update(list =>
+      list.map(t => {
+        if (t.id !== topic.id) return t;
+        if (t.loaded) return { ...t, expanded: true };
+        const subtopics: SubtopicNode[] = file.subtopics.map(s => ({
+          subtopicId: s.subtopicId,
+          subtopicName: s.subtopicName,
+          questionCount: s.questions.length,
+        }));
+        return {
+          ...t, loaded: true, expanded: true, subtopics,
+          questionCount: file.subtopics.reduce((sum, s) => sum + s.questions.length, 0),
+        };
+      })
+    );
+
+    const sub = file.subtopics.find(s => s.questions.some(q => q.id === id));
+    if (!sub) return false;
+
+    this._selected.set({ topicId: topic.id, subtopicId: sub.subtopicId });
+    this._filter.set({ ...EMPTY_FILTER });
+    this._focusQuestionId.set(id);
+    return true;
+  }
+
+  clearFocus(): void {
+    this._focusQuestionId.set(null);
   }
 
   setFilter(patch: Partial<QuestionFilter>): void {

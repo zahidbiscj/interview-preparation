@@ -26,10 +26,18 @@
               "snippet": "public static string Reverse(string s)\n{\n    char[] c = s.ToCharArray();\n    int left = 0, right = c.Length - 1;\n    while (left < right)\n    {\n        (c[left], c[right]) = (c[right], c[left]); // tuple swap\n        left++;\n        right--;\n    }\n    return new string(c);\n}\n\n// Reverse(\"hello\") => \"olleh\"",
               "note": "O(n) time, O(n) space for the char array"
             },
-            "followUps": [
-              "Reverse in place over a char[] (then it's O(1) extra space).",
-              "How would you reverse only the words, not the characters?",
-              "Handle Unicode surrogate pairs / combining characters?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Reverse a string, but don't call any built-in Reverse. How would you approach it?" },
+              { "role": "me", "text": "Since C# strings are immutable, I'd copy to a `char[]`, then use two pointers, one at each end, swapping inward until they cross." },
+              { "role": "interviewer", "text": "Walk me through the complexity." },
+              { "role": "me", "text": "It's O(n) time since each character is touched once, and O(n) space for the char array; if I could mutate a char[] directly it'd be O(1) extra." },
+              { "role": "interviewer", "text": "Any edge cases or inputs that break a naive swap?" },
+              { "role": "me", "text": "Empty or single-char strings are fine since the loop just doesn't run; the real trap is Unicode surrogate pairs, where blind char swapping corrupts the codepoint." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you make it O(1) extra space?", "a": "Mutate a char[] in place rather than allocating a new one." },
+              { "q": "How would you reverse only the words, not the characters?", "a": "Split on whitespace, reverse the word array, then join." },
+              { "q": "How do you handle Unicode surrogate pairs?", "a": "Reverse by text element (StringInfo) so combined codepoints stay intact." }
             ]
           }
         },
@@ -53,10 +61,18 @@
               "snippet": "public static IList<int> MajorityElement(int[] nums)\n{\n    int cand1 = 0, cand2 = 1, c1 = 0, c2 = 0; // cand2 != cand1 initially\n    foreach (int x in nums)\n    {\n        if (x == cand1) c1++;\n        else if (x == cand2) c2++;\n        else if (c1 == 0) { cand1 = x; c1 = 1; }\n        else if (c2 == 0) { cand2 = x; c2 = 1; }\n        else { c1--; c2--; }\n    }\n\n    c1 = 0; c2 = 0;\n    foreach (int x in nums)\n    {\n        if (x == cand1) c1++;\n        else if (x == cand2) c2++;\n    }\n\n    var res = new List<int>();\n    if (c1 > nums.Length / 3) res.Add(cand1);\n    if (c2 > nums.Length / 3) res.Add(cand2);\n    return res;\n}\n\n// {3,2,3,1,1,1,2,2,3}: n=9, n/3=3.\n// counts -> 3 appears 3x, 2 appears 3x, 1 appears 3x; none is > 3, so result is empty.\n// Note: the classic answer people expect is 3, but strictly > floor(n/3) excludes all here.",
               "note": "O(n) time, O(1) space"
             },
-            "followUps": [
-              "Why are there at most 2 answers for the n/3 case?",
-              "Generalize to elements appearing more than n/k times (k candidates).",
-              "What if you used a Dictionary instead -> O(n) space but simpler."
+            "dialogue": [
+              { "role": "interviewer", "text": "Find all elements appearing more than n/3 times. Constraints push you toward O(n) time, O(1) space." },
+              { "role": "me", "text": "Brute force is a Dictionary count in O(n) time but O(n) space. To hit O(1) space I'd use Boyer-Moore voting, extended: at most two elements can exceed n/3." },
+              { "role": "interviewer", "text": "Why at most two, and how does the voting work?" },
+              { "role": "me", "text": "Three elements each over n/3 would need more than n total, which is impossible. So I track two (candidate, count) pairs: match an existing candidate, else fill an empty slot, else decrement both." },
+              { "role": "interviewer", "text": "Is one pass enough?" },
+              { "role": "me", "text": "No, voting only finds candidates; I do a second pass to re-count them and keep only those actually exceeding n/3, since a false candidate can survive pass one." }
+            ],
+            "followUpsQA": [
+              { "q": "Why are there at most 2 answers for the n/3 case?", "a": "Three elements each over n/3 would exceed n total votes." },
+              { "q": "How do you generalize to more than n/k times?", "a": "Track k-1 candidate/counter pairs, then verify each in a second pass." },
+              { "q": "What's the simpler trade-off?", "a": "A Dictionary of counts is O(n) space but far easier to reason about.", "relatedId": "coding-arr-003" }
             ]
           }
         },
@@ -79,9 +95,18 @@
               "snippet": "public static Dictionary<int, int> CountOccurrences(int[] nums)\n{\n    var counts = new Dictionary<int, int>();\n    foreach (int x in nums)\n    {\n        counts.TryGetValue(x, out int c);\n        counts[x] = c + 1;\n    }\n    return counts;\n}\n\n// {1,2,2,3,3,3} => {1:1, 2:2, 3:3}",
               "note": "O(n) time, O(k) space"
             },
-            "followUps": [
-              "LINQ one-liner: nums.GroupBy(x => x).ToDictionary(g => g.Key, g => g.Count()).",
-              "How to get the most frequent element from this?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Count how many times each element occurs in an array." },
+              { "role": "me", "text": "I'd iterate once and accumulate into a Dictionary keyed by the element with the running count as the value." },
+              { "role": "interviewer", "text": "What's the time and space cost?" },
+              { "role": "me", "text": "O(n) time for the single pass with average O(1) lookups, and O(k) space where k is the number of distinct values." },
+              { "role": "interviewer", "text": "How do you increment safely on the first sighting of a key?" },
+              { "role": "me", "text": "I use `TryGetValue(x, out int c); dict[x] = c + 1;` so a missing key defaults c to 0, no separate ContainsKey check needed." }
+            ],
+            "followUpsQA": [
+              { "q": "What's the LINQ one-liner?", "a": "nums.GroupBy(x => x).ToDictionary(g => g.Key, g => g.Count())." },
+              { "q": "How do you get the most frequent element from this?", "a": "Take the entry with the max value (e.g., OrderByDescending or a single max scan)." },
+              { "q": "How do you find duplicates from these counts?", "a": "Keep keys whose count is greater than 1.", "relatedId": "coding-arr-004" }
             ]
           }
         },
@@ -104,9 +129,18 @@
               "snippet": "public static IList<int> FindDuplicates(int[] nums)\n{\n    var seen = new HashSet<int>();\n    var dups = new HashSet<int>();\n    foreach (int x in nums)\n        if (!seen.Add(x)) dups.Add(x);\n    return dups.ToList();\n}\n\n// {1,2,3,2,4,1} => {2,1}",
               "note": "O(n) time, O(n) space"
             },
-            "followUps": [
-              "If values are in range [1..n], can you do it in O(1) extra space by index marking?",
-              "Return the count of each duplicate too."
+            "dialogue": [
+              { "role": "interviewer", "text": "Find all duplicate elements in an array." },
+              { "role": "me", "text": "I'd walk the array with a HashSet of seen values; `Add` returns false when the value already exists, which flags a duplicate." },
+              { "role": "interviewer", "text": "What stops you from reporting the same duplicate twice?" },
+              { "role": "me", "text": "I push flagged values into a second result set, so an element appearing three times still reports once." },
+              { "role": "interviewer", "text": "Complexity, and can you beat the space?" },
+              { "role": "me", "text": "O(n) time, O(n) space. If the values are bounded in [1..n], I can do O(1) extra space by negating the value at index x as a visited marker." }
+            ],
+            "followUpsQA": [
+              { "q": "Can you do it in O(1) extra space?", "a": "If values are in [1..n], mark visited by negating nums[abs(x)-1]." },
+              { "q": "How would you return the count of each duplicate?", "a": "Use a Dictionary of counts and keep entries with count > 1.", "relatedId": "coding-arr-003" },
+              { "q": "Why HashSet over sorting first?", "a": "HashSet is O(n); sorting to find adjacent dups is O(n log n)." }
             ]
           }
         },
@@ -130,9 +164,18 @@
               "snippet": "public static int? SecondLargest(int[] nums)\n{\n    long first = long.MinValue, second = long.MinValue;\n    foreach (int x in nums)\n    {\n        if (x > first) { second = first; first = x; }\n        else if (x > second && x != first) second = x;\n    }\n    return second == long.MinValue ? (int?)null : (int)second;\n}\n\n// {3,1,4,4,5,2} => 4",
               "note": "O(n) time, O(1) space"
             },
-            "followUps": [
-              "Should duplicates of the max count as second largest?",
-              "Generalize to the k-th largest (heap or QuickSelect)."
+            "dialogue": [
+              { "role": "interviewer", "text": "Find the second largest element in a single pass." },
+              { "role": "me", "text": "I'd track `first` and `second` as I scan: if x beats first, second becomes the old first and first becomes x; else if x is between, update second." },
+              { "role": "interviewer", "text": "How do you avoid duplicates of the max becoming the second largest?" },
+              { "role": "me", "text": "In the else branch I require `x > second && x != first`, so a repeated max won't slide into second." },
+              { "role": "interviewer", "text": "Edge cases and complexity?" },
+              { "role": "me", "text": "O(n) time, O(1) space. I init both to long.MinValue to survive int.MinValue inputs, and return null if no valid second exists." }
+            ],
+            "followUpsQA": [
+              { "q": "Should duplicates of the max count as second largest?", "a": "Usually no; guard with x != first so {5,5,3} returns 3." },
+              { "q": "How do you generalize to the k-th largest?", "a": "Use a size-k min-heap or QuickSelect for O(n) average." },
+              { "q": "What if the array has fewer than two distinct values?", "a": "Return null since no second largest exists." }
             ]
           }
         },
@@ -155,9 +198,18 @@
               "snippet": "public static int[] Merge(int[] a, int[] b)\n{\n    var result = new int[a.Length + b.Length];\n    int i = 0, j = 0, k = 0;\n    while (i < a.Length && j < b.Length)\n        result[k++] = a[i] <= b[j] ? a[i++] : b[j++];\n    while (i < a.Length) result[k++] = a[i++];\n    while (j < b.Length) result[k++] = b[j++];\n    return result;\n}\n\n// {1,3,5} + {2,4,6} => {1,2,3,4,5,6}",
               "note": "O(m+n) time, O(m+n) space; stable"
             },
-            "followUps": [
-              "Merge in place when one array has trailing capacity (fill from the back).",
-              "How does this relate to the overall O(n log n) of merge sort?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Merge two sorted arrays into one sorted array." },
+              { "role": "me", "text": "This is the merge step of merge sort: one pointer per array, repeatedly take the smaller front element into the result." },
+              { "role": "interviewer", "text": "What happens when one array runs out before the other?" },
+              { "role": "me", "text": "After the main loop, I drain whatever remains in either array with two cleanup loops, since the leftover is already sorted." },
+              { "role": "interviewer", "text": "Complexity, and can you do it in place?" },
+              { "role": "me", "text": "O(m+n) time and O(m+n) space here. If one array has trailing capacity, I can merge in place by filling from the back to avoid overwriting unread values." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you merge in place with trailing capacity?", "a": "Fill from the back, comparing the two tails so you never overwrite unread data." },
+              { "q": "How does this relate to merge sort's O(n log n)?", "a": "Each level merges in O(n); there are log n levels." },
+              { "q": "Is this merge stable?", "a": "Yes, taking from the first array on ties preserves order." }
             ]
           }
         },
@@ -180,10 +232,18 @@
               "snippet": "public static (string reversed, Dictionary<string,int> counts) ReverseWords(string sentence)\n{\n    string[] words = sentence.Split((char[])null!,\n        StringSplitOptions.RemoveEmptyEntries);\n\n    var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);\n    foreach (var w in words)\n    {\n        counts.TryGetValue(w, out int c);\n        counts[w] = c + 1;\n    }\n\n    Array.Reverse(words); // manual: swap two-pointer if Reverse is banned\n    return (string.Join(' ', words), counts);\n}\n\n// \"the cat the dog\" => reversed: \"dog the cat the\", counts: {the:2, cat:1, dog:1}",
               "note": "O(n) time over characters, O(w) space for word map"
             },
-            "followUps": [
-              "Reverse the words without Array.Reverse (two-pointer swap).",
-              "Reverse characters within each word as well.",
-              "Return the most frequent word."
+            "dialogue": [
+              { "role": "interviewer", "text": "Given a sentence, reverse the order of words and count how many times each word occurs." },
+              { "role": "me", "text": "I'd split on whitespace with RemoveEmptyEntries, tally each word in a Dictionary, then reverse the word array and join it back." },
+              { "role": "interviewer", "text": "How do you handle messy spacing or case sensitivity?" },
+              { "role": "me", "text": "RemoveEmptyEntries collapses runs of spaces, and I use a case-insensitive comparer (OrdinalIgnoreCase) if 'The' and 'the' should count as one." },
+              { "role": "interviewer", "text": "What's the complexity?" },
+              { "role": "me", "text": "O(n) over the characters for splitting and counting, and O(w) space for the word map where w is the number of words." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you reverse the words without Array.Reverse?", "a": "Two-pointer swap from both ends of the word array.", "relatedId": "coding-arr-001" },
+              { "q": "How would you also reverse characters within each word?", "a": "Reverse each word's char[] before joining." },
+              { "q": "How do you return the most frequent word?", "a": "Take the dictionary entry with the maximum count.", "relatedId": "coding-arr-003" }
             ]
           }
         }
@@ -213,9 +273,18 @@
               "snippet": "public static IEnumerable<long> Fibonacci(int n)\n{\n    long a = 0, b = 1;\n    for (int i = 0; i < n; i++)\n    {\n        yield return a;\n        (a, b) = (b, a + b);\n    }\n}\n\n// Fibonacci(8) => 0 1 1 2 3 5 8 13",
               "note": "O(n) time, O(1) extra space"
             },
-            "followUps": [
-              "Why is naive recursion O(2^n)? How does memoization fix it?",
-              "Compute the n-th Fibonacci in O(log n) (matrix exponentiation)."
+            "dialogue": [
+              { "role": "interviewer", "text": "Generate the first n Fibonacci numbers iteratively." },
+              { "role": "me", "text": "I'd keep two rolling variables a and b and update them as (a, b) = (b, a + b) in a loop, yielding a each step." },
+              { "role": "interviewer", "text": "Why iterative rather than recursive?" },
+              { "role": "me", "text": "Naive recursion recomputes overlapping subproblems and is O(2^n); the iterative roll is O(n) time and O(1) space." },
+              { "role": "interviewer", "text": "Any practical concern with large n?" },
+              { "role": "me", "text": "Values grow fast, so I use `long` to delay overflow; for very large n I'd switch to BigInteger." }
+            ],
+            "followUpsQA": [
+              { "q": "Why is naive recursion O(2^n)?", "a": "It recomputes the same subproblems; memoization collapses it to O(n)." },
+              { "q": "How do you compute the n-th Fibonacci in O(log n)?", "a": "Matrix exponentiation or fast doubling." },
+              { "q": "How do you handle overflow for large n?", "a": "Use BigInteger instead of long." }
             ]
           }
         },
@@ -238,9 +307,18 @@
               "snippet": "public static List<int> Primes(int n)\n{\n    var isComposite = new bool[n + 1];\n    var primes = new List<int>();\n    for (int p = 2; p <= n; p++)\n    {\n        if (isComposite[p]) continue;\n        primes.Add(p);\n        for (long m = (long)p * p; m <= n; m += p)\n            isComposite[m] = true;\n    }\n    return primes;\n}\n\n// Primes(20) => 2 3 5 7 11 13 17 19",
               "note": "O(n log log n) time, O(n) space"
             },
-            "followUps": [
-              "Trial division check for a single number (O(sqrt n)).",
-              "Segmented sieve for very large ranges to bound memory."
+            "dialogue": [
+              { "role": "interviewer", "text": "Print all prime numbers up to n efficiently." },
+              { "role": "me", "text": "Brute force is trial division per number, O(n*sqrt(n)). Better is the Sieve of Eratosthenes: mark multiples of each prime as composite." },
+              { "role": "interviewer", "text": "Any optimization on where you start crossing out?" },
+              { "role": "me", "text": "I start at p*p, because smaller multiples of p were already crossed by smaller primes, and I only loop p up to sqrt(n)." },
+              { "role": "interviewer", "text": "Complexity and memory?" },
+              { "role": "me", "text": "O(n log log n) time and O(n) space for the boolean array; for huge ranges a segmented sieve bounds memory." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you check a single number for primality?", "a": "Trial division up to sqrt(n), O(sqrt n)." },
+              { "q": "Why start crossing out at p*p?", "a": "Smaller multiples of p were already marked by smaller primes." },
+              { "q": "How do you sieve a very large range?", "a": "Segmented sieve processes blocks to cap memory." }
             ]
           }
         },
@@ -263,9 +341,18 @@
               "snippet": "public static int TrailingZeros(int n)\n{\n    int count = 0;\n    for (long p = 5; p <= n; p *= 5)\n        count += (int)(n / p);\n    return count;\n}\n\n// TrailingZeros(25) => 6  (25/5=5, 25/25=1)\n// TrailingZeros(100) => 24",
               "note": "O(log_5 n) time, O(1) space"
             },
-            "followUps": [
-              "Why count 5s and not 2s?",
-              "Count trailing zeros in base b (factor b into primes)."
+            "dialogue": [
+              { "role": "interviewer", "text": "Count the number of trailing zeros in n factorial." },
+              { "role": "me", "text": "A trailing zero comes from a factor of 10, which is 2*5. Since 5s are rarer than 2s, I just count factors of 5." },
+              { "role": "interviewer", "text": "How do you count all the 5s correctly?" },
+              { "role": "me", "text": "Sum floor(n/5) + floor(n/25) + floor(n/125)..., because multiples of 25 contribute an extra 5, multiples of 125 yet another, and so on." },
+              { "role": "interviewer", "text": "Why not just compute n! and count zeros?" },
+              { "role": "me", "text": "n! overflows almost immediately; my approach is O(log n) time, O(1) space and never builds the factorial." }
+            ],
+            "followUpsQA": [
+              { "q": "Why count 5s and not 2s?", "a": "Factors of 2 are far more abundant, so 5s are the limiting factor." },
+              { "q": "How do you count trailing zeros in base b?", "a": "Factor b into primes and take the min over each prime's count in n!." },
+              { "q": "Why not compute n! directly?", "a": "It overflows fast; the divisor-sum trick avoids it entirely." }
             ]
           }
         },
@@ -289,9 +376,18 @@
               "snippet": "// Merge sort on a singly linked list (top-down)\npublic class Node { public int Val; public Node? Next; }\n\npublic static Node? Sort(Node? head)\n{\n    if (head?.Next == null) return head;\n    // split with slow/fast pointers\n    Node slow = head, fast = head.Next;\n    while (fast?.Next != null) { slow = slow.Next!; fast = fast.Next.Next; }\n    Node mid = slow.Next!; slow.Next = null;\n    return Merge(Sort(head), Sort(mid));\n}\n\nstatic Node? Merge(Node? a, Node? b)\n{\n    var dummy = new Node(); var tail = dummy;\n    while (a != null && b != null)\n    {\n        if (a.Val <= b.Val) { tail.Next = a; a = a.Next; }\n        else { tail.Next = b; b = b.Next; }\n        tail = tail.Next;\n    }\n    tail.Next = a ?? b;\n    return dummy.Next;\n}",
               "note": "O(n log n) time; relinks nodes, no random access"
             },
-            "followUps": [
-              "Why is quicksort poor for linked lists?",
-              "How does bottom-up merge sort reach O(1) extra space?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What sorting algorithm is preferred for linked lists, and why?" },
+              { "role": "me", "text": "Merge sort. It only needs sequential access and merges by relinking nodes, so it fits a list far better than algorithms that need indexing." },
+              { "role": "interviewer", "text": "Why is quicksort a poor fit here?" },
+              { "role": "me", "text": "Quicksort and heapsort rely on O(1) random access for partitioning or heap indexing, which a singly linked list can't give cheaply." },
+              { "role": "interviewer", "text": "What about the recursion stack space?" },
+              { "role": "me", "text": "Top-down merge sort uses O(log n) stack, but bottom-up merge sort iterates over run sizes and reaches O(1) auxiliary space, with a guaranteed O(n log n)." }
+            ],
+            "followUpsQA": [
+              { "q": "Why is quicksort poor for linked lists?", "a": "Partitioning needs random access, which lists lack." },
+              { "q": "How does bottom-up merge sort reach O(1) extra space?", "a": "It iterates run sizes and splices pointers instead of recursing." },
+              { "q": "Is merge sort stable on a list?", "a": "Yes, taking the left node on ties preserves order." }
             ]
           }
         },
@@ -315,10 +411,18 @@
               "snippet": "// Doubly linked node for back/forward navigation\npublic class Page\n{\n    public string Url = \"\";\n    public Page? Prev, Next;\n}\n\npublic class History\n{\n    private Page? current;\n    public void Visit(string url)\n    {\n        var p = new Page { Url = url, Prev = current };\n        if (current != null) current.Next = p; // forward history truncated\n        current = p;\n    }\n    public string? Back()    => (current?.Prev != null) ? (current = current.Prev).Url : null;\n    public string? Forward() => (current?.Next != null) ? (current = current.Next).Url : null;\n}",
               "note": "Doubly linked -> O(1) Back/Forward"
             },
-            "followUps": [
-              "When would two stacks be simpler than a doubly linked list here?",
-              "How does an LRU cache combine a doubly linked list with a hash map?",
-              "Trade-off: extra prev pointer memory vs O(1) reverse traversal."
+            "dialogue": [
+              { "role": "interviewer", "text": "Compare singly, doubly, and circular linked lists. Which fits browser tab/page switching?" },
+              { "role": "me", "text": "Singly has one forward pointer and least memory; doubly adds a prev pointer for O(1) bidirectional moves; circular links tail back to head for natural cycling." },
+              { "role": "interviewer", "text": "So for browser back/forward navigation, which do you pick?" },
+              { "role": "me", "text": "A doubly linked list, so Back and Forward are both O(1); two stacks also model history cleanly." },
+              { "role": "interviewer", "text": "And for cycling through open tabs endlessly?" },
+              { "role": "me", "text": "A circular list, since the last tab wraps to the first for round-robin Ctrl+Tab behavior." }
+            ],
+            "followUpsQA": [
+              { "q": "When are two stacks simpler than a doubly linked list?", "a": "For pure back/forward history with no random deletion." },
+              { "q": "How does an LRU cache combine a doubly linked list with a hash map?", "a": "Map gives O(1) lookup; the list orders recency for O(1) eviction." },
+              { "q": "What's the cost of the prev pointer?", "a": "Extra memory per node in exchange for O(1) reverse traversal." }
             ]
           }
         },
@@ -342,9 +446,18 @@
               "snippet": "// Tuple: return several values of different types\n(int count, string name) GetStats() => (3, \"Alice\");\nvar s = GetStats();\nConsole.WriteLine($\"{s.name}: {s.count}\");\n\n// List: a growable homogeneous collection\nvar nums = new List<int> { 1, 2, 3 };\nnums.Add(4);\nint third = nums[2];",
               "note": "Tuple = fixed heterogeneous; List = dynamic homogeneous"
             },
-            "followUps": [
-              "ValueTuple vs the older System.Tuple reference type?",
-              "When prefer a small record/class over a tuple for readability?"
+            "dialogue": [
+              { "role": "interviewer", "text": "What's the difference between a Tuple and a List in C#, and when do you use each?" },
+              { "role": "me", "text": "A tuple is a fixed-size, heterogeneous group accessed by position or name; a List<T> is a resizable, homogeneous sequence you index and iterate." },
+              { "role": "interviewer", "text": "Give me a concrete use case for each." },
+              { "role": "me", "text": "A tuple for returning multiple values from a method, like `(int count, string name)`; a list for a growable collection of the same type you loop over." },
+              { "role": "interviewer", "text": "Any value-vs-reference distinction worth noting?" },
+              { "role": "me", "text": "ValueTuple is a value type with named members, while List<T> is a reference type on the heap; tuples aren't meant to be iterated, lists are." }
+            ],
+            "followUpsQA": [
+              { "q": "ValueTuple vs the older System.Tuple?", "a": "ValueTuple is a mutable value type with named fields; System.Tuple is an immutable reference type." },
+              { "q": "When prefer a record/class over a tuple?", "a": "When the fields need names, methods, or wide reuse for readability." },
+              { "q": "Can tuples be deconstructed?", "a": "Yes, var (count, name) = GetStats(); unpacks them." }
             ]
           }
         },
@@ -368,10 +481,18 @@
               "snippet": "void Demo()\n{\n    int x = 5;                 // value type -> stack\n    var p = new Person();      // 'p' (reference) on stack, object on heap\n    object boxed = x;          // boxing -> new heap allocation\n}\n\nclass Person { public string Name = \"\"; }",
               "note": "Stack: auto-freed locals; Heap: GC-managed objects"
             },
-            "followUps": [
-              "What causes a StackOverflowException vs an OutOfMemoryException?",
-              "How do generational GC (gen 0/1/2) and the LOH work?",
-              "Why can stackalloc / Span<T> reduce heap pressure?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Explain the difference between the stack and the heap in .NET memory management." },
+              { "role": "me", "text": "The stack is a fast, per-thread LIFO region for call frames, value-type locals, and references, freed automatically on return; the heap holds reference-type objects managed by the GC." },
+              { "role": "interviewer", "text": "Where does a reference-type variable actually live?" },
+              { "role": "me", "text": "The reference itself sits on the stack, but the object it points to lives on the heap." },
+              { "role": "interviewer", "text": "What's a common hidden allocation people miss?" },
+              { "role": "me", "text": "Boxing: assigning a value type to object copies it onto the heap, adding allocation and GC pressure." }
+            ],
+            "followUpsQA": [
+              { "q": "What causes a StackOverflowException vs an OutOfMemoryException?", "a": "Too-deep recursion exhausts the stack; too many live heap objects exhaust memory." },
+              { "q": "How do generational GC and the LOH work?", "a": "Gen 0/1/2 collect short-lived objects cheaply; large objects go to the LOH, collected less often." },
+              { "q": "Why do stackalloc / Span<T> reduce heap pressure?", "a": "They keep buffers on the stack, avoiding heap allocation and GC." }
             ]
           }
         }
@@ -401,9 +522,18 @@
               "snippet": "-- Using DENSE_RANK\nSELECT MAX(Salary) AS SecondHighestSalary\nFROM (\n    SELECT Salary, DENSE_RANK() OVER (ORDER BY Salary DESC) AS rnk\n    FROM Employee\n) t\nWHERE rnk = 2;\n\n-- Equivalent subquery form (returns NULL if none)\nSELECT MAX(Salary) AS SecondHighestSalary\nFROM Employee\nWHERE Salary < (SELECT MAX(Salary) FROM Employee);",
               "note": "DENSE_RANK handles duplicate salaries correctly"
             },
-            "followUps": [
-              "Why DENSE_RANK over ROW_NUMBER here (ties)?",
-              "What does each return when only one salary exists?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Write a query to find the second highest salary." },
+              { "role": "me", "text": "I'd rank distinct salaries with DENSE_RANK() descending and pick rank 2; a MAX-where-salary-less-than-MAX subquery also works." },
+              { "role": "interviewer", "text": "Why DENSE_RANK rather than ROW_NUMBER?" },
+              { "role": "me", "text": "DENSE_RANK gives tied salaries the same rank with no gaps, so duplicate top salaries don't push the real second place out." },
+              { "role": "interviewer", "text": "What happens when there's only one salary?" },
+              { "role": "me", "text": "Rank 2 returns no row, and wrapping in MAX yields NULL rather than erroring, which is the expected behavior." }
+            ],
+            "followUpsQA": [
+              { "q": "Why DENSE_RANK over ROW_NUMBER here?", "a": "DENSE_RANK handles ties without gaps; ROW_NUMBER would skip duplicates." },
+              { "q": "What does it return when only one salary exists?", "a": "NULL, because rank 2 has no rows." },
+              { "q": "How do you generalize to the N-th highest?", "a": "Filter rnk = N instead of 2.", "relatedId": "coding-sql-002" }
             ]
           }
         },
@@ -426,9 +556,18 @@
               "snippet": "-- Parameterized query (T-SQL)\nDECLARE @N INT = 3;\n\nSELECT MAX(Salary) AS NthHighestSalary\nFROM (\n    SELECT Salary, DENSE_RANK() OVER (ORDER BY Salary DESC) AS rnk\n    FROM Employee\n) t\nWHERE rnk = @N;\n\n-- As a reusable function\nCREATE FUNCTION dbo.GetNthSalary(@N INT)\nRETURNS INT AS\nBEGIN\n    RETURN (\n        SELECT DISTINCT Salary\n        FROM (\n            SELECT Salary, DENSE_RANK() OVER (ORDER BY Salary DESC) AS rnk\n            FROM Employee\n        ) t\n        WHERE rnk = @N\n    );\nEND;",
               "note": "Sort-bound: O(n log n)"
             },
-            "followUps": [
-              "How would OFFSET @N-1 ROWS FETCH NEXT 1 differ with duplicate salaries?",
-              "Per-department N-th highest (PARTITION BY DepartmentId)?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Generalize the second-highest query to the N-th highest salary." },
+              { "role": "me", "text": "Same DENSE_RANK() OVER (ORDER BY Salary DESC) pattern, just filter rnk = N, and I'd wrap it in a function so N is a parameter." },
+              { "role": "interviewer", "text": "Could you use OFFSET/FETCH instead?" },
+              { "role": "me", "text": "Yes, but OFFSET counts raw rows, so duplicate salaries would skew it; I'd need DISTINCT salaries first to match the dedupe semantics." },
+              { "role": "interviewer", "text": "Complexity and the empty case?" },
+              { "role": "me", "text": "It's O(n log n) from the sort, and when fewer than N distinct salaries exist the MAX wrapper returns NULL gracefully." }
+            ],
+            "followUpsQA": [
+              { "q": "How does OFFSET N-1 FETCH 1 differ with duplicate salaries?", "a": "It counts rows, not distinct values, so it can land on a tie unless you DISTINCT first." },
+              { "q": "How do you get per-department N-th highest?", "a": "Add PARTITION BY DepartmentId to the window.", "relatedId": "coding-sql-003" },
+              { "q": "What's the dominant cost?", "a": "The ORDER BY sort, O(n log n)." }
             ]
           }
         },
@@ -451,9 +590,18 @@
               "snippet": "-- Correlated: inner query uses outer alias e\nSELECT e.Name, e.Salary, e.DepartmentId\nFROM Employee e\nWHERE e.Salary > (\n    SELECT AVG(e2.Salary)\n    FROM Employee e2\n    WHERE e2.DepartmentId = e.DepartmentId   -- correlation\n);\n\n-- Window-function rewrite (usually faster)\nSELECT Name, Salary, DepartmentId\nFROM (\n    SELECT Name, Salary, DepartmentId,\n           AVG(Salary) OVER (PARTITION BY DepartmentId) AS deptAvg\n    FROM Employee\n) t\nWHERE Salary > deptAvg;",
               "note": "Correlated subquery references the outer row"
             },
-            "followUps": [
-              "Why can correlated subqueries be slow (row-by-row evaluation)?",
-              "When does EXISTS read better than IN here?"
+            "dialogue": [
+              { "role": "interviewer", "text": "Give an example of a correlated subquery and how it differs from a plain one." },
+              { "role": "me", "text": "A correlated subquery references a column from the outer query, like finding employees who earn above their own department's average; the inner query depends on each outer row." },
+              { "role": "interviewer", "text": "How does that differ from a plain subquery?" },
+              { "role": "me", "text": "A plain subquery runs once, independently, and its result plugs in; a correlated one is logically re-evaluated per outer row." },
+              { "role": "interviewer", "text": "Any performance concern, and a fix?" },
+              { "role": "me", "text": "Row-by-row evaluation can be slow, so I'd often rewrite it as a window function with AVG() OVER (PARTITION BY DepartmentId)." }
+            ],
+            "followUpsQA": [
+              { "q": "Why can correlated subqueries be slow?", "a": "They re-evaluate per outer row instead of once." },
+              { "q": "When does EXISTS read better than IN?", "a": "EXISTS short-circuits and handles NULLs more predictably than IN." },
+              { "q": "How do you avoid the correlation entirely?", "a": "Rewrite with a window function or a pre-aggregated join.", "relatedId": "coding-sql-002" }
             ]
           }
         },
@@ -476,10 +624,18 @@
               "snippet": "SELECT e.Name AS Employee,\n       m.Name AS Manager\nFROM Employee e\nLEFT JOIN Employee m ON e.ManagerId = m.Id\nORDER BY e.Name;\n\n-- Sample:\n-- Alice (ManagerId NULL) -> Manager: NULL (she's the boss)\n-- Bob   (ManagerId = Alice.Id) -> Manager: Alice",
               "note": "LEFT JOIN keeps the manager-less top of the hierarchy"
             },
-            "followUps": [
-              "INNER vs LEFT join: who gets dropped?",
-              "Traverse the full hierarchy with a recursive CTE.",
-              "Count direct reports per manager (GROUP BY m.Id)."
+            "dialogue": [
+              { "role": "interviewer", "text": "Write a self join listing each employee alongside their manager's name." },
+              { "role": "me", "text": "I'd alias the Employee table twice, e for employee and m for manager, joining on e.ManagerId = m.Id." },
+              { "role": "interviewer", "text": "What about the top boss with no manager?" },
+              { "role": "me", "text": "I use a LEFT JOIN so an employee with a NULL ManagerId still appears, with a NULL manager name." },
+              { "role": "interviewer", "text": "What if I asked for the whole chain, not just one level up?" },
+              { "role": "me", "text": "Then a single self-join isn't enough; I'd use a recursive CTE to walk the full hierarchy." }
+            ],
+            "followUpsQA": [
+              { "q": "INNER vs LEFT join here, who gets dropped?", "a": "INNER drops the manager-less top boss; LEFT keeps everyone." },
+              { "q": "How do you traverse the full hierarchy?", "a": "A recursive CTE that joins each level to the next." },
+              { "q": "How do you count direct reports per manager?", "a": "GROUP BY m.Id with COUNT(*).", "relatedId": "coding-sql50-013" }
             ]
           }
         }
@@ -504,7 +660,20 @@
               "snippet": "SELECT product_id\nFROM Products\nWHERE low_fats = 'Y' AND recyclable = 'Y';",
               "note": "Basic WHERE with AND"
             },
-            "keyPoints": ["Two equality predicates joined by AND."]
+            "keyPoints": ["Two equality predicates joined by AND."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Find product ids that are both low fat and recyclable." },
+              { "role": "me", "text": "I'd SELECT product_id and filter WHERE low_fats = 'Y' AND recyclable = 'Y'." },
+              { "role": "interviewer", "text": "Why AND and not OR?" },
+              { "role": "me", "text": "Both conditions must hold simultaneously, so AND is required; OR would return products meeting only one criterion." },
+              { "role": "interviewer", "text": "Do you need DISTINCT here?" },
+              { "role": "me", "text": "No, product_id is the primary key so each row is already unique." }
+            ],
+            "followUpsQA": [
+              { "q": "Why AND instead of OR?", "a": "Both flags must be 'Y' at once." },
+              { "q": "Do you need DISTINCT?", "a": "No, product_id is the primary key." },
+              { "q": "Would an index help this filter?", "a": "A composite index on (low_fats, recyclable) could, though tables are tiny here." }
+            ]
           }
         },
         {
@@ -521,7 +690,20 @@
               "snippet": "SELECT name\nFROM Customer\nWHERE referee_id <> 2 OR referee_id IS NULL;",
               "note": "NULL-aware filtering: <> never matches NULL"
             },
-            "keyPoints": ["NULL <> 2 evaluates to UNKNOWN, so add OR referee_id IS NULL."]
+            "keyPoints": ["NULL <> 2 evaluates to UNKNOWN, so add OR referee_id IS NULL."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Report customers not referred by customer id 2. Note referee_id can be NULL." },
+              { "role": "me", "text": "I'd filter WHERE referee_id <> 2, but that alone drops NULLs, so I add OR referee_id IS NULL." },
+              { "role": "interviewer", "text": "Why does <> 2 drop the NULL rows?" },
+              { "role": "me", "text": "In SQL, NULL <> 2 evaluates to UNKNOWN, not TRUE, so those rows are filtered out unless I handle NULL explicitly." },
+              { "role": "interviewer", "text": "Is there a cleaner way to express that?" },
+              { "role": "me", "text": "Yes, COALESCE(referee_id, 0) <> 2 collapses the NULL handling into one predicate." }
+            ],
+            "followUpsQA": [
+              { "q": "Why does referee_id <> 2 exclude NULLs?", "a": "NULL <> 2 is UNKNOWN, which fails the filter." },
+              { "q": "What's a one-predicate alternative?", "a": "WHERE COALESCE(referee_id, 0) <> 2." },
+              { "q": "Does NOT IN (2) handle NULLs?", "a": "No, NOT IN with comparisons to NULL also yields UNKNOWN." }
+            ]
           }
         },
         {
@@ -538,7 +720,20 @@
               "snippet": "SELECT name, population, area\nFROM World\nWHERE area >= 3000000 OR population >= 25000000;",
               "note": "OR condition on two thresholds"
             },
-            "keyPoints": ["Either condition qualifies, so use OR."]
+            "keyPoints": ["Either condition qualifies, so use OR."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Find big countries where area >= 3000000 OR population >= 25000000." },
+              { "role": "me", "text": "I'd SELECT name, population, area and filter WHERE area >= 3000000 OR population >= 25000000." },
+              { "role": "interviewer", "text": "Why OR rather than AND?" },
+              { "role": "me", "text": "The definition says a country qualifies if either threshold is met, so AND would be too strict." },
+              { "role": "interviewer", "text": "Could an index speed this up?" },
+              { "role": "me", "text": "An OR across two columns usually can't use a single index well; the engine may scan or do an index merge." }
+            ],
+            "followUpsQA": [
+              { "q": "Why OR instead of AND?", "a": "Either threshold alone makes a country big." },
+              { "q": "Can an index help an OR on two columns?", "a": "Often not a single index; an index-merge or scan is common." },
+              { "q": "How would you rewrite OR as UNION?", "a": "Two SELECTs (one per condition) combined with UNION to dedupe." }
+            ]
           }
         },
         {
@@ -555,7 +750,20 @@
               "snippet": "SELECT DISTINCT author_id AS id\nFROM Views\nWHERE author_id = viewer_id\nORDER BY id;",
               "note": "DISTINCT + equality predicate"
             },
-            "keyPoints": ["author_id = viewer_id means self-view.", "DISTINCT removes duplicate authors."]
+            "keyPoints": ["author_id = viewer_id means self-view.", "DISTINCT removes duplicate authors."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Find authors who viewed at least one of their own articles, distinct ids ascending." },
+              { "role": "me", "text": "I'd filter WHERE author_id = viewer_id, then SELECT DISTINCT author_id and ORDER BY it ascending." },
+              { "role": "interviewer", "text": "Why DISTINCT?" },
+              { "role": "me", "text": "An author may self-view many articles or the same one repeatedly, so DISTINCT collapses those to one id." },
+              { "role": "interviewer", "text": "Does the ORDER BY work after the alias?" },
+              { "role": "me", "text": "Yes, I alias author_id AS id and ORDER BY id, which the engine resolves to the selected column." }
+            ],
+            "followUpsQA": [
+              { "q": "Why is DISTINCT needed?", "a": "An author can self-view multiple times, producing duplicate ids." },
+              { "q": "Could GROUP BY replace DISTINCT?", "a": "Yes, GROUP BY author_id gives the same de-duplicated result." },
+              { "q": "What does author_id = viewer_id mean?", "a": "The author viewed their own article." }
+            ]
           }
         },
         {
@@ -572,7 +780,20 @@
               "snippet": "SELECT tweet_id\nFROM Tweets\nWHERE CHAR_LENGTH(content) > 15;",
               "note": "CHAR_LENGTH counts characters (not bytes like LENGTH)"
             },
-            "keyPoints": ["Prefer CHAR_LENGTH over LENGTH for multibyte safety."]
+            "keyPoints": ["Prefer CHAR_LENGTH over LENGTH for multibyte safety."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Find invalid tweets where content has strictly more than 15 characters." },
+              { "role": "me", "text": "I'd SELECT tweet_id and filter WHERE CHAR_LENGTH(content) > 15." },
+              { "role": "interviewer", "text": "Why CHAR_LENGTH instead of LENGTH?" },
+              { "role": "me", "text": "LENGTH counts bytes, so a multibyte character would inflate the count; CHAR_LENGTH counts actual characters, which is what 'characters' means here." },
+              { "role": "interviewer", "text": "Strictly greater than, any boundary concern?" },
+              { "role": "me", "text": "Exactly 15 is valid, so I use > 15, not >= 15." }
+            ],
+            "followUpsQA": [
+              { "q": "Why CHAR_LENGTH over LENGTH?", "a": "LENGTH counts bytes; CHAR_LENGTH counts characters, safe for multibyte." },
+              { "q": "Why > 15 and not >= 15?", "a": "Exactly 15 characters is still valid." },
+              { "q": "What's the SQL Server equivalent?", "a": "LEN(content) > 15." }
+            ]
           }
         },
         {
@@ -589,7 +810,20 @@
               "snippet": "SELECT eu.unique_id, e.name\nFROM Employees e\nLEFT JOIN EmployeeUNI eu ON e.id = eu.id;",
               "note": "LEFT JOIN preserves rows without a match"
             },
-            "keyPoints": ["LEFT JOIN keeps all employees; missing unique_id becomes NULL."]
+            "keyPoints": ["LEFT JOIN keeps all employees; missing unique_id becomes NULL."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Show each user's unique_id, NULL if they have none." },
+              { "role": "me", "text": "I'd LEFT JOIN Employees to EmployeeUNI on id so every employee is preserved even without a match." },
+              { "role": "interviewer", "text": "What happens to employees with no unique_id row?" },
+              { "role": "me", "text": "The LEFT JOIN produces NULL for eu.unique_id on those rows, which is exactly what's asked." },
+              { "role": "interviewer", "text": "Would an INNER JOIN work?" },
+              { "role": "me", "text": "No, INNER JOIN would silently drop employees who lack a unique_id." }
+            ],
+            "followUpsQA": [
+              { "q": "Why LEFT JOIN over INNER JOIN?", "a": "LEFT keeps employees without a unique_id; INNER would drop them." },
+              { "q": "Which table drives the join?", "a": "Employees, on the left, so all employees survive." },
+              { "q": "What value appears for an unmatched row?", "a": "NULL for unique_id." }
+            ]
           }
         },
         {
@@ -606,7 +840,20 @@
               "snippet": "SELECT p.product_name, s.year, s.price\nFROM Sales s\nJOIN Product p ON s.product_id = p.product_id;",
               "note": "Simple INNER JOIN on FK"
             },
-            "keyPoints": ["Join on product_id to enrich sales with the name."]
+            "keyPoints": ["Join on product_id to enrich sales with the name."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Report product_name, year, and price for each Sales row." },
+              { "role": "me", "text": "I'd INNER JOIN Sales to Product on product_id and project the three requested columns." },
+              { "role": "interviewer", "text": "Why is an INNER JOIN safe here?" },
+              { "role": "me", "text": "product_id is a foreign key into Product, so every sale has a matching product; nothing is dropped." },
+              { "role": "interviewer", "text": "Do you risk duplicate rows?" },
+              { "role": "me", "text": "No, Product.product_id is the primary key, so each sale matches exactly one product row." }
+            ],
+            "followUpsQA": [
+              { "q": "Why is INNER JOIN safe here?", "a": "Every sale has a matching product via the FK." },
+              { "q": "Could the join multiply rows?", "a": "No, product_id is unique in Product." },
+              { "q": "When would you need a LEFT JOIN instead?", "a": "If you wanted sales even when the product row is missing.", "relatedId": "coding-sql50-006" }
+            ]
           }
         },
         {
@@ -623,7 +870,20 @@
               "snippet": "SELECT v.customer_id, COUNT(*) AS count_no_trans\nFROM Visits v\nLEFT JOIN Transactions t ON v.visit_id = t.visit_id\nWHERE t.transaction_id IS NULL\nGROUP BY v.customer_id;",
               "note": "LEFT JOIN + IS NULL = anti-join"
             },
-            "keyPoints": ["transaction_id IS NULL isolates visits with no transaction.", "GROUP BY customer to count them."]
+            "keyPoints": ["transaction_id IS NULL isolates visits with no transaction.", "GROUP BY customer to count them."],
+            "dialogue": [
+              { "role": "interviewer", "text": "For each customer, count visits where they made no transaction." },
+              { "role": "me", "text": "I'd LEFT JOIN Visits to Transactions on visit_id, then keep only rows where transaction_id IS NULL." },
+              { "role": "interviewer", "text": "Why does IS NULL isolate the right rows?" },
+              { "role": "me", "text": "A visit with no transaction has no match, so the joined transaction columns are NULL; that's the classic anti-join pattern." },
+              { "role": "interviewer", "text": "How do you produce the per-customer count?" },
+              { "role": "me", "text": "GROUP BY customer_id and COUNT(*) over the surviving null-transaction visits." }
+            ],
+            "followUpsQA": [
+              { "q": "What pattern is LEFT JOIN + IS NULL?", "a": "An anti-join, finding rows with no match." },
+              { "q": "Why count after filtering IS NULL?", "a": "Only no-transaction visits should be counted." },
+              { "q": "Could NOT EXISTS replace it?", "a": "Yes, NOT EXISTS on a correlated transaction subquery is equivalent.", "relatedId": "coding-sql-003" }
+            ]
           }
         },
         {
@@ -640,7 +900,20 @@
               "snippet": "SELECT w1.id\nFROM Weather w1\nJOIN Weather w2\n  ON DATEDIFF(w1.recordDate, w2.recordDate) = 1\nWHERE w1.temperature > w2.temperature;",
               "note": "Self-join on consecutive days via DATEDIFF"
             },
-            "keyPoints": ["DATEDIFF(today, yesterday) = 1 ties consecutive days.", "Compare temperatures across the two aliases."]
+            "keyPoints": ["DATEDIFF(today, yesterday) = 1 ties consecutive days.", "Compare temperatures across the two aliases."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Find ids of days warmer than the previous day." },
+              { "role": "me", "text": "I'd self-join Weather to itself where DATEDIFF(w1.date, w2.date) = 1 and w1.temperature > w2.temperature." },
+              { "role": "interviewer", "text": "Why DATEDIFF rather than subtracting one from the id?" },
+              { "role": "me", "text": "Dates may have gaps and ids don't guarantee consecutive days, so DATEDIFF = 1 reliably ties yesterday to today." },
+              { "role": "interviewer", "text": "Any modern alternative to the self-join?" },
+              { "role": "me", "text": "LAG(temperature) OVER (ORDER BY recordDate) lets me compare to the prior row without a join." }
+            ],
+            "followUpsQA": [
+              { "q": "Why DATEDIFF instead of id arithmetic?", "a": "Dates can have gaps; ids aren't guaranteed consecutive." },
+              { "q": "What's the window-function alternative?", "a": "Compare temperature to LAG(temperature) ordered by date." },
+              { "q": "Why a self-join works here?", "a": "It pairs each day with the prior day's row.", "relatedId": "coding-sql-004" }
+            ]
           }
         },
         {
@@ -657,7 +930,20 @@
               "snippet": "SELECT a.machine_id,\n       ROUND(AVG(b.timestamp - a.timestamp), 3) AS processing_time\nFROM Activity a\nJOIN Activity b\n  ON a.machine_id = b.machine_id\n AND a.process_id = b.process_id\n AND a.activity_type = 'start'\n AND b.activity_type = 'end'\nGROUP BY a.machine_id;",
               "note": "Self-join pairing start/end, then AVG + ROUND"
             },
-            "keyPoints": ["Pair each start with its matching end per process.", "AVG over all processes; ROUND to 3."]
+            "keyPoints": ["Pair each start with its matching end per process.", "AVG over all processes; ROUND to 3."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Compute each machine's average process time from start/end activity rows." },
+              { "role": "me", "text": "I'd self-join Activity to itself on machine_id and process_id, pairing the 'start' row with the 'end' row, then average (end - start)." },
+              { "role": "interviewer", "text": "How do you ensure you subtract end minus start, not the reverse?" },
+              { "role": "me", "text": "I pin a.activity_type = 'start' and b.activity_type = 'end' in the join, so b.timestamp - a.timestamp is always positive." },
+              { "role": "interviewer", "text": "Final shaping?" },
+              { "role": "me", "text": "GROUP BY machine_id and wrap AVG in ROUND(..., 3) for three decimals." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you pair start with end?", "a": "Self-join on machine_id and process_id with the type predicates." },
+              { "q": "How do you guarantee a positive duration?", "a": "Pin a as 'start', b as 'end', so b - a is positive." },
+              { "q": "Could you do it without a self-join?", "a": "Yes, conditional aggregation: AVG(end_ts) - AVG(start_ts) per machine.", "relatedId": "coding-sql50-019" }
+            ]
           }
         },
         {
@@ -674,7 +960,20 @@
               "snippet": "SELECT e.name, b.bonus\nFROM Employee e\nLEFT JOIN Bonus b ON e.empId = b.empId\nWHERE b.bonus < 1000 OR b.bonus IS NULL;",
               "note": "LEFT JOIN; IS NULL captures employees with no bonus"
             },
-            "keyPoints": ["Employees with no bonus have NULL, which must be included explicitly."]
+            "keyPoints": ["Employees with no bonus have NULL, which must be included explicitly."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Report name and bonus for employees with bonus under 1000, including those with no bonus." },
+              { "role": "me", "text": "I'd LEFT JOIN Employee to Bonus on empId, then filter WHERE b.bonus < 1000 OR b.bonus IS NULL." },
+              { "role": "interviewer", "text": "Why the explicit IS NULL?" },
+              { "role": "me", "text": "Employees with no bonus row get NULL, and NULL < 1000 is UNKNOWN, so they'd be dropped without the OR IS NULL." },
+              { "role": "interviewer", "text": "Could you avoid the OR?" },
+              { "role": "me", "text": "Yes, COALESCE(b.bonus, 0) < 1000 folds the no-bonus case into one comparison." }
+            ],
+            "followUpsQA": [
+              { "q": "Why include OR bonus IS NULL?", "a": "NULL < 1000 is UNKNOWN, so no-bonus employees would be excluded." },
+              { "q": "What's a single-predicate alternative?", "a": "WHERE COALESCE(b.bonus, 0) < 1000." },
+              { "q": "Why LEFT JOIN here?", "a": "To keep employees who have no bonus record.", "relatedId": "coding-sql50-006" }
+            ]
           }
         },
         {
@@ -691,7 +990,20 @@
               "snippet": "SELECT s.student_id, s.student_name, sub.subject_name,\n       COUNT(e.subject_name) AS attended_exams\nFROM Students s\nCROSS JOIN Subjects sub\nLEFT JOIN Examinations e\n  ON e.student_id = s.student_id\n AND e.subject_name = sub.subject_name\nGROUP BY s.student_id, s.student_name, sub.subject_name\nORDER BY s.student_id, sub.subject_name;",
               "note": "CROSS JOIN builds all pairs; COUNT(col) ignores NULLs"
             },
-            "keyPoints": ["CROSS JOIN generates every student-subject combination.", "COUNT(e.subject_name) gives 0 for untaken subjects."]
+            "keyPoints": ["CROSS JOIN generates every student-subject combination.", "COUNT(e.subject_name) gives 0 for untaken subjects."],
+            "dialogue": [
+              { "role": "interviewer", "text": "For every student and every subject, count exams taken, even zero." },
+              { "role": "me", "text": "I'd CROSS JOIN Students with Subjects to get all pairs, LEFT JOIN Examinations, then COUNT per pair." },
+              { "role": "interviewer", "text": "Why CROSS JOIN first?" },
+              { "role": "me", "text": "It guarantees a row for every student-subject combination, including ones the student never sat, so we can report zeros." },
+              { "role": "interviewer", "text": "How do untaken subjects become 0 rather than dropped?" },
+              { "role": "me", "text": "COUNT(e.subject_name) ignores the NULLs from the LEFT JOIN, yielding 0 for combinations with no exam." }
+            ],
+            "followUpsQA": [
+              { "q": "Why CROSS JOIN first?", "a": "To create every student-subject pair so zeros can appear." },
+              { "q": "Why COUNT(column) not COUNT(*)?", "a": "COUNT(column) skips NULLs, giving 0 for untaken subjects." },
+              { "q": "What does the LEFT JOIN add?", "a": "It attaches actual exams while keeping all pairs.", "relatedId": "coding-sql50-008" }
+            ]
           }
         },
         {
@@ -708,7 +1020,20 @@
               "snippet": "SELECT name\nFROM Employee\nWHERE id IN (\n    SELECT managerId\n    FROM Employee\n    GROUP BY managerId\n    HAVING COUNT(*) >= 5\n);",
               "note": "GROUP BY ... HAVING COUNT(*) >= 5, then map id back to name"
             },
-            "keyPoints": ["HAVING filters aggregated counts.", "Subquery returns manager ids; outer query resolves names."]
+            "keyPoints": ["HAVING filters aggregated counts.", "Subquery returns manager ids; outer query resolves names."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Find managers with at least five direct reports; return their names." },
+              { "role": "me", "text": "I'd GROUP BY managerId and keep groups with COUNT(*) >= 5 via HAVING, then map those ids back to names." },
+              { "role": "interviewer", "text": "Why HAVING instead of WHERE?" },
+              { "role": "me", "text": "WHERE filters rows before aggregation; the count is an aggregate, so it must be filtered with HAVING after grouping." },
+              { "role": "interviewer", "text": "How do you turn manager ids into names?" },
+              { "role": "me", "text": "I feed the grouped ids into a subquery and select names WHERE id IN that set, effectively a self-reference on Employee." }
+            ],
+            "followUpsQA": [
+              { "q": "Why HAVING not WHERE?", "a": "Aggregates like COUNT can only be filtered after grouping, with HAVING." },
+              { "q": "How do you get the manager's name?", "a": "Map the grouped ids back via id IN (subquery) or a self-join.", "relatedId": "coding-sql-004" },
+              { "q": "What if managerId can be NULL?", "a": "NULL groups together but won't match a real id, so it's harmless here." }
+            ]
           }
         },
         {
@@ -725,7 +1050,20 @@
               "snippet": "SELECT s.user_id,\n       ROUND(IFNULL(AVG(c.action = 'confirmed'), 0), 2) AS confirmation_rate\nFROM Signups s\nLEFT JOIN Confirmations c ON s.user_id = c.user_id\nGROUP BY s.user_id;",
               "note": "AVG of a boolean = fraction true; IFNULL handles no-request users"
             },
-            "keyPoints": ["(c.action = 'confirmed') yields 1/0; AVG = confirmation fraction.", "IFNULL(..., 0) covers users with no confirmations."]
+            "keyPoints": ["(c.action = 'confirmed') yields 1/0; AVG = confirmation fraction.", "IFNULL(..., 0) covers users with no confirmations."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Compute each user's confirmation rate = confirmed / total requests, 0 if none." },
+              { "role": "me", "text": "I'd LEFT JOIN Signups to Confirmations and take AVG(c.action = 'confirmed'), which averages 1s and 0s into the fraction." },
+              { "role": "interviewer", "text": "What about users with no requests at all?" },
+              { "role": "me", "text": "Their AVG is NULL, so I wrap it in IFNULL(..., 0) and ROUND to two decimals." },
+              { "role": "interviewer", "text": "Why does AVG of a boolean give the rate?" },
+              { "role": "me", "text": "In MySQL a boolean evaluates to 1 or 0, so its average is exactly the proportion that are true." }
+            ],
+            "followUpsQA": [
+              { "q": "Why does AVG of a boolean give the rate?", "a": "True/false become 1/0, so the average is the fraction true." },
+              { "q": "Why IFNULL around it?", "a": "Users with no requests have NULL average; default to 0." },
+              { "q": "Why LEFT JOIN from Signups?", "a": "To keep users who never had a confirmation row.", "relatedId": "coding-sql50-006" }
+            ]
           }
         },
         {
@@ -742,7 +1080,20 @@
               "snippet": "SELECT *\nFROM Cinema\nWHERE id % 2 = 1 AND description <> 'boring'\nORDER BY rating DESC;",
               "note": "Modulo for odd ids; ORDER BY DESC"
             },
-            "keyPoints": ["id % 2 = 1 selects odd ids."]
+            "keyPoints": ["id % 2 = 1 selects odd ids."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Report movies with an odd id and description not 'boring', ordered by rating descending." },
+              { "role": "me", "text": "I'd filter WHERE id % 2 = 1 AND description <> 'boring', then ORDER BY rating DESC." },
+              { "role": "interviewer", "text": "How are you testing for an odd id?" },
+              { "role": "me", "text": "id % 2 = 1 picks odd ids; MOD(id, 2) = 1 is the portable equivalent." },
+              { "role": "interviewer", "text": "Does <> 'boring' exclude any rows it shouldn't?" },
+              { "role": "me", "text": "Only exact 'boring' descriptions are excluded; here description is non-NULL so the comparison is straightforward." }
+            ],
+            "followUpsQA": [
+              { "q": "How do you select odd ids?", "a": "id % 2 = 1, or MOD(id, 2) = 1." },
+              { "q": "What if description could be NULL?", "a": "Add OR description IS NULL since NULL <> 'boring' is UNKNOWN.", "relatedId": "coding-sql50-002" },
+              { "q": "Where does ORDER BY go?", "a": "After the WHERE clause, sorting the filtered rows." }
+            ]
           }
         },
         {
@@ -759,7 +1110,20 @@
               "snippet": "SELECT p.product_id,\n       IFNULL(ROUND(SUM(p.price * u.units) / SUM(u.units), 2), 0) AS average_price\nFROM Prices p\nLEFT JOIN UnitsSold u\n  ON p.product_id = u.product_id\n AND u.purchase_date BETWEEN p.start_date AND p.end_date\nGROUP BY p.product_id;",
               "note": "Date-range join + weighted average; IFNULL for no-sales (division by NULL)"
             },
-            "keyPoints": ["Join on purchase_date BETWEEN start and end.", "Weighted avg = SUM(price*units)/SUM(units); IFNULL gives 0."]
+            "keyPoints": ["Join on purchase_date BETWEEN start and end.", "Weighted avg = SUM(price*units)/SUM(units); IFNULL gives 0."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Compute each product's average selling price = SUM(price*units)/SUM(units), 0 if no sales." },
+              { "role": "me", "text": "I'd LEFT JOIN Prices to UnitsSold where purchase_date falls BETWEEN start_date and end_date, then take the weighted average." },
+              { "role": "interviewer", "text": "Why a date-range join condition?" },
+              { "role": "me", "text": "Each price is valid for a window, so a unit's price depends on which window its purchase_date falls into." },
+              { "role": "interviewer", "text": "What about products with no sales?" },
+              { "role": "me", "text": "SUM(units) is NULL there, so the division is NULL; I wrap it in IFNULL(..., 0)." }
+            ],
+            "followUpsQA": [
+              { "q": "Why join on a date range?", "a": "Price is only valid within its start/end window." },
+              { "q": "Why IFNULL around the ratio?", "a": "No-sales products divide by NULL, defaulting to 0." },
+              { "q": "Why weighted average not plain AVG?", "a": "Different quantities sold must weight each price.", "relatedId": "coding-sql50-019" }
+            ]
           }
         },
         {
@@ -776,7 +1140,20 @@
               "snippet": "SELECT p.project_id,\n       ROUND(AVG(e.experience_years), 2) AS average_years\nFROM Project p\nJOIN Employee e ON p.employee_id = e.employee_id\nGROUP BY p.project_id;",
               "note": "JOIN + AVG + ROUND grouped by project"
             },
-            "keyPoints": ["Group by project_id, average the joined experience values."]
+            "keyPoints": ["Group by project_id, average the joined experience values."],
+            "dialogue": [
+              { "role": "interviewer", "text": "For each project, report the average experience years of its employees." },
+              { "role": "me", "text": "I'd JOIN Project to Employee on employee_id, GROUP BY project_id, and AVG(experience_years)." },
+              { "role": "interviewer", "text": "Why an inner join is fine here?" },
+              { "role": "me", "text": "Every project row references a real employee, so there's nothing to preserve with a LEFT JOIN." },
+              { "role": "interviewer", "text": "How do you get two decimals?" },
+              { "role": "me", "text": "Wrap the AVG in ROUND(..., 2)." }
+            ],
+            "followUpsQA": [
+              { "q": "Why GROUP BY project_id?", "a": "To average experience within each project." },
+              { "q": "Why ROUND(..., 2)?", "a": "The problem requires two decimal places." },
+              { "q": "When would LEFT JOIN matter?", "a": "If a project could list a non-existent employee.", "relatedId": "coding-sql50-007" }
+            ]
           }
         },
         {
@@ -793,7 +1170,20 @@
               "snippet": "SELECT contest_id,\n       ROUND(COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM Users), 2) AS percentage\nFROM Register\nGROUP BY contest_id\nORDER BY percentage DESC, contest_id ASC;",
               "note": "Scalar subquery for the denominator (total users)"
             },
-            "keyPoints": ["Denominator is the full user count via a scalar subquery.", "Multiply before dividing to keep precision."]
+            "keyPoints": ["Denominator is the full user count via a scalar subquery.", "Multiply before dividing to keep precision."],
+            "dialogue": [
+              { "role": "interviewer", "text": "For each contest, report the percentage of all users who registered." },
+              { "role": "me", "text": "I'd GROUP BY contest_id and compute COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM Users)." },
+              { "role": "interviewer", "text": "Why a scalar subquery for the denominator?" },
+              { "role": "me", "text": "The denominator is the total user count, independent of the contest grouping, so a one-time scalar subquery is the cleanest source." },
+              { "role": "interviewer", "text": "Any precision pitfall?" },
+              { "role": "me", "text": "I multiply by 100.0 before dividing so it stays floating point, then ROUND to two decimals and order by percentage desc, contest_id asc." }
+            ],
+            "followUpsQA": [
+              { "q": "Why a scalar subquery denominator?", "a": "Total users is constant across contests, so compute it once." },
+              { "q": "Why multiply by 100.0 first?", "a": "To force float division and preserve decimals." },
+              { "q": "Why COUNT(DISTINCT user_id)?", "a": "A user could register multiple rows; count them once per contest." }
+            ]
           }
         },
         {
@@ -810,7 +1200,20 @@
               "snippet": "SELECT query_name,\n       ROUND(AVG(rating / position), 2) AS quality,\n       ROUND(AVG(rating < 3) * 100, 2) AS poor_query_percentage\nFROM Queries\nWHERE query_name IS NOT NULL\nGROUP BY query_name;",
               "note": "AVG(rating < 3) averages a boolean to get the fraction"
             },
-            "keyPoints": ["AVG(rating/position) is the average per-row ratio.", "AVG(boolean)*100 gives the poor-query percentage."]
+            "keyPoints": ["AVG(rating/position) is the average per-row ratio.", "AVG(boolean)*100 gives the poor-query percentage."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Per query_name, compute quality = AVG(rating/position) and the percent of rows with rating < 3." },
+              { "role": "me", "text": "I'd GROUP BY query_name, take AVG(rating / position) for quality, and AVG(rating < 3) * 100 for the poor percentage." },
+              { "role": "interviewer", "text": "How does AVG(rating < 3) become a percentage?" },
+              { "role": "me", "text": "rating < 3 evaluates to 1 or 0 per row, so its average is the fraction of poor queries; times 100 gives the percent." },
+              { "role": "interviewer", "text": "Any rows to exclude?" },
+              { "role": "me", "text": "I filter out NULL query_name, and round both metrics to two decimals." }
+            ],
+            "followUpsQA": [
+              { "q": "How does AVG(rating < 3) give a percentage?", "a": "The boolean is 1/0, so the average times 100 is the percent." },
+              { "q": "Why filter NULL query_name?", "a": "NULL groups shouldn't appear in per-query metrics." },
+              { "q": "What is quality measuring?", "a": "The average rating-to-position ratio per row." }
+            ]
           }
         },
         {
@@ -827,7 +1230,20 @@
               "snippet": "-- Window-function approach (parameter @N)\nSELECT DISTINCT salary AS NthHighestSalary\nFROM (\n    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk\n    FROM Employee\n) t\nWHERE rnk = @N;\n\n-- LIMIT/OFFSET form (MySQL); SET @N := @N - 1 first\n-- SELECT DISTINCT salary FROM Employee ORDER BY salary DESC LIMIT 1 OFFSET @N;",
               "note": "DENSE_RANK dedupes ties; LIMIT/OFFSET works over a DISTINCT set"
             },
-            "keyPoints": ["DENSE_RANK = N targets the Nth distinct salary.", "Empty result naturally yields NULL."]
+            "keyPoints": ["DENSE_RANK = N targets the Nth distinct salary.", "Empty result naturally yields NULL."],
+            "dialogue": [
+              { "role": "interviewer", "text": "Write a generic solution for the N-th highest distinct salary, NULL if it doesn't exist." },
+              { "role": "me", "text": "I'd DENSE_RANK() salaries descending and pick rnk = N; DISTINCT salary in the outer select keeps ties collapsed." },
+              { "role": "interviewer", "text": "What's the LIMIT/OFFSET alternative?" },
+              { "role": "me", "text": "SELECT DISTINCT salary ORDER BY salary DESC LIMIT 1 OFFSET N-1; the DISTINCT is essential so duplicates don't shift the offset." },
+              { "role": "interviewer", "text": "What if there are fewer than N distinct salaries?" },
+              { "role": "me", "text": "The query returns no row, which surfaces as NULL, exactly what's required." }
+            ],
+            "followUpsQA": [
+              { "q": "Why DENSE_RANK over ROW_NUMBER?", "a": "DENSE_RANK collapses tied salaries; ROW_NUMBER would not.", "relatedId": "coding-sql-001" },
+              { "q": "Why DISTINCT before LIMIT/OFFSET?", "a": "So duplicate salaries don't push the offset onto the wrong value." },
+              { "q": "What happens when N exceeds the distinct count?", "a": "No row, returned as NULL.", "relatedId": "coding-sql-002" }
+            ]
           }
         }
       ]

@@ -163,14 +163,42 @@ OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY;  -- page 3, size 10
 
 ---
 
+## Question Map (what's in the bank)
+
+**Queries & Indexing**
+- DELETE vs TRUNCATE vs DROP · INNER/LEFT/RIGHT/FULL joins + anti-join
+- Optimize a slow query / read a plan · CTE (incl. recursive) · #temp vs ##temp vs @table
+- Triggers (AFTER/INSTEAD OF, INSERTED/DELETED) · clustered vs non-clustered index
+- Nth highest salary (DENSE_RANK) · WHERE vs HAVING vs GROUP BY
+- Window functions (ROW_NUMBER/RANK/DENSE_RANK) · covering index & Key Lookup
+- Scan vs seek / SARGability · UNION vs UNION ALL · stored proc vs inline SQL
+
+**Transactions & Design**
+- ACID + XACT_ABORT · isolation levels & concurrency anomalies · deadlocks (1205) & prevention
+- Normalization 1NF/2NF/3NF + denormalize · PK vs UNIQUE vs FK
+- Clustered index physical storage / page splits · surrogate vs natural keys & scale · PK vs UNIQUE NULL/index
+
+**Performance & Tuning**
+- Parameter sniffing (RECOMPILE/OPTIMIZE FOR) · columnstore indexes
+- Optimistic vs pessimistic locking (rowversion) · RCSI
+
+---
+
 ## Quick-Recall Checklist
 
-- [ ] Use `INNER JOIN` when you only want matched rows
-- [ ] Prefer clustered index on PK; non-clustered on FK/filter columns
-- [ ] `TRUNCATE` resets identity; `DELETE` does not
-- [ ] CTE is single-statement scope; `#temp` persists across statements in the same session
-- [ ] Default isolation is `READ COMMITTED` — upgrade to `SNAPSHOT` to eliminate blocking reads
-- [ ] `HAVING` filters after `GROUP BY`; `WHERE` filters before
-- [ ] Avoid `SELECT *`, implicit conversions, and non-SARGable predicates
+- [ ] Use `INNER JOIN` for matches only; `LEFT JOIN ... WHERE right IS NULL` = anti-join
+- [ ] Prefer clustered index on PK; non-clustered on FK/filter columns; **index your FK columns**
+- [ ] `TRUNCATE` resets identity & is minimally logged; `DELETE` is per-row, fires triggers; both roll back
+- [ ] CTE = single-statement, inlined (not materialized); `#temp` has stats; `@table` assumes 1 row
+- [ ] `DENSE_RANK` for Nth highest (ties); window funcs can't go in `WHERE` → wrap in CTE
+- [ ] Default isolation `READ COMMITTED`; turn on **RCSI** to stop reader-writer blocking (versions in tempdb)
+- [ ] Dirty / non-repeatable / phantom reads → know which level fixes each
+- [ ] Deadlock = circular wait, victim gets **1205** → consistent lock order, short txns, retry
+- [ ] `HAVING` filters after `GROUP BY`; `WHERE` before (no alias/aggregate in WHERE)
+- [ ] Covering index (`INCLUDE`) kills the Key Lookup; key cols for seek/sort only
+- [ ] Avoid `SELECT *`, implicit conversions, and non-SARGable predicates (function on column)
+- [ ] Parameter sniffing: plan from first params → `OPTION (RECOMPILE)` / `OPTIMIZE FOR` / Query Store
+- [ ] Columnstore = analytics/aggregation; rowstore = OLTP point lookups
+- [ ] Optimistic = rowversion check (0 rows = conflict); pessimistic = `UPDLOCK`/`HOLDLOCK`
 - [ ] `SCOPE_IDENTITY()` > `@@IDENTITY` (safe across triggers)
 - [ ] Check execution plan for Index Scans, Key Lookups, and implicit conversion warnings

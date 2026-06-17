@@ -1,123 +1,125 @@
 # EF Core Cheat Sheet
 
-EF Core is a lightweight, cross-platform ORM that maps .NET objects to relational database tables via a `DbContext`.
+Lightweight cross-platform ORM mapping .NET objects to relational tables via a `DbContext`. Covers 4 subtopics / 33 questions: **Querying & Performance**, **Loading & Change Tracking**, **Migrations & Modeling**, **Advanced**.
 
 ---
 
 ## Must-Know One-Liners
 
-- `DbContext` = unit of work + identity map + change tracker.
-- `SaveChanges()` wraps all pending changes in a single transaction.
-- Migrations = version control for your database schema.
-- EF Core translates LINQ to SQL — but only what the provider supports.
-- `AsNoTracking()` = read-only query, no change-tracker overhead.
-- Value objects use **owned entity types** (`OwnsOne`/`OwnsMany`).
-- Shadow properties live in the model but not in the CLR class.
+- `DbContext` = unit of work + identity map + change tracker; register **Scoped**.
+- `SaveChanges()` wraps all pending changes in **one transaction** (all or nothing).
+- `IQueryable` → SQL on the DB; `IEnumerable` → LINQ in memory. `AsEnumerable()` is the boundary.
+- `AsNoTracking()` = read-only, no change-tracker snapshots (20–40% faster).
+- EF Core 3.0+ **throws** on untranslatable LINQ (no silent client eval).
+- N+1 = 1 query + 1 per child; fix with `Include` or a `Select` projection.
+- Multiple collection Includes → Cartesian explosion → `AsSplitQuery()`.
+- EF7+ `ExecuteUpdate`/`ExecuteDelete` = set-based, no tracking, no SaveChanges.
+- Value objects → owned types (`OwnsOne`/`OwnsMany`); single hidden column → shadow property.
 
 ---
 
-## IEnumerable vs IQueryable
+## 1. Querying & Performance
 
-| | `IEnumerable<T>` | `IQueryable<T>` |
-|---|---|---|
-| **Where query runs** | In-memory (C# process) | Database (SQL) |
-| **Deferred execution** | Yes — iterates on `foreach`/`.ToList()` | Yes — SQL sent on materialisation |
-| **Filtering** | Pulls all rows, filters after | Translates `Where` to `WHERE` clause |
-| **Use when** | In-memory collections, already loaded data | EF Core queries — always prefer until materialised |
-| **Risk** | Loads entire table into memory | Untranslatable methods throw or silently evaluate client-side |
-
----
-
-## Loading Strategies
-
-| Strategy | How | Triggered |
-|---|---|---|
-| **Eager** | `.Include()` / `.ThenInclude()` | Same query, JOIN in SQL |
-| **Lazy** | Virtual nav props + proxy | First access of nav property (extra round-trip) |
-| **Explicit** | `context.Entry(e).Collection(x => x.Items).Load()` | Manual, on demand |
-
-```csharp
-// Eager loading
-var orders = context.Orders
-    .Include(o => o.Customer)
-    .ThenInclude(c => c.Address)
-    .ToList();
-
-// Explicit loading
-context.Entry(order).Collection(o => o.Items).Load();
-```
-
-**Lazy loading** requires `UseLazyLoadingProxies()` and `virtual` nav props — easy to forget and cause N+1.
-
----
-
-## The N+1 Problem
-
-**What it is:** 1 query fetches N parent rows; then N individual queries fetch each child collection — N+1 total round-trips.
-
-```csharp
-// BAD — N+1: 1 query for orders + 1 per order for items
-foreach (var order in context.Orders.ToList())
-    Console.WriteLine(order.Items.Count); // lazy load fires here
-
-// GOOD — single JOIN
-var orders = context.Orders.Include(o => o.Items).ToList();
-```
-
-**Fix:** Use eager loading (`Include`) or explicit loading in bulk. Avoid lazy loading in loops.
-
----
-
-## Performance Tips
-
-| Tip | Why / How |
+| Topic | Key point |
 |---|---|
-| `AsNoTracking()` | Skips change tracker — 2–3× faster for read-only queries |
-| **Projection with `Select`** | Only fetch columns you need; avoids loading entire entity |
-| **Split queries** | `.AsSplitQuery()` — replaces cartesian-product JOIN with separate queries for large collections |
-| **Compiled queries** | `EF.CompileQuery(...)` — caches query compilation overhead for hot paths |
-| **Batch with `ExecuteUpdate`/`ExecuteDelete`** | EF Core 7+ — set/delete rows without loading entities |
+| **IEnumerable vs IQueryable** | IQueryable composes one SQL query; IEnumerable runs C# in memory. Don't leak IQueryable from repos. |
+| **N+1** | Nav access in a loop fires per-row queries. Fix: `Include`/`ThenInclude` (JOIN) or `Select` DTO. |
+| **AsNoTracking** | Skips snapshots, not the DB call. Use on GET/reports; `AsTracking()` to opt back in. |
+| **Client vs server eval** | Server = SQL; client = .NET. 3.0 bans implicit client eval — use `AsEnumerable()` to opt in explicitly. |
+| **Select projections** | `SELECT col1,col2` only; projected types are **untracked**; `Items.Count` → SQL COUNT subquery. |
+| **Compiled queries** | `EF.CompileQuery` skips translation/lookup overhead — hot paths only (~2–3x); profile first. |
+| **SQL logging** | `LogTo(...)`, `EnableSensitiveDataLogging()` (dev only), `TagWith("label")` to trace in prod. |
+| **Raw SQL** | `FromSqlRaw`/`Interpolated` returns tracked entities; `ExecuteSqlRaw` = non-query. **Always parameterize.** |
+| **Split queries** | One SELECT per collection — avoids Cartesian explosion; not one transaction by default. |
 
 ```csharp
-// AsNoTracking + projection
-var names = context.Customers
+// One SQL: WHERE + ORDER BY + projection, untracked
+var dto = await ctx.Orders
     .AsNoTracking()
-    .Select(c => new { c.Id, c.Name })
-    .ToList();
+    .Where(o => o.Total > 100)
+    .Select(o => new OrderDto { Id = o.Id, Items = o.Items.Count }) // COUNT in SQL
+    .ToListAsync();
 
-// Compiled query
-private static readonly Func<AppDbContext, int, Customer?> GetById =
-    EF.CompileQuery((AppDbContext db, int id) => db.Customers.FirstOrDefault(c => c.Id == id));
+// Avoid N+1 + Cartesian explosion
+var blogs = await ctx.Blogs
+    .Include(b => b.Posts).Include(b => b.Tags)
+    .AsSplitQuery().ToListAsync();
 ```
 
 ---
 
-## DbContext
+## 2. Loading & Change Tracking
 
-- **Scoped lifetime** — one per HTTP request in ASP.NET Core; matches a unit of work.
-- **Not thread-safe** — never share across threads; never inject as singleton.
-- **Change tracker** — tracks entity state (`Added`, `Modified`, `Deleted`, `Unchanged`); `SaveChanges()` generates SQL from diffs.
-- **Unit of work** — batch multiple repo operations into one `SaveChanges()` call / transaction.
-- Dispose it — `using` or DI container handles it; long-lived contexts accumulate stale state and memory.
+| Topic | Key point |
+|---|---|
+| **Loading strategies** | Eager (`Include`, one JOIN) / Lazy (virtual + proxies, N+1-prone) / Explicit (`Entry().Collection().Load()`). |
+| **DbContext lifecycle** | Scoped per request = unit of work. Not thread-safe; never Singleton. Background svc → `IServiceScopeFactory`. |
+| **Change tracker** | Snapshots originals on load; `DetectChanges` diffs on save → only changed columns UPDATEd. O(n) over tracked. |
+| **Add / Attach / Update** | Add=INSERT; Attach=Unchanged (no SQL); Update=all props Modified (full UPDATE, can wipe fields). |
+| **Thread safety** | ChangeTracker + identity map + connection are single-threaded → parallel use corrupts/throws. Use `IDbContextFactory`. |
+| **Identity resolution** | Same row = same instance via identity map; `FindAsync` checks tracker before DB (first-level cache). |
+| **SaveChanges / UoW** | Minimal SQL in one transaction; span multiple with `BeginTransaction`; prefer `SaveChangesAsync`. |
+| **Tracking vs no-tracking** | Tracking = savable + identity resolution + GC cost; no-tracking = faster reads, disconnected POCOs. |
+
+```csharp
+// Partial update: Attach + target only changed props
+var p = new Product { Id = id };
+ctx.Attach(p);
+p.Price = newPrice;              // only Price marked Modified
+await ctx.SaveChangesAsync();
+
+// Parallel reads need separate contexts
+await using var c1 = await factory.CreateDbContextAsync();
+await using var c2 = await factory.CreateDbContextAsync();
+```
 
 ---
 
-## Migrations
+## 3. Migrations & Modeling
 
-```bash
-# Create a migration
-dotnet ef migrations add <MigrationName>
+| Topic | Key point |
+|---|---|
+| **Workflow** | `migrations add <Name>` (diffs snapshot → Up/Down) → `database update`. Tracked in `__EFMigrationsHistory`. |
+| **Code-first vs DB-first** | Code-first: C# → migrations → DB (versioned). DB-first: `dbcontext scaffold` from existing schema. |
+| **Seeding** | `HasData` (static, needs explicit PK, baked into migration) vs custom idempotent seeder (large/env-specific). |
+| **Fluent API vs annotations** | Fluent does everything (composite keys, converters, owned types); keep entities clean. `ApplyConfigurationsFromAssembly`. |
+| **Relationships** | 1:N `HasMany().WithOne().HasForeignKey()`; M:N `HasMany().WithMany()` (auto join) or explicit join entity for payload. `OnDelete(Restrict)` to break cascade cycles. |
+| **Prod migrations** | `script --idempotent` as separate deploy step; not `MigrateAsync` at startup (races). Expand-contract for zero-downtime. |
+| **Optimistic concurrency** | Token (`[ConcurrencyCheck]` / `.IsRowVersion()`) in WHERE; 0 rows → `DbUpdateConcurrencyException` → 409 + ETag. |
+| **Up/Down** | Schema via MigrationBuilder; `Sql("...")` for data backfill/views/procs; Down reverses; `suppressTransaction` when needed. |
+| **Owned types** | `OwnsOne`/`OwnsMany` = DDD value objects in owner's table; no DbSet, load with owner. |
 
-# Apply to database
-dotnet ef database update
+```csharp
+// Concurrency token
+builder.Property(r => r.RowVersion).IsRowVersion();
+
+// Migration: add NOT NULL safely
+mb.AddColumn<bool>("IsVerified", "Users", nullable: false, defaultValue: false);
+mb.Sql("UPDATE Users SET IsVerified = 1");   // backfill in same migration
 ```
 
-- Each migration has `Up()` (apply) and `Down()` (rollback).
-- **Common pitfalls:**
-  - Renaming a column generates drop+add (data loss) — use `MigrationBuilder.RenameColumn` explicitly.
-  - Never edit a migration that's already applied in production.
-  - Check generated SQL with `dotnet ef migrations script` before deploying.
-  - Missing `__EFMigrationsHistory` table = EF can't track applied migrations.
+---
+
+## 4. Advanced
+
+| Topic | Key point |
+|---|---|
+| **Shadow properties** | Column in model, no C# member; great for audit cols + conventional FKs. Access via `Entry().Property("X")`, query with `EF.Property<T>(e,"X")`. |
+| **Soft delete** | `IsDeleted` + `HasQueryFilter(e => !e.IsDeleted)`; flip Deleted→Modified in SaveChanges; `IgnoreQueryFilters()` for admin. |
+| **Bulk ops** | EF7+ `ExecuteUpdate`/`ExecuteDelete` (set-based, bypass tracker → stale entities); BulkExtensions/`SqlBulkCopy` for big inserts. |
+| **Code/DB First vs Migrations** | Migrations is the *mechanism* for Code First, not a third approach. No EDMX in EF Core. |
+| **Owned vs value object vs shadow** | Value object = DDD concept; owned entity = its EF mapping; shadow = single hidden column. |
+| **Multi-SaveChanges transactions** | `BeginTransaction` + explicit commit, or `TransactionScope` (ambient). With retry strategy wrap in `CreateExecutionStrategy().ExecuteAsync`. |
+| **AsSplitQuery vs single** | One collection → single fine; multiple → split avoids explosion but no snapshot consistency. |
+
+```csharp
+// EF7 set-based update — one SQL, no tracking
+await ctx.Products.Where(p => p.CategoryId == 5)
+    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Price, p => p.Price * 1.1m));
+
+// Soft delete filter
+modelBuilder.Entity<Product>().HasQueryFilter(p => !p.IsDeleted);
+```
 
 ---
 
@@ -125,24 +127,27 @@ dotnet ef database update
 
 | Gotcha | Detail |
 |---|---|
-| **Client-side evaluation** | EF silently pulls data into memory if it can't translate LINQ — check logs; throws in EF Core 3+ for top-level projections |
-| **Tracking everything** | Default: all entities tracked; forgetting `AsNoTracking()` on reads wastes memory |
-| **Long-lived DbContext** | Accumulates tracked entities, stale data, memory leaks — always scope tightly |
-| **Lazy loading in serialisation** | Serialising a nav prop triggers lazy load → N+1 or infinite loops (circular refs) |
-| **Null nav properties** | Not loaded nav props are `null` — check before access or always use `Include` |
-| **Concurrency** | No optimistic concurrency by default — add `[ConcurrencyCheck]` or `rowversion` token |
+| **Untranslatable LINQ** | Custom C# in `Where` throws (3.0+). Filter in SQL, then `AsEnumerable()`. |
+| **Update with partial DTO** | Marks all props Modified → can zero out missing fields. Prefer Attach + targeted props. |
+| **Lazy load after dispose** | Serializing nav props after the scoped context is gone → N+1 or "context disposed". Project to DTO. |
+| **MigrateAsync in prod** | Multi-pod race; use idempotent scripts. |
+| **Rename = drop+add** | Data loss; hand-edit to `RenameColumn`. |
+| **ExecuteUpdate staleness** | Bypasses tracker; reload or run before loading. |
+| **Singleton/shared DbContext** | "A second operation was started…" + corruption. |
 
 ---
 
 ## Quick-Recall Checklist
 
-- [ ] Always `AsNoTracking()` on read-only queries.
-- [ ] Use `Include`/`ThenInclude` to avoid N+1.
-- [ ] Project with `Select` — don't fetch full entities when you need 2 columns.
-- [ ] Keep `DbContext` scoped; never singleton.
-- [ ] Check migration SQL before deploying to prod.
-- [ ] Use `AsSplitQuery()` for multi-collection includes.
-- [ ] Enable query logging in dev to catch untranslated expressions.
-- [ ] Use `ExecuteUpdate`/`ExecuteDelete` for bulk ops (EF Core 7+).
-- [ ] Add concurrency tokens on any entity with optimistic concurrency needs.
-- [ ] Dispose `DbContext` — let DI or `using` handle it.
+- [ ] `AsNoTracking()` on read-only queries (or default the context to it).
+- [ ] `Include`/`ThenInclude` or `Select` projection to kill N+1.
+- [ ] `AsSplitQuery()` for multiple collection Includes (mind consistency).
+- [ ] Project to DTOs — don't fetch full entities for 2 columns.
+- [ ] Keep `DbContext` Scoped; `IDbContextFactory` for parallel/Blazor.
+- [ ] Attach + target props for partial updates (not `Update` with partial DTO).
+- [ ] Parameterize all raw SQL (`FromSqlInterpolated`).
+- [ ] `ExecuteUpdate`/`ExecuteDelete` for bulk (EF7+); BulkExtensions for big inserts.
+- [ ] Concurrency token (`rowversion`) on contended entities; handle `DbUpdateConcurrencyException`.
+- [ ] Idempotent migration scripts in prod; review generated SQL (renames!).
+- [ ] Fluent API in `IEntityTypeConfiguration<T>` + `ApplyConfigurationsFromAssembly`.
+- [ ] Enable SQL logging in dev (`LogTo`, `TagWith`) to catch untranslated/slow queries.

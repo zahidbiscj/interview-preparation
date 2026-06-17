@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, inject, input, signal, computed
+  ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, signal, computed
 } from '@angular/core';
 import { QuestionBankService } from '../../question-bank.service';
 import { QuestionView } from '../../models/question-bank.models';
@@ -74,6 +74,20 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
           @if (state() === 'full') {
             <div class="full-answer fade-slide-enter">
 
+              @if (q().answer.dialogue?.length) {
+                <section class="answer-section">
+                  <h4 class="section-title">💬 DIALOGUE</h4>
+                  <div class="dialogue">
+                    @for (turn of q().answer.dialogue!; track $index) {
+                      <div class="turn turn-{{ turn.role }}">
+                        <span class="turn-who">{{ turn.role === 'interviewer' ? 'Interviewer' : 'Me' }}</span>
+                        <div class="turn-text md-content"><markdown [data]="turn.text" /></div>
+                      </div>
+                    }
+                  </div>
+                </section>
+              }
+
               @if (q().answer.keyPoints?.length) {
                 <section class="answer-section">
                   <h4 class="section-title">KEY POINTS</h4>
@@ -118,7 +132,26 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
                 </section>
               }
 
-              @if (q().answer.followUps?.length) {
+              @if (q().answer.followUpsQA?.length) {
+                <section class="answer-section">
+                  <h4 class="section-title">📌 FOLLOW-UP QUESTIONS</h4>
+                  <ul class="followqa-list">
+                    @for (fu of q().answer.followUpsQA!; track $index) {
+                      <li class="followqa">
+                        @if (fu.relatedId) {
+                          <button class="followqa-q link" (click)="goToFollowUp(fu.relatedId!, $event)">
+                            {{ fu.q }} <span class="jump">↗</span>
+                          </button>
+                        } @else {
+                          <span class="followqa-q">{{ fu.q }}</span>
+                        }
+                        <span class="followqa-a md-content"><markdown [data]="fu.a" /></span>
+                      </li>
+                    }
+                  </ul>
+                  <p class="go-deeper">Want to go deeper on any of these follow-up questions?</p>
+                </section>
+              } @else if (q().answer.followUps?.length) {
                 <section class="answer-section">
                   <h4 class="section-title">➡ COMMON FOLLOW-UPS</h4>
                   <ul class="followup-list">
@@ -344,6 +377,60 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
       }
     }
 
+    /* ── Dialogue ── */
+    .dialogue { display: flex; flex-direction: column; gap: 8px; }
+    .turn {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 0.88em;
+    }
+    .turn-interviewer {
+      background: var(--surface-2);
+      border-left: 3px solid var(--text-muted);
+    }
+    .turn-me {
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+      border-left: 3px solid var(--accent);
+    }
+    .turn-who {
+      font-size: 0.72em;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+    .turn-me .turn-who { color: var(--accent); }
+    .turn-text { line-height: 1.5; }
+
+    /* ── Follow-up Q&A ── */
+    .followqa-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .followqa { display: flex; flex-direction: column; gap: 2px; }
+    .followqa-q {
+      font-size: 0.88em;
+      font-weight: 600;
+      color: var(--text);
+      text-align: left;
+    }
+    .followqa-q.link {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      color: var(--accent);
+      &:hover { text-decoration: underline; }
+    }
+    .jump { font-size: 0.85em; opacity: 0.8; }
+    .followqa-a { font-size: 0.85em; color: var(--text-muted); padding-left: 12px; }
+    .go-deeper {
+      margin-top: 12px;
+      font-size: 0.82em;
+      font-style: italic;
+      color: var(--accent);
+    }
+
     .red-flags-section {
       background: color-mix(in srgb, var(--danger) 6%, var(--surface-2));
       border: 1px solid color-mix(in srgb, var(--danger) 20%, var(--border));
@@ -382,14 +469,29 @@ export class QuestionCardComponent {
   readonly question = input.required<QuestionView>();
 
   private svc = inject(QuestionBankService);
+  private host = inject(ElementRef<HTMLElement>);
   readonly state = signal<RevealState>('collapsed');
 
   readonly q = this.question;
 
   readonly hasFullAnswer = computed(() => {
     const a = this.q().answer;
-    return !!(a.keyPoints?.length || a.detail || a.code || a.analogy || a.followUps?.length || a.redFlags?.length);
+    return !!(a.keyPoints?.length || a.detail || a.code || a.analogy ||
+      a.followUps?.length || a.followUpsQA?.length || a.dialogue?.length || a.redFlags?.length);
   });
+
+  constructor() {
+    // When a follow-up links here, expand fully and scroll into view.
+    effect(() => {
+      if (this.svc.focusQuestionId() === this.q().id) {
+        this.state.set('full');
+        queueMicrotask(() => {
+          this.host.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          this.svc.clearFocus();
+        });
+      }
+    });
+  }
 
   readonly codeMarkdown = computed(() => {
     const code = this.q().answer.code;
@@ -421,5 +523,10 @@ export class QuestionCardComponent {
   onBookmark(e: Event): void {
     e.stopPropagation();
     this.svc.toggleBookmark(this.q().id);
+  }
+
+  goToFollowUp(id: string, e: Event): void {
+    e.stopPropagation();
+    this.svc.goToQuestion(id);
   }
 }

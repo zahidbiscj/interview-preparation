@@ -12,7 +12,11 @@
           "q": "What is middleware and how does the request pipeline work?",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["middleware", "pipeline", "request"],
+          "tags": [
+            "middleware",
+            "pipeline",
+            "request"
+          ],
           "answer": {
             "oneLiner": "Middleware are components chained into a pipeline; each one handles the request, optionally calls the next, then can touch the response on the way back out.",
             "keyPoints": [
@@ -27,11 +31,56 @@
               "snippet": "app.Use(async (ctx, next) =>\n{\n    // runs on the way IN\n    await next();        // call the next middleware\n    // runs on the way OUT\n});",
               "note": "Anything before next() runs inbound; anything after runs outbound."
             },
-            "followUps": [
-              "Why does middleware order matter?",
-              "What happens if a middleware doesn't call next()?"
+            "redFlags": [
+              "Thinking middleware runs one direction, or that order doesn't matter"
             ],
-            "redFlags": ["Thinking middleware runs one direction, or that order doesn't matter"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Can you explain what middleware is in ASP.NET Core?"
+              },
+              {
+                "role": "me",
+                "text": "Middleware are components chained into a pipeline. Each one receives the request, can do work, then calls `next` to pass control on — and it can also touch the response on the way back out."
+              },
+              {
+                "role": "interviewer",
+                "text": "You said \"on the way back out\" — what do you mean?"
+              },
+              {
+                "role": "me",
+                "text": "The pipeline is bidirectional, like an onion. Code before `await next()` runs inbound toward the endpoint; code after it runs outbound as the response unwinds back through each middleware in reverse."
+              },
+              {
+                "role": "interviewer",
+                "text": "So what happens if a middleware never calls `next`?"
+              },
+              {
+                "role": "me",
+                "text": "Then it short-circuits the pipeline — nothing downstream runs. That's how auth rejections or cache hits write a response early and stop the chain."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why does middleware order matter?",
+                "a": "Each component can short-circuit or transform the request before later ones run, so order changes behavior — e.g. auth must precede authorization.",
+                "relatedId": "aspnet-middleware-006"
+              },
+              {
+                "q": "What happens if middleware doesn't call next()?",
+                "a": "It short-circuits: the response is written and nothing further in the pipeline executes.",
+                "relatedId": "aspnet-middleware-007"
+              },
+              {
+                "q": "Where do you build the pipeline?",
+                "a": "In `Program.cs` using `app.Use...` calls; registration order is execution order.",
+                "relatedId": "aspnet-middleware-004"
+              },
+              {
+                "q": "What does each middleware receive?",
+                "a": "An `HttpContext` and a `next` delegate to invoke the rest of the pipeline."
+              }
+            ]
           }
         },
         {
@@ -39,7 +88,12 @@
           "q": "What is the difference between app.Use, app.Run, and app.Map?",
           "type": "comparison",
           "freq": "high",
-          "tags": ["use", "run", "map", "middleware"],
+          "tags": [
+            "use",
+            "run",
+            "map",
+            "middleware"
+          ],
           "answer": {
             "oneLiner": "`Use` adds middleware that can call the next; `Run` is terminal and ends the pipeline; `Map` branches the pipeline based on the request path.",
             "keyPoints": [
@@ -51,7 +105,53 @@
               "lang": "csharp",
               "snippet": "app.Map(\"/admin\", admin =>\n{\n    admin.Run(async ctx => await ctx.Response.WriteAsync(\"Admin\"));\n});",
               "note": "Requests to /admin take this branch and terminate there."
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between app.Use, app.Run, and app.Map?"
+              },
+              {
+                "role": "me",
+                "text": "`Use` adds middleware that can call `next` and pass control onward. `Run` is terminal — it ends the pipeline and never calls `next`. `Map` branches the pipeline based on the request path."
+              },
+              {
+                "role": "interviewer",
+                "text": "When would you reach for `Map`?"
+              },
+              {
+                "role": "me",
+                "text": "When I want a separate sub-pipeline for a path prefix — like everything under `/admin` getting its own middleware chain that terminates there."
+              },
+              {
+                "role": "interviewer",
+                "text": "If you put `app.Run` first in your pipeline, what happens?"
+              },
+              {
+                "role": "me",
+                "text": "Everything registered after it is dead code — `Run` is terminal, so it short-circuits the whole pipeline and nothing downstream ever executes."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Is Run the only way to terminate?",
+                "a": "No — any `Use` middleware that doesn't call `next` also short-circuits; `Run` just makes the intent explicit.",
+                "relatedId": "aspnet-middleware-007"
+              },
+              {
+                "q": "Can Map branch on more than a path?",
+                "a": "Yes — `MapWhen` branches on any predicate over the `HttpContext`, not just the path."
+              },
+              {
+                "q": "Does the Map branch rejoin the main pipeline?",
+                "a": "No — a matched branch runs its own pipeline and doesn't fall back to the main one."
+              },
+              {
+                "q": "Why does order still matter with these?",
+                "a": "Because `Use`/`Run`/`Map` are all registered in sequence and execute top-down.",
+                "relatedId": "aspnet-middleware-006"
+              }
+            ]
           }
         },
         {
@@ -59,7 +159,11 @@
           "q": "How does Kestrel work?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["kestrel", "server", "hosting"],
+          "tags": [
+            "kestrel",
+            "server",
+            "hosting"
+          ],
           "answer": {
             "oneLiner": "Kestrel is ASP.NET Core's cross-platform, high-performance built-in web server that listens for HTTP requests and hands them to the middleware pipeline.",
             "keyPoints": [
@@ -67,7 +171,51 @@
               "Often behind a **reverse proxy** (IIS, Nginx) for TLS, load balancing, security",
               "Can also be edge-facing directly"
             ],
-            "followUps": ["Why put a reverse proxy in front of Kestrel?"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does Kestrel work?"
+              },
+              {
+                "role": "me",
+                "text": "Kestrel is ASP.NET Core's built-in, cross-platform web server. It listens for HTTP requests on a socket and hands each one to the middleware pipeline."
+              },
+              {
+                "role": "interviewer",
+                "text": "Would you expose Kestrel directly to the internet?"
+              },
+              {
+                "role": "me",
+                "text": "You can — it's fast and edge-capable — but commonly it sits behind a reverse proxy like IIS or Nginx for TLS termination, load balancing, and extra security hardening."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does the reverse proxy actually buy you there?"
+              },
+              {
+                "role": "me",
+                "text": "Things like TLS offload, request buffering, slow-client protection, and centralized load balancing — concerns you'd rather not bake into every app instance."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why put a reverse proxy in front of Kestrel?",
+                "a": "For TLS termination, load balancing, buffering, and security — offloading cross-cutting infra concerns."
+              },
+              {
+                "q": "Is Kestrel cross-platform?",
+                "a": "Yes — it runs on Windows, Linux, and macOS."
+              },
+              {
+                "q": "What does Kestrel hand the request to?",
+                "a": "The middleware pipeline configured in `Program.cs`.",
+                "relatedId": "aspnet-middleware-001"
+              },
+              {
+                "q": "Can Kestrel be used without a proxy?",
+                "a": "Yes — it's capable of being edge-facing directly, e.g. in containers behind a cloud load balancer."
+              }
+            ]
           }
         },
         {
@@ -75,7 +223,11 @@
           "q": "What is the role of Program.cs in ASP.NET Core (minimal hosting model)?",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["program.cs", "hosting", "startup"],
+          "tags": [
+            "program.cs",
+            "hosting",
+            "startup"
+          ],
           "answer": {
             "oneLiner": "It's the app entry point: builds the host, registers services in DI, builds the app, configures the middleware pipeline, and runs it.",
             "keyPoints": [
@@ -88,7 +240,52 @@
             "code": {
               "lang": "csharp",
               "snippet": "var builder = WebApplication.CreateBuilder(args);\nbuilder.Services.AddControllers();      // register\nvar app = builder.Build();\napp.UseAuthorization();                  // pipeline\napp.MapControllers();\napp.Run();"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the role of Program.cs in the minimal hosting model?"
+              },
+              {
+                "role": "me",
+                "text": "It's the app's entry point. It builds the host, registers services into DI, builds the `WebApplication`, configures the middleware pipeline, then runs it."
+              },
+              {
+                "role": "interviewer",
+                "text": "How is that different from the old Startup.cs?"
+              },
+              {
+                "role": "me",
+                "text": "Since .NET 6 the minimal hosting model merged `Startup.cs` into one file. Conceptually it's still two halves — register services, then configure the pipeline — just no separate `ConfigureServices`/`Configure` methods."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where's the dividing line in that one file?"
+              },
+              {
+                "role": "me",
+                "text": "Everything before `builder.Build()` is service registration; everything after, the `app.Use...` calls, is the pipeline. You can't add services after Build()."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does CreateBuilder give you?",
+                "a": "The host with default config, logging, and the DI container set up.",
+                "relatedId": "aspnet-di-007"
+              },
+              {
+                "q": "What does builder.Build() return?",
+                "a": "The `WebApplication`, on which you configure the pipeline and call `Run()`."
+              },
+              {
+                "q": "Can you register services after Build()?",
+                "a": "No — the service collection is locked once the provider is built."
+              },
+              {
+                "q": "Where do you register controllers?",
+                "a": "`builder.Services.AddControllers()` before Build, then `app.MapControllers()` after."
+              }
+            ]
           }
         },
         {
@@ -96,7 +293,10 @@
           "q": "How do you write custom middleware?",
           "type": "code",
           "freq": "medium",
-          "tags": ["custom-middleware", "convention"],
+          "tags": [
+            "custom-middleware",
+            "convention"
+          ],
           "answer": {
             "oneLiner": "Write a class with an `InvokeAsync(HttpContext)` method (convention-based) or use an inline `app.Use` lambda, then register it with `UseMiddleware`.",
             "code": {
@@ -104,7 +304,55 @@
               "snippet": "public class TimingMiddleware\n{\n    private readonly RequestDelegate _next;\n    public TimingMiddleware(RequestDelegate next) => _next = next;\n\n    public async Task InvokeAsync(HttpContext ctx)\n    {\n        var sw = Stopwatch.StartNew();\n        await _next(ctx);\n        Console.WriteLine($\"{ctx.Request.Path}: {sw.ElapsedMilliseconds}ms\");\n    }\n}\n// app.UseMiddleware<TimingMiddleware>();",
               "note": "The middleware is a singleton — inject scoped services via the InvokeAsync parameters, not the constructor."
             },
-            "redFlags": ["Injecting a scoped/transient service into the middleware constructor"]
+            "redFlags": [
+              "Injecting a scoped/transient service into the middleware constructor"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you write custom middleware?"
+              },
+              {
+                "role": "me",
+                "text": "Two ways: an inline `app.Use` lambda for something quick, or a convention-based class with an `InvokeAsync(HttpContext)` method that I register with `UseMiddleware<T>`."
+              },
+              {
+                "role": "interviewer",
+                "text": "In that class, how do you get a scoped service like a DbContext?"
+              },
+              {
+                "role": "me",
+                "text": "Not through the constructor — the middleware is effectively a singleton, so a scoped service injected there would be captured. I add it as a parameter to `InvokeAsync`, which resolves per request."
+              },
+              {
+                "role": "interviewer",
+                "text": "What goes wrong if you inject the DbContext in the constructor anyway?"
+              },
+              {
+                "role": "me",
+                "text": "It becomes a captive dependency — one DbContext reused across every request, causing stale data and concurrency bugs since it isn't thread-safe."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is middleware effectively a singleton?",
+                "a": "It's constructed once at startup and reused for every request.",
+                "relatedId": "aspnet-di-001"
+              },
+              {
+                "q": "How do you inject scoped services into middleware?",
+                "a": "As parameters on `InvokeAsync`, which the framework resolves per request."
+              },
+              {
+                "q": "What's the convention-based signature?",
+                "a": "A public `Task InvokeAsync(HttpContext ctx)` plus a constructor taking `RequestDelegate next`."
+              },
+              {
+                "q": "When use a lambda vs a class?",
+                "a": "Lambda for small, one-off logic; a class for reusable, testable middleware.",
+                "relatedId": "aspnet-middleware-001"
+              }
+            ]
           }
         },
         {
@@ -112,7 +360,10 @@
           "q": "Why does middleware ordering matter? Give an example.",
           "type": "scenario",
           "freq": "medium",
-          "tags": ["ordering", "pipeline"],
+          "tags": [
+            "ordering",
+            "pipeline"
+          ],
           "answer": {
             "oneLiner": "Because each middleware can short-circuit or transform the request before later ones run — e.g. Authentication must come before Authorization, and exception handling must be near the top.",
             "keyPoints": [
@@ -120,6 +371,53 @@
               "`UseRouting` before endpoint-aware middleware",
               "Exception handling first so it wraps everything",
               "CORS before the endpoints that need it"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Why does middleware ordering matter? Give an example."
+              },
+              {
+                "role": "me",
+                "text": "Because each middleware can short-circuit or transform the request before later ones run. The classic example is authentication must come before authorization — you have to know *who* the user is before deciding *what* they can do."
+              },
+              {
+                "role": "interviewer",
+                "text": "What if you flip authentication and authorization?"
+              },
+              {
+                "role": "me",
+                "text": "Authorization runs against an empty identity, so authenticated users get rejected with 401/403 even with a valid token — the `ClaimsPrincipal` hasn't been built yet."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where should exception handling sit, and why?"
+              },
+              {
+                "role": "me",
+                "text": "Near the very top, so it wraps everything downstream. If it's lower, exceptions thrown by earlier middleware escape it and you lose the consistent error response."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the correct auth order?",
+                "a": "`UseAuthentication()` then `UseAuthorization()` — identity before policy.",
+                "relatedId": "aspnet-restapi-004"
+              },
+              {
+                "q": "Where does UseRouting go?",
+                "a": "Before endpoint-aware middleware like CORS and authorization so they know the matched endpoint."
+              },
+              {
+                "q": "Why put exception handling first?",
+                "a": "So it wraps the whole pipeline and catches exceptions from everything downstream.",
+                "relatedId": "aspnet-restapi-003"
+              },
+              {
+                "q": "Where does CORS belong?",
+                "a": "After `UseRouting`, before `UseAuthorization`.",
+                "relatedId": "aspnet-security-005"
+              }
             ]
           }
         },
@@ -128,9 +426,59 @@
           "q": "What does it mean to short-circuit the pipeline?",
           "type": "conceptual",
           "freq": "low",
-          "tags": ["short-circuit", "pipeline"],
+          "tags": [
+            "short-circuit",
+            "pipeline"
+          ],
           "answer": {
-            "oneLiner": "A middleware short-circuits by writing a response and NOT calling `next()`, so nothing further runs — common for auth rejections, cache hits, or rate limiting."
+            "oneLiner": "A middleware short-circuits by writing a response and NOT calling `next()`, so nothing further runs — common for auth rejections, cache hits, or rate limiting.",
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What does it mean to short-circuit the pipeline?"
+              },
+              {
+                "role": "me",
+                "text": "It means a middleware writes a response and doesn't call `next`, so nothing further downstream runs. The request turns around right there."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me a real case where you'd want that."
+              },
+              {
+                "role": "me",
+                "text": "Auth rejection — if the token's invalid, write a 401 and stop. No point running the rest of the pipeline or the endpoint. Same for a cache hit or a rate-limit rejection."
+              },
+              {
+                "role": "interviewer",
+                "text": "Does short-circuiting skip the outbound code of earlier middleware?"
+              },
+              {
+                "role": "me",
+                "text": "No — middleware that already ran inbound still gets its outbound code on the way back out. Only the components downstream of the short-circuit are skipped."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How does a middleware short-circuit?",
+                "a": "By writing to the response and not calling `next`.",
+                "relatedId": "aspnet-middleware-001"
+              },
+              {
+                "q": "What's a terminal way to short-circuit?",
+                "a": "`app.Run`, which never calls `next` by design.",
+                "relatedId": "aspnet-middleware-002"
+              },
+              {
+                "q": "Common short-circuit scenarios?",
+                "a": "Auth failures, cache hits, and rate limiting.",
+                "relatedId": "aspnet-realtime-perf-001"
+              },
+              {
+                "q": "Does earlier middleware's outbound code still run?",
+                "a": "Yes — only downstream components are skipped; the unwinding still happens for those already entered."
+              }
+            ]
           }
         }
       ]
@@ -145,7 +493,13 @@
           "q": "Explain the three service lifetimes: Singleton, Scoped, and Transient.",
           "type": "comparison",
           "freq": "high",
-          "tags": ["di", "lifetime", "singleton", "scoped", "transient"],
+          "tags": [
+            "di",
+            "lifetime",
+            "singleton",
+            "scoped",
+            "transient"
+          ],
           "answer": {
             "oneLiner": "Singleton = one instance for the whole app; Scoped = one per HTTP request; Transient = a new one every time it's requested.",
             "keyPoints": [
@@ -158,11 +512,55 @@
               "lang": "csharp",
               "snippet": "builder.Services.AddSingleton<IClock, SystemClock>();\nbuilder.Services.AddScoped<IOrderRepo, OrderRepo>();\nbuilder.Services.AddTransient<IEmailFormatter, EmailFormatter>();"
             },
-            "followUps": [
-              "What lifetime is DbContext and why?",
-              "What's the captive dependency problem?"
+            "redFlags": [
+              "Registering DbContext as singleton",
+              "Saying scoped means 'per class'"
             ],
-            "redFlags": ["Registering DbContext as singleton", "Saying scoped means 'per class'"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Explain the three service lifetimes."
+              },
+              {
+                "role": "me",
+                "text": "Singleton is one instance for the whole app. Scoped is one per HTTP request. Transient is a brand-new instance every time it's requested."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which lifetime does DbContext use, and why?"
+              },
+              {
+                "role": "me",
+                "text": "Scoped — one per request. It maps to the unit of work for that request, and it's not thread-safe, so sharing it as a singleton across concurrent requests would corrupt change tracking."
+              },
+              {
+                "role": "interviewer",
+                "text": "What breaks if you register a singleton that holds per-request data?"
+              },
+              {
+                "role": "me",
+                "text": "It leaks across users — one request's data bleeds into another's, since the same instance is shared. That's why a singleton must be stateless or thread-safe."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What lifetime is DbContext and why?",
+                "a": "Scoped — it's the per-request unit of work and isn't thread-safe."
+              },
+              {
+                "q": "What's the captive dependency problem?",
+                "a": "A singleton capturing a shorter-lived service, extending its life to the singleton's.",
+                "relatedId": "aspnet-di-003"
+              },
+              {
+                "q": "What must a singleton service be?",
+                "a": "Stateless or thread-safe, since it's shared across all requests."
+              },
+              {
+                "q": "Why not register DbContext as transient?",
+                "a": "It breaks change tracking and unit-of-work — each repository would get its own context."
+              }
+            ]
           }
         },
         {
@@ -170,13 +568,64 @@
           "q": "Why use dependency injection?",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["di", "ioc", "testability"],
+          "tags": [
+            "di",
+            "ioc",
+            "testability"
+          ],
           "answer": {
             "oneLiner": "DI hands creation of dependencies to a container, giving you loose coupling, easy testability (swap in mocks), and centralized lifetime management.",
             "keyPoints": [
               "Depend on **abstractions**, not concretions — the 'D' in SOLID",
               "Swap implementations without touching consumers",
               "Container manages creation and disposal"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Why use dependency injection?"
+              },
+              {
+                "role": "me",
+                "text": "It hands creation of dependencies to a container, giving loose coupling, easy testability — you can swap in mocks — and centralized lifetime management."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does it help with testing specifically?"
+              },
+              {
+                "role": "me",
+                "text": "Because classes depend on abstractions, in a unit test I just pass a mock implementation into the constructor. No need for the real database or HTTP client."
+              },
+              {
+                "role": "interviewer",
+                "text": "Isn't depending on interfaces just extra ceremony?"
+              },
+              {
+                "role": "me",
+                "text": "It's the 'D' in SOLID — depend on abstractions. The payoff is swapping implementations without touching consumers, plus the container handling creation and disposal for you."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What SOLID principle does DI embody?",
+                "a": "Dependency Inversion — depend on abstractions, not concretions."
+              },
+              {
+                "q": "Who manages creation and disposal?",
+                "a": "The DI container, according to each service's lifetime.",
+                "relatedId": "aspnet-di-007"
+              },
+              {
+                "q": "How does DI aid testability?",
+                "a": "You inject mock implementations into the constructor instead of real dependencies.",
+                "relatedId": "aspnet-di-005"
+              },
+              {
+                "q": "What's the preferred injection style?",
+                "a": "Constructor injection — explicit, required, immutable dependencies.",
+                "relatedId": "aspnet-di-005"
+              }
             ]
           }
         },
@@ -185,7 +634,11 @@
           "q": "What is the captive dependency problem (Scoped vs Singleton)?",
           "type": "scenario",
           "freq": "high",
-          "tags": ["captive-dependency", "scoped", "singleton"],
+          "tags": [
+            "captive-dependency",
+            "scoped",
+            "singleton"
+          ],
           "answer": {
             "oneLiner": "When a singleton depends on a scoped service, the short-lived service gets 'captured' and lives as long as the singleton — effectively becoming a singleton, causing stale data and threading bugs.",
             "keyPoints": [
@@ -197,7 +650,53 @@
               "lang": "csharp",
               "snippet": "// inside a singleton:\nusing var scope = _scopeFactory.CreateScope();\nvar db = scope.ServiceProvider.GetRequiredService<AppDbContext>();",
               "note": "Create a fresh scope to safely resolve a scoped service from a singleton."
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is the captive dependency problem?"
+              },
+              {
+                "role": "me",
+                "text": "It's when a singleton depends on a scoped service. The short-lived service gets captured and lives as long as the singleton — effectively becoming a singleton itself, which causes stale data and threading bugs."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give a concrete example."
+              },
+              {
+                "role": "me",
+                "text": "A singleton service injecting a scoped DbContext. That one DbContext gets reused across every request forever, so you get stale change-tracking and concurrency errors under load."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you fix it if the singleton genuinely needs that service?"
+              },
+              {
+                "role": "me",
+                "text": "Inject `IServiceScopeFactory`, create a fresh scope when you need the work done, and resolve the scoped service from that scope — then dispose the scope."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Does the container catch this?",
+                "a": "In dev with scope validation on, it throws at startup for some cases — but not all."
+              },
+              {
+                "q": "What's the fix?",
+                "a": "Inject `IServiceScopeFactory` and create a scope to resolve the scoped service."
+              },
+              {
+                "q": "Why is a captured DbContext dangerous?",
+                "a": "It's shared across concurrent requests and isn't thread-safe — stale data and corruption.",
+                "relatedId": "aspnet-di-001"
+              },
+              {
+                "q": "Where does this commonly bite you?",
+                "a": "Background services, which are singletons needing a scoped DbContext.",
+                "relatedId": "aspnet-advanced-005"
+              }
+            ]
           }
         },
         {
@@ -205,13 +704,63 @@
           "q": "How do you register and resolve services in ASP.NET Core?",
           "type": "code",
           "freq": "medium",
-          "tags": ["di", "register", "resolve"],
+          "tags": [
+            "di",
+            "register",
+            "resolve"
+          ],
           "answer": {
             "oneLiner": "Register in `builder.Services` with Add{Lifetime}<TInterface, TImpl>(); resolve via constructor injection or `GetRequiredService<T>()`.",
             "keyPoints": [
               "Constructor injection is the idiomatic way",
               "`GetRequiredService<T>` throws if missing; `GetService<T>` returns null",
               "Avoid the service locator anti-pattern"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you register and resolve services?"
+              },
+              {
+                "role": "me",
+                "text": "Register in `builder.Services` with `Add{Lifetime}<TInterface, TImpl>()`. Resolve them with constructor injection, or explicitly via `GetRequiredService<T>()` when you don't have a constructor."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the difference between GetRequiredService and GetService?"
+              },
+              {
+                "role": "me",
+                "text": "`GetRequiredService<T>` throws if the service isn't registered; `GetService<T>` returns null. I prefer the throwing one so misconfiguration fails loudly at resolution time."
+              },
+              {
+                "role": "interviewer",
+                "text": "When is calling GetService directly a code smell?"
+              },
+              {
+                "role": "me",
+                "text": "When you do it inside business logic to pull dependencies — that's the service locator anti-pattern. It hides dependencies. Constructor injection should be the default."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the idiomatic resolution style?",
+                "a": "Constructor injection.",
+                "relatedId": "aspnet-di-005"
+              },
+              {
+                "q": "GetRequiredService vs GetService?",
+                "a": "Required throws when missing; the other returns null."
+              },
+              {
+                "q": "What's the service locator anti-pattern?",
+                "a": "Resolving dependencies manually from the container inside code, hiding them from the constructor."
+              },
+              {
+                "q": "Where is manual resolution legitimate?",
+                "a": "In a singleton creating a scope to use scoped services.",
+                "relatedId": "aspnet-di-003"
+              }
             ]
           }
         },
@@ -220,13 +769,60 @@
           "q": "What is constructor injection and why is it preferred?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["constructor-injection"],
+          "tags": [
+            "constructor-injection"
+          ],
           "answer": {
             "oneLiner": "It declares dependencies as constructor parameters, making them explicit, required, and immutable — the class can't be built in an invalid state.",
             "keyPoints": [
               "Dependencies are visible and required",
               "Easy to test — just pass mocks to the constructor",
               "A fat constructor signals an SRP violation"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is constructor injection and why is it preferred?"
+              },
+              {
+                "role": "me",
+                "text": "Dependencies are declared as constructor parameters. That makes them explicit, required, and immutable — the class simply can't be constructed in an invalid state without its dependencies."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does that compare to property or method injection?"
+              },
+              {
+                "role": "me",
+                "text": "Property injection makes dependencies optional and mutable, which hides them and allows half-built objects. Constructor injection forces them up front, which is clearer and safer."
+              },
+              {
+                "role": "interviewer",
+                "text": "If a constructor has eight dependencies, what does that tell you?"
+              },
+              {
+                "role": "me",
+                "text": "It's a code smell — the class is probably doing too much, violating SRP. The fat constructor is the signal to split the responsibilities."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is it easy to test?",
+                "a": "You just pass mocks into the constructor.",
+                "relatedId": "aspnet-di-002"
+              },
+              {
+                "q": "What does a fat constructor signal?",
+                "a": "An SRP violation — the class has too many responsibilities."
+              },
+              {
+                "q": "Are constructor dependencies mutable?",
+                "a": "No — typically assigned to readonly fields, so they're immutable."
+              },
+              {
+                "q": "What's the downside of property injection?",
+                "a": "Dependencies become optional and hidden, allowing invalid object states."
+              }
             ]
           }
         },
@@ -235,13 +831,61 @@
           "q": "What are keyed services in .NET 8?",
           "type": "conceptual",
           "freq": "low",
-          "tags": ["keyed-services", "dotnet8"],
+          "tags": [
+            "keyed-services",
+            "dotnet8"
+          ],
           "answer": {
             "oneLiner": "They let you register multiple implementations of the same interface under different keys and resolve a specific one with `[FromKeyedServices(\"key\")]`.",
             "code": {
               "lang": "csharp",
               "snippet": "builder.Services.AddKeyedScoped<INotifier, EmailNotifier>(\"email\");\nbuilder.Services.AddKeyedScoped<INotifier, SmsNotifier>(\"sms\");\n// ctor: ([FromKeyedServices(\"sms\")] INotifier notifier)"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are keyed services in .NET 8?"
+              },
+              {
+                "role": "me",
+                "text": "They let you register multiple implementations of the same interface under different string keys, then resolve a specific one with `[FromKeyedServices(\"key\")]`."
+              },
+              {
+                "role": "interviewer",
+                "text": "What problem did that solve?"
+              },
+              {
+                "role": "me",
+                "text": "Before .NET 8, if you had, say, an email and an SMS `INotifier`, you'd inject `IEnumerable<INotifier>` and pick by type, or use a factory. Keyed services let you ask for exactly the one you want by name."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you register and consume a keyed service?"
+              },
+              {
+                "role": "me",
+                "text": "`AddKeyedScoped<INotifier, SmsNotifier>(\"sms\")` to register, then a constructor parameter `[FromKeyedServices(\"sms\")] INotifier notifier` to consume it."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Which .NET version added keyed services?",
+                "a": "8."
+              },
+              {
+                "q": "How did people do this before?",
+                "a": "Injecting `IEnumerable<T>` and filtering, or a factory pattern."
+              },
+              {
+                "q": "How do you resolve a keyed service?",
+                "a": "With the `[FromKeyedServices(\"key\")]` attribute on the constructor parameter."
+              },
+              {
+                "q": "Do keyed services support all lifetimes?",
+                "a": "Yes — there are keyed Singleton, Scoped, and Transient variants.",
+                "relatedId": "aspnet-di-001"
+              }
+            ]
           }
         },
         {
@@ -249,9 +893,58 @@
           "q": "What is the DI container in ASP.NET Core?",
           "type": "conceptual",
           "freq": "low",
-          "tags": ["container", "ioc"],
+          "tags": [
+            "container",
+            "ioc"
+          ],
           "answer": {
-            "oneLiner": "It's the built-in IoC container (`IServiceProvider`) that holds registrations and creates, injects, and disposes service instances per their lifetime."
+            "oneLiner": "It's the built-in IoC container (`IServiceProvider`) that holds registrations and creates, injects, and disposes service instances per their lifetime.",
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is the DI container in ASP.NET Core?"
+              },
+              {
+                "role": "me",
+                "text": "It's the built-in IoC container, exposed as `IServiceProvider`. It holds your registrations and creates, injects, and disposes service instances according to their lifetimes."
+              },
+              {
+                "role": "interviewer",
+                "text": "Can you replace it with something like Autofac?"
+              },
+              {
+                "role": "me",
+                "text": "Yes — the built-in container is intentionally minimal. You can plug in a third-party container like Autofac when you need advanced features such as decorators or assembly scanning."
+              },
+              {
+                "role": "interviewer",
+                "text": "When would the built-in container not be enough?"
+              },
+              {
+                "role": "me",
+                "text": "When you need things it doesn't support out of the box — property injection, decorators, convention-based registration. For most apps it's perfectly sufficient."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What interface represents the container?",
+                "a": "`IServiceProvider`."
+              },
+              {
+                "q": "Can you swap it out?",
+                "a": "Yes — plug in Autofac or another container via the host builder."
+              },
+              {
+                "q": "What does it manage?",
+                "a": "Creation, injection, and disposal of services per their lifetime.",
+                "relatedId": "aspnet-di-001"
+              },
+              {
+                "q": "Where are registrations added?",
+                "a": "`builder.Services` in `Program.cs` before Build().",
+                "relatedId": "aspnet-middleware-004"
+              }
+            ]
           }
         }
       ]
@@ -266,7 +959,11 @@
           "q": "What makes an API RESTful?",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["rest", "http", "statelessness"],
+          "tags": [
+            "rest",
+            "http",
+            "statelessness"
+          ],
           "answer": {
             "oneLiner": "It's stateless, models resources with URIs, uses HTTP verbs for actions and status codes for outcomes, and returns representations like JSON.",
             "keyPoints": [
@@ -275,7 +972,58 @@
               "**HTTP verbs** — GET, POST, PUT/PATCH, DELETE",
               "**Status codes** — 2xx success, 4xx client, 5xx server"
             ],
-            "redFlags": ["Verbs in URLs", "Using GET to mutate data", "Returning 200 for everything"]
+            "redFlags": [
+              "Verbs in URLs",
+              "Using GET to mutate data",
+              "Returning 200 for everything"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What makes an API RESTful?"
+              },
+              {
+                "role": "me",
+                "text": "It's stateless, models resources with URIs, uses HTTP verbs for actions and status codes for outcomes, and returns representations like JSON."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does statelessness matter?"
+              },
+              {
+                "role": "me",
+                "text": "Each request is self-contained — no server-side session. That means any instance can serve any request, so you scale horizontally without sticky sessions or a shared session store."
+              },
+              {
+                "role": "interviewer",
+                "text": "Show me a non-RESTful URL and fix it."
+              },
+              {
+                "role": "me",
+                "text": "`POST /getOrder?id=42` is wrong — a verb in the path and a mutating-looking GET style. RESTful is `GET /orders/42`: a noun resource, the verb expressed by the HTTP method."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why nouns not verbs in URIs?",
+                "a": "The HTTP method already carries the verb; the URI identifies the resource."
+              },
+              {
+                "q": "How does statelessness help scaling?",
+                "a": "Any instance can serve any request — no sticky sessions needed.",
+                "relatedId": "aspnet-realtime-perf-003"
+              },
+              {
+                "q": "What status code family means client error?",
+                "a": "4xx; 5xx is server error.",
+                "relatedId": "aspnet-realtime-perf-004"
+              },
+              {
+                "q": "Which verbs map to CRUD?",
+                "a": "GET read, POST create, PUT/PATCH update, DELETE remove.",
+                "relatedId": "aspnet-restapi-002"
+              }
+            ]
           }
         },
         {
@@ -283,13 +1031,63 @@
           "q": "What is the difference between PUT and PATCH?",
           "type": "comparison",
           "freq": "high",
-          "tags": ["put", "patch", "http"],
+          "tags": [
+            "put",
+            "patch",
+            "http"
+          ],
           "answer": {
             "oneLiner": "PUT replaces the entire resource (full update, idempotent); PATCH applies a partial update to specific fields.",
             "keyPoints": [
               "PUT — send the whole representation; missing fields reset",
               "PATCH — send only the changes",
               "PUT is idempotent by definition"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between PUT and PATCH?"
+              },
+              {
+                "role": "me",
+                "text": "PUT replaces the entire resource — a full update — and is idempotent. PATCH applies a partial update to just the fields you send."
+              },
+              {
+                "role": "interviewer",
+                "text": "If a PUT omits a field, what happens?"
+              },
+              {
+                "role": "me",
+                "text": "That field gets reset to its default or null, because PUT is a full replacement. You're saying 'the resource is now exactly this'. PATCH would leave omitted fields untouched."
+              },
+              {
+                "role": "interviewer",
+                "text": "Is PATCH idempotent?"
+              },
+              {
+                "role": "me",
+                "text": "Not inherently. A 'set name to X' PATCH is, but an 'increment counter' style PATCH isn't — repeating it changes the result each time. PUT is idempotent by definition."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Is PUT idempotent?",
+                "a": "Yes — sending the same body repeatedly yields the same state.",
+                "relatedId": "aspnet-restapi-007"
+              },
+              {
+                "q": "Is PATCH idempotent?",
+                "a": "Not necessarily — it depends on the operation.",
+                "relatedId": "aspnet-restapi-007"
+              },
+              {
+                "q": "What happens to fields omitted from a PUT?",
+                "a": "They're reset, since PUT replaces the whole resource."
+              },
+              {
+                "q": "What format does PATCH often use?",
+                "a": "A partial body or JSON Patch (RFC 6902) describing the changes."
+              }
             ]
           }
         },
@@ -298,7 +1096,11 @@
           "q": "How do you handle exceptions globally in ASP.NET Core?",
           "type": "code",
           "freq": "high",
-          "tags": ["exception-handling", "middleware", "problemdetails"],
+          "tags": [
+            "exception-handling",
+            "middleware",
+            "problemdetails"
+          ],
           "answer": {
             "oneLiner": "Use a global mechanism — `UseExceptionHandler`, custom middleware, or `IExceptionHandler` (.NET 8) — to catch unhandled exceptions and return a consistent `ProblemDetails` response.",
             "keyPoints": [
@@ -309,7 +1111,53 @@
             "code": {
               "lang": "csharp",
               "snippet": "app.UseExceptionHandler(eb => eb.Run(async ctx =>\n{\n    var ex = ctx.Features.Get<IExceptionHandlerFeature>()?.Error;\n    ctx.Response.StatusCode = 500;\n    await ctx.Response.WriteAsJsonAsync(new ProblemDetails { Title = \"Server error\" });\n}));"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you handle exceptions globally?"
+              },
+              {
+                "role": "me",
+                "text": "Use a global mechanism — `UseExceptionHandler`, custom middleware, or `IExceptionHandler` in .NET 8 — to catch unhandled exceptions and return a consistent `ProblemDetails` response."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why not just try/catch in each controller?"
+              },
+              {
+                "role": "me",
+                "text": "That scatters error formatting and logging everywhere and is easy to forget. A global handler centralizes it: one place to format errors, log, and map known exceptions to status codes."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you turn a domain NotFoundException into a 404?"
+              },
+              {
+                "role": "me",
+                "text": "In the handler I inspect the exception type and map it — `NotFoundException` to 404, validation to 400, else 500 — setting the status and writing a `ProblemDetails` body accordingly."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What response shape should you return?",
+                "a": "RFC 7807 `ProblemDetails`.",
+                "relatedId": "aspnet-advanced-003"
+              },
+              {
+                "q": "What's the .NET 8 way?",
+                "a": "Implement `IExceptionHandler` and register it with `UseExceptionHandler`.",
+                "relatedId": "aspnet-advanced-003"
+              },
+              {
+                "q": "Why centralize over try/catch?",
+                "a": "Consistent formatting and logging in one place instead of scattered handlers."
+              },
+              {
+                "q": "Should you leak stack traces in prod?",
+                "a": "No — return a generic message; log details server-side."
+              }
+            ]
           }
         },
         {
@@ -317,7 +1165,10 @@
           "q": "What is the difference between Authentication and Authorization?",
           "type": "comparison",
           "freq": "high",
-          "tags": ["authentication", "authorization"],
+          "tags": [
+            "authentication",
+            "authorization"
+          ],
           "answer": {
             "oneLiner": "Authentication verifies WHO you are; Authorization decides WHAT you can do. AuthN comes first, then AuthZ.",
             "keyPoints": [
@@ -325,7 +1176,54 @@
               "AuthZ — roles, policies, claims checks → grants/denies",
               "Pipeline: `UseAuthentication()` then `UseAuthorization()`"
             ],
-            "analogy": "AuthN is showing your passport; AuthZ is whether your boarding pass gets you into the lounge."
+            "analogy": "AuthN is showing your passport; AuthZ is whether your boarding pass gets you into the lounge.",
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between authentication and authorization?"
+              },
+              {
+                "role": "me",
+                "text": "Authentication verifies *who* you are; authorization decides *what* you're allowed to do. AuthN comes first, then AuthZ."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does authentication produce that authorization consumes?"
+              },
+              {
+                "role": "me",
+                "text": "A `ClaimsPrincipal` — the identity with its claims. AuthN builds it from a validated JWT or cookie, and AuthZ then evaluates roles, policies, and claims against it."
+              },
+              {
+                "role": "interviewer",
+                "text": "If a logged-in user hits an admin endpoint they're not allowed on, which status?"
+              },
+              {
+                "role": "me",
+                "text": "403 Forbidden — they're authenticated but not permitted. 401 is for when they're not authenticated at all."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the pipeline order?",
+                "a": "`UseAuthentication()` then `UseAuthorization()`.",
+                "relatedId": "aspnet-middleware-006"
+              },
+              {
+                "q": "What does AuthN build?",
+                "a": "The `ClaimsPrincipal` representing the user's identity and claims."
+              },
+              {
+                "q": "401 vs 403?",
+                "a": "401 = not authenticated; 403 = authenticated but not authorized.",
+                "relatedId": "aspnet-realtime-perf-004"
+              },
+              {
+                "q": "What are the two authorization styles?",
+                "a": "Role-based and policy-based.",
+                "relatedId": "aspnet-security-006"
+              }
+            ]
           }
         },
         {
@@ -333,7 +1231,11 @@
           "q": "Explain the JWT authentication flow.",
           "type": "scenario",
           "freq": "high",
-          "tags": ["jwt", "token", "auth"],
+          "tags": [
+            "jwt",
+            "token",
+            "auth"
+          ],
           "answer": {
             "oneLiner": "The client logs in, the server returns a signed JWT with claims; the client sends it as `Authorization: Bearer` on each request and the server validates signature and expiry — no server session needed.",
             "keyPoints": [
@@ -342,7 +1244,62 @@
               "Payload is signed not encrypted — never put secrets there",
               "Short-lived access token + refresh token is the common pattern"
             ],
-            "redFlags": ["Putting sensitive data in the payload", "Never expiring tokens", "Storing tokens in localStorage despite XSS"]
+            "redFlags": [
+              "Putting sensitive data in the payload",
+              "Never expiring tokens",
+              "Storing tokens in localStorage despite XSS"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Walk me through the JWT authentication flow."
+              },
+              {
+                "role": "me",
+                "text": "The client logs in, the server validates credentials and returns a signed JWT carrying claims. The client sends it as `Authorization: Bearer` on each request, and the server validates the signature and expiry — no server session needed."
+              },
+              {
+                "role": "interviewer",
+                "text": "Is the payload encrypted?"
+              },
+              {
+                "role": "me",
+                "text": "No — it's signed, not encrypted. Anyone can Base64-decode and read it. So you never put secrets in the payload; the signature only guarantees integrity, not confidentiality."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you handle a stolen token then?"
+              },
+              {
+                "role": "me",
+                "text": "Keep access tokens short-lived to limit the blast radius, and pair them with a refresh token so the client can get a new one without re-login. For instant revocation you need a server-side check or denylist."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What are JWT's three parts?",
+                "a": "Header, Payload, Signature — dot-separated."
+              },
+              {
+                "q": "Is the payload secret?",
+                "a": "No — it's signed not encrypted; never store secrets there."
+              },
+              {
+                "q": "Why short-lived access tokens?",
+                "a": "To limit damage if stolen; pair with a refresh token.",
+                "relatedId": "aspnet-security-007"
+              },
+              {
+                "q": "Why is JWT considered stateless?",
+                "a": "The server validates the signature without storing session state.",
+                "relatedId": "aspnet-realtime-perf-003"
+              },
+              {
+                "q": "How does JWT relate to OAuth?",
+                "a": "OAuth is the flow to get tokens; JWT is a common token format.",
+                "relatedId": "aspnet-security-001"
+              }
+            ]
           }
         },
         {
@@ -350,7 +1307,10 @@
           "q": "What is API versioning, why is it needed, and what approaches exist?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["versioning", "api"],
+          "tags": [
+            "versioning",
+            "api"
+          ],
           "answer": {
             "oneLiner": "Versioning lets you evolve an API without breaking existing clients; common approaches are URL path, query string, header, or media-type.",
             "keyPoints": [
@@ -358,6 +1318,50 @@
               "**Query string** — `?api-version=1.0`",
               "**Header** — `api-version: 1.0`",
               "Use the `Asp.Versioning` package"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is API versioning and why is it needed?"
+              },
+              {
+                "role": "me",
+                "text": "Versioning lets you evolve an API without breaking existing clients. When you make a breaking change, old clients keep hitting v1 while new ones move to v2."
+              },
+              {
+                "role": "interviewer",
+                "text": "What approaches exist?"
+              },
+              {
+                "role": "me",
+                "text": "URL path like `/api/v1/orders`, query string `?api-version=1.0`, a custom header, or media-type versioning via the Accept header. URL path is the most common and most visible."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which would you pick and what's the trade-off?"
+              },
+              {
+                "role": "me",
+                "text": "I'd default to URL path — it's explicit and cache-friendly. Header/media-type keeps URLs clean and is more 'pure' REST, but it's harder to test and discover. I'd use the `Asp.Versioning` package either way."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the most common approach?",
+                "a": "URL path versioning, e.g. `/api/v1/...`."
+              },
+              {
+                "q": "What package helps?",
+                "a": "`Asp.Versioning`."
+              },
+              {
+                "q": "Why version at all?",
+                "a": "To make breaking changes without breaking existing clients."
+              },
+              {
+                "q": "What's the downside of header versioning?",
+                "a": "Harder to discover and test than a visible URL segment."
+              }
             ]
           }
         },
@@ -366,7 +1370,10 @@
           "q": "What is idempotency and which HTTP methods are idempotent?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["idempotency", "http"],
+          "tags": [
+            "idempotency",
+            "http"
+          ],
           "answer": {
             "oneLiner": "An idempotent operation gives the same result no matter how many times it repeats; GET, PUT, DELETE, and HEAD are idempotent, POST is not.",
             "keyPoints": [
@@ -374,6 +1381,51 @@
               "PUT — same body repeatedly yields the same state",
               "DELETE — deleting twice ends in the same state",
               "POST — typically creates a new resource each call"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is idempotency and which HTTP methods are idempotent?"
+              },
+              {
+                "role": "me",
+                "text": "An idempotent operation gives the same result no matter how many times you repeat it. GET, PUT, DELETE, and HEAD are idempotent; POST is not."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does idempotency matter in practice?"
+              },
+              {
+                "role": "me",
+                "text": "It makes retries safe. If a client times out and retries a PUT or DELETE, there's no harm. Retry a POST and you might create a duplicate order."
+              },
+              {
+                "role": "interviewer",
+                "text": "How would you make a POST safe to retry?"
+              },
+              {
+                "role": "me",
+                "text": "With an idempotency key — the client sends a unique key, the server records it, and a repeat with the same key returns the original result instead of creating a duplicate."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Is POST idempotent?",
+                "a": "No — it typically creates a new resource each call."
+              },
+              {
+                "q": "Why is DELETE idempotent?",
+                "a": "Deleting twice leaves the same end state — resource gone."
+              },
+              {
+                "q": "How do you make POST idempotent?",
+                "a": "Use a client-supplied idempotency key the server deduplicates on."
+              },
+              {
+                "q": "Which methods are also 'safe'?",
+                "a": "GET and HEAD — read-only, no side effects.",
+                "relatedId": "aspnet-restapi-001"
+              }
             ]
           }
         },
@@ -382,13 +1434,62 @@
           "q": "How does model binding and validation work in ASP.NET Core?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["model-binding", "validation", "apicontroller"],
+          "tags": [
+            "model-binding",
+            "validation",
+            "apicontroller"
+          ],
           "answer": {
             "oneLiner": "Model binding maps request data (route, query, body, form, headers) to action parameters; with `[ApiController]`, validation runs from data annotations and auto-returns 400 on failure.",
             "keyPoints": [
               "Sources: `[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromForm]`, `[FromHeader]`",
               "`[ApiController]` auto-returns 400 for invalid `ModelState`",
               "Annotations like `[Required]`, `[Range]` drive validation"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does model binding and validation work?"
+              },
+              {
+                "role": "me",
+                "text": "Model binding maps request data — route, query, body, form, headers — onto your action parameters. With `[ApiController]`, validation runs from data annotations and auto-returns 400 on failure."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does it know where to pull each value from?"
+              },
+              {
+                "role": "me",
+                "text": "By convention plus attributes: `[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromForm]`, `[FromHeader]`. `[ApiController]` also infers complex types come from the body so you often don't annotate at all."
+              },
+              {
+                "role": "interviewer",
+                "text": "What if you forget [ApiController]?"
+              },
+              {
+                "role": "me",
+                "text": "Then automatic 400-on-invalid-ModelState doesn't kick in — you'd have to check `ModelState.IsValid` manually in every action or add a filter."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does [ApiController] do for validation?",
+                "a": "Auto-returns 400 when `ModelState` is invalid."
+              },
+              {
+                "q": "What are the binding source attributes?",
+                "a": "`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromForm]`, `[FromHeader]`."
+              },
+              {
+                "q": "What drives validation rules?",
+                "a": "Data annotations like `[Required]` and `[Range]`."
+              },
+              {
+                "q": "How do you avoid over-posting via binding?",
+                "a": "Bind to a purpose-built DTO, not your EF entity.",
+                "relatedId": "aspnet-advanced-008"
+              }
             ]
           }
         }
@@ -404,7 +1505,11 @@
           "q": "How do JWT and OAuth 2.0 relate for API security?",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["jwt", "oauth", "security"],
+          "tags": [
+            "jwt",
+            "oauth",
+            "security"
+          ],
           "answer": {
             "oneLiner": "OAuth 2.0 is the authorization framework defining how a client gets an access token; JWT is a common token *format* used to carry that token's claims.",
             "keyPoints": [
@@ -413,7 +1518,54 @@
               "OpenID Connect sits on OAuth to add authentication",
               "Your API just validates the bearer JWT"
             ],
-            "redFlags": ["Saying OAuth and JWT are the same thing"]
+            "redFlags": [
+              "Saying OAuth and JWT are the same thing"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do JWT and OAuth 2.0 relate?"
+              },
+              {
+                "role": "me",
+                "text": "OAuth 2.0 is the authorization *framework* — it defines how a client obtains an access token. JWT is a common token *format* used to carry that token's claims. Different layers."
+              },
+              {
+                "role": "interviewer",
+                "text": "So is a JWT required for OAuth?"
+              },
+              {
+                "role": "me",
+                "text": "No — OAuth tokens can be opaque reference tokens too. JWT just happens to be a popular self-contained format because the resource server can validate it locally without a lookup."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where does OpenID Connect fit?"
+              },
+              {
+                "role": "me",
+                "text": "OIDC sits on top of OAuth 2.0 to add authentication — it standardizes an ID token (a JWT) about who the user is. OAuth alone is authorization; OIDC adds the 'who'."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Is OAuth the same as JWT?",
+                "a": "No — OAuth is the flow; JWT is a token format."
+              },
+              {
+                "q": "What does OIDC add?",
+                "a": "Authentication on top of OAuth, via a standardized ID token."
+              },
+              {
+                "q": "What does your API do with the token?",
+                "a": "Validates the bearer JWT's signature and expiry.",
+                "relatedId": "aspnet-restapi-005"
+              },
+              {
+                "q": "Can OAuth tokens be non-JWT?",
+                "a": "Yes — they can be opaque reference tokens validated by introspection."
+              }
+            ]
           }
         },
         {
@@ -421,7 +1573,10 @@
           "q": "What is the difference between Filters and Middleware? When do you use which?",
           "type": "comparison",
           "freq": "high",
-          "tags": ["filters", "middleware"],
+          "tags": [
+            "filters",
+            "middleware"
+          ],
           "answer": {
             "oneLiner": "Middleware works on the raw HTTP pipeline for every request; filters run inside the MVC pipeline with access to the action and model state — so use middleware for HTTP concerns, filters for MVC concerns.",
             "keyPoints": [
@@ -429,6 +1584,52 @@
               "Filters — MVC-aware; know the action, args, `ModelState`, result",
               "Filter order: Authorization → Resource → Action → Exception → Result",
               "Use a filter when you need action/model context"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between filters and middleware?"
+              },
+              {
+                "role": "me",
+                "text": "Middleware works on the raw HTTP pipeline for every request. Filters run inside the MVC pipeline with access to the action and model state. So middleware for HTTP concerns, filters for MVC concerns."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me a case that genuinely needs a filter, not middleware."
+              },
+              {
+                "role": "me",
+                "text": "Anything needing the bound action arguments or `ModelState` — like a filter that validates the model and short-circuits, or one that inspects the action's parameters. Middleware can't see any of that."
+              },
+              {
+                "role": "interviewer",
+                "text": "And something better as middleware?"
+              },
+              {
+                "role": "me",
+                "text": "Cross-cutting HTTP concerns that apply to every request including static files — logging, CORS, response compression, global exception handling. Those don't need MVC context."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What can filters access that middleware can't?",
+                "a": "The action, its bound arguments, `ModelState`, and the result.",
+                "relatedId": "aspnet-realtime-perf-009"
+              },
+              {
+                "q": "What's the filter execution order?",
+                "a": "Authorization → Resource → Action → Exception → Result.",
+                "relatedId": "aspnet-security-003"
+              },
+              {
+                "q": "When use middleware?",
+                "a": "For cross-cutting HTTP concerns like logging, CORS, and compression."
+              },
+              {
+                "q": "Does middleware run for static files?",
+                "a": "Yes — it runs for every request; filters only when MVC routing matches."
+              }
             ]
           }
         },
@@ -437,7 +1638,10 @@
           "q": "What are the different types of filters in ASP.NET Core?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["filters", "pipeline"],
+          "tags": [
+            "filters",
+            "pipeline"
+          ],
           "answer": {
             "oneLiner": "Authorization, Resource, Action, Exception, and Result filters — each runs at a specific stage of the MVC action pipeline.",
             "keyPoints": [
@@ -446,6 +1650,53 @@
               "**Action** — before/after the action method",
               "**Exception** — handles action exceptions",
               "**Result** — before/after the result executes"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are the different types of filters?"
+              },
+              {
+                "role": "me",
+                "text": "Five: Authorization, Resource, Action, Exception, and Result filters — each runs at a specific stage of the MVC action pipeline."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which runs first and what's it good for?"
+              },
+              {
+                "role": "me",
+                "text": "Authorization filters run first and short-circuit unauthorized requests before any other work — that's where `[Authorize]` lives. No point binding the model if the user isn't allowed in."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where would you put response caching, and why there?"
+              },
+              {
+                "role": "me",
+                "text": "A resource filter — it wraps model binding, so it can short-circuit and return a cached response before binding even runs, saving that work entirely."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What runs first?",
+                "a": "Authorization filters.",
+                "relatedId": "aspnet-realtime-perf-009"
+              },
+              {
+                "q": "Where does a resource filter sit?",
+                "a": "Around model binding — before and after it.",
+                "relatedId": "aspnet-realtime-perf-010"
+              },
+              {
+                "q": "Which filter handles action exceptions?",
+                "a": "The Exception filter."
+              },
+              {
+                "q": "Why is a resource filter good for caching?",
+                "a": "It can short-circuit before model binding, skipping that work.",
+                "relatedId": "aspnet-advanced-006"
+              }
             ]
           }
         },
@@ -454,7 +1705,11 @@
           "q": "What are Action Results in ASP.NET Core?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["action-result", "iactionresult", "status-codes"],
+          "tags": [
+            "action-result",
+            "iactionresult",
+            "status-codes"
+          ],
           "answer": {
             "oneLiner": "`IActionResult` represents the HTTP response an action returns, with helpers pairing the right status code and payload — `Ok()`, `CreatedAtAction()`, `BadRequest()`, `NotFound()`, `NoContent()`.",
             "keyPoints": [
@@ -463,7 +1718,55 @@
               "`NoContent()` → 204 (e.g. successful DELETE)",
               "`ActionResult<T>` combines a typed body with helpers"
             ],
-            "redFlags": ["Returning 200 with an error message instead of the right 4xx/5xx"]
+            "redFlags": [
+              "Returning 200 with an error message instead of the right 4xx/5xx"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are Action Results in ASP.NET Core?"
+              },
+              {
+                "role": "me",
+                "text": "`IActionResult` represents the HTTP response an action returns, with helper methods that pair the right status code and payload — `Ok()`, `CreatedAtAction()`, `BadRequest()`, `NotFound()`, `NoContent()`."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does CreatedAtAction give you that Ok doesn't?"
+              },
+              {
+                "role": "me",
+                "text": "A 201 status plus a `Location` header pointing at the new resource, which is the correct REST response to a successful create. `Ok` is just 200 with a body."
+              },
+              {
+                "role": "interviewer",
+                "text": "What would you return from a successful DELETE?"
+              },
+              {
+                "role": "me",
+                "text": "`NoContent()` — 204, success with no body. Returning 200 with an empty body works but 204 is the precise semantic."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does Ok() return?",
+                "a": "200 with the supplied object as the body."
+              },
+              {
+                "q": "Correct status for a create?",
+                "a": "201 via `CreatedAtAction`, including a `Location` header.",
+                "relatedId": "aspnet-realtime-perf-004"
+              },
+              {
+                "q": "What's NoContent for?",
+                "a": "204 — a successful response with no body, e.g. DELETE."
+              },
+              {
+                "q": "What's ActionResult<T>?",
+                "a": "A typed variant combining a body type with action-result helpers.",
+                "relatedId": "aspnet-realtime-perf-008"
+              }
+            ]
           }
         },
         {
@@ -471,7 +1774,11 @@
           "q": "What is CORS and how do you enable it?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["cors", "browser", "security"],
+          "tags": [
+            "cors",
+            "browser",
+            "security"
+          ],
           "answer": {
             "oneLiner": "CORS is a browser security mechanism that blocks JS calls to a different origin unless the server opts in via headers; in ASP.NET Core you enable it with a named policy and `UseCors`.",
             "keyPoints": [
@@ -482,7 +1789,52 @@
             "code": {
               "lang": "csharp",
               "snippet": "builder.Services.AddCors(o => o.AddPolicy(\"spa\",\n    p => p.WithOrigins(\"https://app.example.com\").AllowAnyHeader().AllowAnyMethod()));\n// app.UseCors(\"spa\");"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is CORS and how do you enable it?"
+              },
+              {
+                "role": "me",
+                "text": "CORS is a browser security mechanism that blocks JavaScript calls to a different origin unless the server opts in via response headers. In ASP.NET Core you define a named policy and call `UseCors`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Who actually enforces CORS — the server or the browser?"
+              },
+              {
+                "role": "me",
+                "text": "The browser. The server just advertises which origins are allowed; the browser is what blocks the JS from reading the response. A non-browser client like Postman ignores CORS entirely."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where does UseCors go in the pipeline?"
+              },
+              {
+                "role": "me",
+                "text": "After `UseRouting` and before `UseAuthorization`. Get it out of order and either CORS headers are missing or preflight requests fail."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Who enforces CORS?",
+                "a": "The browser — not the server."
+              },
+              {
+                "q": "Where does UseCors belong?",
+                "a": "After `UseRouting`, before `UseAuthorization`.",
+                "relatedId": "aspnet-middleware-006"
+              },
+              {
+                "q": "Does CORS affect Postman/curl?",
+                "a": "No — it's browser-only; non-browser clients ignore it."
+              },
+              {
+                "q": "What do you configure in a policy?",
+                "a": "Allowed origins, headers, and methods."
+              }
+            ]
           }
         },
         {
@@ -490,13 +1842,63 @@
           "q": "What is the difference between role-based and policy-based authorization?",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["authorization", "claims", "policy", "roles"],
+          "tags": [
+            "authorization",
+            "claims",
+            "policy",
+            "roles"
+          ],
           "answer": {
             "oneLiner": "Role-based checks a user's role (`[Authorize(Roles=\"Admin\")]`); policy-based checks flexible requirements from claims/logic (`[Authorize(Policy=\"Over18\")]`), which is more expressive.",
             "keyPoints": [
               "Roles are a simple, coarse claim",
               "Policies combine multiple claims and custom handlers",
               "Policy-based scales better as rules get complex"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Role-based vs policy-based authorization — what's the difference?"
+              },
+              {
+                "role": "me",
+                "text": "Role-based checks a user's role, like `[Authorize(Roles=\"Admin\")]`. Policy-based checks flexible requirements built from claims or custom logic, like `[Authorize(Policy=\"Over18\")]` — it's far more expressive."
+              },
+              {
+                "role": "interviewer",
+                "text": "When does role-based start to fall apart?"
+              },
+              {
+                "role": "me",
+                "text": "When rules get compound — 'admin OR owns the resource AND in this region'. You can't express that with roles cleanly; you end up with role explosion. Policies handle it with a requirement and handler."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you implement a custom policy?"
+              },
+              {
+                "role": "me",
+                "text": "Define an `IAuthorizationRequirement`, write an `AuthorizationHandler` for it that evaluates the claims/context, and register the policy in `AddAuthorization`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's a role in claims terms?",
+                "a": "A simple, coarse claim on the principal."
+              },
+              {
+                "q": "When prefer policies?",
+                "a": "When rules combine multiple claims or custom logic — they scale better."
+              },
+              {
+                "q": "What backs a custom policy?",
+                "a": "An `IAuthorizationRequirement` plus an `AuthorizationHandler`."
+              },
+              {
+                "q": "What builds the claims they check?",
+                "a": "Authentication — the `ClaimsPrincipal`.",
+                "relatedId": "aspnet-restapi-004"
+              }
             ]
           }
         },
@@ -505,13 +1907,63 @@
           "q": "Why use refresh tokens with JWTs?",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["refresh-token", "jwt"],
+          "tags": [
+            "refresh-token",
+            "jwt"
+          ],
           "answer": {
             "oneLiner": "Access tokens are kept short-lived to limit damage if stolen, so a long-lived refresh token lets the client get a new access token silently without re-login.",
             "keyPoints": [
               "Access token short (minutes), refresh token longer (days)",
               "Refresh tokens are stored server-side and revocable",
               "Enables logout/revocation that pure JWTs can't"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Why use refresh tokens with JWTs?"
+              },
+              {
+                "role": "me",
+                "text": "Access tokens are kept short-lived to limit damage if one's stolen. A longer-lived refresh token lets the client silently get a new access token without forcing the user to log in again."
+              },
+              {
+                "role": "interviewer",
+                "text": "JWTs are self-validating — so how does this give you revocation?"
+              },
+              {
+                "role": "me",
+                "text": "The access token still can't be revoked mid-life, but the refresh token is stored server-side and revocable. Revoke it and the client can't mint new access tokens, so access dies within the short access-token window."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where should the refresh token live on the client?"
+              },
+              {
+                "role": "me",
+                "text": "An httpOnly, secure cookie — so JavaScript and XSS can't read it. Never in localStorage. And rotate it on each use."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why short access tokens?",
+                "a": "To limit the blast radius if one is stolen.",
+                "relatedId": "aspnet-restapi-005"
+              },
+              {
+                "q": "How do refresh tokens enable revocation?",
+                "a": "They're stored server-side and revocable, unlike a self-contained JWT."
+              },
+              {
+                "q": "Where should the refresh token be stored?",
+                "a": "An httpOnly, secure cookie.",
+                "relatedId": "aspnet-realtime-perf-007"
+              },
+              {
+                "q": "What is rotation?",
+                "a": "Issuing a new refresh token on each use and invalidating the old one.",
+                "relatedId": "aspnet-realtime-perf-007"
+              }
             ]
           }
         }
@@ -528,7 +1980,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["rate-limiting", "throttling", "performance"],
+          "tags": [
+            "rate-limiting",
+            "throttling",
+            "performance"
+          ],
           "answer": {
             "oneLiner": "ASP.NET Core 7+ ships a built-in rate limiter middleware with four algorithms: fixed window, sliding window, token bucket, and concurrency.",
             "keyPoints": [
@@ -542,8 +1998,55 @@
               "snippet": "builder.Services.AddRateLimiter(o =>\n    o.AddFixedWindowLimiter(\"fixed\", opt => {\n        opt.PermitLimit = 100;\n        opt.Window = TimeSpan.FromMinutes(1);\n    }));\n// app.UseRateLimiter();\n// [EnableRateLimiting(\"fixed\")] on a controller/endpoint",
               "note": "Returns 429 Too Many Requests when the limit is exceeded."
             },
-            "followUps": ["Fixed vs sliding window?", "What status code does it return?"],
-            "redFlags": ["Not knowing 429 is the rejection code", "Thinking fixed window has no burst problem"]
+            "redFlags": [
+              "Not knowing 429 is the rejection code",
+              "Thinking fixed window has no burst problem"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does rate limiting work, and what algorithms ship in ASP.NET Core?"
+              },
+              {
+                "role": "me",
+                "text": "ASP.NET Core 7+ has a built-in rate limiter middleware with four algorithms: fixed window, sliding window, token bucket, and concurrency. You add `UseRateLimiter` and attach policies to endpoints."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the downside of fixed window?"
+              },
+              {
+                "role": "me",
+                "text": "Burstiness at the edges. With 100/minute, a client can fire 100 at 0:59 and another 100 at 1:00 — 200 in two seconds across the window boundary. Sliding window smooths that with sub-windows."
+              },
+              {
+                "role": "interviewer",
+                "text": "What status code does a rejected request get?"
+              },
+              {
+                "role": "me",
+                "text": "429 Too Many Requests. You can also send a `Retry-After` header telling the client when to try again."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What status code on rejection?",
+                "a": "429 Too Many Requests.",
+                "relatedId": "aspnet-realtime-perf-004"
+              },
+              {
+                "q": "Fixed vs sliding window?",
+                "a": "Fixed is cheap but bursty at edges; sliding smooths bursts with sub-windows."
+              },
+              {
+                "q": "What does token bucket allow?",
+                "a": "Controlled bursts — tokens refill over time."
+              },
+              {
+                "q": "How do you apply a policy?",
+                "a": "`UseRateLimiter()` plus `[EnableRateLimiting(\"name\")]` on the endpoint."
+              }
+            ]
           }
         },
         {
@@ -552,7 +2055,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["signalr", "realtime", "websockets"],
+          "tags": [
+            "signalr",
+            "realtime",
+            "websockets"
+          ],
           "answer": {
             "oneLiner": "SignalR is a library for real-time, bidirectional server-to-client messaging — use it for chat, live dashboards, notifications, and collaborative apps.",
             "keyPoints": [
@@ -561,8 +2068,54 @@
               "Hubs expose methods both sides can call (RPC-style)",
               "Scale out across servers with a backplane (Redis/Azure SignalR)"
             ],
-            "followUps": ["Why is a backplane needed when scaling out?", "WebSockets vs SSE?"],
-            "redFlags": ["Using polling when push is needed", "Not knowing the transport fallback order"]
+            "redFlags": [
+              "Using polling when push is needed",
+              "Not knowing the transport fallback order"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is SignalR and when would you use it?"
+              },
+              {
+                "role": "me",
+                "text": "SignalR is a library for real-time, bidirectional server-to-client messaging. I'd use it for chat, live dashboards, notifications, and collaborative apps — anywhere the server needs to push, not just respond."
+              },
+              {
+                "role": "interviewer",
+                "text": "What transports does it use?"
+              },
+              {
+                "role": "me",
+                "text": "It prefers WebSockets, and falls back to Server-Sent Events, then long polling, if WebSockets isn't available. It negotiates the best one automatically."
+              },
+              {
+                "role": "interviewer",
+                "text": "You scale to three servers — what breaks and how do you fix it?"
+              },
+              {
+                "role": "me",
+                "text": "Clients connect to different servers, so a message sent from one isn't seen by clients on the others. You add a backplane — Redis or Azure SignalR — so messages fan out across all servers."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the transport fallback order?",
+                "a": "WebSockets → Server-Sent Events → long polling."
+              },
+              {
+                "q": "Why is a backplane needed when scaling out?",
+                "a": "To broadcast messages across servers so clients on any instance receive them."
+              },
+              {
+                "q": "What's a Hub?",
+                "a": "A class exposing RPC-style methods both server and client can call."
+              },
+              {
+                "q": "WebSockets vs SSE?",
+                "a": "WebSockets is full-duplex; SSE is server-to-client only."
+              }
+            ]
           }
         },
         {
@@ -571,7 +2124,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["rest", "session", "stateless", "auth"],
+          "tags": [
+            "rest",
+            "session",
+            "stateless",
+            "auth"
+          ],
           "answer": {
             "oneLiner": "REST is ideally stateless — each request carries everything needed — so token-based auth (JWT) fits better than server-side sessions, which add server state and hurt horizontal scaling.",
             "keyPoints": [
@@ -580,8 +2138,56 @@
               "Sessions suit server-rendered web apps, not pure APIs",
               "Trade-off: tokens are hard to revoke; sessions are easy to invalidate"
             ],
-            "followUps": ["How do you revoke a stateless JWT?", "When is a session still appropriate?"],
-            "redFlags": ["Saying sessions scale as well as tokens", "Not knowing why statelessness matters"]
+            "redFlags": [
+              "Saying sessions scale as well as tokens",
+              "Not knowing why statelessness matters"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Should you use session-based auth in a REST API?"
+              },
+              {
+                "role": "me",
+                "text": "Ideally no. REST is meant to be stateless — each request carries everything needed — so token-based auth like JWT fits better than server-side sessions, which add server state and hurt horizontal scaling."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why exactly do sessions hurt scaling?"
+              },
+              {
+                "role": "me",
+                "text": "Session state lives on the server, so you need sticky sessions pinning a user to one instance, or a shared session store. Tokens are self-contained, so any instance can serve any request freely."
+              },
+              {
+                "role": "interviewer",
+                "text": "But tokens are hard to revoke — how do you handle logout?"
+              },
+              {
+                "role": "me",
+                "text": "That's the trade-off. You keep access tokens short-lived and use a revocable refresh token, or maintain a small server-side denylist for immediate revocation — reintroducing a bit of state on purpose."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is REST stateless?",
+                "a": "So any instance can serve any request — free horizontal scaling.",
+                "relatedId": "aspnet-restapi-001"
+              },
+              {
+                "q": "How do you revoke a stateless JWT?",
+                "a": "Short lifetimes plus a revocable refresh token, or a denylist.",
+                "relatedId": "aspnet-security-007"
+              },
+              {
+                "q": "When is a session still appropriate?",
+                "a": "For server-rendered web apps, not pure APIs."
+              },
+              {
+                "q": "What do sessions require to scale?",
+                "a": "Sticky sessions or a shared session store."
+              }
+            ]
           }
         },
         {
@@ -590,7 +2196,12 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["status-codes", "http", "404", "500"],
+          "tags": [
+            "status-codes",
+            "http",
+            "404",
+            "500"
+          ],
           "answer": {
             "oneLiner": "4xx means the client did something wrong (the request is the problem); 5xx means the server failed while processing an otherwise valid request.",
             "keyPoints": [
@@ -599,7 +2210,57 @@
               "Common 4xx: 400 bad request, 401 unauthorized, 403 forbidden, 409 conflict",
               "Common 5xx: 500 internal, 502 bad gateway, 503 unavailable"
             ],
-            "redFlags": ["Returning 500 for a missing record (should be 404)", "Returning 200 with an error body"]
+            "redFlags": [
+              "Returning 500 for a missing record (should be 404)",
+              "Returning 200 with an error body"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "When do you return 404 vs 500?"
+              },
+              {
+                "role": "me",
+                "text": "404 means the client asked for something that doesn't exist — the request is the problem. 500 means the server failed while processing an otherwise valid request. Broadly, 4xx is client error, 5xx is server error."
+              },
+              {
+                "role": "interviewer",
+                "text": "An unhandled NullReferenceException reaches the client — which code, and is that good?"
+              },
+              {
+                "role": "me",
+                "text": "It surfaces as 500. That's the right *code*, but a raw exception leaking out isn't good — a global handler should catch it and return a clean `ProblemDetails` without the stack trace."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me 401 vs 403."
+              },
+              {
+                "role": "me",
+                "text": "401 is unauthenticated — no or invalid credentials. 403 is authenticated but not permitted. Don't conflate them."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "4xx vs 5xx?",
+                "a": "4xx = client error, 5xx = server error."
+              },
+              {
+                "q": "Status for a missing record?",
+                "a": "404 — not 500.",
+                "relatedId": "aspnet-security-004"
+              },
+              {
+                "q": "401 vs 403?",
+                "a": "401 unauthenticated; 403 authenticated but forbidden.",
+                "relatedId": "aspnet-restapi-004"
+              },
+              {
+                "q": "How should a 500 reach the client?",
+                "a": "As a clean `ProblemDetails`, via a global handler — no stack trace.",
+                "relatedId": "aspnet-advanced-003"
+              }
+            ]
           }
         },
         {
@@ -608,7 +2269,12 @@
           "level": "mid",
           "type": "code",
           "freq": "medium",
-          "tags": ["parallel", "task-whenall", "throttling", "async"],
+          "tags": [
+            "parallel",
+            "task-whenall",
+            "throttling",
+            "async"
+          ],
           "answer": {
             "oneLiner": "Run independent async work concurrently with `Task.WhenAll`, and throttle the degree of parallelism with `SemaphoreSlim` or `Parallel.ForEachAsync` so you don't overwhelm downstreams.",
             "keyPoints": [
@@ -622,8 +2288,55 @@
               "snippet": "await Parallel.ForEachAsync(ids,\n    new ParallelOptions { MaxDegreeOfParallelism = 5 },\n    async (id, ct) => await _client.GetAsync($\"/items/{id}\", ct));",
               "note": "Caps concurrency at 5 in-flight requests."
             },
-            "followUps": ["Why throttle instead of unbounded WhenAll?", "Task.WhenAll vs Parallel.ForEachAsync?"],
-            "redFlags": ["Firing thousands of concurrent calls with no limit", "Using Parallel.For for I/O-bound work"]
+            "redFlags": [
+              "Firing thousands of concurrent calls with no limit",
+              "Using Parallel.For for I/O-bound work"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you do parallel processing in a Web API and throttle it?"
+              },
+              {
+                "role": "me",
+                "text": "Run independent async work concurrently with `Task.WhenAll`, and throttle the degree of parallelism with `SemaphoreSlim` or `Parallel.ForEachAsync` so you don't overwhelm downstream systems."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why not just fire a thousand tasks with WhenAll?"
+              },
+              {
+                "role": "me",
+                "text": "Unbounded concurrency hammers the DB or downstream API — connection-pool exhaustion, timeouts, throttling, maybe taking the dependency down. You want a cap on in-flight work."
+              },
+              {
+                "role": "interviewer",
+                "text": "When is Parallel.For the wrong tool?"
+              },
+              {
+                "role": "me",
+                "text": "For I/O-bound async work. `Parallel.For` is for CPU-bound work and blocks threads. For I/O you want `Parallel.ForEachAsync` or `SemaphoreSlim`-gated tasks that release the thread while awaiting."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why throttle instead of unbounded WhenAll?",
+                "a": "To avoid exhausting connections and overwhelming downstreams."
+              },
+              {
+                "q": "How do you cap concurrency?",
+                "a": "`SemaphoreSlim` or `Parallel.ForEachAsync` with `MaxDegreeOfParallelism`."
+              },
+              {
+                "q": "Task.WhenAll vs Parallel.ForEachAsync?",
+                "a": "WhenAll awaits a set of tasks; ForEachAsync also caps concurrency for you."
+              },
+              {
+                "q": "Is Parallel.For good for I/O?",
+                "a": "No — it's for CPU-bound work; use async for I/O.",
+                "relatedId": "aspnet-advanced-009"
+              }
+            ]
           }
         },
         {
@@ -632,7 +2345,12 @@
           "level": "senior",
           "type": "scenario",
           "freq": "medium",
-          "tags": ["deadlock", "async", "configureawait", "blocking"],
+          "tags": [
+            "deadlock",
+            "async",
+            "configureawait",
+            "blocking"
+          ],
           "answer": {
             "oneLiner": "Blocking on async code with `.Result` or `.Wait()` while the captured synchronization context is needed to resume the continuation causes a classic deadlock — go async all the way and use `ConfigureAwait(false)` in libraries.",
             "keyPoints": [
@@ -646,8 +2364,55 @@
               "snippet": "// Deadlock-prone:\nvar data = GetDataAsync().Result;\n\n// Correct:\nvar data = await GetDataAsync();\n\n// In library code:\nawait SomeAsync().ConfigureAwait(false);",
               "note": "Async all the way down; reserve ConfigureAwait(false) for non-context-dependent library code."
             },
-            "followUps": ["Why does ConfigureAwait(false) help?", "Does ASP.NET Core have a SynchronizationContext?"],
-            "redFlags": ["Calling .Result/.Wait() in request handling", "Not knowing async-all-the-way"]
+            "redFlags": [
+              "Calling .Result/.Wait() in request handling",
+              "Not knowing async-all-the-way"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What causes a deadlock in async code, and how do you prevent it?"
+              },
+              {
+                "role": "me",
+                "text": "Blocking on async with `.Result` or `.Wait()` while the captured synchronization context is needed to resume the continuation. The continuation waits for the context thread, which is blocked waiting for the continuation — deadlock. Fix: go async all the way, and use `ConfigureAwait(false)` in libraries."
+              },
+              {
+                "role": "interviewer",
+                "text": "ASP.NET Core has no SynchronizationContext — so is blocking fine there?"
+              },
+              {
+                "role": "me",
+                "text": "It won't classically deadlock, but it's still bad — blocking ties up a thread-pool thread, and under load you get thread-pool starvation and latency spikes. Still async all the way."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does ConfigureAwait(false) help?"
+              },
+              {
+                "role": "me",
+                "text": "It tells the await not to capture and resume on the original context, so the continuation runs on any thread-pool thread — no contention for the captured context. It's standard in library code."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the root cause?",
+                "a": "Blocking the context thread the awaited continuation needs to resume."
+              },
+              {
+                "q": "Does ASP.NET Core have a SynchronizationContext?",
+                "a": "No — but blocking still causes thread-pool starvation.",
+                "relatedId": "aspnet-advanced-009"
+              },
+              {
+                "q": "What's the fix?",
+                "a": "Async all the way; never `.Result`/`.Wait()` on async."
+              },
+              {
+                "q": "Where do you use ConfigureAwait(false)?",
+                "a": "In library code that doesn't depend on the context."
+              }
+            ]
           }
         },
         {
@@ -656,7 +2421,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["refresh-token", "jwt", "httponly-cookie", "security"],
+          "tags": [
+            "refresh-token",
+            "jwt",
+            "httponly-cookie",
+            "security"
+          ],
           "answer": {
             "oneLiner": "A refresh token lets the client silently obtain a new short-lived access token without re-login; it should be stored in an httpOnly, secure cookie — never in JS-accessible storage.",
             "keyPoints": [
@@ -665,8 +2435,57 @@
               "localStorage is XSS-vulnerable — avoid for refresh tokens",
               "Should be revocable and rotated on each use"
             ],
-            "followUps": ["Why httpOnly cookie over localStorage?", "What is refresh token rotation?"],
-            "redFlags": ["Storing refresh tokens in localStorage", "Never expiring/rotating them"]
+            "redFlags": [
+              "Storing refresh tokens in localStorage",
+              "Never expiring/rotating them"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is a refresh token for, and can it live on the frontend?"
+              },
+              {
+                "role": "me",
+                "text": "It lets the client silently get a new short-lived access token without re-login. It can be on the frontend, but only in an httpOnly, secure cookie — never in JS-accessible storage."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why httpOnly cookie over localStorage?"
+              },
+              {
+                "role": "me",
+                "text": "localStorage is readable by any JavaScript on the page, so an XSS payload can steal the token. An httpOnly cookie is invisible to JS, so XSS can't exfiltrate it — though you then need CSRF protection."
+              },
+              {
+                "role": "interviewer",
+                "text": "What is refresh token rotation?"
+              },
+              {
+                "role": "me",
+                "text": "Each time a refresh token is used, the server issues a new one and invalidates the old. If an old token is replayed, that signals theft and you can revoke the whole chain."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why httpOnly cookie over localStorage?",
+                "a": "JS can't read httpOnly cookies, so XSS can't steal the token.",
+                "relatedId": "aspnet-security-007"
+              },
+              {
+                "q": "What's the trade-off of cookies?",
+                "a": "They need CSRF protection."
+              },
+              {
+                "q": "What is rotation?",
+                "a": "Issuing a new refresh token on each use and invalidating the old.",
+                "relatedId": "aspnet-security-007"
+              },
+              {
+                "q": "Why keep access tokens short?",
+                "a": "To limit damage if stolen, since they're hard to revoke.",
+                "relatedId": "aspnet-restapi-005"
+              }
+            ]
           }
         },
         {
@@ -675,7 +2494,11 @@
           "level": "mid",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["iactionresult", "actionresult", "return-types"],
+          "tags": [
+            "iactionresult",
+            "actionresult",
+            "return-types"
+          ],
           "answer": {
             "oneLiner": "`IActionResult` only describes the HTTP result (status + body) with no compile-time body type; `ActionResult<T>` lets you return either a typed `T` or any action result, improving API clarity and Swagger output.",
             "keyPoints": [
@@ -689,8 +2512,54 @@
               "snippet": "public ActionResult<Product> Get(int id)\n{\n    var p = _repo.Find(id);\n    if (p is null) return NotFound();\n    return p; // implicit 200 with Product\n}",
               "note": "ActionResult<T> documents the success type and still allows error results."
             },
-            "followUps": ["Why does ActionResult<T> help Swagger?", "When is plain IActionResult fine?"],
-            "redFlags": ["Thinking they behave identically for API documentation"]
+            "redFlags": [
+              "Thinking they behave identically for API documentation"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between IActionResult and ActionResult<T>?"
+              },
+              {
+                "role": "me",
+                "text": "`IActionResult` only describes the HTTP result — status and body — with no compile-time body type. `ActionResult<T>` lets you return either a typed `T` or any action result, improving clarity and Swagger output."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does ActionResult<T> improve Swagger?"
+              },
+              {
+                "role": "me",
+                "text": "It tells the framework the success body type, so OpenAPI documents the 200 response schema as `T`. With bare `IActionResult`, the tooling can't infer the body type, so the schema is missing."
+              },
+              {
+                "role": "interviewer",
+                "text": "What lets you `return product;` directly?"
+              },
+              {
+                "role": "me",
+                "text": "An implicit conversion on `ActionResult<T>` — you can `return product;` for a 200 or `return NotFound();` for a 404 from the same method, no wrapping needed."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why does ActionResult<T> help Swagger?",
+                "a": "It exposes the success body type for OpenAPI schema generation."
+              },
+              {
+                "q": "When is plain IActionResult fine?",
+                "a": "When the body type varies or doesn't matter for docs."
+              },
+              {
+                "q": "What enables returning T directly?",
+                "a": "An implicit conversion on `ActionResult<T>`."
+              },
+              {
+                "q": "What do the helpers return?",
+                "a": "Typed action results like `Ok()`, `NotFound()`, `BadRequest()`.",
+                "relatedId": "aspnet-security-004"
+              }
+            ]
           }
         },
         {
@@ -699,7 +2568,12 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["action-filter", "middleware", "authorize", "pipeline-order"],
+          "tags": [
+            "action-filter",
+            "middleware",
+            "authorize",
+            "pipeline-order"
+          ],
           "answer": {
             "oneLiner": "Middleware runs first on the raw HTTP pipeline; action filters run later inside MVC with access to the action and model state. `[Authorize]` is NOT an action filter — it's an authorization filter, which runs even earlier than action filters.",
             "keyPoints": [
@@ -708,8 +2582,56 @@
               "`[Authorize]` = authorization filter (runs before action filters)",
               "Use middleware for cross-cutting HTTP concerns, filters for MVC concerns"
             ],
-            "followUps": ["Where does [Authorize] sit in the filter pipeline?", "When pick middleware over a filter?"],
-            "redFlags": ["Calling [Authorize] an action filter", "Thinking filters run before middleware"]
+            "redFlags": [
+              "Calling [Authorize] an action filter",
+              "Thinking filters run before middleware"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Action filter vs middleware — which runs first, and is [Authorize] an action filter?"
+              },
+              {
+                "role": "me",
+                "text": "Middleware runs first, on the raw HTTP pipeline. Action filters run later inside MVC with access to the action and model state. And no — `[Authorize]` is an authorization filter, which runs even earlier than action filters."
+              },
+              {
+                "role": "interviewer",
+                "text": "Spell out the order from request to action."
+              },
+              {
+                "role": "me",
+                "text": "Middleware → routing → authorization filter → resource filter → model binding → action filter → the action method. Then results unwind back out."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why isn't [Authorize] an action filter?"
+              },
+              {
+                "role": "me",
+                "text": "Because you want to reject unauthorized requests before doing expensive work like model binding or running action filters. Authorization filters run first precisely so they can short-circuit early."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Where does [Authorize] sit?",
+                "a": "In the authorization filter stage — before action filters.",
+                "relatedId": "aspnet-security-003"
+              },
+              {
+                "q": "What's the overall order?",
+                "a": "Middleware → routing → authorization → resource → action → the action method."
+              },
+              {
+                "q": "When pick middleware over a filter?",
+                "a": "For cross-cutting HTTP concerns that don't need MVC context.",
+                "relatedId": "aspnet-security-002"
+              },
+              {
+                "q": "Can middleware read ModelState?",
+                "a": "No — only filters can; middleware runs before MVC binding."
+              }
+            ]
           }
         },
         {
@@ -718,7 +2640,12 @@
           "level": "senior",
           "type": "comparison",
           "freq": "low",
-          "tags": ["resource-filter", "action-filter", "filters", "pipeline-order"],
+          "tags": [
+            "resource-filter",
+            "action-filter",
+            "filters",
+            "pipeline-order"
+          ],
           "answer": {
             "oneLiner": "Resource filters run earlier — around model binding (before and after it) — making them ideal for caching or short-circuiting; action filters run after model binding, around the action method, with access to bound arguments.",
             "keyPoints": [
@@ -727,8 +2654,56 @@
               "Pipeline order: Authorization → **Resource** → (binding) → **Action**",
               "Pick resource for cross-cutting work before binding, action for model-aware logic"
             ],
-            "followUps": ["Why is a resource filter good for caching?", "Which sees bound model arguments?"],
-            "redFlags": ["Reversing their order", "Thinking both run after model binding"]
+            "redFlags": [
+              "Reversing their order",
+              "Thinking both run after model binding"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Resource filter vs action filter — what's the difference?"
+              },
+              {
+                "role": "me",
+                "text": "Resource filters run earlier, wrapping model binding — before and after it. Action filters run after binding, around the action method, with access to the bound arguments."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which would you use for caching, and why?"
+              },
+              {
+                "role": "me",
+                "text": "A resource filter. Because it runs before model binding, it can short-circuit and return a cached response without paying the cost of binding or executing the action at all."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which one sees the action's bound arguments?"
+              },
+              {
+                "role": "me",
+                "text": "The action filter — it runs after binding, so it has the populated parameters. A resource filter runs around binding, so on the way in the arguments aren't bound yet."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is a resource filter good for caching?",
+                "a": "It can short-circuit before model binding, skipping that work.",
+                "relatedId": "aspnet-advanced-006"
+              },
+              {
+                "q": "Which sees bound model arguments?",
+                "a": "The action filter, which runs after binding."
+              },
+              {
+                "q": "What's the pipeline order?",
+                "a": "Authorization → Resource → binding → Action.",
+                "relatedId": "aspnet-security-003"
+              },
+              {
+                "q": "When pick an action filter?",
+                "a": "For model-aware logic that needs the bound arguments or result."
+              }
+            ]
           }
         }
       ]
@@ -744,7 +2719,11 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["minimal-api", "controllers", "mvc"],
+          "tags": [
+            "minimal-api",
+            "controllers",
+            "mvc"
+          ],
           "answer": {
             "oneLiner": "Minimal APIs are lightweight endpoint-mapping with less ceremony, great for small services and microservices; controllers give you the full MVC feature set (filters, conventions, model binding attributes) that scales better for large APIs.",
             "keyPoints": [
@@ -758,8 +2737,56 @@
               "snippet": "app.MapGet(\"/products/{id}\", async (int id, IProductService svc) =>\n    await svc.Find(id) is { } p ? Results.Ok(p) : Results.NotFound());",
               "note": "Dependencies are injected directly as handler parameters."
             },
-            "followUps": ["When would minimal APIs not scale well?", "How do you group minimal API endpoints?"],
-            "redFlags": ["Saying minimal APIs can't do DI or validation", "Claiming controllers are always better"]
+            "redFlags": [
+              "Saying minimal APIs can't do DI or validation",
+              "Claiming controllers are always better"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Minimal APIs vs controller-based APIs — when do you use each?"
+              },
+              {
+                "role": "me",
+                "text": "Minimal APIs are lightweight endpoint mapping with less ceremony — great for small services and microservices. Controllers give the full MVC feature set: filters, conventions, attribute model binding, which scales better for large APIs."
+              },
+              {
+                "role": "interviewer",
+                "text": "People say minimal APIs can't do DI or validation — true?"
+              },
+              {
+                "role": "me",
+                "text": "No. DI works — dependencies are injected as handler parameters. And since .NET 7 you have endpoint filters and route groups, so validation and cross-cutting logic are covered. The gap with controllers has narrowed a lot."
+              },
+              {
+                "role": "interviewer",
+                "text": "So when would minimal APIs actually not scale well?"
+              },
+              {
+                "role": "me",
+                "text": "On a large, complex domain with lots of shared cross-cutting behavior and many endpoints — the convention-based organization and filters of controllers keep that tidier than a sprawl of map calls."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Can minimal APIs do DI?",
+                "a": "Yes — dependencies are injected as handler parameters."
+              },
+              {
+                "q": "How do you group minimal API endpoints?",
+                "a": "With route groups (`MapGroup`) and shared endpoint filters.",
+                "relatedId": "aspnet-advanced-002"
+              },
+              {
+                "q": "When would minimal APIs not scale?",
+                "a": "On large, complex domains where MVC conventions/filters keep things organized."
+              },
+              {
+                "q": "What did .NET 7 add to minimal APIs?",
+                "a": "Endpoint filters and route groups.",
+                "relatedId": "aspnet-advanced-002"
+              }
+            ]
           }
         },
         {
@@ -768,7 +2795,12 @@
           "level": "senior",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["endpoint-filter", "middleware", "mvc-filters", "minimal-api"],
+          "tags": [
+            "endpoint-filter",
+            "middleware",
+            "mvc-filters",
+            "minimal-api"
+          ],
           "answer": {
             "oneLiner": "Middleware runs on the raw pipeline for every request; MVC filters run inside the controller pipeline with action/model context; endpoint filters (.NET 7) bring filter-like, per-endpoint logic to minimal APIs.",
             "keyPoints": [
@@ -782,8 +2814,56 @@
               "snippet": "app.MapPost(\"/orders\", Handler)\n   .AddEndpointFilter(async (ctx, next) =>\n   {\n       // pre-handler validation\n       return await next(ctx); // post-handler\n   });",
               "note": "Endpoint filters see the handler arguments via ctx.GetArgument<T>(index)."
             },
-            "followUps": ["Why use an endpoint filter over middleware in a minimal API?"],
-            "redFlags": ["Thinking endpoint filters work with controllers", "Saying middleware can read ModelState"]
+            "redFlags": [
+              "Thinking endpoint filters work with controllers",
+              "Saying middleware can read ModelState"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Endpoint filters vs middleware vs MVC filters — when each?"
+              },
+              {
+                "role": "me",
+                "text": "Middleware runs on the raw pipeline for every request with no endpoint knowledge. MVC filters run inside the controller pipeline with action and model context. Endpoint filters, added in .NET 7, bring filter-like per-endpoint logic to minimal APIs."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why use an endpoint filter instead of middleware in a minimal API?"
+              },
+              {
+                "role": "me",
+                "text": "Because an endpoint filter can see the handler's arguments via `ctx.GetArgument<T>`, and it's scoped to specific endpoints or a group — middleware is global and blind to the handler's parameters."
+              },
+              {
+                "role": "interviewer",
+                "text": "Can you use MVC filters with minimal APIs?"
+              },
+              {
+                "role": "me",
+                "text": "No — MVC filters belong to controllers. The minimal-API equivalent is the endpoint filter; they're not interchangeable."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why endpoint filter over middleware in minimal APIs?",
+                "a": "It can read handler arguments and is scoped per-endpoint."
+              },
+              {
+                "q": "Do MVC filters work with minimal APIs?",
+                "a": "No — use endpoint filters instead."
+              },
+              {
+                "q": "Can middleware read ModelState?",
+                "a": "No — it's MVC-unaware.",
+                "relatedId": "aspnet-security-002"
+              },
+              {
+                "q": "How do you scope an endpoint filter?",
+                "a": "Per-endpoint with `AddEndpointFilter`, or per-group on a route group.",
+                "relatedId": "aspnet-advanced-001"
+              }
+            ]
           }
         },
         {
@@ -792,7 +2872,12 @@
           "level": "mid",
           "type": "code",
           "freq": "high",
-          "tags": ["exception-handling", "iexceptionhandler", "problemdetails", "dotnet8"],
+          "tags": [
+            "exception-handling",
+            "iexceptionhandler",
+            "problemdetails",
+            "dotnet8"
+          ],
           "answer": {
             "oneLiner": "Implement `IExceptionHandler` (.NET 8), register it, and pair it with `UseExceptionHandler` to convert unhandled exceptions into consistent RFC 7807 `ProblemDetails` responses.",
             "keyPoints": [
@@ -806,8 +2891,55 @@
               "snippet": "public class GlobalExceptionHandler : IExceptionHandler\n{\n    public async ValueTask<bool> TryHandleAsync(\n        HttpContext ctx, Exception ex, CancellationToken ct)\n    {\n        var pd = new ProblemDetails { Title = \"Server error\", Status = 500 };\n        ctx.Response.StatusCode = 500;\n        await ctx.Response.WriteAsJsonAsync(pd, ct);\n        return true;\n    }\n}\n// builder.Services.AddExceptionHandler<GlobalExceptionHandler>();\n// builder.Services.AddProblemDetails();\n// app.UseExceptionHandler();",
               "note": "Return true once handled so later handlers/middleware are skipped."
             },
-            "followUps": ["What is RFC 7807 ProblemDetails?", "How do you map exception types to status codes?"],
-            "redFlags": ["Try/catch in every controller instead of a global handler", "Leaking stack traces to clients in prod"]
+            "redFlags": [
+              "Try/catch in every controller instead of a global handler",
+              "Leaking stack traces to clients in prod"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you do centralized exception handling with IExceptionHandler in .NET 8?"
+              },
+              {
+                "role": "me",
+                "text": "Implement `IExceptionHandler`, register it with `AddExceptionHandler`, and pair it with `UseExceptionHandler` to turn unhandled exceptions into consistent RFC 7807 `ProblemDetails` responses."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why is IExceptionHandler cleaner than custom middleware?"
+              },
+              {
+                "role": "me",
+                "text": "It's a focused abstraction — just a `TryHandleAsync` method — it integrates with the built-in `UseExceptionHandler` infrastructure and `AddProblemDetails`, and you can chain multiple handlers, first to return true wins."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you map specific exception types to status codes?"
+              },
+              {
+                "role": "me",
+                "text": "Inside `TryHandleAsync` I switch on the exception type — a domain `NotFoundException` to 404, validation to 400 — set the status and write the matching `ProblemDetails`; return true once handled."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is RFC 7807 ProblemDetails?",
+                "a": "A standard JSON error format with title, status, detail, and type fields."
+              },
+              {
+                "q": "How do you map exception types to status codes?",
+                "a": "Switch on the type inside `TryHandleAsync` and set the status accordingly."
+              },
+              {
+                "q": "What does returning true do?",
+                "a": "Signals the exception is handled so later handlers/middleware are skipped."
+              },
+              {
+                "q": "Why centralize over per-controller try/catch?",
+                "a": "Consistent formatting and logging in one place.",
+                "relatedId": "aspnet-restapi-003"
+              }
+            ]
           }
         },
         {
@@ -816,7 +2948,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["health-checks", "microservices", "kubernetes", "liveness-readiness"],
+          "tags": [
+            "health-checks",
+            "microservices",
+            "kubernetes",
+            "liveness-readiness"
+          ],
           "answer": {
             "oneLiner": "Health checks expose a `/health` endpoint reporting whether the app and its dependencies are working, so orchestrators and load balancers can route traffic only to healthy instances.",
             "keyPoints": [
@@ -830,8 +2967,54 @@
               "snippet": "builder.Services.AddHealthChecks()\n    .AddSqlServer(connString)\n    .AddRedis(redisConn);\n// app.MapHealthChecks(\"/health\");",
               "note": "Separate liveness and readiness endpoints with tags/predicates."
             },
-            "followUps": ["Liveness vs readiness probe difference?", "Why split health endpoints?"],
-            "redFlags": ["Returning healthy without checking dependencies", "Confusing liveness with readiness"]
+            "redFlags": [
+              "Returning healthy without checking dependencies",
+              "Confusing liveness with readiness"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are health checks and why do they matter in microservices?"
+              },
+              {
+                "role": "me",
+                "text": "Health checks expose a `/health` endpoint reporting whether the app and its dependencies are working, so orchestrators and load balancers route traffic only to healthy instances."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the difference between liveness and readiness?"
+              },
+              {
+                "role": "me",
+                "text": "Liveness asks 'is the process alive?' — if it fails, Kubernetes restarts the pod. Readiness asks 'can it serve traffic right now?' — if it fails, traffic is withheld but the pod isn't killed, e.g. while warming up or a dependency is briefly down."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why split the endpoints rather than one combined check?"
+              },
+              {
+                "role": "me",
+                "text": "Because the actions differ. A failing dependency shouldn't restart the pod (that won't help) — it should just pull it from rotation. Conflating them causes needless restart loops."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Liveness vs readiness probe?",
+                "a": "Liveness = is it alive (restart if not); readiness = can it serve traffic (withhold if not)."
+              },
+              {
+                "q": "Why split health endpoints?",
+                "a": "Different failures need different actions — restart vs pull from rotation."
+              },
+              {
+                "q": "What should a health check verify?",
+                "a": "Dependency reachability — DB, Redis, message broker."
+              },
+              {
+                "q": "Who consumes health checks?",
+                "a": "Kubernetes and load balancers to restart or stop routing."
+              }
+            ]
           }
         },
         {
@@ -840,7 +3023,12 @@
           "level": "mid",
           "type": "code",
           "freq": "medium",
-          "tags": ["backgroundservice", "ihostedservice", "background-tasks", "hosted-service"],
+          "tags": [
+            "backgroundservice",
+            "ihostedservice",
+            "background-tasks",
+            "hosted-service"
+          ],
           "answer": {
             "oneLiner": "Derive from `BackgroundService` (a convenience base over `IHostedService`) and override `ExecuteAsync` to run long-lived work like polling, queue processing, or scheduled jobs alongside the app.",
             "keyPoints": [
@@ -854,8 +3042,56 @@
               "snippet": "public class QueueWorker : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken ct)\n    {\n        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));\n        while (await timer.WaitForNextTickAsync(ct))\n            await ProcessBatchAsync(ct);\n    }\n}\n// builder.Services.AddHostedService<QueueWorker>();",
               "note": "Create a DI scope inside the loop to use scoped services like DbContext."
             },
-            "followUps": ["How do you use a scoped DbContext in a BackgroundService?", "How does graceful shutdown work?"],
-            "redFlags": ["Ignoring the CancellationToken", "Injecting a scoped service into the constructor"]
+            "redFlags": [
+              "Ignoring the CancellationToken",
+              "Injecting a scoped service into the constructor"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you run background tasks with BackgroundService?"
+              },
+              {
+                "role": "me",
+                "text": "Derive from `BackgroundService` — a convenience base over `IHostedService` — and override `ExecuteAsync` to run long-lived work like polling, queue processing, or scheduled jobs alongside the app."
+              },
+              {
+                "role": "interviewer",
+                "text": "BackgroundService is a singleton — how do you use a scoped DbContext in it?"
+              },
+              {
+                "role": "me",
+                "text": "I inject `IServiceScopeFactory`, then inside the work loop create a scope and resolve the DbContext from it, disposing the scope each iteration. Injecting the DbContext directly would be a captive dependency."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does graceful shutdown work here?"
+              },
+              {
+                "role": "me",
+                "text": "The framework passes a `CancellationToken` that's signaled on shutdown. I honor it — pass it to async calls and check it in the loop — so in-flight work stops cleanly instead of being killed mid-operation."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you use a scoped DbContext in a BackgroundService?",
+                "a": "Create a scope via `IServiceScopeFactory` inside the loop and resolve from it.",
+                "relatedId": "aspnet-di-003"
+              },
+              {
+                "q": "How does graceful shutdown work?",
+                "a": "Honor the `CancellationToken` the framework signals on shutdown."
+              },
+              {
+                "q": "Why not inject DbContext in the constructor?",
+                "a": "BackgroundService is a singleton — it'd be a captive dependency.",
+                "relatedId": "aspnet-di-003"
+              },
+              {
+                "q": "How do you schedule periodic work?",
+                "a": "With `PeriodicTimer`, or a library like Hangfire/Quartz."
+              }
+            ]
           }
         },
         {
@@ -864,7 +3100,12 @@
           "level": "mid",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["output-caching", "response-caching", "performance", "caching"],
+          "tags": [
+            "output-caching",
+            "response-caching",
+            "performance",
+            "caching"
+          ],
           "answer": {
             "oneLiner": "Response caching relies on HTTP cache headers and mostly serves downstream/proxy/client caches; output caching (.NET 7+) is a server-side store the app fully controls, including invalidation by tag.",
             "keyPoints": [
@@ -878,8 +3119,54 @@
               "snippet": "builder.Services.AddOutputCache();\n// app.UseOutputCache();\napp.MapGet(\"/report\", GetReport).CacheOutput(p => p.Tag(\"reports\"));\n// await cache.EvictByTagAsync(\"reports\", ct);",
               "note": "Tag-based eviction is the key advantage over response caching."
             },
-            "followUps": ["Why is server-side control better than header-only?", "How does tag eviction work?"],
-            "redFlags": ["Thinking response caching guarantees caching (clients can ignore it)"]
+            "redFlags": [
+              "Thinking response caching guarantees caching (clients can ignore it)"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Output caching vs response caching — what's the difference?"
+              },
+              {
+                "role": "me",
+                "text": "Response caching is header-driven — it mostly serves downstream proxy and client caches, which can ignore the headers. Output caching, new in .NET 7, is a server-side store the app fully controls, including tag-based invalidation."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why is server-side control better than header-only?"
+              },
+              {
+                "role": "me",
+                "text": "Because with response caching a client or proxy can just ignore the cache headers, so you can't rely on it. Output caching stores the response on the server, so caching actually happens regardless of client behavior."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does tag-based eviction help?"
+              },
+              {
+                "role": "me",
+                "text": "You tag cached entries — say all reports with `\"reports\"` — and when underlying data changes you call `EvictByTagAsync(\"reports\")` to invalidate them all at once. Response caching has no equivalent."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is server-side control better?",
+                "a": "Caching happens regardless of whether clients honor headers."
+              },
+              {
+                "q": "How does tag eviction work?",
+                "a": "Tag entries, then call `EvictByTagAsync` to invalidate a group.",
+                "relatedId": "aspnet-security-003"
+              },
+              {
+                "q": "What's response caching driven by?",
+                "a": "HTTP cache headers, which clients/proxies may ignore."
+              },
+              {
+                "q": "Which is newer?",
+                "a": "Output caching, added in .NET 7."
+              }
+            ]
           }
         },
         {
@@ -888,7 +3175,12 @@
           "level": "junior",
           "type": "comparison",
           "freq": "low",
-          "tags": ["blazor", "blazor-server", "webassembly", "ssr"],
+          "tags": [
+            "blazor",
+            "blazor-server",
+            "webassembly",
+            "ssr"
+          ],
           "answer": {
             "oneLiner": "Blazor Server runs C# on the server and pushes UI diffs over a SignalR connection; Blazor WebAssembly runs C# in the browser via WASM; SSR (.NET 8) renders static HTML on the server with optional interactivity.",
             "keyPoints": [
@@ -897,8 +3189,55 @@
               "SSR — fast first paint, SEO-friendly, less interactive by default",
               ".NET 8 unifies these as render modes you can mix per component"
             ],
-            "followUps": ["When would you pick WASM over Server?", "What are .NET 8 render modes?"],
-            "redFlags": ["Saying Blazor Server runs in the browser", "Not knowing WASM has a larger initial payload"]
+            "redFlags": [
+              "Saying Blazor Server runs in the browser",
+              "Not knowing WASM has a larger initial payload"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Blazor Server vs WebAssembly vs SSR — brief comparison."
+              },
+              {
+                "role": "me",
+                "text": "Blazor Server runs C# on the server and pushes UI diffs over a SignalR connection. WebAssembly runs C# in the browser via WASM. SSR, in .NET 8, renders static HTML on the server with optional interactivity."
+              },
+              {
+                "role": "interviewer",
+                "text": "When would you pick WASM over Server?"
+              },
+              {
+                "role": "me",
+                "text": "When I need offline support or to offload work to the client, and can tolerate a larger initial download. Server needs a constant low-latency connection; WASM runs fully client-side once loaded."
+              },
+              {
+                "role": "interviewer",
+                "text": "What changed in .NET 8 here?"
+              },
+              {
+                "role": "me",
+                "text": "It unifies these as render modes you can mix per component — you can render a page SSR for fast first paint and make just the interactive parts Server or WASM."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Does Blazor Server run in the browser?",
+                "a": "No — C# runs on the server; only UI diffs go to the browser."
+              },
+              {
+                "q": "What's WASM's downside?",
+                "a": "A larger initial download payload."
+              },
+              {
+                "q": "What are .NET 8 render modes?",
+                "a": "Per-component modes (SSR, Server, WASM) you can mix in one app."
+              },
+              {
+                "q": "What does Blazor Server use for transport?",
+                "a": "A SignalR connection.",
+                "relatedId": "aspnet-realtime-perf-002"
+              }
+            ]
           }
         },
         {
@@ -907,7 +3246,13 @@
           "level": "mid",
           "type": "scenario",
           "freq": "medium",
-          "tags": ["over-posting", "mass-assignment", "dto", "security", "model-binding"],
+          "tags": [
+            "over-posting",
+            "mass-assignment",
+            "dto",
+            "security",
+            "model-binding"
+          ],
           "answer": {
             "oneLiner": "Bind requests to purpose-built input DTOs containing only the fields a client may set, never directly to your EF entities, so attackers can't smuggle in fields like `IsAdmin` or `Price`.",
             "keyPoints": [
@@ -921,8 +3266,55 @@
               "snippet": "public record UpdateProductRequest(string Name, string Description);\n// Map only allowed fields — Price/IsActive can't be set by the client\nproduct.Name = req.Name;\nproduct.Description = req.Description;",
               "note": "The DTO defines exactly what the client is permitted to change."
             },
-            "followUps": ["Why not bind directly to EF entities?", "What is the [Bind] attribute?"],
-            "redFlags": ["Binding requests straight to EF entities", "Trusting all incoming fields"]
+            "redFlags": [
+              "Binding requests straight to EF entities",
+              "Trusting all incoming fields"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you prevent over-posting / mass assignment?"
+              },
+              {
+                "role": "me",
+                "text": "Bind requests to purpose-built input DTOs that contain only the fields a client may set — never directly to your EF entities — so an attacker can't smuggle in fields like `IsAdmin` or `Price`."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the concrete attack if you bind straight to the entity?"
+              },
+              {
+                "role": "me",
+                "text": "The client posts extra JSON fields that happen to match entity properties — `\"IsAdmin\": true` or `\"Price\": 0` — and the binder sets them. You then save and you've granted admin or zeroed the price."
+              },
+              {
+                "role": "interviewer",
+                "text": "Isn't the [Bind] allow-list enough?"
+              },
+              {
+                "role": "me",
+                "text": "`[Bind]` works, but it's easy to forget and lives on the action. A dedicated DTO is explicit and self-documenting — the type itself defines exactly what the client can change."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why not bind directly to EF entities?",
+                "a": "Clients could set fields they shouldn't, like `IsAdmin` or `Price`."
+              },
+              {
+                "q": "What is the [Bind] attribute?",
+                "a": "An allow-list of bindable properties — works but DTOs are cleaner."
+              },
+              {
+                "q": "What's the fix?",
+                "a": "Bind to a request DTO, then map allowed fields to the entity server-side."
+              },
+              {
+                "q": "How does model binding pick fields?",
+                "a": "It maps matching request fields onto the target type's properties.",
+                "relatedId": "aspnet-restapi-008"
+              }
+            ]
           }
         },
         {
@@ -931,7 +3323,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["async", "sync", "thread-pool-starvation", "scalability"],
+          "tags": [
+            "async",
+            "sync",
+            "thread-pool-starvation",
+            "scalability"
+          ],
           "answer": {
             "oneLiner": "For I/O-bound work (DB, HTTP, files), async frees the thread while waiting, so you serve far more concurrent requests; synchronous blocking holds threads and causes thread-pool starvation under load.",
             "keyPoints": [
@@ -945,8 +3342,55 @@
               "snippet": "// Good: releases the thread during the DB wait\npublic async Task<IActionResult> Get(int id)\n    => Ok(await _repo.FindAsync(id));",
               "note": "Async all the way; never block on async with .Result/.Wait()."
             },
-            "followUps": ["What is thread-pool starvation?", "Does async speed up CPU-bound work?"],
-            "redFlags": ["Thinking async makes a single request faster", "Calling .Result in an action"]
+            "redFlags": [
+              "Thinking async makes a single request faster",
+              "Calling .Result in an action"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Sync vs async controller actions — when does it actually matter?"
+              },
+              {
+                "role": "me",
+                "text": "For I/O-bound work — DB, HTTP, files — async frees the thread while waiting, so you serve far more concurrent requests. Synchronous blocking holds the thread doing nothing and causes thread-pool starvation under load."
+              },
+              {
+                "role": "interviewer",
+                "text": "Does async make a single request faster?"
+              },
+              {
+                "role": "me",
+                "text": "No — a single request isn't any faster; the I/O takes the same time. Async improves throughput and scalability, not per-request latency. That's the common misconception."
+              },
+              {
+                "role": "interviewer",
+                "text": "What about CPU-bound work — should that be async?"
+              },
+              {
+                "role": "me",
+                "text": "Async gains nothing for CPU-bound work — there's no I/O wait to release the thread during. Async is specifically for freeing the thread while awaiting I/O."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is thread-pool starvation?",
+                "a": "All pool threads are blocked, so new requests queue and latency spikes."
+              },
+              {
+                "q": "Does async speed up CPU-bound work?",
+                "a": "No — async only helps I/O-bound waits."
+              },
+              {
+                "q": "Does async make one request faster?",
+                "a": "No — it improves throughput/scalability, not single-request latency."
+              },
+              {
+                "q": "What must you never do in an action?",
+                "a": "Block on async with `.Result`/`.Wait()`.",
+                "relatedId": "aspnet-realtime-perf-006"
+              }
+            ]
           }
         }
       ]

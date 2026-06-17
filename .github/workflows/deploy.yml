@@ -1,4 +1,4 @@
-name: Deploy PrepDeck to GitHub Pages
+name: Deploy crackInterview to GitHub Pages
 
 on:
   push:

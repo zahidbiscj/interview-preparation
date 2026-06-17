@@ -27,7 +27,7 @@ import { ButtonModule } from 'primeng/button';
       <header class="topbar">
         <div class="topbar-left">
           <button class="menu-btn" (click)="drawerOpen.set(true)">☰ Topics</button>
-          <span class="app-brand">📚 PrepDeck</span>
+          <span class="app-brand">🚀 crackInterview</span>
         </div>
         <div class="topbar-center">
           <span class="stats-pill">{{ topicCount() }} topics · 522 questions</span>
