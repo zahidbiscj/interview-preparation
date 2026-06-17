@@ -26,16 +26,16 @@ import { ButtonModule } from 'primeng/button';
       <!-- ── Top bar ── -->
       <header class="topbar">
         <div class="topbar-left">
-          <button class="menu-btn" (click)="drawerOpen.set(true)">☰ Topics</button>
-          <span class="app-brand">🚀 crackInterview</span>
+          <button class="menu-btn" (click)="drawerOpen.set(true)">☰ <span class="lbl">Topics</span></button>
+          <span class="app-brand">🚀 <span class="lbl">crackInterview</span></span>
         </div>
         <div class="topbar-center">
           <span class="stats-pill">{{ topicCount() }} topics · 522 questions</span>
         </div>
         <div class="topbar-right">
-          <a routerLink="/dashboard" class="sim-link">📊 Dashboard</a>
-          <a routerLink="/sets" class="sim-link">🗂 Sets</a>
-          <a routerLink="/simulator" class="sim-link">🎯 Simulator</a>
+          <a routerLink="/dashboard" class="sim-link"><span class="ico">📊</span><span class="lbl">Dashboard</span></a>
+          <a routerLink="/sets" class="sim-link"><span class="ico">🗂</span><span class="lbl">Sets</span></a>
+          <a routerLink="/simulator" class="sim-link"><span class="ico">🎯</span><span class="lbl">Simulator</span></a>
           <button class="theme-btn" (click)="toggleTheme()" [title]="isDark() ? 'Switch to light' : 'Switch to dark'">
             {{ isDark() ? '☀️' : '🌙' }}
           </button>
@@ -392,6 +392,18 @@ import { ButtonModule } from 'primeng/button';
       flex-direction: column;
       gap: 8px;
       padding-top: 12px;
+    }
+
+    .sim-link .ico { margin-right: 4px; }
+
+    /* ── Mobile topbar: icon-only nav so every link stays visible ── */
+    @media (max-width: 600px) {
+      .topbar { padding: 0 10px; gap: 8px; }
+      .topbar-right { gap: 6px; }
+      .menu-btn .lbl { display: none; }
+      .sim-link .lbl { display: none; }
+      .sim-link .ico { margin-right: 0; }
+      .sim-link { padding: 6px 9px; font-size: 1em; }
     }
   `]
 })

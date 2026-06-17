@@ -41,10 +41,10 @@ const STOP = new Set([
     <div class="fey-shell" [attr.data-theme]="isDark() ? 'dark' : 'light'">
 
       <header class="topbar">
-        <a routerLink="/dashboard" class="back-link">← Dashboard</a>
-        <span class="app-brand">🗣️ Feynman Mode</span>
+        <a routerLink="/dashboard" class="back-link">← <span class="lbl">Dashboard</span></a>
+        <span class="app-brand">🗣️ <span class="lbl">Feynman Mode</span></span>
         <span class="topbar-spacer">
-          <a routerLink="/simulator" class="nav-link">🎯 Simulator</a>
+          <a routerLink="/simulator" class="nav-link"><span class="ico">🎯</span><span class="lbl">Simulator</span></a>
           <button class="theme-btn" (click)="svc.toggleTheme()">{{ isDark() ? '☀️' : '🌙' }}</button>
         </span>
       </header>

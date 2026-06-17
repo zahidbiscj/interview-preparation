@@ -22,10 +22,11 @@ interface TopicRow {
     <div class="dash-shell" [attr.data-theme]="isDark() ? 'dark' : 'light'">
 
       <header class="topbar">
-        <span class="app-brand">📊 Dashboard</span>
+        <span class="app-brand">📊 <span class="lbl">Dashboard</span></span>
         <nav class="nav">
-          <a routerLink="/" class="nav-link">📚 Bank</a>
-          <a routerLink="/simulator" class="nav-link">🎯 Simulator</a>
+          <a routerLink="/" class="nav-link"><span class="ico">📚</span><span class="lbl">Bank</span></a>
+          <a routerLink="/sets" class="nav-link"><span class="ico">🗂</span><span class="lbl">Sets</span></a>
+          <a routerLink="/simulator" class="nav-link"><span class="ico">🎯</span><span class="lbl">Simulator</span></a>
           <button class="theme-btn" (click)="svc.toggleTheme()">{{ isDark() ? '☀️' : '🌙' }}</button>
         </nav>
       </header>
@@ -48,30 +49,6 @@ interface TopicRow {
               <p>10 random questions across every topic — opens the simulator, fresh shuffle each time.</p>
             </div>
             <button class="shuffle-btn" (click)="shuffle10()">🔀 Shuffle 10 &amp; Practice</button>
-          </section>
-
-          <!-- Practice mode tiles -->
-          <section class="tiles">
-            <a routerLink="/spaced-repetition" class="tile">
-              <span class="tile-icon">🧠</span>
-              <span class="tile-name">Spaced Repetition</span>
-              <span class="tile-sub">SM-2 review queue</span>
-            </a>
-            <a routerLink="/feynman" class="tile">
-              <span class="tile-icon">🗣️</span>
-              <span class="tile-name">Feynman Mode</span>
-              <span class="tile-sub">Explain it simply</span>
-            </a>
-            <a routerLink="/neglect" class="tile">
-              <span class="tile-icon">⏳</span>
-              <span class="tile-name">Topic Neglect</span>
-              <span class="tile-sub">What you're forgetting</span>
-            </a>
-            <a routerLink="/mastery" class="tile">
-              <span class="tile-icon">📡</span>
-              <span class="tile-name">Mastery Radar</span>
-              <span class="tile-sub">Strengths &amp; gaps</span>
-            </a>
           </section>
 
           <div class="two-col">
@@ -114,6 +91,30 @@ interface TopicRow {
               </ul>
             </section>
           </div>
+
+          <!-- Practice mode tiles (only implemented modes are active) -->
+          <section class="tiles">
+            <a routerLink="/feynman" class="tile">
+              <span class="tile-icon">🗣️</span>
+              <span class="tile-name">Feynman Mode</span>
+              <span class="tile-sub">Explain &amp; check key points</span>
+            </a>
+            <div class="tile disabled" title="Coming soon">
+              <span class="tile-icon">🧠</span>
+              <span class="tile-name">Spaced Repetition</span>
+              <span class="tile-sub">Coming soon</span>
+            </div>
+            <div class="tile disabled" title="Coming soon">
+              <span class="tile-icon">⏳</span>
+              <span class="tile-name">Topic Neglect</span>
+              <span class="tile-sub">Coming soon</span>
+            </div>
+            <div class="tile disabled" title="Coming soon">
+              <span class="tile-icon">📡</span>
+              <span class="tile-name">Mastery Radar</span>
+              <span class="tile-sub">Coming soon</span>
+            </div>
+          </section>
         </div>
       </main>
     </div>
@@ -171,7 +172,8 @@ export class DashboardPage implements OnInit {
   }
 
   studyTopic(topicId: string): void {
-    this.router.navigate(['/spaced-repetition'], { queryParams: { topic: topicId } });
+    // Spaced repetition isn't implemented yet; route topic study into Feynman mode.
+    this.router.navigate(['/feynman'], { queryParams: { topic: topicId } });
   }
 
   barPct(value: number): number { return Math.round((value / this.chartMax()) * 100); }

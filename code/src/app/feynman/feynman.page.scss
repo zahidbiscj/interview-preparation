@@ -181,4 +181,11 @@
 @media (max-width: 640px) {
   .q-panel { padding: 18px; }
   .result-stats { grid-template-columns: 1fr; }
+
+  .topbar { padding: 0 10px; gap: 8px; }
+  .topbar-spacer { gap: 6px; }
+  .back-link .lbl { display: none; }
+  .app-brand .lbl { display: none; }
+  .nav-link .lbl { display: none; }
+  .nav-link { padding: 5px 9px; }
 }

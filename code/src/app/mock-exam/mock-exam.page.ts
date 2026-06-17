@@ -22,11 +22,11 @@ interface Graded { question: QuestionView; grade: Grade; }
 
       <!-- ── Top bar ── -->
       <header class="topbar">
-        <a routerLink="/" class="back-link">← Question Bank</a>
-        <span class="app-brand">🎯 Interview Simulator</span>
+        <a routerLink="/" class="back-link">← <span class="lbl">Question Bank</span></a>
+        <span class="app-brand">🎯 <span class="lbl">Interview Simulator</span></span>
         <span class="topbar-spacer">
-          <a routerLink="/sets" class="nav-link">🗂 Sets</a>
-          <a routerLink="/dashboard" class="nav-link">📊 Dashboard</a>
+          <a routerLink="/sets" class="nav-link"><span class="ico">🗂</span><span class="lbl">Sets</span></a>
+          <a routerLink="/dashboard" class="nav-link"><span class="ico">📊</span><span class="lbl">Dashboard</span></a>
           <button class="theme-btn" (click)="svc.toggleTheme()">{{ isDark() ? '☀️' : '🌙' }}</button>
         </span>
       </header>
@@ -228,12 +228,12 @@ export class MockExamPage implements OnInit {
     { value: 'mid', label: '🟡 Mid' },
     { value: 'senior', label: '🔴 Senior' },
   ];
-  readonly countOptions = [10, 20, 40, 0];
+  readonly countOptions = [5, 10, 20, 40, 0];
 
   // ── setup state ──
   readonly topicChoices = signal<TopicChoice[]>([]);
   readonly selectedLevels = signal<string[]>(['junior', 'mid', 'senior']);
-  readonly count = signal<number>(20);
+  readonly count = signal<number>(10);
   readonly order = signal<'gradual' | 'shuffle'>('shuffle');
   readonly predictOnly = signal(false);
   readonly loading = signal(false);

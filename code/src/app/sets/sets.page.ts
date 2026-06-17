@@ -18,11 +18,11 @@ type Mode = 'add' | 'review';
 
       <!-- ── Top bar ── -->
       <header class="topbar">
-        <a routerLink="/" class="back-link">← Question Bank</a>
-        <span class="app-brand">🗂 Question Sets</span>
+        <a routerLink="/" class="back-link">← <span class="lbl">Question Bank</span></a>
+        <span class="app-brand">🗂 <span class="lbl">Question Sets</span></span>
         <span class="topbar-spacer">
-          <a routerLink="/simulator" class="nav-link">🎯 Simulator</a>
-          <a routerLink="/dashboard" class="nav-link">📊 Dashboard</a>
+          <a routerLink="/simulator" class="nav-link"><span class="ico">🎯</span><span class="lbl">Simulator</span></a>
+          <a routerLink="/dashboard" class="nav-link"><span class="ico">📊</span><span class="lbl">Dashboard</span></a>
           <button class="theme-btn" (click)="svc.toggleTheme()">{{ isDark() ? '☀️' : '🌙' }}</button>
         </span>
       </header>
@@ -371,6 +371,33 @@ type Mode = 'add' | 'review';
     .review-list { display: flex; flex-direction: column; gap: 8px; }
 
     .no-results { color: var(--text-muted); font-size: 0.9em; padding: 24px; text-align: center; }
+
+    .nav-link .ico { margin-right: 4px; }
+
+    /* ── Mobile: stack the two panes, icon-only nav ── */
+    @media (max-width: 720px) {
+      .topbar { padding: 0 10px; gap: 8px; }
+      .topbar-spacer { gap: 6px; }
+      .back-link .lbl, .app-brand .lbl, .nav-link .lbl { display: none; }
+      .nav-link .ico { margin-right: 0; }
+      .nav-link { padding: 5px 9px; }
+
+      .layout { flex-direction: column; }
+      .sets-col {
+        width: 100%;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .main-col { padding: 14px 14px 28px; }
+
+      .set-head { flex-direction: column; align-items: stretch; gap: 10px; }
+      .run-btn { width: 100%; }
+      .add-controls { flex-direction: column; }
+      .type-select { width: 100%; }
+      .pick-row { grid-template-columns: auto 1fr; }
+      .pick-meta { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; padding-left: 0; }
+    }
   `]
 })
 export class SetsPage implements OnInit {

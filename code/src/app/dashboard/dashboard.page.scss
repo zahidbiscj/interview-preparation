@@ -124,6 +124,12 @@
   transition: border-color 120ms, transform 120ms;
   &:hover { border-color: var(--accent); transform: translateY(-2px); text-decoration: none; }
 }
+.tile.disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  &:hover { border-color: var(--border); transform: none; }
+}
 .tile-icon { font-size: 1.6em; }
 .tile-name { font-weight: 700; font-size: 0.9em; color: var(--text); }
 .tile-sub { font-size: 0.72em; color: var(--text-muted); }
@@ -284,4 +290,10 @@
 @media (max-width: 640px) {
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
   .q-panel { padding: 18px; }
+
+  .topbar { padding: 0 10px; gap: 8px; }
+  .nav { gap: 6px; }
+  .app-brand .lbl { display: none; }
+  .nav-link .lbl { display: none; }
+  .nav-link { padding: 5px 9px; }
 }
