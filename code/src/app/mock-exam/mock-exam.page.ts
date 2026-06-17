@@ -1,7 +1,7 @@
 import {
   ChangeDetectionStrategy, Component, computed, inject, OnInit, signal
 } from '@angular/core';
-import { RouterLink, ActivatedRoute } from '@angular/router';
+import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { MarkdownComponent } from 'ngx-markdown';
 import { QuestionBankService } from '../question-bank/question-bank.service';
 import { QuestionView } from '../question-bank/models/question-bank.models';
@@ -92,6 +92,9 @@ interface Graded { question: QuestionView; grade: Grade; }
 
             <button class="start-btn" [disabled]="loading()" (click)="start()">
               {{ loading() ? 'Loading…' : 'Start Simulation →' }}
+            </button>
+            <button class="start-btn" style="margin-top:8px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); font-weight: 600;" (click)="goLive()">
+              🎤 Live Interview Mode
             </button>
           </div>
         }
@@ -267,6 +270,7 @@ export class MockExamPage implements OnInit {
   });
 
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private reviewLog = inject(ReviewLogService);
 
   async ngOnInit(): Promise<void> {
@@ -396,6 +400,10 @@ export class MockExamPage implements OnInit {
   retryReview(): void {
     const pool = this.reviewList().map(g => g.question);
     this.beginExam(this.shuffle(pool));
+  }
+
+  goLive(): void {
+    this.router.navigate(['/live-interview']);
   }
 
   resetToSetup(): void {

@@ -22,6 +22,11 @@ export const routes: Routes = [
       import('./dashboard/dashboard.page').then(m => m.DashboardPage)
   },
   {
+    path: 'live-interview',
+    loadComponent: () =>
+      import('./live-interview/live-interview.page').then(m => m.LiveInterviewPage)
+  },
+  {
     path: 'feynman',
     loadComponent: () =>
       import('./feynman/feynman.page').then(m => m.FeynmanPage)
