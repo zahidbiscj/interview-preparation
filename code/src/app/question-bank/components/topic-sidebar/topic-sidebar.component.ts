@@ -10,7 +10,10 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
     <nav class="sidebar">
       <div class="sidebar-header">
         <span class="sidebar-title">Topics</span>
-        <span class="topic-count">{{ topics().length }} topics</span>
+        <span class="header-counts">
+          <span class="topic-count total">{{ totalQuestions() }} questions</span>
+          <span class="topic-count">{{ topics().length }} topics</span>
+        </span>
       </div>
 
       <ul class="topic-list">
@@ -87,12 +90,25 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
       color: var(--text-muted);
     }
 
+    .header-counts {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     .topic-count {
       font-size: 0.75em;
       color: var(--text-muted);
       background: var(--surface-2);
       padding: 2px 7px;
       border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .topic-count.total {
+      color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      font-weight: 600;
     }
 
     .topic-list {
@@ -188,6 +204,7 @@ export class TopicSidebarComponent {
   private svc = inject(QuestionBankService);
 
   readonly topics = this.svc.topics;
+  readonly totalQuestions = this.svc.totalQuestions;
   readonly loadingTopicId = this.svc.loadingTopicId;
   readonly selected = this.svc.selected;
 

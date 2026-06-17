@@ -11,6 +11,67 @@ const THEME_KEY = 'qbank.theme';
 const DAILY_KEY = 'qbank.daily';
 const SETS_KEY = 'qbank.sets';
 
+/** Pre-built sets seeded on first visit (keyed to real question IDs in the bank). */
+const PRESET_SETS: QuestionSet[] = [
+  {
+    id: 'preset-fullstack-dotnet-react',
+    name: 'Fullstack .NET + React (KL Contract)',
+    createdAt: 3,
+    questionIds: [
+      'csharp-oop-001', 'csharp-oop-003', 'csharp-oop-004', 'csharp-oop-005',
+      'csharp-async-001', 'csharp-fund-004',
+      'aspnet-restapi-001', 'aspnet-restapi-002', 'aspnet-restapi-003', 'aspnet-restapi-005',
+      'aspnet-di-001', 'aspnet-middleware-001',
+      'efcore-querying-001', 'efcore-querying-002', 'efcore-querying-003', 'efcore-loading-001',
+      'sql-queries-002', 'sql-queries-003', 'sql-transactions-001',
+      'js-fund-011', 'js-fund-007', 'js-fund-004', 'js-async-001', 'js-async-003',
+      'angular-basics-001', 'angular-binding-001', 'angular-advanced-001',
+      'testing-fundamentals-001',
+      'behavioral-experience-005', 'behavioral-experience-007',
+    ],
+  },
+  {
+    id: 'preset-dotnet-developer-my',
+    name: '.NET Developer Malaysia',
+    createdAt: 2,
+    questionIds: [
+      'csharp-fund-001', 'csharp-fund-002', 'csharp-fund-004', 'csharp-fund-005',
+      'csharp-oop-001', 'csharp-oop-002', 'csharp-oop-003', 'csharp-oop-004',
+      'csharp-async-001', 'csharp-async-002',
+      'aspnet-middleware-001', 'aspnet-di-001', 'aspnet-di-002',
+      'aspnet-restapi-001', 'aspnet-restapi-002', 'aspnet-restapi-005',
+      'aspnet-restapi-006', 'aspnet-restapi-008',
+      'efcore-querying-001', 'efcore-querying-002', 'efcore-querying-003',
+      'efcore-loading-001', 'efcore-migrations-001',
+      'sql-queries-002', 'sql-queries-007', 'sql-transactions-001',
+      'architecture-patterns-001', 'architecture-patterns-002',
+      'devops-git-001',
+      'testing-fundamentals-001',
+    ],
+  },
+  {
+    id: 'preset-azure-integration-engineer',
+    name: 'Senior Integration Engineer – Azure',
+    createdAt: 1,
+    questionIds: [
+      'azure-compute-001', 'azure-compute-002', 'azure-compute-005',
+      'azure-compute-006', 'azure-compute-008', 'azure-compute-013',
+      'azure-messaging-001', 'azure-messaging-002', 'azure-messaging-003',
+      'azure-messaging-004', 'azure-messaging-005', 'azure-messaging-009',
+      'azure-messaging-012',
+      'azure-integration-patterns-001', 'azure-integration-patterns-002',
+      'csharp-oop-001', 'csharp-async-001', 'csharp-async-002',
+      'aspnet-restapi-001', 'aspnet-restapi-005',
+      'architecture-patterns-004', 'architecture-patterns-005',
+      'architecture-patterns-007', 'architecture-patterns-012',
+      'architecture-patterns-013',
+      'devops-cicd-001', 'devops-cicd-005',
+      'security-authz-008', 'security-data-secrets-004',
+      'behavioral-experience-002',
+    ],
+  },
+];
+
 /** Per-day practice tally, keyed by YYYY-MM-DD. */
 export interface DailyStat {
   date: string;
@@ -66,6 +127,10 @@ export class QuestionBankService {
   readonly focusQuestionId = this._focusQuestionId.asReadonly();
   /** User-curated question sets, newest first. */
   readonly sets = this._sets.asReadonly();
+
+  /** Total questions across every topic (uses the loaded count when available, else the index's). */
+  readonly totalQuestions = computed(() =>
+    this._topics().reduce((sum, t) => sum + (t.loaded ? t.questionCount : (t.count ?? 0)), 0));
 
   /** Total questions self-graded across all days. */
   readonly totalAnswered = computed(() =>
@@ -448,7 +513,11 @@ export class QuestionBankService {
   private loadSets(): QuestionSet[] {
     try {
       const raw = localStorage.getItem(SETS_KEY);
-      return raw ? JSON.parse(raw) : [];
+      const parsed: QuestionSet[] = raw ? JSON.parse(raw) : [];
+      if (parsed.length > 0) return parsed;
+      // No sets yet — seed the JD-matched preset sets.
+      localStorage.setItem(SETS_KEY, JSON.stringify(PRESET_SETS));
+      return PRESET_SETS;
     } catch {
       return [];
     }

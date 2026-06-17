@@ -1,17 +1,108 @@
 {
   "topics": [
-    { "id": "csharp",       "name": "C# & .NET",                    "icon": "🔷", "file": "csharp.json",       "order": 1 },
-    { "id": "aspnet",       "name": "ASP.NET Core & Web API",        "icon": "🌐", "file": "aspnet.json",       "order": 2 },
-    { "id": "efcore",       "name": "EF Core",                       "icon": "🗃️", "file": "efcore.json",       "order": 3 },
-    { "id": "sql",          "name": "SQL Server",                    "icon": "🗄️", "file": "sql.json",          "order": 4 },
-    { "id": "angular",      "name": "Angular & Frontend",            "icon": "🅰️", "file": "angular.json",      "order": 5 },
-    { "id": "javascript",   "name": "JavaScript & React",            "icon": "🟨", "file": "javascript.json",   "order": 6 },
-    { "id": "azure",        "name": "Azure & Cloud Integration",     "icon": "☁️", "file": "azure.json",        "order": 7 },
-    { "id": "security",     "name": "Security",                      "icon": "🔐", "file": "security.json",     "order": 8 },
-    { "id": "architecture", "name": "System Design & Architecture",  "icon": "🏗️", "file": "architecture.json", "order": 9 },
-    { "id": "devops",       "name": "DevOps & Git",                  "icon": "🔧", "file": "devops.json",       "order": 10 },
-    { "id": "testing",      "name": "Testing",                       "icon": "🧪", "file": "testing.json",      "order": 11 },
-    { "id": "coding",       "name": "Coding & DSA",                  "icon": "🧩", "file": "coding.json",       "order": 12 },
-    { "id": "behavioral",   "name": "Project & Experience",          "icon": "💼", "file": "behavioral.json",   "order": 13 }
+    {
+      "id": "csharp",
+      "name": "C# & .NET",
+      "icon": "🔷",
+      "file": "csharp.json",
+      "order": 1,
+      "count": 118
+    },
+    {
+      "id": "aspnet",
+      "name": "ASP.NET Core & Web API",
+      "icon": "🌐",
+      "file": "aspnet.json",
+      "order": 2,
+      "count": 48
+    },
+    {
+      "id": "efcore",
+      "name": "EF Core",
+      "icon": "🗃️",
+      "file": "efcore.json",
+      "order": 3,
+      "count": 33
+    },
+    {
+      "id": "sql",
+      "name": "SQL Server",
+      "icon": "🗄️",
+      "file": "sql.json",
+      "order": 4,
+      "count": 26
+    },
+    {
+      "id": "angular",
+      "name": "Angular & Frontend",
+      "icon": "🅰️",
+      "file": "angular.json",
+      "order": 5,
+      "count": 45
+    },
+    {
+      "id": "javascript",
+      "name": "JavaScript & React",
+      "icon": "🟨",
+      "file": "javascript.json",
+      "order": 6,
+      "count": 39
+    },
+    {
+      "id": "azure",
+      "name": "Azure & Cloud Integration",
+      "icon": "☁️",
+      "file": "azure.json",
+      "order": 7,
+      "count": 63
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "icon": "🔐",
+      "file": "security.json",
+      "order": 8,
+      "count": 30
+    },
+    {
+      "id": "architecture",
+      "name": "System Design & Architecture",
+      "icon": "🏗️",
+      "file": "architecture.json",
+      "order": 9,
+      "count": 55
+    },
+    {
+      "id": "devops",
+      "name": "DevOps & Git",
+      "icon": "🔧",
+      "file": "devops.json",
+      "order": 10,
+      "count": 18
+    },
+    {
+      "id": "testing",
+      "name": "Testing",
+      "icon": "🧪",
+      "file": "testing.json",
+      "order": 11,
+      "count": 29
+    },
+    {
+      "id": "coding",
+      "name": "Coding & DSA",
+      "icon": "🧩",
+      "file": "coding.json",
+      "order": 12,
+      "count": 105
+    },
+    {
+      "id": "behavioral",
+      "name": "Project & Experience",
+      "icon": "💼",
+      "file": "behavioral.json",
+      "order": 13,
+      "count": 15
+    }
   ]
 }

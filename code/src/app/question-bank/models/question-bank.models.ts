@@ -20,6 +20,8 @@ export interface TopicRef {
   icon: string;
   file: string;
   order: number;
+  /** Precomputed question count from topics.json (available before the topic loads). */
+  count?: number;
 }
 
 export interface TopicFile {
