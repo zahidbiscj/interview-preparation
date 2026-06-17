@@ -23,7 +23,10 @@ interface Graded { question: QuestionView; grade: Grade; }
       <header class="topbar">
         <a routerLink="/" class="back-link">← Question Bank</a>
         <span class="app-brand">🎯 Interview Simulator</span>
-        <button class="theme-btn" (click)="svc.toggleTheme()">{{ isDark() ? '☀️' : '🌙' }}</button>
+        <span class="topbar-spacer">
+          <a routerLink="/dashboard" class="nav-link">📊 Dashboard</a>
+          <button class="theme-btn" (click)="svc.toggleTheme()">{{ isDark() ? '☀️' : '🌙' }}</button>
+        </span>
       </header>
 
       <main class="exam-main">
@@ -229,7 +232,7 @@ export class MockExamPage implements OnInit {
   readonly topicChoices = signal<TopicChoice[]>([]);
   readonly selectedLevels = signal<string[]>(['junior', 'mid', 'senior']);
   readonly count = signal<number>(20);
-  readonly order = signal<'gradual' | 'shuffle'>('gradual');
+  readonly order = signal<'gradual' | 'shuffle'>('shuffle');
   readonly predictOnly = signal(false);
   readonly loading = signal(false);
   readonly setupError = signal<string | null>(null);
@@ -353,7 +356,9 @@ export class MockExamPage implements OnInit {
   }
 
   finish(): void {
+    if (this.phase() !== 'running') return;
     this.stopTimer();
+    this.svc.recordPractice(this.graded().length, this.gotCount());
     this.phase.set('done');
   }
 

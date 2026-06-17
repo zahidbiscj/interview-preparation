@@ -745,6 +745,141 @@
           }
         }
       ]
+    },
+    {
+      "subtopicId": "performance",
+      "subtopicName": "Performance & Tuning",
+      "order": 3,
+      "questions": [
+        {
+          "id": "sql-performance-001",
+          "q": "What is parameter sniffing and how do you deal with it?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["parameter sniffing", "option recompile", "optimize for", "plan cache", "performance"],
+          "answer": {
+            "oneLiner": "SQL Server builds and caches a plan based on the first parameter values it sees; if later calls have very different selectivity, that cached plan can be terrible for them.",
+            "keyPoints": [
+              "First execution's parameters shape the cached plan for everyone.",
+              "Fixes: `OPTION (RECOMPILE)` (fresh plan per call), `OPTIMIZE FOR (@p = value)`, or `OPTIMIZE FOR UNKNOWN`.",
+              "Assigning the parameter to a local variable disables sniffing (uses average estimate).",
+              "Broader fixes: Query Store plan forcing, or splitting into separate procedures."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Recompile every call (best plan, small CPU cost)\nSELECT * FROM Orders WHERE CustomerId = @cid\nOPTION (RECOMPILE);\n\n-- Optimize for a representative value\nSELECT * FROM Orders WHERE CustomerId = @cid\nOPTION (OPTIMIZE FOR (@cid = 100));\n\n-- Ignore sniffed value, use density average\nSELECT * FROM Orders WHERE CustomerId = @cid\nOPTION (OPTIMIZE FOR UNKNOWN);",
+              "note": "OPTION (RECOMPILE) is the simplest fix but trades CPU for a per-execution plan"
+            },
+            "followUps": [
+              "Why does a local variable disable parameter sniffing?",
+              "How does Query Store help fix a regressed plan?",
+              "When is OPTION (RECOMPILE) too expensive?"
+            ],
+            "redFlags": [
+              "Not knowing the cached plan comes from the first parameters",
+              "Thinking parameter sniffing is always bad (it usually helps)",
+              "Slapping RECOMPILE on a high-frequency OLTP query without measuring"
+            ]
+          }
+        },
+        {
+          "id": "sql-performance-002",
+          "q": "What is a columnstore index and when would you use one?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["columnstore", "analytical", "olap", "compression", "batch mode"],
+          "answer": {
+            "oneLiner": "A columnstore index stores data column-by-column with heavy compression, giving huge gains for analytical/aggregation queries over millions of rows, while rowstore stays better for OLTP point lookups.",
+            "keyPoints": [
+              "Column-oriented + batch-mode execution = fast scans and aggregates.",
+              "High compression because similar values sit together per column.",
+              "Clustered columnstore for data-warehouse fact tables; nonclustered for HTAP on OLTP tables.",
+              "Poor for single-row seeks/frequent small updates — use rowstore there."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Clustered columnstore for an analytical fact table\nCREATE CLUSTERED COLUMNSTORE INDEX CCI_Sales ON SalesFact;\n\n-- Nonclustered columnstore on an OLTP table (HTAP / real-time analytics)\nCREATE NONCLUSTERED COLUMNSTORE INDEX NCCI_Orders\n    ON Orders (OrderDate, CustomerId, Total);",
+              "note": "Columnstore shines on SELECT SUM/COUNT/GROUP BY over large tables, not on point lookups"
+            },
+            "followUps": [
+              "Rowstore vs columnstore trade-offs?",
+              "What is batch-mode execution?",
+              "What is HTAP and how does nonclustered columnstore enable it?"
+            ],
+            "redFlags": [
+              "Using columnstore for an OLTP point-lookup table",
+              "Not knowing columnstore compresses per-column",
+              "Confusing columnstore with covering indexes"
+            ]
+          }
+        },
+        {
+          "id": "sql-performance-003",
+          "q": "What is the difference between optimistic and pessimistic locking?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["optimistic locking", "pessimistic locking", "concurrency", "rowversion", "updlock"],
+          "answer": {
+            "oneLiner": "Pessimistic locking takes a lock up front so others wait; optimistic locking takes no lock and instead checks at write time whether the row changed, retrying or failing on conflict.",
+            "keyPoints": [
+              "Pessimistic: hold locks (e.g. UPDLOCK/HOLDLOCK) — safe but blocks and risks deadlocks.",
+              "Optimistic: read freely, validate a version/rowversion on update.",
+              "Optimistic wins under low contention (better concurrency); pessimistic under high contention/critical sections.",
+              "Optimistic conflict = re-read and retry or return 409 to the user."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Pessimistic: lock the row for update inside a transaction\nBEGIN TRANSACTION;\nSELECT * FROM Accounts WITH (UPDLOCK, HOLDLOCK) WHERE AccountId = 1;\n-- ... others block until COMMIT\nCOMMIT;\n\n-- Optimistic: rowversion check, 0 rows = someone else changed it\nUPDATE Accounts\nSET Balance = @new\nWHERE AccountId = 1 AND RowVer = @originalRowVer;\n-- if @@ROWCOUNT = 0 -> conflict, re-read and retry",
+              "note": "Optimistic locking is the default in EF Core via a rowversion concurrency token"
+            },
+            "followUps": [
+              "How does a rowversion column implement optimistic locking?",
+              "When does pessimistic locking cause deadlocks?",
+              "How does RCSI relate to these strategies?"
+            ],
+            "redFlags": [
+              "Confusing the two strategies",
+              "Thinking optimistic locking actually takes a lock",
+              "Not handling the optimistic conflict (0 rows affected)"
+            ]
+          }
+        },
+        {
+          "id": "sql-performance-004",
+          "q": "What is READ COMMITTED SNAPSHOT isolation (RCSI) and why would you enable it?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["rcsi", "snapshot", "row versioning", "tempdb", "blocking", "isolation"],
+          "answer": {
+            "oneLiner": "RCSI changes the default READ COMMITTED behavior to use row versioning so readers see the last committed version instead of taking shared locks — readers no longer block writers and vice versa.",
+            "keyPoints": [
+              "Database-level setting; row versions are kept in tempdb.",
+              "Readers get the last committed row, no shared (S) locks, no blocking.",
+              "Eliminates many reader-writer deadlocks without any app code change.",
+              "Cost: extra tempdb usage and a 14-byte version pointer per row."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Enable RCSI (changes default READ COMMITTED to use versioning)\nALTER DATABASE AppDb\n    SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;\n\n-- Now ordinary queries no longer take shared read locks\nSELECT * FROM Orders WHERE CustomerId = 42;  -- reads a version, doesn't block writers",
+              "note": "RCSI is statement-level versioning; full SNAPSHOT isolation versions for the whole transaction"
+            },
+            "followUps": [
+              "RCSI vs SNAPSHOT isolation?",
+              "Why does RCSI increase tempdb usage?",
+              "Why prefer RCSI over scattering NOLOCK hints?"
+            ],
+            "redFlags": [
+              "Confusing RCSI with NOLOCK / dirty reads",
+              "Not knowing versions live in tempdb",
+              "Confusing statement-level RCSI with transaction-level snapshot"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

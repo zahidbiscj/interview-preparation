@@ -1,0 +1,640 @@
+{
+  "topicId": "security",
+  "topicName": "Security",
+  "subtopics": [
+    {
+      "subtopicId": "web",
+      "subtopicName": "Web & API Security",
+      "order": 1,
+      "questions": [
+        {
+          "id": "security-web-001",
+          "q": "How would you secure a public-facing Web API?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["api", "hardening", "checklist"],
+          "answer": {
+            "oneLiner": "Layer it: authenticate and authorize every endpoint, force HTTPS/HSTS, validate all input, lock down CORS, rate-limit, and add security headers.",
+            "keyPoints": [
+              "AuthN + AuthZ on every endpoint (deny by default)",
+              "HTTPS + HSTS, input validation, output encoding",
+              "CORS whitelist, rate limiting / throttling, WAF in front",
+              "Versioning + least-privilege DB and secrets"
+            ],
+            "followUps": [
+              "Where would you put rate limiting — app or gateway?",
+              "How do you handle API versioning securely?"
+            ],
+            "redFlags": ["Relying only on HTTPS", "Trusting client-side validation"]
+          }
+        },
+        {
+          "id": "security-web-002",
+          "q": "What is CORS and how do you configure it securely in ASP.NET Core?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["cors", "browser", "config"],
+          "answer": {
+            "oneLiner": "CORS is a browser mechanism that controls which origins may call your API via response headers; configure it with a strict origin whitelist, never a wildcard with credentials.",
+            "keyPoints": [
+              "Browser-enforced, not server security — it relaxes same-origin policy",
+              "Use `AddCors` + `UseCors` with a named policy",
+              "Whitelist specific origins/methods/headers",
+              "Never combine `AllowAnyOrigin()` with `AllowCredentials()`"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "builder.Services.AddCors(o => o.AddPolicy(\"app\", p =>\n    p.WithOrigins(\"https://app.contoso.com\")\n     .AllowAnyHeader().AllowAnyMethod()\n     .AllowCredentials()));\n...\napp.UseCors(\"app\");",
+              "note": "AllowAnyOrigin + AllowCredentials is invalid and exposes cookies/tokens."
+            },
+            "followUps": ["Does CORS protect the server itself?", "Why does AllowAnyOrigin block credentials?"],
+            "redFlags": ["Calling CORS a server-side security control", "Using AllowAnyOrigin in production"]
+          }
+        },
+        {
+          "id": "security-web-003",
+          "q": "What is XSS and how do you prevent it?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["xss", "owasp", "injection"],
+          "answer": {
+            "oneLiner": "XSS is injecting malicious script into a page so it runs in another user's browser; prevent it with context-aware output encoding and a Content-Security-Policy.",
+            "keyPoints": [
+              "Stored, reflected, and DOM-based variants",
+              "Encode output for its context (HTML/attr/JS/URL)",
+              "Razor auto-encodes; avoid `Html.Raw` on untrusted data",
+              "Add CSP and use HttpOnly cookies to limit impact"
+            ],
+            "followUps": ["What is DOM-based XSS?", "How does CSP reduce XSS impact?"],
+            "redFlags": ["Blacklisting `<script>` only", "Disabling Razor encoding"]
+          }
+        },
+        {
+          "id": "security-web-004",
+          "q": "What is CSRF and how do you prevent it?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["csrf", "antiforgery", "cookies"],
+          "answer": {
+            "oneLiner": "CSRF tricks a logged-in user's browser into sending an unwanted authenticated request; prevent it with antiforgery tokens and SameSite cookies.",
+            "keyPoints": [
+              "Only affects cookie/credential-based auth (browser auto-sends)",
+              "Use antiforgery tokens (`[ValidateAntiForgeryToken]`)",
+              "Set cookies `SameSite=Lax/Strict` + `Secure`",
+              "Token-in-header APIs (Bearer) are largely immune"
+            ],
+            "followUps": ["Why are pure JWT-in-header APIs less exposed?", "Lax vs Strict SameSite?"],
+            "redFlags": ["Thinking HTTPS stops CSRF", "Validating tokens only on GET"]
+          }
+        },
+        {
+          "id": "security-web-005",
+          "q": "How do you prevent SQL injection?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["sql-injection", "parameterization", "ef"],
+          "answer": {
+            "oneLiner": "Never concatenate user input into queries — use parameterized queries or an ORM that parameterizes, plus least-privilege DB accounts.",
+            "keyPoints": [
+              "Parameterized commands / EF LINQ are parameterized",
+              "Use `FromSqlInterpolated` not string concat in EF",
+              "Least-privilege DB user, no `sa`/`db_owner`",
+              "Validate input and put a WAF in front as defense-in-depth"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// safe\nctx.Users.FromSqlInterpolated($\"SELECT * FROM Users WHERE Email = {email}\");\n// also safe (ADO.NET)\ncmd.Parameters.AddWithValue(\"@email\", email);",
+              "note": "FromSqlRaw with string concatenation is NOT safe."
+            },
+            "followUps": ["Is EF immune to SQL injection?", "What does least privilege add here?"],
+            "redFlags": ["String concatenation in queries", "Using FromSqlRaw with interpolation"]
+          }
+        },
+        {
+          "id": "security-web-006",
+          "q": "What is over-posting / mass assignment and how do you prevent it?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["mass-assignment", "over-posting", "dto"],
+          "answer": {
+            "oneLiner": "Over-posting is when a client binds extra fields (like `IsAdmin`) you never intended to accept; prevent it by binding to purpose-built DTOs instead of entities.",
+            "keyPoints": [
+              "Happens when model binding maps to your domain entity directly",
+              "Use input DTOs/view models with only allowed fields",
+              "Or restrict with `[Bind]` / `[BindNever]`",
+              "Map DTO to entity explicitly server-side"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public record UpdateProfileDto(string Name, string Email); // no IsAdmin\n\n[HttpPut]\npublic IActionResult Update(UpdateProfileDto dto) { ... }",
+              "note": "Never bind directly to an entity that has privileged fields."
+            },
+            "followUps": ["What does [BindNever] do?", "Why are DTOs better than [Bind]?"],
+            "redFlags": ["Binding requests straight to EF entities", "Trusting all posted fields"]
+          }
+        },
+        {
+          "id": "security-web-007",
+          "q": "Which security response headers matter and what do they do?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["headers", "csp", "hsts"],
+          "answer": {
+            "oneLiner": "A small set of response headers harden the browser: CSP, X-Content-Type-Options, X-Frame-Options, HSTS, Referrer-Policy, and Permissions-Policy.",
+            "keyPoints": [
+              "`Content-Security-Policy` — restricts script/resource sources (XSS)",
+              "`X-Content-Type-Options: nosniff` — stops MIME sniffing",
+              "`X-Frame-Options: DENY` — anti-clickjacking; `Strict-Transport-Security` — force HTTPS",
+              "`Referrer-Policy` + `Permissions-Policy` — limit leakage / browser features"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "app.Use(async (ctx, next) => {\n  ctx.Response.Headers[\"X-Content-Type-Options\"] = \"nosniff\";\n  ctx.Response.Headers[\"X-Frame-Options\"] = \"DENY\";\n  await next();\n});\napp.UseHsts();",
+              "note": "CSP is the strongest but needs tuning to avoid breaking the app."
+            },
+            "followUps": ["Which header replaces X-Frame-Options in modern CSP?", "Why use HSTS preload?"],
+            "redFlags": ["Setting CSP to `unsafe-inline` everywhere", "Enabling HSTS in local dev"]
+          }
+        },
+        {
+          "id": "security-web-008",
+          "q": "What is clickjacking and how do you defend against it?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["clickjacking", "headers", "iframe"],
+          "answer": {
+            "oneLiner": "Clickjacking tricks a user into clicking on your site loaded invisibly inside an attacker's iframe; block it by refusing to be framed.",
+            "keyPoints": [
+              "Attacker overlays/hides your page in an iframe",
+              "Defend with `X-Frame-Options: DENY` or `SAMEORIGIN`",
+              "Modern equivalent: CSP `frame-ancestors 'none'`",
+              "Use both for broad browser coverage"
+            ],
+            "followUps": ["CSP frame-ancestors vs X-Frame-Options?", "When would you allow SAMEORIGIN?"],
+            "redFlags": ["No framing protection on sensitive pages"]
+          }
+        },
+        {
+          "id": "security-web-009",
+          "q": "What is a WAF and what does it protect against?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "low",
+          "tags": ["waf", "defense-in-depth", "gateway"],
+          "answer": {
+            "oneLiner": "A Web Application Firewall inspects HTTP traffic at the edge and blocks common attack patterns (SQLi, XSS, bots); it's defense-in-depth, not a replacement for secure code.",
+            "keyPoints": [
+              "Sits in front (Azure Front Door / App Gateway, Cloudflare)",
+              "Rule-based: OWASP CRS, rate limits, geo/IP filters",
+              "Buys time against zero-days and known patterns",
+              "Complements, never replaces, app-level fixes"
+            ],
+            "followUps": ["Can a WAF stop business-logic abuse?", "What is the OWASP Core Rule Set?"],
+            "redFlags": ["Treating a WAF as full protection", "Leaving it in detection-only mode"]
+          }
+        },
+        {
+          "id": "security-web-010",
+          "q": "How do you handle input validation in a Web API?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["validation", "modelstate", "api"],
+          "answer": {
+            "oneLiner": "Validate every input on the server with an allow-list mindset; client validation is only UX, never a security control.",
+            "keyPoints": [
+              "`[ApiController]` auto-validates `ModelState`",
+              "Use data annotations or FluentValidation",
+              "Allow-list expected formats/ranges, reject the rest",
+              "Validate even for authenticated/internal callers"
+            ],
+            "followUps": ["Why isn't client-side validation enough?", "Allow-list vs deny-list?"],
+            "redFlags": ["Trusting the client", "Deny-list filtering of 'bad' characters only"]
+          }
+        },
+        {
+          "id": "security-web-011",
+          "q": "Walk me through the OWASP Top 10 at a high level.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["owasp", "top10", "overview"],
+          "answer": {
+            "oneLiner": "It's OWASP's list of the most critical web app risks, currently led by Broken Access Control, Cryptographic Failures, and Injection.",
+            "keyPoints": [
+              "Broken Access Control (#1), Crypto Failures, Injection",
+              "Insecure Design, Security Misconfiguration",
+              "Vulnerable Components, Auth Failures, SSRF",
+              "It's awareness/prioritization, not a checklist of everything"
+            ],
+            "followUps": ["What's the #1 risk and why?", "What is SSRF?"],
+            "redFlags": ["Naming only injection/XSS and nothing about access control"]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "authz",
+      "subtopicName": "Auth & Identity",
+      "order": 2,
+      "questions": [
+        {
+          "id": "security-authz-001",
+          "q": "What is the difference between authentication and authorization?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["authn", "authz", "basics"],
+          "answer": {
+            "oneLiner": "Authentication proves who you are; authorization decides what you're allowed to do.",
+            "keyPoints": [
+              "AuthN = identity (login, tokens)",
+              "AuthZ = permissions (roles, policies, claims)",
+              "AuthN always happens first",
+              "ASP.NET: `UseAuthentication()` before `UseAuthorization()`"
+            ],
+            "followUps": ["Which middleware comes first and why?", "Give an example of each."],
+            "redFlags": ["Using the terms interchangeably"]
+          }
+        },
+        {
+          "id": "security-authz-002",
+          "q": "What's the difference between OAuth 2.0 and OpenID Connect?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["oauth", "oidc", "tokens"],
+          "answer": {
+            "oneLiner": "OAuth 2.0 is an authorization framework that issues access tokens for API access; OpenID Connect is an identity layer on top that adds an ID token to authenticate the user.",
+            "keyPoints": [
+              "OAuth → access token (authorization / 'can call API')",
+              "OIDC → ID token (authentication / 'who the user is')",
+              "ID token is a JWT with user claims (`sub`, `email`)",
+              "Use OIDC when you need to log a user in, OAuth for delegated API access"
+            ],
+            "followUps": ["What's in an ID token vs an access token?", "When do you only need OAuth?"],
+            "redFlags": ["Using an access token to identify the user", "Calling OAuth an authentication protocol"]
+          }
+        },
+        {
+          "id": "security-authz-003",
+          "q": "What is the PKCE flow and why is it used for SPAs and mobile apps?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["pkce", "oauth", "spa", "mobile"],
+          "answer": {
+            "oneLiner": "PKCE is the Authorization Code flow plus a one-time code verifier/challenge, so public clients that can't keep a secret can still exchange codes securely.",
+            "keyPoints": [
+              "Client sends a hashed `code_challenge`, later proves it with `code_verifier`",
+              "Stops authorization-code interception/replay",
+              "Required for public clients (SPA, mobile, native)",
+              "No client secret needed — replaces the old implicit flow"
+            ],
+            "followUps": ["Why was the implicit flow deprecated?", "Where is the code_verifier kept?"],
+            "redFlags": ["Still using implicit flow for SPAs", "Embedding a client secret in a SPA"]
+          }
+        },
+        {
+          "id": "security-authz-004",
+          "q": "Describe the structure of a JWT and how you validate one.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["jwt", "tokens", "validation"],
+          "answer": {
+            "oneLiner": "A JWT has three base64url parts — header, payload (claims), and signature; you validate the signature, issuer, audience, and expiry before trusting it.",
+            "keyPoints": [
+              "Header (alg) . Payload (claims) . Signature",
+              "Payload is encoded, not encrypted — never put secrets in it",
+              "Validate signature, `iss`, `aud`, `exp`, `nbf`",
+              "Verify against the IdP's signing keys (JWKS)"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "options.TokenValidationParameters = new() {\n  ValidateIssuer = true, ValidateAudience = true,\n  ValidateLifetime = true, ValidateIssuerSigningKey = true\n};",
+              "note": "Disabling any of these validations is a common, serious bug."
+            },
+            "followUps": ["Why can't you store secrets in the payload?", "What is JWKS?"],
+            "redFlags": ["Skipping signature/audience validation", "Accepting `alg: none`"]
+          }
+        },
+        {
+          "id": "security-authz-005",
+          "q": "JWT vs cookie authentication — when do you use each?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["jwt", "cookies", "sessions"],
+          "answer": {
+            "oneLiner": "Cookies suit server-rendered apps and are CSRF-prone but XSS-safer when HttpOnly; JWTs suit APIs/SPAs/mobile and cross-domain calls but need careful storage.",
+            "keyPoints": [
+              "Cookies: stateful-ish, auto-sent, HttpOnly, needs CSRF protection",
+              "JWT: stateless, sent in Authorization header, good cross-domain",
+              "JWT downside: hard to revoke; cookie downside: CSRF",
+              "Hybrid: short-lived JWT + refresh token in HttpOnly cookie"
+            ],
+            "followUps": ["Where should a SPA store a JWT?", "How does the hybrid pattern work?"],
+            "redFlags": ["Storing JWTs in localStorage without considering XSS", "Long-lived JWTs with no revocation plan"]
+          }
+        },
+        {
+          "id": "security-authz-006",
+          "q": "How do refresh tokens work and where should they be stored?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["refresh-token", "rotation", "tokens"],
+          "answer": {
+            "oneLiner": "A refresh token is a long-lived credential exchanged for new short-lived access tokens; store it securely server-side or in an HttpOnly cookie and rotate it on every use.",
+            "keyPoints": [
+              "Lets access tokens stay short-lived (minutes)",
+              "Rotate on each use; detect reuse → revoke the family",
+              "Store HttpOnly+Secure cookie (web) or secure storage (mobile)",
+              "Never put refresh tokens in localStorage"
+            ],
+            "followUps": ["What is refresh-token rotation?", "How do you detect a stolen refresh token?"],
+            "redFlags": ["Refresh token in localStorage", "No rotation or reuse detection"]
+          }
+        },
+        {
+          "id": "security-authz-007",
+          "q": "Compare RBAC, claims-based, and policy-based authorization in ASP.NET Core.",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["rbac", "policy", "claims", "authorization"],
+          "answer": {
+            "oneLiner": "RBAC checks roles, claims-based checks specific user claims, and policy-based wraps both (plus custom logic) in named, reusable rules — policy-based is the most flexible.",
+            "keyPoints": [
+              "RBAC: `[Authorize(Roles=\"Admin\")]` — coarse-grained",
+              "Claims: assert a specific claim value (e.g. department)",
+              "Policy: named rules, combine claims + custom `IAuthorizationRequirement`",
+              "Prefer policies for anything beyond simple roles"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "[Authorize(Roles = \"Admin\")] // RBAC\n\nbuilder.Services.AddAuthorization(o =>\n  o.AddPolicy(\"HrOnly\", p => p.RequireClaim(\"department\", \"HR\")));\n\n[Authorize(Policy = \"HrOnly\")] // policy-based\npublic IActionResult Salaries() => ...;",
+              "note": "Roles are really just claims under the hood."
+            },
+            "followUps": ["When would you write a custom requirement handler?", "Why prefer policies over roles?"],
+            "redFlags": ["Hardcoding role string checks everywhere", "No central authorization strategy"]
+          }
+        },
+        {
+          "id": "security-authz-008",
+          "q": "What are Azure AD / Entra ID and Managed Identity, and how do they help?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["entra", "azure-ad", "managed-identity"],
+          "answer": {
+            "oneLiner": "Entra ID (Azure AD) is Microsoft's cloud identity provider for users and apps; Managed Identity gives an Azure resource its own Entra identity so it can call services with no stored credentials.",
+            "keyPoints": [
+              "Entra ID = IdP for OAuth/OIDC sign-in and tokens",
+              "Managed Identity = passwordless identity for app/VM/service",
+              "Platform rotates the credential — no secrets in code",
+              "Use it to access Key Vault, SQL, Storage securely"
+            ],
+            "followUps": ["System-assigned vs user-assigned identity?", "How does it remove secrets?"],
+            "redFlags": ["Storing service principal secrets when MI is available"]
+          }
+        },
+        {
+          "id": "security-authz-009",
+          "q": "Give an overview of ASP.NET Core Identity.",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["aspnet-identity", "membership", "authn"],
+          "answer": {
+            "oneLiner": "ASP.NET Core Identity is the built-in membership system for managing users, passwords, roles, and sign-in, typically backed by EF Core.",
+            "keyPoints": [
+              "Handles registration, login, password hashing, lockout",
+              "Stores users/roles/claims (EF Core by default)",
+              "Supports 2FA, external logins, email confirmation",
+              "Good for first-party local accounts; use an IdP for SSO/B2C"
+            ],
+            "followUps": ["When would you use an external IdP instead?", "How does it hash passwords?"],
+            "redFlags": ["Rolling your own user/password store unnecessarily"]
+          }
+        },
+        {
+          "id": "security-authz-010",
+          "q": "How do you revoke JWTs given they're stateless?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["jwt", "revocation", "tokens"],
+          "answer": {
+            "oneLiner": "Since JWTs are self-contained you can't truly invalidate one; you mitigate with short lifetimes plus a server-side denylist or token-version check.",
+            "keyPoints": [
+              "Keep access tokens short-lived; revoke at the refresh step",
+              "Maintain a denylist/jti cache for forced logout",
+              "Bump a per-user 'token version'/security stamp to invalidate all",
+              "Rotate signing keys for a global kill-switch"
+            ],
+            "followUps": ["What is a security stamp?", "Trade-off of a denylist vs short expiry?"],
+            "redFlags": ["Claiming you can instantly revoke a stateless JWT", "Hour-long access tokens with no revocation"]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "data-secrets",
+      "subtopicName": "Data & Secrets",
+      "order": 3,
+      "questions": [
+        {
+          "id": "security-data-secrets-001",
+          "q": "What is the difference between symmetric and asymmetric encryption, and where is each used?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["encryption", "symmetric", "asymmetric"],
+          "answer": {
+            "oneLiner": "Symmetric uses one shared key (fast, for bulk data); asymmetric uses a public/private key pair (slower, for key exchange and signatures).",
+            "keyPoints": [
+              "Symmetric: AES — fast, bulk data at rest/in transit",
+              "Asymmetric: RSA/ECC — key exchange, signing, certs",
+              "TLS uses both: asymmetric to agree a symmetric session key",
+              "Symmetric pain point is securely sharing the key"
+            ],
+            "followUps": ["Why does TLS use both?", "Why not encrypt everything with RSA?"],
+            "redFlags": ["Saying asymmetric replaces symmetric for bulk data"]
+          }
+        },
+        {
+          "id": "security-data-secrets-002",
+          "q": "What's the difference between hashing and encryption?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["hashing", "encryption", "basics"],
+          "answer": {
+            "oneLiner": "Encryption is reversible with a key; hashing is a one-way fingerprint with no way back.",
+            "keyPoints": [
+              "Encryption: two-way, needs a key (confidentiality)",
+              "Hashing: one-way, fixed length (integrity, passwords)",
+              "Hashing isn't encryption and shouldn't be reversible",
+              "Encoding (base64) is neither — not security"
+            ],
+            "followUps": ["When do you use each?", "Is base64 a security measure?"],
+            "redFlags": ["Calling hashing 'encryption you can't undo' loosely", "Confusing encoding with encryption"]
+          }
+        },
+        {
+          "id": "security-data-secrets-003",
+          "q": "How should you store user passwords?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["passwords", "hashing", "salt", "bcrypt"],
+          "answer": {
+            "oneLiner": "Never store them in plaintext or with a fast hash — use a slow, salted, adaptive algorithm like bcrypt, PBKDF2, or Argon2.",
+            "keyPoints": [
+              "Unique random salt per password (stored with the hash)",
+              "Use bcrypt / PBKDF2 / Argon2, not MD5/SHA-256 alone",
+              "Slow + adaptive work factor resists brute force",
+              "ASP.NET Core Identity does this for you"
+            ],
+            "followUps": ["Why is a fast hash like SHA-256 bad here?", "What does the salt prevent?"],
+            "redFlags": ["Plaintext or unsalted hashes", "Using MD5/SHA1 for passwords"]
+          }
+        },
+        {
+          "id": "security-data-secrets-004",
+          "q": "How do you manage application secrets and connection strings?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["secrets", "key-vault", "config"],
+          "answer": {
+            "oneLiner": "Keep secrets out of source control — use Azure Key Vault (accessed via Managed Identity) in production and user-secrets locally, injecting them at runtime.",
+            "keyPoints": [
+              "Never commit secrets; no secrets in appsettings or repo",
+              "Prod: Key Vault + Managed Identity (no stored creds)",
+              "Local dev: `dotnet user-secrets`",
+              "CI/CD: secret variables / secure store, masked in logs"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "builder.Configuration.AddAzureKeyVault(\n    new Uri(\"https://kv-app.vault.azure.net/\"),\n    new DefaultAzureCredential());",
+              "note": "DefaultAzureCredential uses Managed Identity in Azure, dev creds locally."
+            },
+            "followUps": ["How do you avoid secrets in CI logs?", "What does Managed Identity remove?"],
+            "redFlags": ["Secrets committed to git", "Secrets in plaintext appsettings in prod"]
+          }
+        },
+        {
+          "id": "security-data-secrets-005",
+          "q": "What's the difference between protecting data at rest and in transit?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["encryption", "at-rest", "in-transit", "tls"],
+          "answer": {
+            "oneLiner": "In transit means encrypting data moving over the network (TLS/HTTPS); at rest means encrypting stored data (disk/DB/blob).",
+            "keyPoints": [
+              "In transit: TLS 1.2+/HTTPS, mTLS internally",
+              "At rest: TDE, disk/storage encryption, column encryption",
+              "You need both — they cover different threats",
+              "Manage keys via KMS/Key Vault"
+            ],
+            "followUps": ["Does at-rest encryption stop SQL injection?", "What is TDE?"],
+            "redFlags": ["Assuming HTTPS covers stored data too"]
+          }
+        },
+        {
+          "id": "security-data-secrets-006",
+          "q": "How do you isolate data in a multi-tenant application?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["multi-tenant", "isolation", "saas"],
+          "answer": {
+            "oneLiner": "Pick an isolation model on a cost-vs-isolation spectrum — separate database per tenant, separate schema, or a shared schema with a tenant discriminator.",
+            "keyPoints": [
+              "DB-per-tenant: strongest isolation, costlier to scale",
+              "Schema-per-tenant: middle ground",
+              "Shared schema + TenantId: cheapest, must filter every query",
+              "Enforce the tenant filter centrally (EF global query filter) — never per-query trust"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "modelBuilder.Entity<Order>()\n  .HasQueryFilter(o => o.TenantId == _tenant.Id);",
+              "note": "A missed WHERE TenantId is a cross-tenant data leak."
+            },
+            "followUps": ["Risk of the shared-schema model?", "Where do you set the current tenant?"],
+            "redFlags": ["Relying on developers to remember the tenant filter", "Trusting a client-supplied TenantId"]
+          }
+        },
+        {
+          "id": "security-data-secrets-007",
+          "q": "What does handling PII and GDPR basics involve?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["pii", "gdpr", "privacy"],
+          "answer": {
+            "oneLiner": "Collect the minimum personal data, secure it, and honor rights like access and erasure; GDPR requires a lawful basis and breach notification.",
+            "keyPoints": [
+              "Data minimization + purpose limitation",
+              "Encrypt PII, restrict access, log who reads it",
+              "Support right to access / erasure (delete or anonymize)",
+              "Lawful basis (e.g. consent) + ~72h breach notification"
+            ],
+            "followUps": ["What is the right to be forgotten?", "Pseudonymization vs anonymization?"],
+            "redFlags": ["Storing PII 'just in case'", "No way to delete a user's data"]
+          }
+        },
+        {
+          "id": "security-data-secrets-008",
+          "q": "What is the principle of least privilege and how do you apply it?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["least-privilege", "access-control", "hardening"],
+          "answer": {
+            "oneLiner": "Give every user, service, and process only the minimum access it needs to do its job — nothing more.",
+            "keyPoints": [
+              "App DB account: only needed CRUD, not db_owner",
+              "Scope tokens/roles narrowly; deny by default",
+              "Managed Identity with tight RBAC over broad keys",
+              "Review and revoke unused access regularly"
+            ],
+            "followUps": ["How does it limit blast radius?", "How does it apply to DB accounts?"],
+            "redFlags": ["Running everything as admin/sa for convenience"]
+          }
+        },
+        {
+          "id": "security-data-secrets-009",
+          "q": "How would you respond if you discovered a secret had been committed to the repository?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "low",
+          "tags": ["secrets", "incident", "rotation"],
+          "answer": {
+            "oneLiner": "Treat it as compromised: rotate the secret immediately, then remove it from history and add scanning to prevent recurrence.",
+            "keyPoints": [
+              "Rotate/revoke the secret first — assume it's leaked",
+              "Move it to Key Vault / secret store",
+              "Purge from git history (and notify if it was pushed)",
+              "Add secret scanning + pre-commit hooks"
+            ],
+            "followUps": ["Why is deleting the file not enough?", "How do you prevent it next time?"],
+            "redFlags": ["Just deleting the file without rotating", "Assuming a private repo means it's safe"]
+          }
+        }
+      ]
+    }
+  ]
+}

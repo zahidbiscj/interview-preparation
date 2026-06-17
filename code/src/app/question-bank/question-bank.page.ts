@@ -30,9 +30,10 @@ import { ButtonModule } from 'primeng/button';
           <span class="app-brand">📚 PrepDeck</span>
         </div>
         <div class="topbar-center">
-          <span class="stats-pill">{{ topicCount() }} topics · 398 questions</span>
+          <span class="stats-pill">{{ topicCount() }} topics · 522 questions</span>
         </div>
         <div class="topbar-right">
+          <a routerLink="/dashboard" class="sim-link">📊 Dashboard</a>
           <a routerLink="/simulator" class="sim-link">🎯 Simulator</a>
           <button class="theme-btn" (click)="toggleTheme()" [title]="isDark() ? 'Switch to light' : 'Switch to dark'">
             {{ isDark() ? '☀️' : '🌙' }}

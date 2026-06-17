@@ -11,5 +11,10 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./mock-exam/mock-exam.page').then(m => m.MockExamPage)
   },
+  {
+    path: 'dashboard',
+    loadComponent: () =>
+      import('./dashboard/dashboard.page').then(m => m.DashboardPage)
+  },
   { path: '**', redirectTo: '' }
 ];

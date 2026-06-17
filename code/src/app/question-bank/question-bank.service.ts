@@ -8,6 +8,14 @@ import {
 
 const BOOKMARK_KEY = 'qbank.bookmarks';
 const THEME_KEY = 'qbank.theme';
+const DAILY_KEY = 'qbank.daily';
+
+/** Per-day practice tally, keyed by YYYY-MM-DD. */
+export interface DailyStat {
+  date: string;
+  answered: number;
+  got: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class QuestionBankService {
@@ -20,6 +28,7 @@ export class QuestionBankService {
   private _bookmarks = signal<Set<string>>(this.loadBookmarks());
   private _error = signal<string | null>(null);
   private _isDark = signal<boolean>(this.loadTheme());
+  private _daily = signal<Record<string, DailyStat>>(this.loadDaily());
 
   private topicCache = new Map<string, TopicFile>();
   private cheatSheetCache = new Map<string, string>();
@@ -30,6 +39,31 @@ export class QuestionBankService {
   readonly filter = this._filter.asReadonly();
   readonly error = this._error.asReadonly();
   readonly isDark = this._isDark.asReadonly();
+  readonly daily = this._daily.asReadonly();
+
+  /** Total questions self-graded across all days. */
+  readonly totalAnswered = computed(() =>
+    Object.values(this._daily()).reduce((s, d) => s + d.answered, 0));
+
+  /** Consecutive-day practice streak ending today (or yesterday). */
+  readonly streak = computed(() => {
+    const map = this._daily();
+    let count = 0;
+    const day = new Date();
+    // allow the streak to count even if today isn't done yet (start from today)
+    for (let i = 0; i < 366; i++) {
+      const key = this.dateKey(day);
+      if (map[key] && map[key].answered > 0) {
+        count++;
+      } else if (i > 0) {
+        break; // a gap (other than today) ends the streak
+      } else {
+        // today not practiced yet — keep checking from yesterday
+      }
+      day.setDate(day.getDate() - 1);
+    }
+    return count;
+  });
 
   readonly visibleQuestions = computed<QuestionView[]>(() => {
     const sel = this._selected();
@@ -220,6 +254,48 @@ export class QuestionBankService {
       }
     }
     return pool;
+  }
+
+  /** Record a finished practice batch into today's tally. */
+  recordPractice(answered: number, got: number): void {
+    if (answered <= 0) return;
+    const key = this.dateKey(new Date());
+    this._daily.update(map => {
+      const prev = map[key] ?? { date: key, answered: 0, got: 0 };
+      const next = { ...map, [key]: { date: key, answered: prev.answered + answered, got: prev.got + got } };
+      localStorage.setItem(DAILY_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  /** Last `days` days (oldest→newest) as DailyStat rows, zero-filled. */
+  lastDays(days: number): DailyStat[] {
+    const map = this._daily();
+    const out: DailyStat[] = [];
+    const day = new Date();
+    day.setDate(day.getDate() - (days - 1));
+    for (let i = 0; i < days; i++) {
+      const key = this.dateKey(day);
+      out.push(map[key] ?? { date: key, answered: 0, got: 0 });
+      day.setDate(day.getDate() + 1);
+    }
+    return out;
+  }
+
+  private dateKey(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  private loadDaily(): Record<string, DailyStat> {
+    try {
+      const raw = localStorage.getItem(DAILY_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
   }
 
   toggleTheme(): void {

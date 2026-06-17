@@ -484,6 +484,353 @@
           }
         }
       ]
+    },
+    {
+      "subtopicId": "sql-50",
+      "subtopicName": "LeetCode SQL 50",
+      "order": 4,
+      "questions": [
+        {
+          "id": "coding-sql50-001",
+          "q": "Recyclable and Low Fat Products. Products(product_id PK, low_fats ENUM('Y','N'), recyclable ENUM('Y','N')). Find the ids of products that are both low fat and recyclable.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "where", "filter"],
+          "answer": {
+            "oneLiner": "Filter rows where both flag columns equal 'Y'.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT product_id\nFROM Products\nWHERE low_fats = 'Y' AND recyclable = 'Y';",
+              "note": "Basic WHERE with AND"
+            },
+            "keyPoints": ["Two equality predicates joined by AND."]
+          }
+        },
+        {
+          "id": "coding-sql50-002",
+          "q": "Find Customer Referee. Customer(id PK, name, referee_id). Report the names of customers that are NOT referred by the customer with id = 2 (note: referee_id can be NULL).",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "null", "where"],
+          "answer": {
+            "oneLiner": "Keep rows where referee_id is not 2, explicitly including NULLs since NULL <> 2 is unknown, not true.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT name\nFROM Customer\nWHERE referee_id <> 2 OR referee_id IS NULL;",
+              "note": "NULL-aware filtering: <> never matches NULL"
+            },
+            "keyPoints": ["NULL <> 2 evaluates to UNKNOWN, so add OR referee_id IS NULL."]
+          }
+        },
+        {
+          "id": "coding-sql50-003",
+          "q": "Big Countries. World(name PK, continent, area, population, gdp). A country is big if area >= 3000000 OR population >= 25000000. Return name, population, area.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "where", "or"],
+          "answer": {
+            "oneLiner": "Select the three columns where either size threshold is met.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT name, population, area\nFROM World\nWHERE area >= 3000000 OR population >= 25000000;",
+              "note": "OR condition on two thresholds"
+            },
+            "keyPoints": ["Either condition qualifies, so use OR."]
+          }
+        },
+        {
+          "id": "coding-sql50-004",
+          "q": "Article Views I. Views(article_id, author_id, viewer_id, view_date). Find all authors who viewed at least one of their own articles. Return the distinct ids sorted ascending.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "distinct", "self-view"],
+          "answer": {
+            "oneLiner": "Keep rows where author_id = viewer_id, take DISTINCT ids, order ascending.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT DISTINCT author_id AS id\nFROM Views\nWHERE author_id = viewer_id\nORDER BY id;",
+              "note": "DISTINCT + equality predicate"
+            },
+            "keyPoints": ["author_id = viewer_id means self-view.", "DISTINCT removes duplicate authors."]
+          }
+        },
+        {
+          "id": "coding-sql50-005",
+          "q": "Invalid Tweets. Tweets(tweet_id PK, content). Find the ids of invalid tweets, where a tweet is invalid if the number of characters in content is strictly greater than 15.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "string-length", "char-length"],
+          "answer": {
+            "oneLiner": "Filter by CHAR_LENGTH(content) > 15.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT tweet_id\nFROM Tweets\nWHERE CHAR_LENGTH(content) > 15;",
+              "note": "CHAR_LENGTH counts characters (not bytes like LENGTH)"
+            },
+            "keyPoints": ["Prefer CHAR_LENGTH over LENGTH for multibyte safety."]
+          }
+        },
+        {
+          "id": "coding-sql50-006",
+          "q": "Replace Employee ID With The Unique Identifier. Employees(id PK, name), EmployeeUNI(id, unique_id). Show the unique_id of each user; if a user has no unique_id, show NULL.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "left-join"],
+          "answer": {
+            "oneLiner": "LEFT JOIN from Employees to EmployeeUNI on id so unmatched employees still appear with NULL unique_id.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT eu.unique_id, e.name\nFROM Employees e\nLEFT JOIN EmployeeUNI eu ON e.id = eu.id;",
+              "note": "LEFT JOIN preserves rows without a match"
+            },
+            "keyPoints": ["LEFT JOIN keeps all employees; missing unique_id becomes NULL."]
+          }
+        },
+        {
+          "id": "coding-sql50-007",
+          "q": "Product Sales Analysis I. Sales(sale_id, product_id, year, quantity, price), Product(product_id PK, product_name). Report product_name, year, and price for each Sales row.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "inner-join"],
+          "answer": {
+            "oneLiner": "Inner join Sales to Product on product_id and project the requested columns.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT p.product_name, s.year, s.price\nFROM Sales s\nJOIN Product p ON s.product_id = p.product_id;",
+              "note": "Simple INNER JOIN on FK"
+            },
+            "keyPoints": ["Join on product_id to enrich sales with the name."]
+          }
+        },
+        {
+          "id": "coding-sql50-008",
+          "q": "Customer Who Visited but Did Not Make Any Transactions. Visits(visit_id, customer_id), Transactions(transaction_id, visit_id, amount). For each customer, find how many times they visited without making a transaction. Return customer_id, count_no_trans.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "left-join", "group-by", "anti-join"],
+          "answer": {
+            "oneLiner": "LEFT JOIN visits to transactions and keep only visits with no matching transaction (transaction_id IS NULL), then count per customer.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT v.customer_id, COUNT(*) AS count_no_trans\nFROM Visits v\nLEFT JOIN Transactions t ON v.visit_id = t.visit_id\nWHERE t.transaction_id IS NULL\nGROUP BY v.customer_id;",
+              "note": "LEFT JOIN + IS NULL = anti-join"
+            },
+            "keyPoints": ["transaction_id IS NULL isolates visits with no transaction.", "GROUP BY customer to count them."]
+          }
+        },
+        {
+          "id": "coding-sql50-009",
+          "q": "Rising Temperature. Weather(id PK, recordDate, temperature). Find all dates' ids with a higher temperature than the previous (yesterday's) date.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "self-join", "datediff"],
+          "answer": {
+            "oneLiner": "Self-join Weather to itself where the dates are exactly one day apart and today's temperature exceeds yesterday's.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT w1.id\nFROM Weather w1\nJOIN Weather w2\n  ON DATEDIFF(w1.recordDate, w2.recordDate) = 1\nWHERE w1.temperature > w2.temperature;",
+              "note": "Self-join on consecutive days via DATEDIFF"
+            },
+            "keyPoints": ["DATEDIFF(today, yesterday) = 1 ties consecutive days.", "Compare temperatures across the two aliases."]
+          }
+        },
+        {
+          "id": "coding-sql50-010",
+          "q": "Average Time of Process per Machine. Activity(machine_id, process_id, activity_type ENUM('start','end'), timestamp). For each machine compute the average time to complete a process (end timestamp minus start timestamp), rounded to 3 decimals.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "self-join", "aggregate", "round"],
+          "answer": {
+            "oneLiner": "Join start rows to end rows on machine_id + process_id and average (end - start) per machine.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT a.machine_id,\n       ROUND(AVG(b.timestamp - a.timestamp), 3) AS processing_time\nFROM Activity a\nJOIN Activity b\n  ON a.machine_id = b.machine_id\n AND a.process_id = b.process_id\n AND a.activity_type = 'start'\n AND b.activity_type = 'end'\nGROUP BY a.machine_id;",
+              "note": "Self-join pairing start/end, then AVG + ROUND"
+            },
+            "keyPoints": ["Pair each start with its matching end per process.", "AVG over all processes; ROUND to 3."]
+          }
+        },
+        {
+          "id": "coding-sql50-011",
+          "q": "Employee Bonus. Employee(empId PK, name, supervisor, salary), Bonus(empId, bonus). Report the name and bonus of employees with a bonus less than 1000, including employees who have no bonus record.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "left-join", "null"],
+          "answer": {
+            "oneLiner": "LEFT JOIN to keep bonus-less employees, then filter bonus < 1000 OR bonus IS NULL.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT e.name, b.bonus\nFROM Employee e\nLEFT JOIN Bonus b ON e.empId = b.empId\nWHERE b.bonus < 1000 OR b.bonus IS NULL;",
+              "note": "LEFT JOIN; IS NULL captures employees with no bonus"
+            },
+            "keyPoints": ["Employees with no bonus have NULL, which must be included explicitly."]
+          }
+        },
+        {
+          "id": "coding-sql50-012",
+          "q": "Students and Examinations. Students(student_id, student_name), Subjects(subject_name), Examinations(student_id, subject_name). For every student and every subject, count how many exams the student took. Order by student_id, then subject_name.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "cross-join", "left-join", "group-by"],
+          "answer": {
+            "oneLiner": "CROSS JOIN students with subjects to get every pair, LEFT JOIN examinations, then COUNT the exam rows per pair.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT s.student_id, s.student_name, sub.subject_name,\n       COUNT(e.subject_name) AS attended_exams\nFROM Students s\nCROSS JOIN Subjects sub\nLEFT JOIN Examinations e\n  ON e.student_id = s.student_id\n AND e.subject_name = sub.subject_name\nGROUP BY s.student_id, s.student_name, sub.subject_name\nORDER BY s.student_id, sub.subject_name;",
+              "note": "CROSS JOIN builds all pairs; COUNT(col) ignores NULLs"
+            },
+            "keyPoints": ["CROSS JOIN generates every student-subject combination.", "COUNT(e.subject_name) gives 0 for untaken subjects."]
+          }
+        },
+        {
+          "id": "coding-sql50-013",
+          "q": "Managers with at Least 5 Direct Reports. Employee(id PK, name, department, managerId). Find managers who have at least five direct reports. Return their names.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "group-by", "having", "self-join"],
+          "answer": {
+            "oneLiner": "Group employees by managerId, keep groups with 5+ members, then join back to get the manager's name.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT name\nFROM Employee\nWHERE id IN (\n    SELECT managerId\n    FROM Employee\n    GROUP BY managerId\n    HAVING COUNT(*) >= 5\n);",
+              "note": "GROUP BY ... HAVING COUNT(*) >= 5, then map id back to name"
+            },
+            "keyPoints": ["HAVING filters aggregated counts.", "Subquery returns manager ids; outer query resolves names."]
+          }
+        },
+        {
+          "id": "coding-sql50-014",
+          "q": "Confirmation Rate. Signups(user_id PK, time_stamp), Confirmations(user_id, time_stamp, action ENUM('confirmed','timeout')). The confirmation rate of a user is the number of 'confirmed' messages divided by total requests. Report user_id and confirmation_rate rounded to 2 decimals (0 if no requests).",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "left-join", "avg", "ifnull"],
+          "answer": {
+            "oneLiner": "LEFT JOIN signups to confirmations; AVG of (action='confirmed') gives the rate, wrapped in IFNULL/ROUND for users with no requests.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT s.user_id,\n       ROUND(IFNULL(AVG(c.action = 'confirmed'), 0), 2) AS confirmation_rate\nFROM Signups s\nLEFT JOIN Confirmations c ON s.user_id = c.user_id\nGROUP BY s.user_id;",
+              "note": "AVG of a boolean = fraction true; IFNULL handles no-request users"
+            },
+            "keyPoints": ["(c.action = 'confirmed') yields 1/0; AVG = confirmation fraction.", "IFNULL(..., 0) covers users with no confirmations."]
+          }
+        },
+        {
+          "id": "coding-sql50-015",
+          "q": "Not Boring Movies. Cinema(id PK, movie, description, rating). Report movies with an odd id and a description that is not 'boring', ordered by rating descending.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "where", "modulo", "order-by"],
+          "answer": {
+            "oneLiner": "Filter id % 2 = 1 and description <> 'boring', then ORDER BY rating DESC.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT *\nFROM Cinema\nWHERE id % 2 = 1 AND description <> 'boring'\nORDER BY rating DESC;",
+              "note": "Modulo for odd ids; ORDER BY DESC"
+            },
+            "keyPoints": ["id % 2 = 1 selects odd ids."]
+          }
+        },
+        {
+          "id": "coding-sql50-016",
+          "q": "Average Selling Price. Prices(product_id, start_date, end_date, price), UnitsSold(product_id, purchase_date, units). For each product compute the average selling price = SUM(price*units)/SUM(units), rounded to 2 decimals; products with no sales get 0.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "left-join", "weighted-average", "ifnull"],
+          "answer": {
+            "oneLiner": "LEFT JOIN prices to units sold where the purchase date falls inside the price window, then take the weighted average, defaulting to 0.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT p.product_id,\n       IFNULL(ROUND(SUM(p.price * u.units) / SUM(u.units), 2), 0) AS average_price\nFROM Prices p\nLEFT JOIN UnitsSold u\n  ON p.product_id = u.product_id\n AND u.purchase_date BETWEEN p.start_date AND p.end_date\nGROUP BY p.product_id;",
+              "note": "Date-range join + weighted average; IFNULL for no-sales (division by NULL)"
+            },
+            "keyPoints": ["Join on purchase_date BETWEEN start and end.", "Weighted avg = SUM(price*units)/SUM(units); IFNULL gives 0."]
+          }
+        },
+        {
+          "id": "coding-sql50-017",
+          "q": "Project Employees I. Project(project_id, employee_id), Employee(employee_id PK, name, experience_years). For each project report the average experience years of its employees, rounded to 2 decimals.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "join", "avg", "group-by"],
+          "answer": {
+            "oneLiner": "Join Project to Employee on employee_id and AVG(experience_years) per project_id.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT p.project_id,\n       ROUND(AVG(e.experience_years), 2) AS average_years\nFROM Project p\nJOIN Employee e ON p.employee_id = e.employee_id\nGROUP BY p.project_id;",
+              "note": "JOIN + AVG + ROUND grouped by project"
+            },
+            "keyPoints": ["Group by project_id, average the joined experience values."]
+          }
+        },
+        {
+          "id": "coding-sql50-018",
+          "q": "Percentage of Users Attended a Contest. Users(user_id PK, user_name), Register(contest_id, user_id). For each contest, report the percentage of all users who registered, rounded to 2 decimals. Order by percentage descending, then contest_id ascending.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "group-by", "subquery", "percentage"],
+          "answer": {
+            "oneLiner": "Count distinct registrants per contest, divide by the total user count (a scalar subquery), and order as required.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT contest_id,\n       ROUND(COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM Users), 2) AS percentage\nFROM Register\nGROUP BY contest_id\nORDER BY percentage DESC, contest_id ASC;",
+              "note": "Scalar subquery for the denominator (total users)"
+            },
+            "keyPoints": ["Denominator is the full user count via a scalar subquery.", "Multiply before dividing to keep precision."]
+          }
+        },
+        {
+          "id": "coding-sql50-019",
+          "q": "Queries Quality and Percentage. Queries(query_name, result, position, rating). For each query_name compute quality = AVG(rating/position) and poor_query_percentage = percentage of queries with rating < 3, both rounded to 2 decimals.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "group-by", "avg", "conditional-aggregate"],
+          "answer": {
+            "oneLiner": "Group by query_name; quality is AVG(rating/position) and poor percentage is AVG(rating < 3) * 100.",
+            "code": {
+              "lang": "sql",
+              "snippet": "SELECT query_name,\n       ROUND(AVG(rating / position), 2) AS quality,\n       ROUND(AVG(rating < 3) * 100, 2) AS poor_query_percentage\nFROM Queries\nWHERE query_name IS NOT NULL\nGROUP BY query_name;",
+              "note": "AVG(rating < 3) averages a boolean to get the fraction"
+            },
+            "keyPoints": ["AVG(rating/position) is the average per-row ratio.", "AVG(boolean)*100 gives the poor-query percentage."]
+          }
+        },
+        {
+          "id": "coding-sql50-020",
+          "q": "Nth Highest Salary. Employee(id PK, salary). Write a generic solution to return the Nth highest distinct salary (return NULL if it does not exist).",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["sql", "leetcode", "dense-rank", "nth", "limit-offset"],
+          "answer": {
+            "oneLiner": "Rank distinct salaries with DENSE_RANK() descending and pick rank N; equivalently use DISTINCT ... LIMIT 1 OFFSET N-1.",
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Window-function approach (parameter @N)\nSELECT DISTINCT salary AS NthHighestSalary\nFROM (\n    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk\n    FROM Employee\n) t\nWHERE rnk = @N;\n\n-- LIMIT/OFFSET form (MySQL); SET @N := @N - 1 first\n-- SELECT DISTINCT salary FROM Employee ORDER BY salary DESC LIMIT 1 OFFSET @N;",
+              "note": "DENSE_RANK dedupes ties; LIMIT/OFFSET works over a DISTINCT set"
+            },
+            "keyPoints": ["DENSE_RANK = N targets the Nth distinct salary.", "Empty result naturally yields NULL."]
+          }
+        }
+      ]
     }
   ]
 }

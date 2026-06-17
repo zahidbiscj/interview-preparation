@@ -717,6 +717,114 @@
               "When choose Memory<T> over Span<T>?"
             ]
           }
+        },
+        {
+          "id": "csharp-memory-012",
+          "q": "What is the difference between `Span<T>` and `Memory<T>`?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "memory",
+            "span",
+            "memory-t",
+            "performance",
+            "async"
+          ],
+          "answer": {
+            "oneLiner": "`Span<T>` is a stack-only `ref struct` (fastest, no allocation) but can't live on the heap or cross `await`; `Memory<T>` is a heap-storable wrapper you can hold in fields and use in async methods.",
+            "keyPoints": [
+              "`Span<T>` — stack-only, can't be a field, captured, or used across `await`/`yield`.",
+              "`Memory<T>` — heap-friendly, works in async methods and class fields.",
+              "Get a Span from Memory via `.Span` only when you actually process the buffer.",
+              "Both give zero-copy views; pick Span for sync hot paths, Memory for async."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Memory<T> survives across await; Span<T> would not compile here\nasync Task ProcessAsync(Memory<byte> buffer, Stream s)\n{\n    int read = await s.ReadAsync(buffer);   // async OK with Memory\n    Parse(buffer.Span.Slice(0, read));      // get Span only for the sync work\n}\nvoid Parse(ReadOnlySpan<byte> data) { /* zero-alloc sync processing */ }",
+              "note": "Rule: Memory<T> at the async boundary, Span<T> for the synchronous inner work"
+            },
+            "followUps": [
+              "Why exactly can't a Span<T> cross an await?",
+              "What does ReadOnlyMemory<T> add?"
+            ],
+            "redFlags": [
+              "Trying to store a Span<T> in a field or async local.",
+              "Not knowing why Span is stack-only (ref struct)."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-013",
+          "q": "Compare `string` concatenation, `StringBuilder`, and string interpolation — when do you use each?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [
+            "memory",
+            "string",
+            "stringbuilder",
+            "interpolation",
+            "performance"
+          ],
+          "answer": {
+            "oneLiner": "Use `+` or interpolation for a few known parts; use `StringBuilder` when concatenating in a loop or building an unknown number of pieces, because strings are immutable and `+` reallocates each time.",
+            "keyPoints": [
+              "`+` / interpolation — fine for a fixed, small number of parts (one allocation).",
+              "Loop concatenation with `+` is O(n^2) allocations — use `StringBuilder`.",
+              "`StringBuilder` is a mutable buffer that grows and copies once at `ToString()`.",
+              "Interpolation `$\"...\"` is readable and, since C# 10, can be very low-overhead."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Few known parts — interpolation is clearest\nstring greeting = $\"Hello {name}, you have {count} messages\";\n\n// Many/unknown parts in a loop — StringBuilder\nvar sb = new StringBuilder();\nforeach (var line in lines) sb.AppendLine(line);\nstring report = sb.ToString();",
+              "note": "Threshold rule of thumb: if you concatenate in a loop, reach for StringBuilder"
+            },
+            "followUps": [
+              "Why is loop concatenation O(n^2)?",
+              "What did C# 10 interpolated string handlers improve?"
+            ],
+            "redFlags": [
+              "Using StringBuilder for two or three fixed parts (premature optimization).",
+              "Building large strings with `+=` inside a loop."
+            ]
+          }
+        },
+        {
+          "id": "csharp-memory-014",
+          "q": "What is the difference between Server GC and Workstation GC, and when do you use each?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "memory",
+            "gc",
+            "server-gc",
+            "workstation-gc",
+            "performance"
+          ],
+          "answer": {
+            "oneLiner": "Workstation GC is tuned for low latency on a single heap/thread (desktop/client apps); Server GC uses a heap and dedicated GC thread per core for maximum throughput on multi-core servers.",
+            "keyPoints": [
+              "Workstation — one managed heap, GC on the calling thread; default for client apps.",
+              "Server — per-CPU heaps + GC threads, higher throughput, more memory use.",
+              "Server GC is the default for ASP.NET Core / hosted server workloads.",
+              "Enable via `<ServerGarbageCollection>true</ServerGarbageCollection>` in csproj."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "<!-- .csproj -->\n<PropertyGroup>\n  <ServerGarbageCollection>true</ServerGarbageCollection>\n  <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>\n</PropertyGroup>",
+              "note": "Server GC for throughput on many cores; Workstation for low-latency desktop/single-core"
+            },
+            "followUps": [
+              "What does concurrent (background) GC add on top of this?",
+              "Why can Server GC use noticeably more memory?"
+            ],
+            "redFlags": [
+              "Enabling Server GC on a memory-constrained single-core container blindly.",
+              "Not knowing ASP.NET Core defaults to Server GC."
+            ]
+          }
         }
       ]
     },
@@ -982,6 +1090,257 @@
             "followUps": [
               "How does IValueTaskSource enable zero-alloc async?",
               "Overhead of an async method vs synchronous?"
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-010",
+          "q": "What is the difference between `ValueTask` and `Task`, and when does `ValueTask` help?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "async",
+            "valuetask",
+            "task",
+            "performance",
+            "allocation"
+          ],
+          "answer": {
+            "oneLiner": "`Task` is a heap-allocated reference type; `ValueTask` is a struct that avoids the allocation when a method often completes synchronously — useful in hot, frequently-called paths.",
+            "keyPoints": [
+              "`Task` always allocates; `ValueTask` can wrap a result with no allocation.",
+              "Use `ValueTask` on hot paths that usually return a cached/synchronous result.",
+              "Restrictions: await it only once, never block on it, don't store/await twice.",
+              "Default to `Task`; switch to `ValueTask` only under measured allocation pressure."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public ValueTask<int> GetAsync(string key)\n{\n    if (_cache.TryGetValue(key, out var v))\n        return new ValueTask<int>(v);     // synchronous, zero allocation\n    return new ValueTask<int>(LoadAsync(key)); // falls back to a real Task\n}",
+              "note": "ValueTask shines when the synchronous (cache-hit) path dominates"
+            },
+            "followUps": [
+              "Why must you not await a ValueTask twice?",
+              "What is IValueTaskSource and pooled ValueTasks?"
+            ],
+            "redFlags": [
+              "Using ValueTask everywhere by default.",
+              "Awaiting the same ValueTask more than once or calling .Result on it."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-011",
+          "q": "What does the `volatile` keyword do and when is it needed?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "async",
+            "volatile",
+            "memory-model",
+            "threading"
+          ],
+          "answer": {
+            "oneLiner": "`volatile` forces reads/writes of a field to hit main memory with acquire/release semantics, preventing the compiler/CPU from caching or reordering them — needed for lock-free flags shared across threads.",
+            "keyPoints": [
+              "Stops a thread from caching a stale copy of the field in a register.",
+              "Prevents certain instruction reorderings around the access.",
+              "Only for simple flags; it does NOT make compound ops (`i++`) atomic.",
+              "For counters use `Interlocked`; for blocks use `lock` — both are stronger."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "private volatile bool _stop;   // read by worker, set by another thread\npublic void Stop() => _stop = true;\npublic void Worker()\n{\n    while (!_stop) { /* without volatile, this could loop forever */ }\n}",
+              "note": "volatile is for a single shared flag — not a substitute for lock/Interlocked"
+            },
+            "followUps": [
+              "Why doesn't volatile make `count++` thread-safe?",
+              "volatile vs Interlocked vs lock?"
+            ],
+            "redFlags": [
+              "Thinking volatile makes compound operations atomic.",
+              "Using volatile when a lock or Interlocked is actually required."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-012",
+          "q": "Compare `lock`, `Monitor`, `Mutex`, and `Semaphore`/`SemaphoreSlim` for synchronization.",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [
+            "async",
+            "lock",
+            "monitor",
+            "mutex",
+            "semaphore",
+            "synchronization"
+          ],
+          "answer": {
+            "oneLiner": "`lock` is syntactic sugar over `Monitor` (fast, in-process, one thread); `Mutex` is a heavier OS-level lock that works across processes; `Semaphore`/`SemaphoreSlim` allow N concurrent holders, and `SemaphoreSlim` supports async.",
+            "keyPoints": [
+              "`lock`/`Monitor` — fast in-process mutual exclusion for one thread at a time.",
+              "`Mutex` — named, cross-process, kernel object; slower (e.g. single-instance app).",
+              "`Semaphore`/`SemaphoreSlim` — limit to N concurrent threads (a throttle).",
+              "`SemaphoreSlim.WaitAsync()` — the only one of these you can `await`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Async-safe throttle: max 3 concurrent calls\nprivate readonly SemaphoreSlim _gate = new(3);\npublic async Task CallAsync()\n{\n    await _gate.WaitAsync();\n    try { await DoWorkAsync(); }\n    finally { _gate.Release(); }\n}\n// Note: you cannot use `lock` around an `await` — use SemaphoreSlim",
+              "note": "Never await inside a lock; use SemaphoreSlim for async mutual exclusion"
+            },
+            "followUps": [
+              "Why can't you await inside a lock block?",
+              "When is a Mutex worth its overhead over lock?"
+            ],
+            "redFlags": [
+              "Trying to `await` inside a `lock`.",
+              "Using a cross-process Mutex for simple in-process locking."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-013",
+          "q": "How do you implement a producer-consumer pattern in modern C#?",
+          "level": "senior",
+          "type": "code",
+          "freq": "medium",
+          "tags": [
+            "async",
+            "channels",
+            "producer-consumer",
+            "blockingcollection",
+            "concurrency"
+          ],
+          "answer": {
+            "oneLiner": "Use `System.Threading.Channels` for async producer-consumer (or `BlockingCollection<T>` for the older blocking/threaded style) — both give a thread-safe queue with backpressure.",
+            "keyPoints": [
+              "`Channel<T>` — async-first, `WriteAsync`/`ReadAllAsync`, supports bounded backpressure.",
+              "`BlockingCollection<T>` — blocking API for classic worker threads.",
+              "Producer signals completion with `writer.Complete()` / `CompleteAdding()`.",
+              "Bounded channels apply backpressure so a fast producer can't exhaust memory."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "var channel = Channel.CreateBounded<int>(100);\n// Producer\n_ = Task.Run(async () => {\n    for (int i = 0; i < 1000; i++) await channel.Writer.WriteAsync(i);\n    channel.Writer.Complete();\n});\n// Consumer\nawait foreach (var item in channel.Reader.ReadAllAsync())\n    Process(item);",
+              "note": "Channels are the modern async-friendly choice; BlockingCollection for blocking threads"
+            },
+            "followUps": [
+              "What does a bounded channel do when full?",
+              "How would you run multiple concurrent consumers?"
+            ],
+            "redFlags": [
+              "Hand-rolling a lock + Queue when Channels exist.",
+              "Forgetting to Complete the writer (consumers hang forever)."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-014",
+          "q": "What is the difference between `Parallel.ForEach` and PLINQ (`AsParallel`)?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "async",
+            "parallel",
+            "plinq",
+            "data-parallelism"
+          ],
+          "answer": {
+            "oneLiner": "Both parallelize CPU-bound work across cores; `Parallel.ForEach` is for imperative side-effecting loops, while PLINQ is for declarative query pipelines that produce a result, with easy ordering control.",
+            "keyPoints": [
+              "`Parallel.ForEach` — imperative, great for 'do this action per item'.",
+              "PLINQ (`.AsParallel()`) — declarative LINQ that returns a transformed sequence.",
+              "PLINQ offers `.AsOrdered()`, `.WithDegreeOfParallelism()` cleanly.",
+              "Neither is for I/O-bound work — use `Task.WhenAll` for that."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Imperative side effects\nParallel.ForEach(files, file => Process(file));\n\n// Declarative transform producing a result\nvar results = numbers.AsParallel()\n    .Where(n => IsPrime(n))\n    .Select(n => n * n)\n    .ToList();",
+              "note": "Parallel.ForEach for side effects; PLINQ to compute a result set"
+            },
+            "followUps": [
+              "When is parallelizing actually slower (overhead)?",
+              "What does AsOrdered cost?"
+            ],
+            "redFlags": [
+              "Using either for I/O-bound work instead of async.",
+              "Mutating shared state inside the body without synchronization."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-015",
+          "q": "What is a race condition, and how do you detect and prevent one?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "async",
+            "race-condition",
+            "thread-safety",
+            "interlocked",
+            "concurrency"
+          ],
+          "answer": {
+            "oneLiner": "A race condition is when the result depends on the unpredictable timing of concurrent threads accessing shared mutable state; prevent it by removing shared mutability or guarding it with `lock`/`Interlocked`.",
+            "keyPoints": [
+              "Classic cause: read-modify-write (`count++`) interleaved across threads.",
+              "Prevent: `lock`, `Interlocked` for counters, or immutable/per-thread state.",
+              "Use thread-safe types (`ConcurrentDictionary`) instead of locking by hand.",
+              "Detect: stress/load tests, code review of shared fields, race detectors/logging."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// BUG: ++ is read-modify-write, not atomic\n// Parallel.For(0, 1000, i => _count++); // loses updates\n\n// FIX 1: atomic\nParallel.For(0, 1000, i => Interlocked.Increment(ref _count));\n// FIX 2: lock\n// lock (_sync) { _count++; }",
+              "note": "Interlocked is the cheapest fix for simple counters; lock for multi-step updates"
+            },
+            "followUps": [
+              "Race condition vs deadlock?",
+              "Why is ConcurrentDictionary's GetOrAdd factory not atomic by default?"
+            ],
+            "redFlags": [
+              "Assuming `count++` is atomic.",
+              "Adding locks everywhere without identifying the shared state."
+            ]
+          }
+        },
+        {
+          "id": "csharp-async-016",
+          "q": "What is `IAsyncEnumerable<T>` (async streams) and when do you use it?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "async",
+            "iasyncenumerable",
+            "async-streams",
+            "yield",
+            "streaming"
+          ],
+          "answer": {
+            "oneLiner": "`IAsyncEnumerable<T>` (C# 8) streams items asynchronously — you `await foreach` over it and produce items with `async` + `yield return`, ideal for paged APIs or streaming DB reads without buffering everything.",
+            "keyPoints": [
+              "Consume with `await foreach`; produce with `async IAsyncEnumerable<T>` + `yield return`.",
+              "Lazy and async: each item awaits I/O without loading the whole set into memory.",
+              "Pass a `[EnumeratorCancellation] CancellationToken` to make it cancellable.",
+              "Use for paging, streaming query results, or reading large files/streams."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "async IAsyncEnumerable<Order> StreamOrdersAsync(\n    [EnumeratorCancellation] CancellationToken ct = default)\n{\n    int page = 0;\n    while (true)\n    {\n        var batch = await _api.GetPageAsync(page++, ct);\n        if (batch.Count == 0) yield break;\n        foreach (var o in batch) yield return o;\n    }\n}\n// Consumer\nawait foreach (var order in StreamOrdersAsync(ct)) Handle(order);",
+              "note": "Streams pages without ever holding all results in memory"
+            },
+            "followUps": [
+              "Why the [EnumeratorCancellation] attribute?",
+              "EF Core's AsAsyncEnumerable vs ToListAsync?"
+            ],
+            "redFlags": [
+              "Materializing the whole stream with ToList when streaming was the point.",
+              "Not flowing the CancellationToken into the iterator."
             ]
           }
         }
@@ -1756,6 +2115,218 @@
               "C# 13: `params` collections, `System.Threading.Lock`, `\\e` escape."
             ],
             "note": "Versions map to .NET releases: C# 10/.NET 6, 11/.NET 7, 12/.NET 8, 13/.NET 9"
+          }
+        },
+        {
+          "id": "csharp-advanced-029",
+          "q": "What are expression trees in C# and what is a real use case?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": [
+            "expression-trees",
+            "linq",
+            "ef-core",
+            "iqueryable",
+            "metaprogramming"
+          ],
+          "answer": {
+            "oneLiner": "An expression tree (`Expression<Func<...>>`) represents code as a data structure rather than compiled IL, so libraries can inspect and translate it — this is how EF Core turns a C# lambda into SQL.",
+            "keyPoints": [
+              "`Func<T>` is executable code; `Expression<Func<T>>` is an inspectable tree.",
+              "EF Core walks the tree to translate `Where(o => o.Total > 100)` into SQL.",
+              "Also used for dynamic queries, mappers, and validation rule builders.",
+              "You can compile a tree to a delegate at runtime with `.Compile()`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// A tree, not executable code yet\nExpression<Func<Order, bool>> pred = o => o.Total > 100;\n// EF translates this to: WHERE Total > 100\nvar rows = db.Orders.Where(pred).ToList();\n\n// Compile a tree to a runnable delegate\nFunc<Order, bool> compiled = pred.Compile();",
+              "note": "IQueryable.Where takes an Expression; IEnumerable.Where takes a Func"
+            },
+            "followUps": [
+              "Why does Where on IQueryable take Expression but on IEnumerable take Func?",
+              "What happens if EF can't translate part of the tree?"
+            ],
+            "redFlags": [
+              "Confusing Expression<Func<>> with Func<>.",
+              "Not knowing this underpins LINQ-to-SQL/EF translation."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-030",
+          "q": "What is the difference between `Func`, `Action`, and `Predicate`?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [
+            "func",
+            "action",
+            "predicate",
+            "delegates"
+          ],
+          "answer": {
+            "oneLiner": "They're built-in generic delegates: `Action` returns void, `Func` returns a value (last type parameter), and `Predicate<T>` is a specialized `Func<T,bool>` for tests.",
+            "keyPoints": [
+              "`Action<T>` — takes args, returns nothing.",
+              "`Func<T,...,TResult>` — last generic arg is the return type.",
+              "`Predicate<T>` — takes one `T`, returns `bool` (same as `Func<T,bool>`).",
+              "LINQ uses `Func<T,bool>`, not `Predicate<T>` (e.g. `Where`)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "Action<string> log = s => Console.WriteLine(s);   // returns void\nFunc<int, int, int> add = (a, b) => a + b;        // returns int\nPredicate<int> isEven = n => n % 2 == 0;          // returns bool\n\nbool found = list.Exists(isEven);   // List.Exists takes a Predicate<T>\nvar evens = list.Where(n => n % 2 == 0); // LINQ uses Func<T,bool>",
+              "note": "Predicate<T> and Func<T,bool> are interchangeable in meaning but distinct types"
+            },
+            "followUps": [
+              "Why does LINQ use Func<T,bool> rather than Predicate<T>?",
+              "Can you pass a Predicate<T> where a Func<T,bool> is expected?"
+            ],
+            "redFlags": [
+              "Not knowing Func's last type parameter is the return type.",
+              "Thinking Predicate<T> and Func<T,bool> are the same .NET type."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-031",
+          "q": "What is the difference between .NET Framework, .NET Core, and .NET 5+?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [
+            "dotnet",
+            "dotnet-core",
+            "dotnet-framework",
+            "platform"
+          ],
+          "answer": {
+            "oneLiner": ".NET Framework is the legacy Windows-only platform; .NET Core was the cross-platform open-source rewrite; .NET 5+ is the unified, single continuation of .NET Core (the 'Core' name was dropped).",
+            "keyPoints": [
+              ".NET Framework — Windows-only, legacy, in maintenance (max 4.8).",
+              ".NET Core (1-3.1) — cross-platform, open-source, high-performance rewrite.",
+              ".NET 5+ — the unified successor; one stack for web, desktop, mobile, cloud.",
+              "New projects target current .NET (e.g. .NET 8/9); skip Framework unless legacy."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "<!-- Modern .NET project file -->\n<TargetFramework>net8.0</TargetFramework>\n<!-- Legacy .NET Framework -->\n<!-- <TargetFramework>net48</TargetFramework> -->",
+              "note": "There was no .NET 4 to avoid confusion with .NET Framework 4.x"
+            },
+            "followUps": [
+              "What is .NET Standard and is it still relevant?",
+              "How do you migrate a Framework app to modern .NET?"
+            ],
+            "redFlags": [
+              "Thinking .NET 5+ is a new version of .NET Framework.",
+              "Starting greenfield projects on .NET Framework."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-032",
+          "q": "What is Native AOT compilation in .NET and what are its trade-offs?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "low",
+          "tags": [
+            "aot",
+            "native-aot",
+            "performance",
+            "deployment"
+          ],
+          "answer": {
+            "oneLiner": "Native AOT compiles your app to a self-contained native binary ahead of time (no JIT), giving fast startup and small memory footprint at the cost of losing runtime reflection/codegen and larger build complexity.",
+            "keyPoints": [
+              "Benefits: near-instant startup, lower memory, no runtime dependency, smaller attack surface.",
+              "Great for serverless/containers/CLI where cold-start matters.",
+              "Trade-offs: limited reflection, no runtime IL emit, platform-specific builds.",
+              "Some libraries that rely on reflection/dynamic code won't be AOT-compatible."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "<!-- .csproj -->\n<PropertyGroup>\n  <PublishAot>true</PublishAot>\n</PropertyGroup>\n<!-- dotnet publish -r linux-x64 -c Release -->",
+              "note": "AOT trades JIT flexibility (reflection, dynamic) for startup speed and small size"
+            },
+            "followUps": [
+              "Why does AOT restrict reflection?",
+              "AOT vs ReadyToRun (R2R)?"
+            ],
+            "redFlags": [
+              "Assuming all libraries work under Native AOT.",
+              "Choosing AOT for an app that depends heavily on reflection."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-033",
+          "q": "What is the difference between `Tuple` and `ValueTuple` in C#?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "tuple",
+            "valuetuple",
+            "value-types",
+            "performance"
+          ],
+          "answer": {
+            "oneLiner": "The old `System.Tuple` is an immutable reference type with `Item1`/`Item2` properties; the newer `ValueTuple` (C# 7 `(int, string)` syntax) is a mutable struct that supports named elements and deconstruction.",
+            "keyPoints": [
+              "`Tuple` — class (heap-allocated), immutable, only `Item1..N`.",
+              "`ValueTuple` — struct (no heap alloc), supports named fields.",
+              "ValueTuple enables `(string Name, int Age)` syntax and deconstruction.",
+              "Prefer ValueTuple in modern code; it's lighter and more readable."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Old reference-type Tuple\nTuple<string,int> t1 = Tuple.Create(\"Bob\", 30);\nstring n = t1.Item1;\n\n// Modern ValueTuple — struct, named, deconstructable\n(string Name, int Age) t2 = (\"Bob\", 30);\nvar (name, age) = t2;",
+              "note": "ValueTuple avoids the heap allocation that Tuple incurs"
+            },
+            "followUps": [
+              "Where do ValueTuple element names live (compile-time only)?",
+              "Are ValueTuples compared by value?"
+            ],
+            "redFlags": [
+              "Using System.Tuple in new code.",
+              "Not knowing ValueTuple is a struct (value semantics)."
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-034",
+          "q": "Distinguish `IEnumerable`, `IEnumerator`, `IQueryable`, and `IAsyncEnumerable`.",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": [
+            "ienumerable",
+            "ienumerator",
+            "iqueryable",
+            "iasyncenumerable",
+            "iteration"
+          ],
+          "answer": {
+            "oneLiner": "`IEnumerable<T>` is the iterable (`GetEnumerator`), `IEnumerator<T>` is the cursor that does the actual `MoveNext`/`Current`; `IQueryable<T>` is an IEnumerable backed by an expression tree (SQL), and `IAsyncEnumerable<T>` is the async-streaming version.",
+            "keyPoints": [
+              "`IEnumerable<T>` — 'I can be iterated'; hands out an enumerator.",
+              "`IEnumerator<T>` — the cursor with `MoveNext()` and `Current`.",
+              "`IQueryable<T>` — IEnumerable + expression tree translated by a provider (EF).",
+              "`IAsyncEnumerable<T>` — async stream consumed with `await foreach`."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "IEnumerable<int> seq = new[] { 1, 2, 3 };\nIEnumerator<int> cursor = seq.GetEnumerator();\nwhile (cursor.MoveNext()) Console.Write(cursor.Current); // foreach uses this\n\nIQueryable<Order> q = db.Orders;          // translated to SQL\nIAsyncEnumerable<int> s = GetStreamAsync(); // await foreach",
+              "note": "foreach is sugar over GetEnumerator + MoveNext + Current"
+            },
+            "followUps": [
+              "What does foreach desugar into?",
+              "When does IQueryable fall back to in-memory IEnumerable?"
+            ],
+            "redFlags": [
+              "Confusing IEnumerable (the collection) with IEnumerator (the cursor).",
+              "Not knowing IQueryable carries an expression tree."
+            ]
           }
         }
       ]

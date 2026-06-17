@@ -23,6 +23,12 @@
 .back-link { font-size: 0.85em; color: var(--text-muted); }
 .back-link:hover { color: var(--accent); text-decoration: none; }
 .app-brand { font-weight: 700; }
+.topbar-spacer { display: flex; align-items: center; gap: 10px; }
+.nav-link {
+  font-size: 0.82em; font-weight: 600; color: var(--text-muted);
+  padding: 5px 10px; border-radius: 6px;
+  &:hover { color: var(--accent); background: var(--surface-2); text-decoration: none; }
+}
 .theme-btn {
   background: var(--surface-2);
   border: 1px solid var(--border);
