@@ -130,3 +130,28 @@ C# is a statically-typed, managed, multi-paradigm language running on the .NET C
 - [ ] Generics constraints: `where T : class`, `new()`, `IComparable<T>`
 - [ ] How events prevent subscribers from invoking or clearing each other
 - [ ] Gen 0 / Gen 1 / Gen 2 GC collection and what promotes an object
+
+---
+
+## 🔮 Predict-the-Output Cheat Sheet (Gotchas)
+
+Memorize these one-line rules — they cover most C# trick questions:
+
+| Trap | Rule to say in the interview |
+|------|------------------------------|
+| **Virtual call in constructor** | Base ctor runs first; a virtual call dispatches to the derived override *before* its fields are initialized → often a `NullReferenceException`. Never call virtual methods from a ctor. |
+| **`new` vs `override`** | `override` = runtime dispatch (object's real type). `new` = *hiding*, resolved by the **declared** (reference) type at compile time. |
+| **Non-virtual method via base reference** | Static/early binding — the **declared** type's method is called, not the runtime type's. |
+| **Property hiding** | Properties hidden with `new` follow the reference type, not the object type. |
+| **Struct vs class assignment** | Struct copies on assignment (independent); class copies the reference (shared object). |
+| **Closure over `for` variable** | All lambdas share one `i` → prints the final value. `foreach` variable is per-iteration (C# 5+). |
+| **LINQ deferred execution** | `Select`/`Where` run when enumerated. `.ToList()`/`.ToArray()` force immediate execution. |
+| **Boxing** | Each box is a new heap object; `==` on `object` is reference equality; `.Equals` is value equality. |
+| **String interning** | Compile-time constant concatenation is folded + interned (same ref); runtime concat is a new object. |
+| **Integer overflow** | Default is `unchecked` → wraps silently. Use `checked { }` to throw `OverflowException`. |
+| **Multicast `Func`** | Only the **last** subscriber's return value is kept; an exception mid-chain stops the rest. |
+| **Explicit `(int)` cast** | Truncates toward zero — does not round. |
+| **`async`/`await` order** | Code runs synchronously up to the first real `await`; the continuation resumes afterward. |
+| **Static init order** | Static field initializers run in textual order **before** the static constructor body. |
+
+> **Interview tip:** when given a snippet, first identify the **declared type vs runtime type**, then ask "is this member `virtual`/`override` or hidden with `new`?" — that single distinction explains most of these.
