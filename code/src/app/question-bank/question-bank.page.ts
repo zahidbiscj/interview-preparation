@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy, Component, computed, inject, OnInit, signal
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { QuestionBankService } from './question-bank.service';
 import { TopicSidebarComponent } from './components/topic-sidebar/topic-sidebar.component';
 import { SearchFilterComponent } from './components/search-filter/search-filter.component';
@@ -12,6 +13,7 @@ import { ButtonModule } from 'primeng/button';
   selector: 'app-question-bank-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RouterLink,
     TopicSidebarComponent,
     SearchFilterComponent,
     QuestionCardComponent,
@@ -28,9 +30,10 @@ import { ButtonModule } from 'primeng/button';
           <span class="app-brand">📚 PrepDeck</span>
         </div>
         <div class="topbar-center">
-          <span class="stats-pill">210 questions · 8 topics</span>
+          <span class="stats-pill">235 questions · 8 topics</span>
         </div>
         <div class="topbar-right">
+          <a routerLink="/simulator" class="sim-link">🎯 Simulator</a>
           <button class="theme-btn" (click)="toggleTheme()" [title]="isDark() ? 'Switch to light' : 'Switch to dark'">
             {{ isDark() ? '☀️' : '🌙' }}
           </button>
@@ -192,6 +195,20 @@ import { ButtonModule } from 'primeng/button';
       transition: background 120ms;
 
       &:hover { background: var(--surface); }
+    }
+
+    .sim-link {
+      background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+      color: var(--accent);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.82em;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background 120ms;
+
+      &:hover { background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); text-decoration: none; }
     }
 
     /* ── Layout ── */

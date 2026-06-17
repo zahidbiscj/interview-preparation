@@ -174,6 +174,54 @@ export class QuestionBankService {
     }
   }
 
+  /** Ensure a topic's questions are loaded into the cache (no UI side-effects). */
+  async ensureTopicLoaded(id: string): Promise<TopicFile | null> {
+    if (this.topicCache.has(id)) return this.topicCache.get(id)!;
+    const topic = this._topics().find(t => t.id === id);
+    if (!topic) return null;
+    try {
+      const file = await firstValueFrom(
+        this.http.get<TopicFile>(`assets/data/questions/${topic.file}`)
+      );
+      this.topicCache.set(id, file);
+      return file;
+    } catch {
+      this._error.set(`Failed to load questions for "${topic.name}".`);
+      return null;
+    }
+  }
+
+  /**
+   * Build a flat pool of QuestionViews for the mock-exam simulator.
+   * @param topicIds which topics to draw from (empty = all topics)
+   * @param levels which difficulty levels to include (empty = all)
+   */
+  async buildPool(topicIds: string[], levels: string[]): Promise<QuestionView[]> {
+    const ids = topicIds.length ? topicIds : this._topics().map(t => t.id);
+    const bookmarks = this._bookmarks();
+    const pool: QuestionView[] = [];
+
+    for (const id of ids) {
+      const file = await this.ensureTopicLoaded(id);
+      if (!file) continue;
+      const topicNode = this._topics().find(t => t.id === id);
+      for (const sub of file.subtopics) {
+        for (const q of sub.questions) {
+          if (levels.length && !levels.includes(q.level ?? 'mid')) continue;
+          pool.push({
+            ...q,
+            topicId: file.topicId,
+            topicName: topicNode?.name ?? file.topicName,
+            subtopicId: sub.subtopicId,
+            subtopicName: sub.subtopicName,
+            bookmarked: bookmarks.has(q.id),
+          });
+        }
+      }
+    }
+    return pool;
+  }
+
   toggleTheme(): void {
     const next = !this._isDark();
     this._isDark.set(next);

@@ -38,6 +38,19 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
         </div>
       </div>
 
+      <!-- Predict-the-output: show code upfront so you can guess before revealing -->
+      @if (isPredict()) {
+        <div class="predict-code">
+          <div class="code-block">
+            <div class="code-lang-tag">{{ q().answer.code!.lang }}</div>
+            <markdown [data]="codeMarkdown()" />
+          </div>
+          @if (state() === 'collapsed') {
+            <button class="reveal-btn" (click)="toggle()">🔮 Reveal answer</button>
+          }
+        </div>
+      }
+
       <!-- One-liner + full content -->
       @if (state() !== 'collapsed') {
         <div class="qcard-body fade-slide-enter">
@@ -81,7 +94,7 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
                 </section>
               }
 
-              @if (q().answer.code) {
+              @if (q().answer.code && !isPredict()) {
                 <section class="answer-section">
                   <div class="code-block">
                     <div class="code-lang-tag">{{ q().answer.code!.lang }}</div>
@@ -91,6 +104,9 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
                     <p class="code-note">{{ q().answer.code!.note }}</p>
                   }
                 </section>
+              }
+              @if (q().answer.code && isPredict() && q().answer.code!.note) {
+                <p class="code-note">📤 {{ q().answer.code!.note }}</p>
               }
 
               @if (q().answer.analogy) {
@@ -199,6 +215,26 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
     }
 
     .caret-icon { color: var(--text-muted); font-size: 0.75em; }
+
+    .predict-code {
+      padding: 0 14px 12px;
+    }
+
+    .reveal-btn {
+      margin-top: 10px;
+      width: 100%;
+      background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+      color: var(--accent);
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85em;
+      font-weight: 600;
+      transition: background 120ms;
+
+      &:hover { background: color-mix(in srgb, var(--accent) 20%, var(--surface-2)); }
+    }
 
     .qcard-body { padding: 0 14px 14px; }
 
@@ -360,6 +396,9 @@ export class QuestionCardComponent {
     if (!code) return '';
     return `\`\`\`${code.lang}\n${code.snippet}\n\`\`\``;
   });
+
+  /** A "predict the output" question: show its code upfront so you can guess first. */
+  readonly isPredict = computed(() => this.q().type === 'code' && !!this.q().answer.code);
 
   toggle(): void {
     if (this.state() === 'collapsed') {

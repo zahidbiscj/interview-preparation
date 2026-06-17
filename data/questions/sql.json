@@ -15,30 +15,28 @@
           "freq": "high",
           "tags": ["delete", "truncate", "drop", "ddl", "dml"],
           "answer": {
-            "oneLiner": "DELETE removes rows one-by-one with logging and can be rolled back; TRUNCATE removes all rows by deallocating pages (faster, minimal logging) and can also be rolled back in a transaction; DROP removes the entire table object from the database.",
+            "oneLiner": "DELETE removes rows one-by-one (logged, can use WHERE); TRUNCATE wipes all rows by deallocating pages (fast, resets identity); DROP removes the whole table object.",
             "keyPoints": [
-              "**DELETE**: DML, fires triggers, logged per-row, can use WHERE, can be rolled back, resets identity only if all rows deleted via TRUNCATE",
-              "**TRUNCATE**: DDL, no triggers fired, deallocates data pages (minimal log), no WHERE clause, resets IDENTITY counter, can be rolled back if inside an explicit transaction",
-              "**DROP**: DDL, removes the table structure and all its data, indexes, constraints permanently — cannot be rolled back outside a transaction",
-              "TRUNCATE requires no foreign key references to the table (unless references are also truncated first)",
-              "DELETE is slower on large tables; TRUNCATE is near-instant regardless of row count"
+              "DELETE: DML, per-row logging, fires triggers, supports WHERE",
+              "TRUNCATE: DDL, minimal logging, no WHERE, resets IDENTITY",
+              "DROP: removes table structure, data, indexes, constraints",
+              "Both DELETE and TRUNCATE roll back inside an explicit transaction"
             ],
-            "detail": "**DELETE** is a DML statement that removes rows one at a time, writing a log record for every deleted row. Because each row deletion is individually logged, it fires AFTER DELETE triggers and supports a WHERE clause for partial deletes. It respects foreign key constraints, and the operation can be wrapped in a transaction and rolled back.\n\n**TRUNCATE** is technically a DDL statement. Instead of deleting rows one by one, it deallocates the data pages that store the table's data, writing only page-deallocation entries to the transaction log. This makes it dramatically faster on large tables. Triggers are NOT fired, the IDENTITY seed resets to its original value, and no WHERE clause is allowed. Despite being DDL, SQL Server does allow TRUNCATE inside an explicit `BEGIN TRANSACTION` block — if you roll back that transaction the data returns.\n\n**DROP** removes the table object entirely from the catalog — the schema, all indexes, all constraints, statistics, and all rows vanish. Like any DDL inside an explicit transaction it can be rolled back, but in practice most developers think of it as permanent.\n\n**Interview tip**: Always mention that TRUNCATE resets IDENTITY and cannot have a WHERE clause — interviewers love to probe both facts.",
             "code": {
               "lang": "sql",
               "snippet": "-- DELETE: partial removal, triggers fire, per-row log\nDELETE FROM Orders WHERE OrderDate < '2020-01-01';\n\n-- TRUNCATE: all rows gone, minimal log, identity resets, no WHERE\nTRUNCATE TABLE StagingOrders;\n\n-- DROP: table no longer exists\nDROP TABLE StagingOrders;",
               "note": "DELETE supports WHERE; TRUNCATE does not"
             },
-            "analogy": "DELETE is tearing pages out of a book one by one; TRUNCATE is throwing the entire book's pages in the recycling bin while keeping the cover; DROP is throwing cover and all into a shredder.",
+            "analogy": "DELETE tears pages out one by one; TRUNCATE recycles all pages but keeps the cover; DROP shreds the whole book.",
             "followUps": [
               "Can TRUNCATE be rolled back?",
               "Why doesn't TRUNCATE fire triggers?",
-              "What happens to the IDENTITY column after each operation?"
+              "What happens to the IDENTITY column after each?"
             ],
             "redFlags": [
-              "Saying TRUNCATE cannot be rolled back at all (it can inside an explicit transaction)",
+              "Saying TRUNCATE can never be rolled back",
               "Confusing TRUNCATE and DROP",
-              "Forgetting that DELETE fires triggers"
+              "Forgetting DELETE fires triggers"
             ]
           }
         },
@@ -50,31 +48,29 @@
           "freq": "high",
           "tags": ["joins", "inner join", "left join", "right join", "full outer join"],
           "answer": {
-            "oneLiner": "Joins combine rows from two tables: INNER returns only matching rows; LEFT returns all left rows + matching right rows (NULLs for non-matches); RIGHT is the mirror; FULL OUTER returns all rows from both, with NULLs where no match exists.",
+            "oneLiner": "INNER returns only matches; LEFT returns all left rows plus matches (NULLs otherwise); RIGHT is the mirror; FULL OUTER returns all rows from both sides.",
             "keyPoints": [
-              "**INNER JOIN**: intersection — only rows where the join condition is TRUE in both tables",
-              "**LEFT JOIN** (LEFT OUTER): all rows from the left table; NULL-filled columns from the right where no match",
-              "**RIGHT JOIN** (RIGHT OUTER): all rows from the right table; NULL-filled columns from the left where no match",
-              "**FULL OUTER JOIN**: union of both — all rows from both tables, NULLs wherever no match on either side",
-              "LEFT JOIN with `WHERE right.key IS NULL` = anti-join (rows in left with no match in right)",
-              "CROSS JOIN returns the Cartesian product — every left row paired with every right row (no ON clause)"
+              "INNER: only rows matching the ON condition in both tables",
+              "LEFT: all left rows, NULLs where no right match",
+              "RIGHT: all right rows, NULLs where no left match",
+              "FULL OUTER: all rows from both, NULLs where no match",
+              "LEFT + WHERE right.key IS NULL = anti-join"
             ],
-            "detail": "All JOIN types use an ON clause to specify the matching condition. The difference lies in how they handle non-matching rows.\n\n**INNER JOIN** is the default and most common. Only rows that satisfy the ON condition in *both* tables appear in the result. If a Customer has no Orders, that Customer is excluded.\n\n**LEFT JOIN** starts with every row in the left table. For rows that find a match in the right table the right columns are populated; for rows that find no match the right columns are NULL. This is the go-to join for 'give me all Customers and their Orders if they exist'.\n\n**RIGHT JOIN** is the symmetric opposite. In practice most developers rewrite right joins as left joins by swapping table order — it is clearer.\n\n**FULL OUTER JOIN** returns every row from both tables. Rows that match appear once with all columns populated; rows in the left table with no right-side match appear with right columns NULL; rows in the right table with no left-side match appear with left columns NULL. Useful for reconciliation queries.\n\n**Performance note**: Joins on indexed foreign-key columns (especially clustered or covering) execute as nested-loop or hash-join with seek; unindexed joins degrade to table scans.",
             "code": {
               "lang": "sql",
               "snippet": "-- Sample tables: Customers(CustomerId, Name), Orders(OrderId, CustomerId, Total)\n\n-- INNER: only customers who have orders\nSELECT c.Name, o.Total\nFROM Customers c\nINNER JOIN Orders o ON c.CustomerId = o.CustomerId;\n\n-- LEFT: all customers, NULL Total where no order exists\nSELECT c.Name, o.Total\nFROM Customers c\nLEFT JOIN Orders o ON c.CustomerId = o.CustomerId;\n\n-- Anti-join: customers with NO orders\nSELECT c.Name\nFROM Customers c\nLEFT JOIN Orders o ON c.CustomerId = o.CustomerId\nWHERE o.CustomerId IS NULL;\n\n-- FULL OUTER: all rows from both tables\nSELECT c.Name, o.Total\nFROM Customers c\nFULL OUTER JOIN Orders o ON c.CustomerId = o.CustomerId;",
               "note": "Anti-join pattern (LEFT + WHERE IS NULL) is a classic interview question"
             },
-            "analogy": "Think of two Venn diagram circles: INNER is the overlap; LEFT includes the entire left circle; RIGHT includes the entire right circle; FULL OUTER is both circles combined.",
+            "analogy": "Two Venn circles: INNER is the overlap, LEFT/RIGHT is one whole circle, FULL OUTER is both circles combined.",
             "followUps": [
               "What is a CROSS JOIN and when would you use it?",
               "How does a SELF JOIN work?",
-              "What is the difference between a JOIN and a subquery performance-wise?"
+              "JOIN vs subquery performance?"
             ],
             "redFlags": [
-              "Confusing LEFT and RIGHT join semantics",
-              "Not knowing the anti-join (WHERE right.key IS NULL) pattern",
-              "Thinking FULL OUTER JOIN duplicates rows"
+              "Confusing LEFT and RIGHT semantics",
+              "Not knowing the anti-join pattern",
+              "Thinking FULL OUTER duplicates rows"
             ]
           }
         },
@@ -86,16 +82,15 @@
           "freq": "high",
           "tags": ["performance", "execution plan", "optimization", "index", "statistics"],
           "answer": {
-            "oneLiner": "Optimization starts with the execution plan: look for table scans, high estimated cost operators, thick arrows (large row estimates), and missing index hints — then address with proper indexes, statistics updates, query rewrites, or schema changes.",
+            "oneLiner": "Start with the execution plan: look for scans, thick arrows, and Key Lookups, then fix with proper indexes, SARGable predicates, and updated statistics. Always measure with SET STATISTICS IO before and after.",
             "keyPoints": [
-              "Use `SET STATISTICS IO ON` and `SET STATISTICS TIME ON` to measure logical reads and CPU before/after",
-              "In the graphical plan, read **right-to-left, top-to-bottom**; operator width (arrow thickness) shows row-count estimates",
-              "Key operators to spot: **Table Scan** (no index), **Key Lookup** (missing covering column), **Sort** (expensive, blocks), **Hash Match** (memory-intensive join), **Nested Loops** (good for small sets)",
-              "Missing Index hints in the plan are a starting point, not gospel — always test before applying",
-              "Rewrite anti-patterns: SELECT *, functions on indexed columns in WHERE, implicit type conversions, OR instead of UNION, non-SARGable predicates",
-              "Update statistics with `UPDATE STATISTICS` or `sp_updatestats`; stale stats cause bad cardinality estimates"
+              "Baseline with SET STATISTICS IO/TIME ON (logical reads = I/O cost)",
+              "Read graphical plans right-to-left; thick arrows = many rows",
+              "Watch for Table Scan, Key Lookup, Sort, expensive Hash Match",
+              "Fix non-SARGable predicates, SELECT *, implicit conversions",
+              "Update stale statistics; missing-index hints are a hint, not gospel"
             ],
-            "detail": "**Step 1 — Baseline**: Capture logical reads (`SET STATISTICS IO ON`) and elapsed time before any change. Logical reads are the truest measure of I/O cost.\n\n**Step 2 — Execution plan**: Use SSMS's 'Include Actual Execution Plan' (Ctrl+M) or `sys.dm_exec_query_plan`. Read it right-to-left. The thickest arrows point to operators processing the most rows. Green text warnings indicate implicit conversions or missing statistics.\n\n**Step 3 — Common culprits**:\n- *Table Scan / Clustered Index Scan*: the optimizer found no useful index. Add a non-clustered index on the filter/join column.\n- *Key Lookup*: the query uses a non-clustered index for the WHERE clause but then goes back to the clustered index for additional columns. Fix by including those columns in the index (INCLUDE clause = covering index).\n- *Implicit conversion warning*: a column is VARCHAR but the parameter is NVARCHAR — the index cannot be used. Fix the data type mismatch.\n- *Sort operator*: expensive on large sets; consider an index that already provides the required order.\n\n**Step 4 — Query rewrites**: Avoid `NOLOCK` as a performance fix (it causes dirty reads). Avoid `SELECT *`. Move functions away from indexed columns in WHERE clauses (make predicates SARGable). Replace correlated subqueries with JOINs or CTEs where possible.\n\n**Step 5 — Index maintenance**: Rebuild or reorganize fragmented indexes. Update statistics. Consider fill factor settings for write-heavy tables.",
+            "detail": "Key Lookup means a non-clustered index seek had to go back to the clustered index for extra columns; fix with a covering index (INCLUDE). Make predicates SARGable by keeping functions off indexed columns.",
             "code": {
               "lang": "sql",
               "snippet": "-- Baseline I/O measurement\nSET STATISTICS IO ON;\nSET STATISTICS TIME ON;\n\n-- Non-SARGable (BAD) -- function prevents index seek\nSELECT * FROM Orders WHERE YEAR(OrderDate) = 2024;\n\n-- SARGable (GOOD) -- allows index seek\nSELECT OrderId, CustomerId, Total\nFROM Orders\nWHERE OrderDate >= '2024-01-01' AND OrderDate < '2025-01-01';\n\n-- Covering index: seek on CustomerId, include Total to avoid Key Lookup\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId_Inc\n  ON Orders (CustomerId)\n  INCLUDE (Total, OrderDate);",
@@ -103,13 +98,13 @@
             },
             "followUps": [
               "What is parameter sniffing and how do you deal with it?",
-              "When would you use query hints like OPTION (RECOMPILE)?",
-              "How does the Query Store help with performance regression?"
+              "When would you use OPTION (RECOMPILE)?",
+              "How does Query Store help with regressions?"
             ],
             "redFlags": [
-              "Jumping straight to adding indexes without reading the plan first",
+              "Adding indexes without reading the plan first",
               "Using NOLOCK as a default performance fix",
-              "Not knowing what a Key Lookup is or how to fix it"
+              "Not knowing what a Key Lookup is"
             ]
           }
         },
@@ -121,26 +116,24 @@
           "freq": "high",
           "tags": ["cte", "with", "recursive", "readability", "subquery"],
           "answer": {
-            "oneLiner": "A CTE is a named temporary result set defined with the WITH keyword that exists only for the duration of a single SQL statement; it improves readability, enables recursion, and can be referenced multiple times in the same query.",
+            "oneLiner": "A CTE is a named temporary result set defined with WITH that exists only for the next single statement; it improves readability and enables recursion for hierarchies.",
             "keyPoints": [
-              "Syntax: `WITH CTE_Name AS (SELECT ...)` followed immediately by a SELECT/INSERT/UPDATE/DELETE",
-              "**Non-recursive CTEs** are syntactic sugar for subqueries — the optimizer may or may not materialize them",
-              "**Recursive CTEs** use an anchor member UNION ALL'd with a recursive member to traverse hierarchies (org charts, BOMs)",
-              "A CTE is scoped to the single statement that follows it; it is NOT a physical temporary table",
-              "Multiple CTEs can be chained with commas in one WITH clause",
-              "Unlike a view, a CTE is ad-hoc and not stored in the database"
+              "Syntax: WITH Name AS (SELECT ...) then a SELECT/INSERT/UPDATE/DELETE",
+              "Scoped to one statement; not a physical temp table",
+              "Recursive CTEs: anchor UNION ALL recursive member, for hierarchies",
+              "Default recursion limit 100; override with OPTION (MAXRECURSION n)"
             ],
-            "detail": "CTEs were introduced in SQL Server 2005 and have become the standard way to structure complex queries.\n\n**Non-recursive use cases**: Breaking a multi-step calculation into named stages makes the query self-documenting. You can also reference the same CTE multiple times in a join without rewriting the subquery.\n\n**Recursive CTEs** have two parts separated by UNION ALL:\n1. *Anchor* — the base case (e.g., top-level manager)\n2. *Recursive member* — references the CTE itself to traverse one level deeper\n\nSQL Server imposes a default recursion limit of 100 levels; override with `OPTION (MAXRECURSION n)`.\n\n**Performance caveat**: Unlike a temp table, a non-recursive CTE is typically inlined by the optimizer rather than materialized. If the CTE is referenced multiple times and is expensive, the optimizer may re-execute it each time. In that case, materialize it into a `#temp` table first.\n\n**vs. Subquery**: CTEs and subqueries are often equivalent in the plan; CTEs win on readability when logic is complex or reused multiple times in the same statement.",
+            "detail": "A non-recursive CTE is usually inlined by the optimizer, not materialized, so referencing it many times can re-execute it; use a #temp table if that's expensive.",
             "code": {
               "lang": "sql",
               "snippet": "-- Non-recursive: top customers by order value\nWITH CustomerTotals AS (\n    SELECT CustomerId, SUM(Total) AS TotalSpent\n    FROM Orders\n    GROUP BY CustomerId\n)\nSELECT c.Name, ct.TotalSpent\nFROM CustomerTotals ct\nJOIN Customers c ON c.CustomerId = ct.CustomerId\nORDER BY ct.TotalSpent DESC;\n\n-- Recursive: org-chart hierarchy\nWITH OrgChart AS (\n    -- Anchor: CEO (no manager)\n    SELECT EmployeeId, Name, ManagerId, 0 AS Level\n    FROM Employees\n    WHERE ManagerId IS NULL\n\n    UNION ALL\n\n    -- Recursive: reports\n    SELECT e.EmployeeId, e.Name, e.ManagerId, oc.Level + 1\n    FROM Employees e\n    INNER JOIN OrgChart oc ON e.ManagerId = oc.EmployeeId\n)\nSELECT * FROM OrgChart\nOPTION (MAXRECURSION 50);",
               "note": "Recursive CTEs require UNION ALL — UNION is not allowed in the recursive member"
             },
-            "analogy": "A CTE is like naming an intermediate calculation on a whiteboard — you give it a label, reference it multiple times in the same derivation, and erase it when done.",
+            "analogy": "A CTE is like naming an intermediate calculation on a whiteboard, then erasing it when done.",
             "followUps": [
-              "What is the difference between a CTE and a temp table?",
+              "CTE vs temp table?",
               "Can a CTE be indexed?",
-              "What happens if a recursive CTE has no termination condition?"
+              "What if a recursive CTE never terminates?"
             ],
             "redFlags": [
               "Thinking a CTE is persisted like a temp table",
@@ -157,30 +150,28 @@
           "freq": "high",
           "tags": ["temp table", "table variable", "tempdb", "scope", "local temp", "global temp"],
           "answer": {
-            "oneLiner": "A local temp table (#temp) is session-scoped and stored in tempdb; a global temp table (##temp) is visible to all sessions until the creating session closes; a table variable (@table) is scoped to the batch/procedure and is NOT in tempdb — each has different logging, statistics, and transaction behaviors.",
+            "oneLiner": "#temp is session-scoped in tempdb; ##temp is global across all sessions; @table is batch-scoped, has no real statistics, and is not undone by a transaction rollback.",
             "keyPoints": [
-              "**#temp**: stored in tempdb, session-scoped, visible to nested stored procedures in the same session, supports indexes and statistics, participates in transactions",
-              "**##temp**: stored in tempdb, globally visible to ALL connections, dropped when the creating session disconnects and no other session is using it",
-              "**@table variable**: scoped to the current batch/function/stored procedure only, minimal logging, does NOT rollback with a transaction rollback, no statistics (optimizer assumes 1 row), limited to 8060-byte row size for some operations",
-              "Table variables cannot be used with INSERT EXEC or across dynamic SQL in some cases",
-              "For small sets (< ~1000 rows) table variables are fine; for larger sets temp tables perform better due to statistics",
-              "Both #temp and ##temp are dropped automatically when the session ends; you can also DROP TABLE explicitly"
+              "#temp: tempdb, session-scoped, supports indexes/stats, rolls back",
+              "##temp: tempdb, visible to all sessions until creator disconnects",
+              "@table: batch/proc-scoped, no stats (optimizer assumes 1 row), rollback-immune",
+              "Small sets: table variable; larger sets: #temp (better stats)"
             ],
-            "detail": "**Local temp table (#temp)**: Created with CREATE TABLE #TableName or SELECT INTO #TableName. Lives in tempdb. Only the creating session (and nested calls within it) can see it. Supports CREATE INDEX, which gives the optimizer cardinality statistics for better plans. Fully participates in transactions — a ROLLBACK undoes inserts/updates to the temp table. Use for intermediate result sets in multi-step procedures.\n\n**Global temp table (##temp)**: Prefixed with double hash. Visible to every active session on the server. Dropped when the session that created it closes AND no other session is actively using it. Rarely used in practice — consider them a shared scratchpad that should be used carefully in multi-user environments.\n\n**Table variable (@table)**: Declared with DECLARE @T TABLE (...). Scoped to the current batch or stored procedure. Because it has no statistics, the optimizer always estimates 1 row, which can cause poor plan choices (e.g., nested loops instead of hash join) for large data sets. Critically, changes to a table variable are NOT rolled back by a ROLLBACK TRANSACTION — this makes them useful for audit logging inside a try/catch block. They are NOT accessible across different connections or even from nested stored procedures called from the same session.\n\n**Rule of thumb**: Use table variables for small, short-lived sets in functions or when you need rollback immunity. Use #temp tables for any meaningful data volume inside stored procedures.",
+            "detail": "Because table variables have no statistics, the optimizer estimates 1 row and can pick bad plans on large data. Their rollback immunity makes them handy for audit logging inside TRY/CATCH.",
             "code": {
               "lang": "sql",
               "snippet": "-- Local temp table\nCREATE TABLE #RecentOrders (\n    OrderId   INT,\n    Total     DECIMAL(18,2)\n);\nINSERT INTO #RecentOrders\n    SELECT OrderId, Total FROM Orders WHERE OrderDate > DATEADD(DAY,-30,GETDATE());\nSELECT * FROM #RecentOrders;\nDROP TABLE IF EXISTS #RecentOrders;\n\n-- Table variable (no indexes except PK/UNIQUE at declaration)\nDECLARE @TopCustomers TABLE (\n    CustomerId INT PRIMARY KEY,\n    TotalSpent DECIMAL(18,2)\n);\nINSERT INTO @TopCustomers\n    SELECT TOP 10 CustomerId, SUM(Total) FROM Orders GROUP BY CustomerId ORDER BY SUM(Total) DESC;\nSELECT * FROM @TopCustomers;",
               "note": "Table variables cannot have CREATE INDEX added after declaration; temp tables can"
             },
             "followUps": [
-              "Can a temp table be accessed from a different connection?",
-              "Why do table variables not roll back with a transaction?",
-              "When would you choose a CTE over a temp table?"
+              "Can a temp table be accessed from another connection?",
+              "Why don't table variables roll back?",
+              "When choose a CTE over a temp table?"
             ],
             "redFlags": [
-              "Saying table variables exist in tempdb (they may use tempdb internally but behave differently)",
-              "Not knowing that ##temp is visible across sessions",
-              "Claiming table variables are always faster than temp tables"
+              "Saying table variables behave just like temp tables",
+              "Not knowing ##temp is visible across sessions",
+              "Claiming table variables are always faster"
             ]
           }
         },
@@ -192,29 +183,27 @@
           "freq": "medium",
           "tags": ["trigger", "dml trigger", "ddl trigger", "inserted", "deleted", "after", "instead of"],
           "answer": {
-            "oneLiner": "A trigger is a special stored procedure that automatically fires in response to DML (INSERT/UPDATE/DELETE) or DDL events on a table or database; it uses the virtual INSERTED and DELETED tables to access before/after row states.",
+            "oneLiner": "A trigger is a special stored procedure that fires automatically on DML or DDL events, using the virtual INSERTED and DELETED tables to see the new and old row states.",
             "keyPoints": [
-              "**AFTER trigger** (default): fires after the DML statement completes; you can still ROLLBACK inside it",
-              "**INSTEAD OF trigger**: fires *in place of* the DML operation; used on views to make them updatable",
-              "The **INSERTED** pseudo-table holds the new/updated rows; **DELETED** holds old/deleted rows",
-              "Triggers run in the same transaction as the triggering statement — a ROLLBACK inside cancels both",
-              "DDL triggers fire on schema events (CREATE TABLE, ALTER PROCEDURE, etc.) at database or server scope",
-              "Triggers add latency to every affected DML; prefer constraints or application logic where possible"
+              "AFTER (default): fires after the DML; you can still ROLLBACK",
+              "INSTEAD OF: replaces the DML; used to make views updatable",
+              "INSERTED = new rows, DELETED = old rows; both populated on UPDATE",
+              "Runs in the same transaction; always handle multi-row cases"
             ],
-            "detail": "**DML Triggers** attach to a table and fire for INSERT, UPDATE, or DELETE (or any combination). Inside the trigger body, two virtual tables are always available:\n- `INSERTED`: contains the new row versions (populated on INSERT and UPDATE)\n- `DELETED`: contains the old row versions (populated on DELETE and UPDATE)\n\nFor an UPDATE, both tables are populated — DELETED has the before-image, INSERTED has the after-image.\n\n**AFTER triggers** are the most common type. They fire after SQL Server applies the DML and enforces constraints. You can still call ROLLBACK TRANSACTION to abort the whole operation if a business rule is violated.\n\n**INSTEAD OF triggers** replace the DML entirely. The original INSERT/UPDATE/DELETE does NOT execute unless you re-issue it inside the trigger. They are frequently used on views that join multiple tables to simulate direct writes.\n\n**DDL triggers** fire on schema-level events such as CREATE, ALTER, DROP, GRANT, etc. They are typically used to prevent unauthorized schema changes or to audit schema modifications.\n\n**Best practices**: Keep trigger logic minimal and fast. Never use triggers for complex business workflows — they are invisible to application developers and make debugging harder. Always handle the multi-row case: INSERTED and DELETED can contain multiple rows, so never assume single-row in trigger logic.",
+            "detail": "A ROLLBACK inside a trigger aborts the whole calling transaction. Keep triggers minimal — they are invisible to app developers and hard to debug.",
             "code": {
               "lang": "sql",
               "snippet": "-- AFTER INSERT trigger: log new orders to an audit table\nCREATE OR ALTER TRIGGER trg_Orders_AfterInsert\nON Orders\nAFTER INSERT\nAS\nBEGIN\n    SET NOCOUNT ON;\n    INSERT INTO OrderAudit (OrderId, CustomerId, Total, AuditAction, AuditDate)\n    SELECT OrderId, CustomerId, Total, 'INSERT', GETUTCDATE()\n    FROM INSERTED;  -- INSERTED can have multiple rows\nEND;\n\n-- INSTEAD OF UPDATE trigger on a view\nCREATE OR ALTER TRIGGER trg_vCustomerOrders_InsteadOfUpdate\nON vCustomerOrders\nINSTEAD OF UPDATE\nAS\nBEGIN\n    SET NOCOUNT ON;\n    UPDATE o SET o.Total = i.Total\n    FROM Orders o\n    INNER JOIN INSERTED i ON o.OrderId = i.OrderId;\nEND;",
               "note": "Always handle multi-row: INSERTED is a table, not a single row"
             },
             "followUps": [
-              "What is the difference between AFTER and INSTEAD OF triggers?",
-              "Can a trigger call another trigger (recursive/nested triggers)?",
-              "How would you audit data changes without using a trigger?"
+              "AFTER vs INSTEAD OF triggers?",
+              "Can triggers be recursive/nested?",
+              "How would you audit changes without a trigger?"
             ],
             "redFlags": [
-              "Assuming INSERTED/DELETED always contain exactly one row",
-              "Not knowing that a ROLLBACK inside a trigger rolls back the entire calling transaction",
+              "Assuming INSERTED/DELETED hold exactly one row",
+              "Not knowing a ROLLBACK in a trigger rolls back the caller",
               "Overusing triggers for business logic"
             ]
           }
@@ -227,31 +216,29 @@
           "freq": "high",
           "tags": ["index", "clustered index", "non-clustered index", "b-tree", "performance"],
           "answer": {
-            "oneLiner": "An index is a B-tree data structure that speeds up row lookups; a clustered index physically orders the table's data rows by the key and there can be only one per table, while a non-clustered index is a separate structure containing the key plus a pointer back to the data row, and you can have up to 999 per table.",
+            "oneLiner": "An index is a B-tree that speeds up lookups. A clustered index physically sorts the table by its key (one per table); a non-clustered index is a separate structure with the key plus a pointer back to the row (up to 999).",
             "keyPoints": [
-              "A table without a clustered index is called a **heap**; rows are stored in no particular order",
-              "The clustered index key IS the row — leaf nodes contain the full data row, not a pointer",
-              "Non-clustered index leaf nodes contain the index key columns plus the **row locator** (clustered key or RID for a heap)",
-              "Choose clustered index on the column most often used for range queries and joins (usually the primary key)",
-              "A **Key Lookup** occurs when a non-clustered index is used for the WHERE clause but extra columns must be fetched — solve with a covering index (INCLUDE clause)",
-              "Indexes speed up reads but slow down writes (INSERT/UPDATE/DELETE must maintain every index)"
+              "Table with no clustered index = heap (unordered)",
+              "Clustered leaf nodes ARE the data rows",
+              "Non-clustered leaf = key + row locator (clustered key or RID)",
+              "Key Lookup happens when extra columns are needed; fix with covering index",
+              "Indexes speed reads but slow writes"
             ],
-            "detail": "**How indexes work**: SQL Server uses a B+ tree structure. Non-leaf pages contain key values that guide the search; leaf pages contain the actual data (for clustered) or key + row locator (for non-clustered). Lookups are O(log n) compared to O(n) for a full scan.\n\n**Clustered Index**: Think of it as the table itself arranged in sorted order. There is exactly one per table (or none — heap). By default, defining a PRIMARY KEY creates a clustered index. The leaf level of the clustered index IS the data pages. Range queries on the clustered key column are very efficient because related rows are stored contiguously on disk.\n\n**Non-Clustered Index**: A separate B-tree structure. Leaf nodes hold the indexed column(s) plus a pointer to the actual row (the clustered index key, or a Row ID for heaps). When a query uses a non-clustered index but needs columns not in the index, SQL Server performs a **Key Lookup** (bookmark lookup) — one extra read per qualifying row, which can be very expensive for large result sets. The fix is a **covering index** — add the needed columns to the INCLUDE clause of the non-clustered index.\n\n**Choosing a good clustered key**: It should be unique, narrow (4 bytes INT is better than a wide NVARCHAR), static (rarely updated), and ideally ever-increasing (avoids page splits — a common argument for identity columns over GUIDs).",
             "code": {
               "lang": "sql",
               "snippet": "-- Default: PRIMARY KEY creates a clustered index\nCREATE TABLE Orders (\n    OrderId   INT IDENTITY PRIMARY KEY,  -- clustered by default\n    CustomerId INT NOT NULL,\n    OrderDate  DATE NOT NULL,\n    Total      DECIMAL(18,2)\n);\n\n-- Non-clustered index on CustomerId\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId\n    ON Orders (CustomerId);\n\n-- Covering index: include Total to avoid Key Lookup for this common query\nCREATE NONCLUSTERED INDEX IX_Orders_Customer_Covering\n    ON Orders (CustomerId)\n    INCLUDE (OrderDate, Total);\n\n-- Explicit clustered index (different column)\nCREATE CLUSTERED INDEX CIX_Orders_OrderDate\n    ON Orders (OrderDate);  -- table physically sorted by date",
               "note": "Only one clustered index per table; choose the key wisely as it affects all non-clustered indexes"
             },
-            "analogy": "A clustered index is like a phone book sorted by last name — the data itself is in order. A non-clustered index is like a book's index at the back — it has keywords and page numbers pointing to where the actual content lives.",
+            "analogy": "Clustered = phone book sorted by last name (data itself is ordered). Non-clustered = the index at the back of a book pointing to page numbers.",
             "followUps": [
-              "What is a covering index and how does it eliminate Key Lookups?",
-              "Why are GUIDs a poor choice for a clustered index key?",
+              "What is a covering index?",
+              "Why are GUIDs poor clustered keys?",
               "What is index fragmentation and how do you fix it?"
             ],
             "redFlags": [
-              "Saying you can have multiple clustered indexes on a table",
+              "Saying you can have multiple clustered indexes",
               "Not knowing what a Key Lookup is",
-              "Thinking indexes only help SELECT queries, ignoring the write overhead"
+              "Ignoring the write overhead of indexes"
             ]
           }
         },
@@ -263,29 +250,27 @@
           "freq": "high",
           "tags": ["nth highest", "row_number", "dense_rank", "window functions", "salary"],
           "answer": {
-            "oneLiner": "Use DENSE_RANK() to handle ties correctly: assign a dense rank ordered by salary descending, then filter WHERE DenseRank = N in an outer query or CTE.",
+            "oneLiner": "Use DENSE_RANK() ordered by salary descending in a CTE, then filter WHERE rank = N — it handles ties correctly.",
             "keyPoints": [
-              "**DENSE_RANK** is preferred over ROW_NUMBER for salary problems because ties receive the same rank",
-              "ROW_NUMBER gives each row a unique number — two employees with the same salary get different numbers, which is usually wrong for 'Nth highest' semantics",
-              "RANK skips numbers after ties (1,1,3) while DENSE_RANK does not (1,1,2)",
-              "Wrap the window function in a CTE or subquery since you cannot use window functions directly in WHERE",
-              "Classic alternative: correlated subquery with `SELECT COUNT(DISTINCT Salary)` — correct but slower"
+              "DENSE_RANK is preferred: ties get the same rank, no gaps",
+              "ROW_NUMBER gives unique numbers — wrong when salaries tie",
+              "Window functions can't go in WHERE — wrap in a CTE/subquery",
+              "Alternative: correlated subquery with COUNT(DISTINCT) — slower"
             ],
-            "detail": "The key insight is defining what 'Nth highest' means when there are duplicate salaries. For interviews, DENSE_RANK is almost always the expected answer because it treats equal salaries as the same rank.\n\n**DENSE_RANK approach**: Assign ranks in a subquery/CTE, then filter by rank in the outer query. This is clean, readable, and performs well with an index on Salary.\n\n**ROW_NUMBER approach**: If the question says 'Nth highest row' (not salary value), ROW_NUMBER is fine — but be explicit about the distinction.\n\n**Correlated subquery approach**: `SELECT MIN(Salary) FROM Employees WHERE Salary IN (SELECT DISTINCT TOP N Salary FROM Employees ORDER BY Salary DESC)` — works but harder to read and often slower.\n\n**Edge case**: Always consider what happens when N is larger than the number of distinct salaries. The CTE approach simply returns no rows, which is correct behavior.",
             "code": {
               "lang": "sql",
               "snippet": "-- Method 1: DENSE_RANK in a CTE (preferred)\nWITH RankedSalaries AS (\n    SELECT\n        EmployeeId,\n        Name,\n        Salary,\n        DENSE_RANK() OVER (ORDER BY Salary DESC) AS SalaryRank\n    FROM Employees\n)\nSELECT EmployeeId, Name, Salary\nFROM RankedSalaries\nWHERE SalaryRank = 3;  -- Change 3 to any N\n\n-- Method 2: ROW_NUMBER (wrong for ties, but interviewer may ask for the distinction)\nWITH Numbered AS (\n    SELECT EmployeeId, Name, Salary,\n           ROW_NUMBER() OVER (ORDER BY Salary DESC) AS RowNum\n    FROM Employees\n)\nSELECT * FROM Numbered WHERE RowNum = 3;\n\n-- Method 3: Classic correlated subquery (for comparison only)\nSELECT MIN(Salary)\nFROM (\n    SELECT DISTINCT TOP 3 Salary\n    FROM Employees\n    ORDER BY Salary DESC\n) AS Top3;",
               "note": "Always clarify tie-handling with the interviewer — DENSE_RANK is the safe default"
             },
             "followUps": [
-              "What is the difference between RANK, DENSE_RANK, and ROW_NUMBER?",
-              "How would you find the Nth highest salary per department?",
-              "Can you do this without a window function (for older SQL compatibility)?"
+              "Difference between RANK, DENSE_RANK, ROW_NUMBER?",
+              "Nth highest salary per department?",
+              "Can you do it without a window function?"
             ],
             "redFlags": [
-              "Using ROW_NUMBER without acknowledging it handles ties differently",
-              "Not being able to write it using a window function at all",
-              "Forgetting that window functions cannot appear in WHERE clauses directly"
+              "Using ROW_NUMBER without noting it differs on ties",
+              "Unable to write it with a window function",
+              "Forgetting window functions can't go in WHERE"
             ]
           }
         },
@@ -297,29 +282,26 @@
           "freq": "high",
           "tags": ["where", "having", "group by", "aggregation", "filter"],
           "answer": {
-            "oneLiner": "WHERE filters individual rows before aggregation; HAVING filters groups after aggregation; GROUP BY collapses rows sharing the same key values into a single group so aggregate functions (SUM, COUNT, AVG) can be applied.",
+            "oneLiner": "WHERE filters rows before aggregation; HAVING filters groups after aggregation; GROUP BY collapses rows sharing a key so aggregates can be applied.",
             "keyPoints": [
-              "**WHERE** is applied before GROUP BY — it cannot reference aggregate functions",
-              "**HAVING** is applied after GROUP BY — it can reference aggregate functions",
-              "Logical query processing order: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY",
-              "Any column in SELECT that is not inside an aggregate must appear in GROUP BY",
-              "For performance, always filter with WHERE first to reduce rows before grouping; HAVING filters after (more expensive)",
-              "HAVING without GROUP BY applies to the entire result set treated as one group"
+              "WHERE runs before GROUP BY — no aggregates allowed",
+              "HAVING runs after GROUP BY — aggregates allowed",
+              "Order: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY",
+              "Filter with WHERE first to cut rows before grouping"
             ],
-            "detail": "Understanding SQL's logical processing order is essential to writing correct queries.\n\n1. **FROM/JOIN**: identify the source rows\n2. **WHERE**: filter rows — no aggregates allowed here\n3. **GROUP BY**: collapse rows into groups\n4. **HAVING**: filter groups — aggregates are now available\n5. **SELECT**: compute output columns (aliases defined here are NOT available in WHERE/HAVING in standard SQL)\n6. **ORDER BY**: sort the final result\n\n**Common mistake**: `SELECT CustomerId, SUM(Total) FROM Orders WHERE SUM(Total) > 1000 GROUP BY CustomerId` — this fails because WHERE cannot reference SUM(Total). Move the condition to HAVING.\n\n**Performance tip**: Push as many conditions as possible into WHERE to reduce the number of rows before aggregation. HAVING should only contain conditions that genuinely depend on aggregate results.",
             "code": {
               "lang": "sql",
               "snippet": "-- Customers who placed more than 5 orders with a total spend > $1000\nSELECT\n    c.Name,\n    COUNT(o.OrderId)      AS OrderCount,\n    SUM(o.Total)          AS TotalSpent\nFROM Customers c\nINNER JOIN Orders o ON c.CustomerId = o.CustomerId\nWHERE o.OrderDate >= '2023-01-01'       -- WHERE: filter rows first\nGROUP BY c.CustomerId, c.Name           -- GROUP BY: collapse into groups\nHAVING COUNT(o.OrderId) > 5            -- HAVING: filter groups by aggregate\n   AND SUM(o.Total) > 1000\nORDER BY TotalSpent DESC;",
               "note": "The WHERE clause here removes old orders BEFORE grouping — more efficient than filtering after"
             },
             "followUps": [
-              "Can you use a column alias defined in SELECT in a WHERE clause?",
-              "What happens if you use HAVING without GROUP BY?",
-              "How does COUNT(*) differ from COUNT(column)?"
+              "Can you use a SELECT alias in WHERE?",
+              "What does HAVING without GROUP BY do?",
+              "COUNT(*) vs COUNT(column)?"
             ],
             "redFlags": [
-              "Putting aggregate conditions in WHERE instead of HAVING",
-              "Not knowing the logical processing order of SQL clauses",
+              "Putting aggregates in WHERE instead of HAVING",
+              "Not knowing the logical processing order",
               "Omitting a non-aggregate column from GROUP BY"
             ]
           }
@@ -332,30 +314,28 @@
           "freq": "high",
           "tags": ["window functions", "row_number", "rank", "dense_rank", "over", "partition by"],
           "answer": {
-            "oneLiner": "Window functions perform calculations across a set of rows related to the current row without collapsing them into groups; ROW_NUMBER assigns a unique sequential number, RANK skips numbers after ties, and DENSE_RANK never skips — all three use OVER (PARTITION BY ... ORDER BY ...).",
+            "oneLiner": "Window functions compute across related rows without collapsing them. ROW_NUMBER is always unique (1,2,3), RANK skips after ties (1,1,3), DENSE_RANK never skips (1,1,2).",
             "keyPoints": [
-              "Unlike GROUP BY, window functions do NOT collapse rows — every source row remains in the output",
-              "**OVER clause** defines the window: PARTITION BY resets the counter per group; ORDER BY determines the sort within each partition",
-              "**ROW_NUMBER**: 1,2,3,4 — always unique, arbitrarily breaks ties",
-              "**RANK**: 1,1,3 — tied rows share a rank; next rank skips the count of tied rows",
-              "**DENSE_RANK**: 1,1,2 — tied rows share a rank; next rank is always rank+1 with no gaps",
-              "Other window functions: LAG/LEAD (access adjacent rows), SUM/AVG OVER (running totals), NTILE (buckets), FIRST_VALUE/LAST_VALUE"
+              "Unlike GROUP BY, rows are NOT collapsed",
+              "OVER defines the window: PARTITION BY resets per group, ORDER BY sorts within",
+              "ROW_NUMBER unique; RANK gaps after ties; DENSE_RANK no gaps",
+              "Also: LAG/LEAD, SUM/AVG OVER (running totals), NTILE"
             ],
-            "detail": "Window functions extend the SQL SELECT clause and are evaluated after WHERE and GROUP BY but before ORDER BY. The OVER() clause is mandatory and defines the 'window' of rows the function sees.\n\n`PARTITION BY` is optional — it resets the calculation for each distinct value of the partition column (like GROUP BY but without collapsing rows). Without PARTITION BY, the entire result set is one window.\n\n`ORDER BY` inside OVER determines the ranking/frame order. Without ORDER BY, functions like SUM() OVER() compute a grand total for every row.\n\n**Practical use cases**:\n- *De-duplication*: use ROW_NUMBER() OVER (PARTITION BY key ORDER BY updated_date DESC) and keep only RowNum = 1\n- *Running totals*: SUM(Amount) OVER (ORDER BY OrderDate ROWS UNBOUNDED PRECEDING)\n- *Previous/next row*: LAG(Salary) OVER (ORDER BY HireDate) to compare with the previous hire's salary\n- *Top-N per group*: ROW_NUMBER() OVER (PARTITION BY DepartmentId ORDER BY Salary DESC) and filter = 1",
+            "detail": "Common use: de-dupe with ROW_NUMBER() OVER (PARTITION BY key ORDER BY date DESC) and keep rn = 1.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT\n    Name,\n    Department,\n    Salary,\n    ROW_NUMBER()  OVER (PARTITION BY Department ORDER BY Salary DESC) AS RowNum,\n    RANK()        OVER (PARTITION BY Department ORDER BY Salary DESC) AS Rnk,\n    DENSE_RANK()  OVER (PARTITION BY Department ORDER BY Salary DESC) AS DenseRnk\nFROM Employees;\n\n-- Result for Engineering dept with salaries 90k, 85k, 85k, 70k:\n-- RowNum: 1, 2, 3, 4\n-- Rank:   1, 2, 2, 4   (skips 3)\n-- DenseRnk: 1, 2, 2, 3 (no skip)\n\n-- De-duplicate: keep latest record per CustomerId\nWITH Deduped AS (\n    SELECT *, ROW_NUMBER() OVER (PARTITION BY CustomerId ORDER BY UpdatedAt DESC) AS rn\n    FROM CustomerEvents\n)\nSELECT * FROM Deduped WHERE rn = 1;",
               "note": "De-duplication with ROW_NUMBER is one of the most common real-world uses"
             },
             "followUps": [
-              "What is the difference between ROWS and RANGE in window frame specification?",
-              "How does LAG() differ from a self-join for accessing the previous row?",
+              "ROWS vs RANGE in a window frame?",
+              "LAG() vs a self-join?",
               "Can window functions be used in WHERE or GROUP BY?"
             ],
             "redFlags": [
               "Confusing RANK and DENSE_RANK gap behavior",
-              "Not knowing that window functions do not collapse rows",
-              "Trying to use window functions in a WHERE clause"
+              "Not knowing window functions keep all rows",
+              "Trying to use them in WHERE"
             ]
           }
         },
@@ -367,30 +347,28 @@
           "freq": "high",
           "tags": ["covering index", "include", "key lookup", "non-clustered", "performance"],
           "answer": {
-            "oneLiner": "A covering index is a non-clustered index that contains all columns a query needs — key columns in the index definition plus extra columns in the INCLUDE clause — so SQL Server can satisfy the query entirely from the index without returning to the base table.",
+            "oneLiner": "A covering index contains every column a query needs — key columns plus INCLUDE columns — so the query is answered entirely from the index without a Key Lookup to the base table.",
             "keyPoints": [
-              "A **Key Lookup** (or bookmark lookup) occurs when the optimizer uses a non-clustered index for a seek but must fetch additional columns from the clustered index — one extra I/O per qualifying row",
-              "The INCLUDE clause adds non-key columns at the leaf level only — they reduce lookups but do not affect the sort order or allow range scans on themselves",
-              "Key columns (in the index definition) can be used for both seeking AND filtering; INCLUDE columns are purely for coverage",
-              "Covering indexes are critical for OLTP queries that run thousands of times per second",
-              "Trade-off: covering indexes increase storage size and slow down writes that modify the included columns",
-              "Check for missing covering indexes via the execution plan's green missing index hint or `sys.dm_db_missing_index_details`"
+              "Key Lookup = extra I/O per row to fetch columns from the clustered index",
+              "INCLUDE adds non-key columns at the leaf level only",
+              "Key columns: seek/filter/sort; INCLUDE: coverage only",
+              "Trade-off: bigger index, slower writes on included columns"
             ],
-            "detail": "When a query hits a non-clustered index but needs columns not stored in that index, SQL Server must perform a **Key Lookup** (if there is a clustered index) or an **RID Lookup** (for a heap) to fetch those extra columns. For a query returning millions of rows this is catastrophically expensive — essentially an extra clustered index seek per row.\n\nA covering index solves this by adding the extra columns to the index's leaf pages via the `INCLUDE` clause. The INCLUDE clause exists precisely to avoid bloating the index key (which would widen every level of the B-tree and slow seeks) while still eliminating lookups.\n\n**When to use INCLUDE vs key columns**:\n- Put columns in the key if you want to seek/range-scan on them or if they are used in ORDER BY inside the index\n- Put columns in INCLUDE if they are only needed in SELECT or for a covering check in WHERE on an already-sought result\n\n**Monitoring**: `sys.dm_db_missing_index_details` and `sys.dm_db_missing_index_group_stats` expose indexes the optimizer wished existed during query execution. This is a first-pass guide — always validate the suggestion against actual workload patterns.",
+            "detail": "Put a column in the key if you seek, range-scan, or sort on it; use INCLUDE if it's only needed in SELECT. Check sys.dm_db_missing_index_details for suggestions, but validate against the real workload.",
             "code": {
               "lang": "sql",
               "snippet": "-- Query that causes a Key Lookup on IX_Orders_CustomerId\nSELECT OrderId, OrderDate, Total\nFROM Orders\nWHERE CustomerId = 42;\n-- Execution plan shows: Index Seek (IX_Orders_CustomerId) -> Key Lookup\n\n-- Fix: covering index\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId_Covering\n    ON Orders (CustomerId)          -- key: seek happens here\n    INCLUDE (OrderDate, Total);     -- leaf only: eliminates Key Lookup\n\n-- Find missing index suggestions\nSELECT\n    mid.statement AS TableName,\n    mid.equality_columns,\n    mid.include_columns,\n    migs.avg_user_impact\nFROM sys.dm_db_missing_index_details mid\nJOIN sys.dm_db_missing_index_groups mig ON mid.index_handle = mig.index_handle\nJOIN sys.dm_db_missing_index_group_stats migs ON mig.index_group_handle = migs.group_handle\nORDER BY migs.avg_user_impact DESC;",
               "note": "INCLUDE columns are stored only at leaf level — they don't affect seek efficiency but eliminate Key Lookups"
             },
             "followUps": [
-              "What is the difference between putting a column in the key vs in INCLUDE?",
-              "How many non-clustered indexes should you typically have on a heavily-written table?",
-              "What is an index intersection and when does the optimizer use it?"
+              "Key column vs INCLUDE column?",
+              "How many indexes on a write-heavy table?",
+              "What is index intersection?"
             ],
             "redFlags": [
               "Not knowing what a Key Lookup is",
-              "Putting every column in the index key instead of INCLUDE",
-              "Blindly applying every missing index suggestion without considering write overhead"
+              "Putting every column in the key instead of INCLUDE",
+              "Blindly applying every missing index suggestion"
             ]
           }
         },
@@ -402,29 +380,28 @@
           "freq": "high",
           "tags": ["table scan", "index seek", "optimizer", "statistics", "selectivity", "sargable"],
           "answer": {
-            "oneLiner": "The optimizer chooses a table scan when there is no suitable index, when the query is non-SARGable, when selectivity is low (returning a large % of rows makes a scan cheaper), or when statistics are stale — otherwise it uses an index seek for high-selectivity, SARGable predicates.",
+            "oneLiner": "The optimizer scans when there's no suitable index, the predicate is non-SARGable, selectivity is low, or stats are stale; it seeks for high-selectivity SARGable predicates.",
             "keyPoints": [
-              "**Index seek**: optimizer navigates the B-tree to find qualifying rows; efficient for high-selectivity predicates (few rows match)",
-              "**Table/index scan**: optimizer reads every row; chosen when selectivity is too low or no index exists",
-              "**SARGable** (Search ARGument able): a predicate the optimizer can use for an index seek — e.g., `column = value`, `column BETWEEN x AND y`. Non-SARGable: functions on the column (`YEAR(col)=2024`), implicit conversions, `LIKE '%text'`",
-              "The optimizer uses **statistics** (histograms) to estimate cardinality; stale stats lead to wrong plan choices",
-              "**Tipping point**: if a query returns more than roughly 1-3% of rows, SQL Server may prefer a scan over seek + Key Lookup (varies by table size and I/O cost)",
-              "Explicit type mismatches (e.g., comparing INT column to VARCHAR parameter) prevent index seeks due to implicit conversion"
+              "Seek: navigates the B-tree; good when few rows match",
+              "Scan: reads every row; chosen for low selectivity or no index",
+              "SARGable = optimizer can seek; functions on columns / leading % / implicit conversions break it",
+              "Optimizer uses statistics; stale stats cause bad estimates",
+              "Above ~1-3% of rows, a scan can beat seek + Key Lookup"
             ],
-            "detail": "**Statistics and cardinality estimation**: Every index and many columns have associated statistics — a histogram of value distribution. The optimizer uses these to estimate how many rows a predicate will return. If it estimates 10 rows, it uses a seek; if it estimates 100,000 out of 110,000, it scans.\n\n**Non-SARGable predicates** are the most common developer-caused reason for unwanted scans:\n- `WHERE CAST(OrderDate AS DATE) = '2024-06-01'` — function on column prevents seek\n- `WHERE LOWER(Name) = 'smith'` — fix with case-insensitive collation or a computed column index\n- `WHERE Salary * 1.1 > 50000` — move the math to the other side: `WHERE Salary > 50000 / 1.1`\n- `WHERE Description LIKE '%keyword%'` — leading wildcard disables seek; consider full-text search\n\n**Implicit type conversion**: If a column is `VARCHAR` and the parameter is `NVARCHAR`, SQL Server must convert every row to compare — turning a seek into a scan. This appears as a warning in the execution plan.\n\n**Statistics maintenance**: Run `UPDATE STATISTICS table` or use the auto-update statistics feature (enabled by default). For large tables, consider using `FULLSCAN` or a high sample rate for critical tables.",
+            "detail": "Implicit type conversion (VARCHAR column vs NVARCHAR parameter) converts every row and forces a scan — it shows as a warning in the plan. Keep statistics updated.",
             "code": {
               "lang": "sql",
               "snippet": "-- Non-SARGable: function on column causes scan\nSELECT * FROM Orders WHERE YEAR(OrderDate) = 2024;  -- BAD\n\n-- SARGable equivalent: allows index seek on OrderDate\nSELECT * FROM Orders\nWHERE OrderDate >= '2024-01-01' AND OrderDate < '2025-01-01';  -- GOOD\n\n-- Implicit conversion (scan warning in plan if col is VARCHAR)\nDECLARE @id NVARCHAR(10) = N'123';\nSELECT * FROM Orders WHERE OrderId = @id;  -- type mismatch may prevent seek\n\n-- Check column statistics\nDBCC SHOW_STATISTICS ('Orders', 'IX_Orders_CustomerId');\n\n-- Update stale statistics\nUPDATE STATISTICS Orders WITH FULLSCAN;",
               "note": "Green warnings in the execution plan often indicate implicit conversions causing index scans"
             },
             "followUps": [
-              "What is parameter sniffing and how does it relate to plan selection?",
-              "How do you force an index seek with a query hint (and when should you NOT)?",
-              "What is a filtered index and when is it useful?"
+              "What is parameter sniffing?",
+              "How (and when not) to force an index seek?",
+              "What is a filtered index?"
             ],
             "redFlags": [
               "Not knowing what SARGable means",
-              "Thinking adding an index always results in a seek",
+              "Thinking an index always means a seek",
               "Ignoring statistics as a cause of bad plans"
             ]
           }
@@ -437,30 +414,27 @@
           "freq": "medium",
           "tags": ["union", "union all", "distinct", "duplicates", "set operations"],
           "answer": {
-            "oneLiner": "UNION removes duplicate rows from the combined result by performing a sort or hash operation; UNION ALL includes all rows including duplicates and is significantly faster because no deduplication step is needed.",
+            "oneLiner": "UNION removes duplicates via a sort/hash step; UNION ALL keeps everything and is faster because there's no dedup. Default to UNION ALL unless you need dedup.",
             "keyPoints": [
-              "Both combine result sets from multiple SELECT statements with compatible column lists",
-              "**UNION**: implicit DISTINCT — adds a blocking sort/hash step to remove duplicates, slower",
-              "**UNION ALL**: keeps all rows including duplicates, no extra processing, preferred when duplicates are impossible or acceptable",
-              "Column count and compatible data types must match in all SELECT statements",
-              "ORDER BY can only appear once, at the very end of the UNION ALL chain",
-              "INTERSECT and EXCEPT are the other set operators (intersection and difference)"
+              "Both need matching column count and compatible types",
+              "UNION = implicit DISTINCT (extra blocking step, slower)",
+              "UNION ALL keeps duplicates, no extra work",
+              "ORDER BY only once, at the very end"
             ],
-            "detail": "Internally, UNION is equivalent to `UNION ALL` followed by `SELECT DISTINCT`. The deduplication requires a blocking Sort or Hash Match Aggregate operator, which consumes memory and CPU proportional to the result set size.\n\nUse UNION ALL whenever:\n- The source queries are guaranteed to return disjoint sets (e.g., different date ranges from the same table)\n- You are combining data from different physical sources where duplicates are structurally impossible\n- You deliberately want all rows (e.g., audit log aggregation)\n\nUse UNION only when you genuinely need deduplication and the source sets may overlap.",
             "code": {
               "lang": "sql",
               "snippet": "-- UNION: deduplicates; slower\nSELECT CustomerId FROM ActiveCustomers\nUNION\nSELECT CustomerId FROM ArchivedCustomers;\n\n-- UNION ALL: keeps duplicates; faster — use when sets are disjoint\nSELECT OrderId, Total, 'Online' AS Channel FROM OnlineOrders\nUNION ALL\nSELECT OrderId, Total, 'Store'  AS Channel FROM StoreOrders\nORDER BY Total DESC;  -- ORDER BY goes at the end only",
               "note": "Default to UNION ALL unless you specifically need deduplication"
             },
             "followUps": [
-              "What is the difference between UNION and JOIN?",
+              "UNION vs JOIN?",
               "How do INTERSECT and EXCEPT work?",
-              "When would UNION cause a performance issue?"
+              "When does UNION cause a performance issue?"
             ],
             "redFlags": [
-              "Defaulting to UNION when UNION ALL is sufficient",
+              "Defaulting to UNION when UNION ALL suffices",
               "Not knowing why UNION is slower",
-              "Trying to put ORDER BY in the middle of a UNION chain"
+              "Putting ORDER BY mid-chain"
             ]
           }
         },
@@ -472,16 +446,14 @@
           "freq": "medium",
           "tags": ["stored procedure", "inline sql", "sql injection", "plan caching", "security"],
           "answer": {
-            "oneLiner": "Stored procedures are pre-compiled, named T-SQL objects stored in the database that support plan caching, reduced network traffic, permission control, and protection against SQL injection; inline SQL is query text sent directly from the application at runtime.",
+            "oneLiner": "Stored procedures are named, cached T-SQL objects with permission control and injection safety; parameterized inline SQL (sp_executesql) gets the same caching and safety, while string-concatenated SQL is vulnerable.",
             "keyPoints": [
-              "**Stored procedures**: plan is compiled and cached on first execution; subsequent calls reuse the plan (subject to parameter sniffing)",
-              "**Parameterized inline SQL** (sp_executesql): also achieves plan caching and SQL injection safety — nearly equivalent to stored procedures for single statements",
-              "Stored procedures allow GRANT EXECUTE without granting direct table permissions — a security boundary",
-              "Stored procedures can encapsulate multi-step business logic, transactions, and error handling (TRY/CATCH)",
-              "**SQL injection**: string-concatenated inline SQL is vulnerable; stored procedures with parameters are safe",
-              "ORMs (EF Core) typically generate parameterized SQL that is functionally equivalent to stored procedures for simple CRUD"
+              "Stored procs: plan cached on first run, reused afterward",
+              "Parameterized inline SQL caches and is injection-safe too",
+              "GRANT EXECUTE without granting table access = security boundary",
+              "String-concatenated SQL is the real injection risk, not inline per se"
             ],
-            "detail": "**Plan caching**: When a stored procedure is first called, SQL Server compiles an execution plan and caches it keyed by the procedure name and parameter signature. Subsequent calls skip compilation. Parameterized inline SQL via `sp_executesql` achieves the same caching behavior. Unparameterized literal SQL (`'SELECT * FROM T WHERE Id = ' + @id`) generates a new plan for every distinct value — cache bloat.\n\n**Security**: You can GRANT EXECUTE on a stored procedure without granting SELECT/INSERT/UPDATE/DELETE on the underlying tables. This is useful for principle-of-least-privilege database access.\n\n**Parameter sniffing**: SQL Server compiles the procedure plan based on the first parameter values it sees. If those values are atypical, the cached plan may be suboptimal for typical values. Mitigations: OPTION (RECOMPILE), local variable trick, OPTIMIZE FOR hint, or Query Store forced plans.\n\n**When to prefer inline SQL / ORMs**: Rapid development, CRUD-heavy applications, team familiarity with ORM patterns. When to prefer stored procedures: complex multi-step logic, strict security requirements, DBA-managed databases, or performance-sensitive high-frequency operations.",
+            "detail": "Both stored procs and sp_executesql are subject to parameter sniffing — the plan is built from the first parameters seen. Mitigate with OPTION (RECOMPILE), OPTIMIZE FOR, or Query Store.",
             "code": {
               "lang": "sql",
               "snippet": "-- Stored procedure with error handling\nCREATE OR ALTER PROCEDURE usp_GetCustomerOrders\n    @CustomerId INT,\n    @StartDate  DATE = NULL\nAS\nBEGIN\n    SET NOCOUNT ON;\n    SELECT o.OrderId, o.Total, o.OrderDate\n    FROM Orders o\n    WHERE o.CustomerId = @CustomerId\n      AND (@StartDate IS NULL OR o.OrderDate >= @StartDate)\n    ORDER BY o.OrderDate DESC;\nEND;\n\n-- Execute\nEXEC usp_GetCustomerOrders @CustomerId = 42, @StartDate = '2024-01-01';\n\n-- Parameterized inline SQL (also safe, also cached)\nEXEC sp_executesql\n    N'SELECT * FROM Orders WHERE CustomerId = @cid',\n    N'@cid INT',\n    @cid = 42;",
@@ -489,13 +461,13 @@
             },
             "followUps": [
               "What is parameter sniffing and how do you deal with it?",
-              "When would you choose an inline table-valued function over a stored procedure?",
+              "Inline table-valued function vs stored procedure?",
               "How does EF Core handle parameterization?"
             ],
             "redFlags": [
-              "Thinking stored procedures are always faster than parameterized inline SQL",
+              "Thinking stored procs are always faster than parameterized SQL",
               "Not knowing about parameter sniffing",
-              "Thinking any stored procedure automatically prevents SQL injection (it doesn't if it uses string concatenation internally)"
+              "Thinking any stored proc prevents injection (not if it concatenates strings)"
             ]
           }
         }
@@ -514,31 +486,29 @@
           "freq": "high",
           "tags": ["acid", "atomicity", "consistency", "isolation", "durability", "transactions"],
           "answer": {
-            "oneLiner": "ACID stands for Atomicity (all-or-nothing), Consistency (data always valid), Isolation (concurrent transactions don't interfere), and Durability (committed data survives failures) — SQL Server guarantees these through write-ahead logging, locking, and the recovery model.",
+            "oneLiner": "ACID = Atomicity (all-or-nothing), Consistency (always valid state), Isolation (concurrent txns don't interfere), Durability (committed data survives crashes), backed by write-ahead logging and locking.",
             "keyPoints": [
-              "**Atomicity**: all statements in a transaction succeed together or all are rolled back — no partial commits",
-              "**Consistency**: a transaction brings the database from one valid state to another — constraints, cascades, and triggers enforce this",
-              "**Isolation**: concurrent transactions behave as if they run serially — controlled by isolation levels and locks",
-              "**Durability**: once a COMMIT is acknowledged, the data is written to the transaction log on durable storage and will survive a server crash",
-              "SQL Server uses **Write-Ahead Logging (WAL)**: changes are written to the log before the data pages — the log is the source of truth for recovery",
-              "TRY/CATCH with XACT_ABORT ON is the standard pattern for enforcing atomicity in application code"
+              "Atomicity: all statements commit together or all roll back",
+              "Consistency: constraints/triggers keep the DB in a valid state",
+              "Isolation: controlled by isolation levels and locks",
+              "Durability: committed log is hardened to disk (Write-Ahead Logging)"
             ],
-            "detail": "**Atomicity** is implemented by SQL Server's transaction log. Every change is recorded in the log. On COMMIT, the log records are hardened to disk. On ROLLBACK (or crash before commit), SQL Server uses the log to undo all changes made by the transaction — rolling back to the state before BEGIN TRANSACTION.\n\n**Consistency** is maintained by constraints (NOT NULL, CHECK, FOREIGN KEY, UNIQUE), triggers, and the database's schema rules. A transaction that violates a constraint is automatically rolled back by SQL Server.\n\n**Isolation** is the most nuanced property. Perfect isolation (serializable) is expensive — every read takes a lock that blocks other writers. SQL Server offers multiple isolation levels (see the isolation levels question) as a spectrum between performance and isolation guarantee.\n\n**Durability** is ensured by the recovery model and the Write-Ahead Log. Even if the server crashes immediately after a COMMIT, the committed data can be recovered from the log during startup recovery (redo phase). The Full recovery model provides point-in-time restore capability; Simple recovery truncates the log after a checkpoint.\n\n**SET XACT_ABORT ON**: When this is ON and a runtime error occurs, the entire transaction is automatically rolled back rather than just the failing statement. Always set this in stored procedures that contain transactions.",
+            "detail": "SET XACT_ABORT ON makes any runtime error roll back the whole transaction, not just the failing statement — use it with TRY/CATCH in stored procedures.",
             "code": {
               "lang": "sql",
               "snippet": "-- Atomic bank transfer: both debit and credit must succeed together\nSET XACT_ABORT ON;\nBEGIN TRY\n    BEGIN TRANSACTION;\n\n    UPDATE Accounts SET Balance = Balance - 500 WHERE AccountId = 1;\n    UPDATE Accounts SET Balance = Balance + 500 WHERE AccountId = 2;\n\n    -- Consistency check\n    IF (SELECT Balance FROM Accounts WHERE AccountId = 1) < 0\n        THROW 50001, 'Insufficient funds', 1;\n\n    COMMIT TRANSACTION;\nEND TRY\nBEGIN CATCH\n    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;\n    THROW;  -- re-raise the error\nEND CATCH;",
               "note": "XACT_ABORT ON ensures the transaction rolls back on any error, not just the failing statement"
             },
-            "analogy": "ACID is like an ATM transaction: either you get your money AND your balance decreases (Atomic), the account stays valid (Consistent), other users aren't affected mid-transaction (Isolated), and once you see 'Transaction Complete' the bank records it permanently (Durable).",
+            "analogy": "Like an ATM withdrawal: you get cash and the balance drops together (Atomic), account stays valid (Consistent), others aren't affected mid-way (Isolated), and the record is permanent once confirmed (Durable).",
             "followUps": [
-              "What is the difference between a ROLLBACK and a SAVEPOINT?",
-              "How does SQL Server implement durability during a power failure?",
-              "What is XACT_ABORT and why should you use it?"
+              "ROLLBACK vs SAVEPOINT?",
+              "How is durability ensured during a power failure?",
+              "What is XACT_ABORT and why use it?"
             ],
             "redFlags": [
-              "Confusing Isolation with the other ACID properties",
-              "Not knowing that SQL Server uses a Write-Ahead Log for durability",
-              "Omitting TRY/CATCH and XACT_ABORT from transaction code"
+              "Confusing Isolation with the other properties",
+              "Not knowing about the Write-Ahead Log",
+              "Omitting TRY/CATCH and XACT_ABORT"
             ]
           }
         },
@@ -550,30 +520,28 @@
           "freq": "high",
           "tags": ["isolation levels", "dirty read", "phantom read", "non-repeatable read", "snapshot", "read committed"],
           "answer": {
-            "oneLiner": "SQL Server has five isolation levels — Read Uncommitted, Read Committed (default), Repeatable Read, Serializable, and Snapshot — each offering a different trade-off between concurrency and protection against dirty reads, non-repeatable reads, and phantom reads.",
+            "oneLiner": "Five levels — Read Uncommitted, Read Committed (default), Repeatable Read, Serializable, Snapshot — trading concurrency against protection from dirty reads, non-repeatable reads, and phantoms.",
             "keyPoints": [
-              "**Dirty read**: reading uncommitted data from another transaction (only allowed at Read Uncommitted)",
-              "**Non-repeatable read**: re-reading the same row in the same transaction yields different values (prevented at Repeatable Read+)",
-              "**Phantom read**: re-executing the same range query returns different rows (prevented at Serializable only in lock-based; Snapshot also prevents it)",
-              "**Read Committed** (default): no dirty reads; reads take shared locks released immediately after reading",
-              "**Read Committed Snapshot Isolation (RCSI)**: reads see the last committed version; no read locks, high concurrency — enable at database level",
-              "**Snapshot Isolation**: the entire transaction sees a consistent point-in-time snapshot; detects update conflicts at commit time",
-              "**Serializable**: full isolation via range locks; prevents all anomalies but causes the most blocking"
+              "Dirty read: reading uncommitted data (only at Read Uncommitted)",
+              "Non-repeatable read: same row re-read differs (fixed at Repeatable Read+)",
+              "Phantom: range re-query returns new rows (fixed at Serializable/Snapshot)",
+              "RCSI: readers see last committed version, no read locks — recommended for OLTP",
+              "Snapshot: whole txn sees a point-in-time view; detects write conflicts"
             ],
-            "detail": "**Read Uncommitted** (`NOLOCK` hint equivalent): reads do not acquire shared locks and can read uncommitted ('dirty') data. This can cause dirty reads, non-repeatable reads, and phantoms. Never use as a general performance fix — you can read rows twice or miss rows entirely during a page split.\n\n**Read Committed** (default): each statement reads only committed data. Shared locks are acquired but released immediately after the read, not held for the transaction. Prevents dirty reads but allows non-repeatable reads and phantoms.\n\n**Read Committed Snapshot Isolation (RCSI)**: a version-based alternative to Read Committed. When enabled at the database level (`ALTER DATABASE ... SET READ_COMMITTED_SNAPSHOT ON`), readers never block writers and writers never block readers — SQL Server uses row versions stored in tempdb. This is the recommended setting for most OLTP applications on SQL Server/Azure SQL.\n\n**Repeatable Read**: holds shared locks until the transaction commits, preventing other transactions from modifying already-read rows. Prevents dirty reads and non-repeatable reads. Still allows phantom rows (new rows inserted by another transaction).\n\n**Serializable**: adds range locks that prevent INSERT of new rows in the range read. Prevents all three anomalies but causes the most contention.\n\n**Snapshot Isolation**: each transaction sees the database as it was at the transaction start. Uses row versions in tempdb. Readers never block writers. On write conflict (two transactions modifying the same row), SQL Server throws a conflict error and rolls back the later transaction.",
+            "detail": "RCSI (READ_COMMITTED_SNAPSHOT ON) makes readers not block writers without app changes. Snapshot Isolation versions at transaction start and throws a conflict error on concurrent updates.",
             "code": {
               "lang": "sql",
               "snippet": "-- Set isolation level for the current session\nSET TRANSACTION ISOLATION LEVEL READ COMMITTED;  -- default\nSET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; -- dirty reads allowed\nSET TRANSACTION ISOLATION LEVEL REPEATABLE READ;\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nSET TRANSACTION ISOLATION LEVEL SNAPSHOT;\n\n-- Enable RCSI at database level (eliminates read-write blocking)\nALTER DATABASE AdventureWorks\n    SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;\n\n-- Query hint equivalent of READ UNCOMMITTED (avoid in production)\nSELECT * FROM Orders WITH (NOLOCK);",
               "note": "Enable RCSI on Azure SQL / SQL Server to dramatically reduce blocking without changing application code"
             },
             "followUps": [
-              "What is the difference between RCSI and Snapshot Isolation?",
+              "RCSI vs Snapshot Isolation?",
               "Why is NOLOCK dangerous?",
-              "How does Snapshot Isolation detect write conflicts?"
+              "How does Snapshot detect write conflicts?"
             ],
             "redFlags": [
-              "Recommending NOLOCK as a performance fix without explaining the dangers",
-              "Not knowing what dirty/non-repeatable/phantom reads are",
+              "Recommending NOLOCK without explaining the dangers",
+              "Not knowing dirty/non-repeatable/phantom reads",
               "Confusing RCSI with Snapshot Isolation"
             ]
           }
@@ -586,30 +554,28 @@
           "freq": "high",
           "tags": ["deadlock", "locking", "transaction", "deadlock graph", "prevention"],
           "answer": {
-            "oneLiner": "A deadlock occurs when two or more transactions each hold a lock the other needs and neither can proceed; SQL Server's deadlock monitor detects the cycle and automatically kills the victim transaction — prevention focuses on consistent lock ordering, short transactions, and appropriate indexes.",
+            "oneLiner": "A deadlock is a circular wait where two transactions each hold a lock the other needs; SQL Server auto-kills the cheapest victim (error 1205). Prevent with consistent lock order, short transactions, and good indexes.",
             "keyPoints": [
-              "SQL Server detects deadlocks every 5 seconds via the lock monitor; the transaction with the least rollback cost becomes the **deadlock victim** and receives error 1205",
-              "**Cause**: Transaction A holds lock on Table1, needs Table2; Transaction B holds Table2, needs Table1 — circular wait",
-              "**Prevention 1**: always access tables in the same order across all transactions",
-              "**Prevention 2**: keep transactions as short as possible — acquire locks late, release early (COMMIT quickly)",
-              "**Prevention 3**: use appropriate indexes to reduce the duration and scope of locks",
-              "**Prevention 4**: use RCSI or Snapshot Isolation — readers don't take shared locks, eliminating reader-writer deadlocks",
-              "Monitor with Extended Events (deadlock graph) or `sys.dm_os_wait_stats`"
+              "Lock monitor detects the cycle; victim gets error 1205",
+              "Always access tables in the same order across transactions",
+              "Keep transactions short — commit fast",
+              "Good indexes shrink lock scope; RCSI removes reader-writer deadlocks",
+              "App should catch 1205 and retry"
             ],
-            "detail": "**Deadlock mechanics**: Lock A → waits for Lock B → waits for Lock A = circular dependency. SQL Server resolves by rolling back one transaction (the victim). The application must handle error 1205 and retry.\n\n**Diagnosis**: Enable the system_health Extended Events session (on by default since SQL Server 2008) which captures deadlock graphs. The XML deadlock graph shows which transactions were involved, which resources they held, and which they were waiting for. In SSMS, open the .xdl file for a visual diagram.\n\n**Common deadlock patterns**:\n1. *Reader-writer deadlock*: reader holds shared lock, writer needs exclusive lock (fix: RCSI)\n2. *Table order deadlock*: two transactions lock tables in opposite order (fix: consistent order)\n3. *Index range deadlock*: range lock escalation on poorly indexed tables (fix: proper indexes reduce scan ranges)\n\n**Application-level**: Implement retry logic for error 1205. With TRY/CATCH and a retry counter, the application can transparently re-run the transaction after a brief delay. Entity Framework Core supports `EnableRetryOnFailure()` for transient errors.",
+            "detail": "The system_health Extended Events session captures deadlock graphs by default; open the .xdl to see who held and waited on what. EF Core's EnableRetryOnFailure handles transient retries.",
             "code": {
               "lang": "sql",
               "snippet": "-- Deadlock scenario:\n-- Session A: UPDATE Orders SET...  then UPDATE Customers SET...\n-- Session B: UPDATE Customers SET... then UPDATE Orders SET...\n-- Fix: both sessions access tables in the SAME order\n\n-- Capture deadlocks with Extended Events (query the ring buffer)\nSELECT\n    xdr.value('@timestamp', 'datetime2') AS DeadlockTime,\n    xdr.query('.') AS DeadlockGraph\nFROM (\n    SELECT CAST(target_data AS XML) AS TargetData\n    FROM sys.dm_xe_session_targets t\n    JOIN sys.dm_xe_sessions s ON t.event_session_address = s.address\n    WHERE s.name = 'system_health' AND t.target_name = 'ring_buffer'\n) AS Data\nCROSS APPLY TargetData.nodes('//RingBufferTarget/event[@name=\"xml_deadlock_report\"]') AS XEventData(xdr)\nORDER BY DeadlockTime DESC;\n\n-- Application retry for error 1205\n-- (C# pseudocode: catch SqlException ex when ex.Number == 1205 => retry with backoff)",
               "note": "system_health Extended Events session captures deadlock graphs by default — no setup required"
             },
             "followUps": [
-              "How do you set a deadlock priority to control which transaction becomes the victim?",
+              "How do you set deadlock priority?",
               "What is lock escalation and how can it cause deadlocks?",
-              "How does RCSI eliminate the most common class of deadlocks?"
+              "How does RCSI remove common deadlocks?"
             ],
             "redFlags": [
-              "Thinking NOLOCK solves deadlocks (it reduces them but introduces dirty reads and can still deadlock on intent locks)",
-              "Not knowing SQL Server automatically resolves deadlocks",
+              "Thinking NOLOCK solves deadlocks",
+              "Not knowing SQL Server resolves deadlocks automatically",
               "Not knowing about error 1205 or retry logic"
             ]
           }
@@ -622,30 +588,28 @@
           "freq": "high",
           "tags": ["normalization", "denormalization", "1nf", "2nf", "3nf", "database design"],
           "answer": {
-            "oneLiner": "Normalization removes data redundancy by organizing tables according to normal forms — 1NF eliminates repeating groups, 2NF removes partial dependencies on a composite key, 3NF removes transitive dependencies — denormalization deliberately reintroduces redundancy to improve read performance.",
+            "oneLiner": "Normalization removes redundancy: 1NF = atomic values, 2NF = no partial dependency on a composite key, 3NF = no transitive dependency. Denormalize to speed up reads.",
             "keyPoints": [
-              "**1NF**: each column holds atomic values; no repeating groups or arrays; each row uniquely identified by a primary key",
-              "**2NF**: satisfies 1NF + every non-key column depends on the WHOLE primary key (eliminates partial dependencies — only relevant when the PK is composite)",
-              "**3NF**: satisfies 2NF + no transitive dependencies (non-key column depends only on the primary key, not on another non-key column)",
-              "**BCNF** (Boyce-Codd NF): stronger form of 3NF — every determinant is a candidate key",
-              "**Denormalization reasons**: read-heavy reporting, avoiding expensive joins, pre-computed aggregates, data warehousing (star schema)",
-              "Normalization improves write integrity and reduces anomalies; denormalization improves read throughput"
+              "1NF: atomic columns, no repeating groups, has a PK",
+              "2NF: 1NF + every non-key column depends on the whole PK",
+              "3NF: 2NF + no non-key column depends on another non-key column",
+              "Denormalize for read-heavy reporting, warehouses (star schema)"
             ],
-            "detail": "**1NF example violation**: a `PhoneNumbers` column that stores `'555-1234, 555-5678'` — a single cell with multiple values. Fix: separate PhoneNumbers table with one row per number.\n\n**2NF example violation**: Table `OrderItems(OrderId, ProductId, Quantity, ProductName)` with PK (OrderId, ProductId). ProductName depends only on ProductId, not the whole composite key — partial dependency. Fix: move ProductName to a Products table.\n\n**3NF example violation**: Table `Employees(EmployeeId, DepartmentId, DepartmentName)`. DepartmentName depends on DepartmentId (non-key column), not directly on EmployeeId — transitive dependency. Fix: move DepartmentName to a Departments table.\n\n**When to denormalize**:\n- OLAP / data warehouses: star schema and snowflake schema deliberately denormalize for fast analytical queries\n- Read-heavy systems with infrequent writes: pre-join tables reduce query complexity\n- Computed columns and materialized views: store aggregates that are expensive to compute repeatedly\n- Sharding: in distributed systems, joining across shards is expensive, so related data is co-located\n\n**Trade-offs**: Denormalized data requires more careful update logic (update anomalies — changing a value in one place but not another). Consider computed columns, indexed views, or application-level caching instead of full denormalization.",
+            "detail": "Examples: 1NF fixes a comma-separated phone column; 2NF moves ProductName out of OrderItems; 3NF moves DepartmentName out of Employees into Departments.",
             "code": {
               "lang": "sql",
               "snippet": "-- Normalized (3NF)\nCREATE TABLE Departments (DepartmentId INT PRIMARY KEY, DepartmentName NVARCHAR(100));\nCREATE TABLE Employees  (EmployeeId INT PRIMARY KEY, Name NVARCHAR(100), DepartmentId INT REFERENCES Departments(DepartmentId));\n\n-- Denormalized (for a read-heavy reporting table)\nCREATE TABLE EmployeeReportView (\n    EmployeeId     INT,\n    EmployeeName   NVARCHAR(100),\n    DepartmentId   INT,\n    DepartmentName NVARCHAR(100)  -- redundant but avoids join in reports\n);",
               "note": "In practice, most OLTP databases target 3NF; data warehouses use star schemas (1-2NF)"
             },
             "followUps": [
-              "What is BCNF and when does 3NF not go far enough?",
-              "What is a star schema and how does it differ from 3NF?",
-              "How do indexed views help avoid physical denormalization?"
+              "What is BCNF?",
+              "What is a star schema vs 3NF?",
+              "How do indexed views avoid physical denormalization?"
             ],
             "redFlags": [
-              "Not being able to give a concrete example of a 2NF or 3NF violation",
-              "Thinking normalization always leads to better performance",
-              "Not knowing when denormalization is appropriate"
+              "Can't give a concrete 2NF/3NF violation example",
+              "Thinking normalization always means better performance",
+              "Not knowing when to denormalize"
             ]
           }
         },
@@ -657,29 +621,27 @@
           "freq": "medium",
           "tags": ["primary key", "unique key", "foreign key", "constraints", "null", "clustered"],
           "answer": {
-            "oneLiner": "A primary key uniquely identifies each row, cannot be NULL, and by default creates a clustered index; a unique key also enforces uniqueness but allows one NULL per column and creates a non-clustered index; a foreign key enforces referential integrity by requiring that a value in the child table exist in the referenced parent table.",
+            "oneLiner": "A PK uniquely identifies a row, is NOT NULL, and is clustered by default; a unique key also enforces uniqueness but allows one NULL and is non-clustered; a foreign key enforces that a child value exists in the parent.",
             "keyPoints": [
-              "**Primary Key**: NOT NULL enforced, only one per table, creates a clustered index by default, can be composite",
-              "**Unique Key**: allows a single NULL (SQL Server treats NULL as unknown, so only one NULL is 'unique'), multiple unique constraints per table, creates a non-clustered index by default",
-              "**Foreign Key**: enforces referential integrity — child row's FK column value must exist in the parent table's referenced column (or be NULL if nullable)",
-              "Foreign keys cause cascading behavior: ON DELETE CASCADE / ON UPDATE CASCADE / SET NULL / RESTRICT",
-              "Foreign key columns should be indexed (they are not indexed automatically in SQL Server — a common oversight that causes slow deletes on the parent table)",
-              "Disabling FK constraints (`NOCHECK`) removes the guard — dangerous; re-enable with `WITH CHECK`"
+              "PK: NOT NULL, one per table, clustered by default",
+              "UNIQUE: allows one NULL, many per table, non-clustered by default",
+              "FK: child value must exist in parent (or be NULL)",
+              "FK columns are NOT auto-indexed — index them yourself"
             ],
-            "detail": "**Primary Key**: Every table should have one. It is the entity's identity. In SQL Server, defining a PK automatically creates a clustered index unless you explicitly specify NONCLUSTERED. Composite PKs are possible but should be avoided for clustered indexes on large tables (all non-clustered indexes carry the full clustered key as the row locator).\n\n**Unique Key**: Use when a column combination must be unique but is not the primary identifier. A common example: an Employees table with a PK of EmployeeId but a UNIQUE constraint on Email — you can have one employee per email. Unlike a PK, a unique constraint (and unique index) allows a single NULL value per column in the key.\n\n**Foreign Key**: Maintains referential integrity between tables. When you try to insert a row in Orders with a CustomerId that does not exist in Customers, SQL Server raises an error. Similarly, deleting a Customer that has Orders will fail unless CASCADE DELETE is set or all related Orders are deleted first.\n\n**Indexing FKs**: SQL Server does NOT automatically index FK columns on the child table. If you frequently join from parent to child or delete parent rows, you should add an index on the FK column in the child table — otherwise SQL Server will scan the entire child table to find dependent rows on each parent DELETE.",
+            "detail": "Without an index on the child's FK column, deleting a parent row scans the whole child table to check dependents. FKs also support ON DELETE/UPDATE CASCADE, SET NULL, or RESTRICT.",
             "code": {
               "lang": "sql",
               "snippet": "CREATE TABLE Departments (\n    DepartmentId   INT         IDENTITY PRIMARY KEY,  -- clustered by default\n    DepartmentCode CHAR(4)     NOT NULL UNIQUE,        -- unique, allows one NULL\n    DepartmentName NVARCHAR(100) NOT NULL\n);\n\nCREATE TABLE Employees (\n    EmployeeId   INT         IDENTITY PRIMARY KEY,\n    Email        NVARCHAR(256) NOT NULL UNIQUE,         -- unique key\n    DepartmentId INT         NOT NULL\n        REFERENCES Departments(DepartmentId)            -- foreign key\n        ON DELETE RESTRICT\n        ON UPDATE CASCADE\n);\n\n-- Index the FK column to avoid table scans on parent DELETE\nCREATE INDEX IX_Employees_DepartmentId ON Employees (DepartmentId);",
               "note": "Always index FK columns on child tables — SQL Server does NOT do this automatically"
             },
             "followUps": [
-              "Can a primary key column be NULL?",
-              "What happens when you delete a parent row without CASCADE?",
-              "Why should you index foreign key columns?"
+              "Can a PK column be NULL?",
+              "What happens deleting a parent without CASCADE?",
+              "Why index FK columns?"
             ],
             "redFlags": [
-              "Saying UNIQUE allows multiple NULLs (SQL Server only allows one)",
-              "Not knowing that FK columns are not auto-indexed",
+              "Saying UNIQUE allows multiple NULLs",
+              "Not knowing FK columns aren't auto-indexed",
               "Saying a table can have multiple clustered indexes"
             ]
           }
@@ -692,30 +654,28 @@
           "freq": "medium",
           "tags": ["clustered index", "physical order", "b-tree", "page splits", "heap", "identity"],
           "answer": {
-            "oneLiner": "A clustered index physically orders the table's data rows on disk according to the index key — the leaf level of the B-tree IS the table data — so range queries on the key are highly efficient, but random-key inserts cause page splits and fragmentation.",
+            "oneLiner": "A clustered index physically orders the rows by its key — the B-tree leaf IS the data — so range scans are fast, but random-key inserts cause page splits and fragmentation.",
             "keyPoints": [
-              "The table's data pages are arranged in the B-tree leaf level in clustered key order — there is no separate 'table' and 'index' object",
-              "A table without a clustered index is a **heap** — rows are stored in insertion order with no guaranteed sort; lookups require a full scan or a non-clustered index pointing to an 8-byte RID (file:page:slot)",
-              "All non-clustered indexes store the clustered key as the row locator — a wide clustered key makes every non-clustered index larger",
-              "**Page splits**: when an INSERT falls in the middle of an ordered sequence (e.g., non-sequential GUIDs), SQL Server must split the existing 8KB page to make room — expensive and causes fragmentation",
-              "**IDENTITY columns** generate sequential values, preventing splits (new rows always go at the end)",
-              "Rebuild/reorganize indexes to fix fragmentation: `ALTER INDEX ALL ON Table REBUILD` or `REORGANIZE`"
+              "Leaf level holds the actual data rows in key order",
+              "No clustered index = heap (unordered, RID locators)",
+              "All non-clustered indexes carry the clustered key as locator",
+              "Random keys (GUIDs) cause page splits; IDENTITY appends sequentially"
             ],
-            "detail": "**B-tree structure**: SQL Server B-trees have root, intermediate, and leaf pages. For a clustered index, the leaf pages contain the full data row. For a non-clustered index, leaf pages contain the key column(s) plus the clustered key (or RID for a heap).\n\n**Effect on range queries**: Because rows are physically ordered by the clustered key, a range query like `WHERE OrderDate BETWEEN '2024-01-01' AND '2024-12-31'` reads a contiguous range of pages — very efficient (sequential I/O). A heap would scatter the same rows across random pages.\n\n**Effect on non-clustered indexes**: Every non-clustered index leaf node stores the clustered index key as the row locator so SQL Server can find the full row via a Key Lookup. If you choose a wide clustered key (e.g., a composite or NVARCHAR key), every non-clustered index gets wider too — impacting storage and memory.\n\n**GUID vs IDENTITY**: Random GUIDs (`NEWID()`) as clustered keys cause page splits on every insert because the new key typically falls somewhere in the middle of existing data. This leads to ~50% page fill and heavy I/O for maintenance. Alternatives: NEWSEQUENTIALID() for sequential GUIDs, or use IDENTITY INT/BIGINT.\n\n**Fragmentation**: Logical fragmentation (pages out of order at the extent level) is fixed by REBUILD. Minor fragmentation (page density below threshold) is fixed by REORGANIZE, which is an online operation.",
+            "detail": "A wide clustered key bloats every non-clustered index. Fix fragmentation with REBUILD (>30%) or REORGANIZE (5-30%); both can update statistics.",
             "code": {
               "lang": "sql",
               "snippet": "-- Check fragmentation\nSELECT\n    i.name AS IndexName,\n    ips.avg_fragmentation_in_percent,\n    ips.page_count\nFROM sys.dm_db_index_physical_stats(DB_ID(), OBJECT_ID('Orders'), NULL, NULL, 'LIMITED') ips\nJOIN sys.indexes i ON ips.object_id = i.object_id AND ips.index_id = i.index_id\nWHERE ips.avg_fragmentation_in_percent > 5;\n\n-- Rebuild (offline, resets fill factor)\nALTER INDEX ALL ON Orders REBUILD WITH (ONLINE = ON);\n\n-- Reorganize (online, minimal locking)\nALTER INDEX IX_Orders_CustomerId ON Orders REORGANIZE;",
               "note": "Rebuild when fragmentation > 30%, reorganize when 5-30%; both update statistics"
             },
             "followUps": [
-              "Why are GUIDs a bad choice for a clustered index on a high-insert table?",
-              "What is the difference between REBUILD and REORGANIZE?",
+              "Why are GUIDs bad clustered keys on high-insert tables?",
+              "REBUILD vs REORGANIZE?",
               "How does fill factor affect page splits?"
             ],
             "redFlags": [
-              "Thinking a clustered index is a separate structure from the table data",
-              "Not knowing that non-clustered indexes carry the clustered key",
-              "Not knowing about page splits and fragmentation from random keys"
+              "Thinking the clustered index is separate from the table data",
+              "Not knowing non-clustered indexes carry the clustered key",
+              "Not knowing about page splits from random keys"
             ]
           }
         },
@@ -727,30 +687,28 @@
           "freq": "medium",
           "tags": ["database design", "surrogate key", "natural key", "scalability", "sharding", "partitioning"],
           "answer": {
-            "oneLiner": "Surrogate keys (system-generated IDs) are preferred for their stability and simplicity in joins; natural keys (meaningful business values) can be used when truly unique and immutable — scalability design considers partitioning, read replicas, sharding, and archiving strategies upfront.",
+            "oneLiner": "Prefer surrogate keys (INT/BIGINT IDENTITY) for stability and simple joins; use natural keys only when truly unique and immutable. For scale, plan partitioning, archiving, and sharding upfront.",
             "keyPoints": [
-              "**Surrogate key**: INT IDENTITY or BIGINT, no business meaning, never changes — safe for FK relationships, simpler joins",
-              "**Natural key**: uses real-world unique identifiers (SSN, ISBN, email) — risks: they change, can be NULLable, may not be truly unique across systems",
-              "Use surrogate PKs for most tables; enforce the natural key uniqueness with a UNIQUE constraint separately",
-              "**Partitioning**: SQL Server table partitioning splits a large table across multiple filegroups by a partition function on a key (e.g., date) — queries that filter on the partition key benefit from partition elimination",
-              "**Archiving**: design with a DateCreated/DateModified column from day one to support archiving old data efficiently",
-              "**Avoid wide clustered keys** — they bloat every non-clustered index; keep the clustered key narrow (INT/BIGINT)"
+              "Surrogate: no business meaning, narrow, stable, sequential",
+              "Natural keys risk changing, being NULL, or not unique — enforce with a UNIQUE constraint instead",
+              "Partition large tables by date for partition elimination",
+              "Add CreatedAt/ModifiedAt from day one; shard by tenant for multi-tenant"
             ],
-            "detail": "**Surrogate vs Natural Key Decision**:\nA surrogate key is always the safer default for clustered index keys: it is narrow, stable, sequential (with IDENTITY), and independent of business rule changes. However, you must still enforce the natural key uniqueness via a UNIQUE constraint — the surrogate key alone does not prevent duplicate business records.\n\nNatural keys are sometimes used in lookup/reference tables where the code IS the identifier (e.g., ISO country codes). In these cases the natural key is stable and meaningful, making surrogate keys redundant.\n\n**Scalability design patterns**:\n1. *Table partitioning*: split a billions-row table (e.g., TransactionHistory) by year/month. Queries filtering by date use partition elimination to scan only relevant partitions. Old partitions can be switched out for archiving in milliseconds.\n2. *Read replicas*: Azure SQL supports readable secondary replicas for offloading reporting queries.\n3. *Indexed views*: pre-compute expensive aggregations as an indexed view — queries can use them transparently.\n4. *Archiving*: move old rows to an archive table on a schedule. Design the schema with a CreatedDate column and partition key from the start.\n5. *Sharding*: horizontal partitioning across multiple databases/servers. Each shard holds a subset of rows (e.g., by TenantId in a multi-tenant SaaS app). Azure SQL Elastic Pools and Elastic Database tools support this pattern.",
+            "detail": "Keep the clustered key narrow since every non-clustered index carries it. Partition switching lets you archive old partitions in milliseconds.",
             "code": {
               "lang": "sql",
               "snippet": "-- Surrogate PK + separate unique constraint for natural key\nCREATE TABLE Products (\n    ProductId  INT         IDENTITY PRIMARY KEY,   -- surrogate\n    SKU        NVARCHAR(50) NOT NULL UNIQUE,        -- natural key enforced separately\n    Name       NVARCHAR(200) NOT NULL,\n    CreatedAt  DATETIME2    NOT NULL DEFAULT SYSUTCDATETIME()\n);\n\n-- Partition function and scheme for date-based partitioning\nCREATE PARTITION FUNCTION pf_OrderDate (DATE)\n    AS RANGE RIGHT FOR VALUES ('2022-01-01','2023-01-01','2024-01-01','2025-01-01');\n\nCREATE PARTITION SCHEME ps_OrderDate\n    AS PARTITION pf_OrderDate ALL TO ([PRIMARY]);\n\nCREATE TABLE OrdersPartitioned (\n    OrderId   BIGINT IDENTITY,\n    OrderDate DATE NOT NULL,\n    Total     DECIMAL(18,2)\n) ON ps_OrderDate(OrderDate);",
               "note": "Always add CreatedAt/ModifiedAt columns even if not immediately needed — retrofitting is expensive"
             },
             "followUps": [
-              "What is partition elimination and how does it improve query performance?",
-              "How would you design a multi-tenant database in Azure SQL?",
-              "What are the trade-offs of horizontal sharding vs vertical scaling?"
+              "What is partition elimination?",
+              "How would you design a multi-tenant Azure SQL DB?",
+              "Horizontal sharding vs vertical scaling trade-offs?"
             ],
             "redFlags": [
-              "Using SSN or email as a clustered index key",
-              "Not enforcing uniqueness on natural keys when using surrogate PKs",
-              "Not considering partitioning or archiving for tables expected to grow beyond 100M rows"
+              "Using SSN or email as a clustered key",
+              "Not enforcing natural key uniqueness with surrogate PKs",
+              "Ignoring partitioning/archiving for tables over 100M rows"
             ]
           }
         },
@@ -762,29 +720,27 @@
           "freq": "medium",
           "tags": ["primary key", "unique key", "null", "clustered", "non-clustered"],
           "answer": {
-            "oneLiner": "A primary key implicitly enforces NOT NULL and creates a clustered index by default; a unique key permits exactly one NULL per column set and creates a non-clustered index by default — a table has at most one primary key but can have many unique constraints.",
+            "oneLiner": "A PK is NOT NULL and clustered by default (one per table); a unique key allows one NULL and is non-clustered by default (many per table).",
             "keyPoints": [
-              "PK: NOT NULL enforced implicitly, one per table, clustered by default",
-              "UNIQUE: one NULL allowed (SQL Server treats NULL != NULL so only one NULL is 'unique'), multiple per table, non-clustered by default",
-              "Both can be composite (multiple columns)",
-              "A unique index and a unique constraint are functionally identical in SQL Server",
-              "PK columns are the default target for FK references unless another unique column is specified"
+              "PK: NOT NULL, one per table, clustered by default",
+              "UNIQUE: one NULL allowed, many per table, non-clustered by default",
+              "Both can be composite",
+              "Unique index and unique constraint are functionally identical"
             ],
-            "detail": "This distinction matters at query-plan and design level. Because the PK is clustered by default, the table data is physically sorted by the PK. All non-clustered indexes (including UNIQUE non-clustered indexes) carry the PK as the row locator.\n\nNULL handling: SQL Server's unique index uses a null-comparison rule where NULL is treated as a distinct value for purposes of the unique constraint, but only ONE null is allowed in a unique index (single-column). In a multi-column unique index, you can have multiple rows where all columns are NULL because the combination is still considered distinct in the ISO SQL sense — though SQL Server actual behavior may differ by version.\n\nIn practice: use PK for the entity's identity, use UNIQUE constraints to enforce alternate keys or business rules (e.g., unique email per user).",
             "code": {
               "lang": "sql",
               "snippet": "CREATE TABLE Users (\n    UserId    INT          IDENTITY CONSTRAINT PK_Users PRIMARY KEY CLUSTERED,\n    Email     NVARCHAR(256) NOT NULL CONSTRAINT UQ_Users_Email UNIQUE NONCLUSTERED,\n    Username  NVARCHAR(100) NOT NULL CONSTRAINT UQ_Users_Username UNIQUE\n);\n-- PK: clustered, not null\n-- UNIQUE on Email: non-clustered, one NULL allowed (Email is NOT NULL here anyway)",
               "note": "Name your constraints explicitly for easier maintenance and error messages"
             },
             "followUps": [
-              "Can a foreign key reference a UNIQUE column instead of the primary key?",
+              "Can an FK reference a UNIQUE column instead of the PK?",
               "How many unique indexes can a table have?",
-              "What happens if you try to insert two NULLs into a unique column?"
+              "What happens inserting two NULLs into a unique column?"
             ],
             "redFlags": [
               "Saying UNIQUE allows multiple NULLs",
               "Saying a table can have multiple clustered indexes",
-              "Not knowing that PK is NOT NULL by definition"
+              "Not knowing PK is NOT NULL by definition"
             ]
           }
         }

@@ -1,0 +1,418 @@
+{
+  "subtopicId": "predict-output",
+  "subtopicName": "🔮 Predict the Output",
+  "order": 5,
+  "questions": [
+    {
+      "id": "csharp-po-001",
+      "q": "Predict the output: struct copied on assignment.",
+      "level": "junior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["struct", "value-type", "copy"],
+      "answer": {
+        "oneLiner": "Prints **1** then **2**. A struct is a value type, so `b = a` copies it — changing `b` doesn't touch `a`.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "struct Point { public int X; }\nPoint a = new Point { X = 1 };\nPoint b = a;   // copy\nb.X = 2;\nConsole.WriteLine(a.X);  // ?\nConsole.WriteLine(b.X);  // ?",
+          "note": "Output: 1 and 2"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-002",
+      "q": "Predict the output: class shared by reference.",
+      "level": "junior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["class", "reference-type"],
+      "answer": {
+        "oneLiner": "Prints **2** then **2**. A class is a reference type — `a` and `b` point to the *same* object, so the change is visible through both.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "class Point { public int X; }\nPoint a = new Point { X = 1 };\nPoint b = a;   // same reference\nb.X = 2;\nConsole.WriteLine(a.X);  // ?\nConsole.WriteLine(b.X);  // ?",
+          "note": "Output: 2 and 2"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-003",
+      "q": "Predict the output: virtual method called from base constructor.",
+      "level": "senior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["virtual", "constructor", "nullreference", "polymorphism"],
+      "answer": {
+        "oneLiner": "**NullReferenceException.** The base ctor runs first and the virtual call dispatches to `B.Print()`, but `_str` isn't initialized yet (B's ctor hasn't run) → null.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "class A {\n    public A() { Print(); }            // virtual call in ctor\n    public virtual void Print() => Console.WriteLine(\"parent\");\n}\nclass B : A {\n    private string _str;\n    public B() { _str = \"child\"; }\n    public override void Print() => Console.WriteLine(_str.ToLower());\n}\nvar b = new B();   // ?",
+          "note": "Base ctor → virtual dispatch to B.Print() → _str is still null"
+        },
+        "keyPoints": [
+          "Order: base field inits → **base ctor** → derived field inits → derived ctor.",
+          "Rule: **never call a virtual method from a constructor.**"
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-004",
+      "q": "Predict the output: non-virtual method, base reference (static dispatch).",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["static-dispatch", "early-binding", "polymorphism"],
+      "answer": {
+        "oneLiner": "Prints **\"animal speak\"**. `Speak` isn't virtual, so the call binds to the *declared* type `Animal` at compile time (static/early binding) — not the runtime type `Dog`.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "class Animal { public void Speak() => Console.WriteLine(\"animal speak\"); }\nclass Dog : Animal { public void Speak() => Console.WriteLine(\"dog speak\"); }\n\nAnimal a = new Dog();\na.Speak();   // ?",
+          "note": "Declared type = Animal, method not virtual → Animal.Speak()"
+        },
+        "keyPoints": [
+          "Make `Speak` **virtual** + `override` in Dog to get \"dog speak\" (runtime dispatch)."
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-005",
+      "q": "Predict the output: method hiding with `new`.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["method-hiding", "new-keyword", "polymorphism"],
+      "answer": {
+        "oneLiner": "Prints **\"Base\"** then **\"Derived\"**. `new` *hides* (doesn't override) — the call resolves by the reference's declared type, not the object's runtime type.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "class Base { public virtual void Show() => Console.Write(\"Base\"); }\nclass Derived : Base { public new void Show() => Console.Write(\"Derived\"); }\n\nBase b = new Derived(); b.Show();      // ?\nDerived d = new Derived(); d.Show();   // ?",
+          "note": "new = hiding (compile-time), override = polymorphism (runtime)"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-006",
+      "q": "Predict the output: property hiding via `new` through a base reference.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["property-hiding", "new-keyword"],
+      "answer": {
+        "oneLiner": "Prints **\"aamir\"**. The variable is typed `User`, and `new` hides rather than overrides, so the *base* property is read.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "class User     { public string Username { get; set; } = \"aamir\"; }\nclass Customer : User { public new string Username { get; set; } = \"zahid\"; }\n\nUser u = new Customer();\nConsole.WriteLine(u.Username);   // ?",
+          "note": "Hidden member resolved by declared type (User)"
+        },
+        "keyPoints": [
+          "Use `virtual`/`override` (not `new`) if you want the derived value through a base reference."
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-007",
+      "q": "Predict the output: closure capturing a `for` loop variable.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["closure", "capture", "loop"],
+      "answer": {
+        "oneLiner": "Prints **333**. All three lambdas capture the *same* variable `i`; by the time they run the loop has finished and `i == 3`.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "var actions = new List<Action>();\nfor (int i = 0; i < 3; i++)\n    actions.Add(() => Console.Write(i));\nforeach (var a in actions) a();   // ?",
+          "note": "Closures capture variables, not values"
+        },
+        "keyPoints": [
+          "Fix: copy into a loop-local `int copy = i;` and capture `copy`.",
+          "A `foreach` loop variable is per-iteration since C# 5, so it would print 012."
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-008",
+      "q": "Predict the output: LINQ deferred execution after the source changes.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["linq", "deferred-execution"],
+      "answer": {
+        "oneLiner": "Prints **2 4 6 8**. `Select` is deferred — it runs when enumerated in the `foreach`, *after* the 4 was added.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "var nums = new List<int> { 1, 2, 3 };\nvar doubled = nums.Select(x => x * 2);\nnums.Add(4);\nforeach (var n in doubled) Console.Write(n + \" \");   // ?",
+          "note": "Add .ToList() right after Select to capture only 1,2,3"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-009",
+      "q": "Predict the output: boxed value equality vs reference equality.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["boxing", "equality", "referenceequals"],
+      "answer": {
+        "oneLiner": "Prints **True** then **False**. `==` on `object` here compares the boxed values via `Equals`... actually `==` uses reference equality for `object`, so both are **False**. Each boxing makes a new heap object.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "object a = 123;\nobject b = 123;\nConsole.WriteLine(a == b);                      // ?\nConsole.WriteLine(object.ReferenceEquals(a, b)); // ?",
+          "note": "Both False: == on object is reference compare; two separate boxes"
+        },
+        "keyPoints": [
+          "`a.Equals(b)` would be **True** (value compare).",
+          "Watch out: for `object` operands, `==` is reference equality, not value equality."
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-010",
+      "q": "Predict the output: string interning of compile-time constants.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["string", "interning", "referenceequals"],
+      "answer": {
+        "oneLiner": "Prints **True**. `\"he\" + \"llo\"` is folded to the literal `\"hello\"` at compile time and interned, so both refer to the same object.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "string a = \"hello\";\nstring b = \"he\" + \"llo\";    // constant-folded\nConsole.WriteLine(object.ReferenceEquals(a, b));   // ?",
+          "note": "Runtime concat (string.Concat) would be False — not interned"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-011",
+      "q": "Predict the output: integer overflow in unchecked context.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["overflow", "int", "unchecked"],
+      "answer": {
+        "oneLiner": "Prints **-2147483648** (`int.MinValue`). Default arithmetic is *unchecked*, so it silently wraps around.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "int a = int.MaxValue;\nint b = a + 1;\nConsole.WriteLine(b);   // ?",
+          "note": "Wrap a `checked { }` block around it to throw OverflowException instead"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-012",
+      "q": "Predict the output: multicast delegate return value.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["delegate", "multicast", "func"],
+      "answer": {
+        "oneLiner": "Prints **8**. For a multicast `Func`, only the **last** subscriber's return value is kept; the others' results are discarded.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "Func<int,int> d = x => x + 1;\nd += x => x + 2;\nd += x => x + 3;\nConsole.WriteLine(d(5));   // ?",
+          "note": "All three run, but only the last (5+3=8) is returned"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-013",
+      "q": "Predict the output: explicit double-to-int cast.",
+      "level": "junior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["cast", "truncation", "double"],
+      "answer": {
+        "oneLiner": "Prints **10**. An explicit `(int)` cast **truncates** toward zero — it does not round.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "double d = 10.9;\nint i = (int)d;\nConsole.WriteLine(i);   // ?",
+          "note": "Use Math.Round(d) for 11"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-014",
+      "q": "Predict the output: null-coalescing chain.",
+      "level": "junior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["null-coalescing", "nullable"],
+      "answer": {
+        "oneLiner": "Prints **99**. `??` is right-associative: `x` is null → try `y` (null) → fall back to `99`.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "int? x = null;\nint? y = null;\nint z = x ?? y ?? 99;\nConsole.WriteLine(z);   // ?"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-015",
+      "q": "Predict the output: try/catch/finally with a handled exception.",
+      "level": "junior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["exception", "finally"],
+      "answer": {
+        "oneLiner": "Prints **B** then **C**. The divide-by-zero is caught (B), and `finally` always runs (C). \"A\" never executes.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "try { int x = 5 / int.Parse(\"0\"); Console.WriteLine(\"A\"); }\ncatch (DivideByZeroException) { Console.WriteLine(\"B\"); }\nfinally { Console.WriteLine(\"C\"); }   // ?"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-016",
+      "q": "Predict the output: nested try — inner finally vs outer catch order.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["exception", "finally", "nested"],
+      "answer": {
+        "oneLiner": "Prints **Inner Finally** then **Outer Catch**. The inner `finally` runs *before* the exception unwinds to the outer `catch`.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "try {\n    try { int x = 5 / int.Parse(\"0\"); }\n    finally { Console.WriteLine(\"Inner Finally\"); }\n}\ncatch { Console.WriteLine(\"Outer Catch\"); }   // ?"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-017",
+      "q": "Predict the output: async ordering with await.",
+      "level": "senior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["async", "await", "ordering"],
+      "answer": {
+        "oneLiner": "Prints **1, 2, 4** then (after the delay) **3**. Code runs synchronously up to the first real `await`; the continuation (3) resumes later.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "async Task Run() {\n    Console.WriteLine(\"1\");\n    await Work();\n    Console.WriteLine(\"3\");\n}\nasync Task Work() {\n    Console.WriteLine(\"2\");\n    await Task.Delay(100);\n}\nvar t = Run();\nConsole.WriteLine(\"4\");\nt.Wait();",
+          "note": "Synchronous part runs first; await yields back to the caller"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-018",
+      "q": "Predict the output: static field initializer vs static constructor order.",
+      "level": "senior",
+      "type": "code",
+      "freq": "low",
+      "tags": ["static", "initialization-order"],
+      "answer": {
+        "oneLiner": "Prints **Field** then **Constructor**. Static field initializers run in textual order *before* the static constructor body.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "class Example {\n    static int x = Print(\"Field\");\n    static Example() => Console.WriteLine(\"Constructor\");\n    static int Print(string s) { Console.WriteLine(s); return 0; }\n}\n_ = Example.x;   // triggers type init"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-019",
+      "q": "Predict the output: passing null to a params array.",
+      "level": "mid",
+      "type": "code",
+      "freq": "low",
+      "tags": ["params", "null", "nullreference"],
+      "answer": {
+        "oneLiner": "`Print()` → **0**; `Print(null)` → **NullReferenceException**. No args makes an empty array; explicit `null` is passed straight through as the array reference.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "void Print(params int[] n) => Console.WriteLine(n.Length);\nPrint();        // ?  -> 0\nPrint(null);    // ?  -> NRE on n.Length"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-020",
+      "q": "Predict the output: covariant assignment of IEnumerable<T>.",
+      "level": "senior",
+      "type": "code",
+      "freq": "low",
+      "tags": ["covariance", "generics"],
+      "answer": {
+        "oneLiner": "Prints **1**. `IEnumerable<out T>` is covariant, so `IEnumerable<Dog>` is assignable to `IEnumerable<Animal>` — no copy, same sequence.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "class Animal {} class Dog : Animal {}\nIEnumerable<Dog> dogs = new List<Dog> { new Dog() };\nIEnumerable<Animal> animals = dogs;   // covariance\nConsole.WriteLine(animals.Count());   // ?",
+          "note": "List<Dog> is NOT assignable to List<Animal> — only the covariant interface is"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-021",
+      "q": "Predict the output: default values of an uninitialized struct.",
+      "level": "junior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["struct", "default-values"],
+      "answer": {
+        "oneLiner": "Prints **True** then **0**. Struct fields get type defaults: reference fields → `null`, numeric → `0`.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "struct Person { public string Name; public int Age; }\nPerson p = new Person();\nConsole.WriteLine(p.Name == null);  // ?\nConsole.WriteLine(p.Age);           // ?"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-022",
+      "q": "Predict the output: mutating a list while a deferred query is held.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["linq", "deferred-execution", "where"],
+      "answer": {
+        "oneLiner": "Prints **2 3** — because `.ToList()` forced *immediate* execution before the `Add(4)`, so 4 is excluded.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "var nums = new List<int> { 1, 2, 3 };\nvar big = nums.Where(x => x > 1).ToList();  // runs now\nnums.Add(4);\nforeach (var n in big) Console.Write(n + \" \");   // ?",
+          "note": "Without ToList() it would print 2 3 4"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-023",
+      "q": "Predict the output: ref parameter modifying a value type.",
+      "level": "junior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["ref", "value-type"],
+      "answer": {
+        "oneLiner": "Prints **100**. `ref` passes the variable itself (an alias), so the method's assignment changes the caller's `a`.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "void Modify(ref int x) => x = 100;\nint a = 5;\nModify(ref a);\nConsole.WriteLine(a);   // ?"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-024",
+      "q": "Predict the output: exception thrown mid-chain in a multicast Action.",
+      "level": "mid",
+      "type": "code",
+      "freq": "low",
+      "tags": ["delegate", "multicast", "exception"],
+      "answer": {
+        "oneLiner": "Prints **AC**. The first handler runs (A), the second throws and *halts the whole chain*, so B never runs; the catch prints C.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "Action d = () => Console.Write(\"A\");\nd += () => throw new Exception();\nd += () => Console.Write(\"B\");\ntry { d(); } catch { Console.Write(\"C\"); }   // ?",
+          "note": "An exception in one subscriber stops the remaining ones"
+        }
+      }
+    },
+    {
+      "id": "csharp-po-025",
+      "q": "Predict the output: list of base reference holding derived, virtual call.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["polymorphism", "virtual", "override"],
+      "answer": {
+        "oneLiner": "Prints **\"dog speak\"**. With `virtual`+`override`, the call dispatches on the runtime type (`Dog`) regardless of the `Animal` declared type.",
+        "code": {
+          "lang": "csharp",
+          "snippet": "class Animal { public virtual void Speak() => Console.WriteLine(\"animal speak\"); }\nclass Dog : Animal { public override void Speak() => Console.WriteLine(\"dog speak\"); }\n\nAnimal a = new Dog();\na.Speak();   // ?",
+          "note": "Contrast with the non-virtual version which prints 'animal speak'"
+        }
+      }
+    }
+  ]
+}

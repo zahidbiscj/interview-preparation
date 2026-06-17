@@ -14,14 +14,14 @@
           "freq": "high",
           "tags": ["middleware", "pipeline", "request"],
           "answer": {
-            "oneLiner": "Middleware are components chained into a pipeline; each one inspects/handles the HTTP request, optionally calls the next component, then can inspect the response on the way back out.",
+            "oneLiner": "Middleware are components chained into a pipeline; each one handles the request, optionally calls the next, then can touch the response on the way back out.",
             "keyPoints": [
-              "The pipeline is built in `Program.cs` with `app.Use...` calls — **order matters**",
-              "Each middleware gets the `HttpContext` and a `next` delegate",
-              "A middleware can **short-circuit** (not call `next`) to end the request early (e.g. auth failure)",
-              "It's a bidirectional chain: logic before `next()` runs on the way in, logic after runs on the way out"
+              "Built in `Program.cs` with `app.Use...` — **order matters**",
+              "Each one gets `HttpContext` and a `next` delegate",
+              "Can **short-circuit** by not calling `next` (e.g. auth failure)",
+              "Bidirectional: before `next()` runs inbound, after runs outbound"
             ],
-            "detail": "Think of the pipeline as an onion. A request passes inward through each middleware, hits the endpoint, then the response travels back outward through the same middleware in reverse.\n\nTypical order: ExceptionHandler → HSTS → HttpsRedirection → Static Files → Routing → CORS → Authentication → Authorization → Endpoints.",
+            "detail": "Think of it as an onion: the request passes inward, hits the endpoint, then the response travels back out through the same middleware in reverse.",
             "code": {
               "lang": "csharp",
               "snippet": "app.Use(async (ctx, next) =>\n{\n    // runs on the way IN\n    await next();        // call the next middleware\n    // runs on the way OUT\n});",
@@ -31,7 +31,7 @@
               "Why does middleware order matter?",
               "What happens if a middleware doesn't call next()?"
             ],
-            "redFlags": ["Thinking middleware only runs one direction, or that order doesn't matter"]
+            "redFlags": ["Thinking middleware runs one direction, or that order doesn't matter"]
           }
         },
         {
@@ -41,11 +41,11 @@
           "freq": "high",
           "tags": ["use", "run", "map", "middleware"],
           "answer": {
-            "oneLiner": "`Use` adds a middleware that can call the next one; `Run` is a terminal middleware that ends the pipeline; `Map` branches the pipeline based on the request path.",
+            "oneLiner": "`Use` adds middleware that can call the next; `Run` is terminal and ends the pipeline; `Map` branches the pipeline based on the request path.",
             "keyPoints": [
-              "`Use` — passes control onward via `next` (most middleware)",
-              "`Run` — terminal, never calls `next`; the pipeline stops here",
-              "`Map` / `MapWhen` — creates a branch that runs only for matching paths/conditions"
+              "`Use` — passes control onward via `next`",
+              "`Run` — terminal, never calls `next`",
+              "`Map` / `MapWhen` — branches for matching paths/conditions"
             ],
             "code": {
               "lang": "csharp",
@@ -63,8 +63,8 @@
           "answer": {
             "oneLiner": "Kestrel is ASP.NET Core's cross-platform, high-performance built-in web server that listens for HTTP requests and hands them to the middleware pipeline.",
             "keyPoints": [
-              "Default in-process server, runs on Windows/Linux/macOS",
-              "Often sat behind a **reverse proxy** (IIS, Nginx) in production for TLS termination, load balancing, and security",
+              "Default server, runs on Windows/Linux/macOS",
+              "Often behind a **reverse proxy** (IIS, Nginx) for TLS, load balancing, security",
               "Can also be edge-facing directly"
             ],
             "followUps": ["Why put a reverse proxy in front of Kestrel?"]
@@ -77,14 +77,14 @@
           "freq": "high",
           "tags": ["program.cs", "hosting", "startup"],
           "answer": {
-            "oneLiner": "Program.cs is the app entry point: it builds the host, registers services in the DI container, builds the app, configures the middleware pipeline, and runs it.",
+            "oneLiner": "It's the app entry point: builds the host, registers services in DI, builds the app, configures the middleware pipeline, and runs it.",
             "keyPoints": [
-              "`WebApplication.CreateBuilder(args)` → configures host, config, logging, DI",
-              "`builder.Services.Add...` → **service registration** (the DI container)",
-              "`builder.Build()` → produces the `WebApplication`",
-              "`app.Use...` / `app.Map...` → **pipeline configuration**, then `app.Run()`"
+              "`CreateBuilder(args)` → host, config, logging, DI",
+              "`builder.Services.Add...` → **service registration**",
+              "`builder.Build()` → the `WebApplication`",
+              "`app.Use...` → **pipeline**, then `app.Run()`"
             ],
-            "detail": "Since .NET 6 the minimal hosting model merged the old `Startup.cs` (ConfigureServices + Configure) into a single top-level `Program.cs`. The two halves are still conceptually there: **register services**, then **configure the pipeline**.",
+            "detail": "Since .NET 6 the minimal hosting model merged the old `Startup.cs` into one file. Conceptually it's still two halves: register services, then configure the pipeline.",
             "code": {
               "lang": "csharp",
               "snippet": "var builder = WebApplication.CreateBuilder(args);\nbuilder.Services.AddControllers();      // register\nvar app = builder.Build();\napp.UseAuthorization();                  // pipeline\napp.MapControllers();\napp.Run();"
@@ -98,13 +98,13 @@
           "freq": "medium",
           "tags": ["custom-middleware", "convention"],
           "answer": {
-            "oneLiner": "Create a class with an `InvokeAsync(HttpContext, RequestDelegate next)` method (convention-based) or use an inline `app.Use` lambda, then register it in the pipeline.",
+            "oneLiner": "Write a class with an `InvokeAsync(HttpContext)` method (convention-based) or use an inline `app.Use` lambda, then register it with `UseMiddleware`.",
             "code": {
               "lang": "csharp",
               "snippet": "public class TimingMiddleware\n{\n    private readonly RequestDelegate _next;\n    public TimingMiddleware(RequestDelegate next) => _next = next;\n\n    public async Task InvokeAsync(HttpContext ctx)\n    {\n        var sw = Stopwatch.StartNew();\n        await _next(ctx);\n        Console.WriteLine($\"{ctx.Request.Path}: {sw.ElapsedMilliseconds}ms\");\n    }\n}\n// app.UseMiddleware<TimingMiddleware>();",
-              "note": "The middleware itself is a singleton — inject scoped services via the InvokeAsync parameters, not the constructor."
+              "note": "The middleware is a singleton — inject scoped services via the InvokeAsync parameters, not the constructor."
             },
-            "redFlags": ["Injecting a scoped/transient service into the middleware constructor (it's created once)"]
+            "redFlags": ["Injecting a scoped/transient service into the middleware constructor"]
           }
         },
         {
@@ -114,11 +114,11 @@
           "freq": "medium",
           "tags": ["ordering", "pipeline"],
           "answer": {
-            "oneLiner": "Because each middleware can short-circuit or transform the request before later ones run — e.g. Authentication must come before Authorization, and exception handling must be near the top to catch everything below it.",
+            "oneLiner": "Because each middleware can short-circuit or transform the request before later ones run — e.g. Authentication must come before Authorization, and exception handling must be near the top.",
             "keyPoints": [
-              "`UseAuthentication` before `UseAuthorization` — you must know *who* the user is before checking *what* they can do",
+              "`UseAuthentication` before `UseAuthorization` — know *who* before *what*",
               "`UseRouting` before endpoint-aware middleware",
-              "Exception/error handling registered first so it wraps the whole pipeline",
+              "Exception handling first so it wraps everything",
               "CORS before the endpoints that need it"
             ]
           }
@@ -130,7 +130,7 @@
           "freq": "low",
           "tags": ["short-circuit", "pipeline"],
           "answer": {
-            "oneLiner": "A middleware short-circuits by writing a response and NOT calling `next()`, so no further middleware or the endpoint runs — common for auth rejections, caching hits, or rate limiting."
+            "oneLiner": "A middleware short-circuits by writing a response and NOT calling `next()`, so nothing further runs — common for auth rejections, cache hits, or rate limiting."
           }
         }
       ]
@@ -147,13 +147,13 @@
           "freq": "high",
           "tags": ["di", "lifetime", "singleton", "scoped", "transient"],
           "answer": {
-            "oneLiner": "Singleton = one instance for the whole app; Scoped = one instance per HTTP request; Transient = a new instance every time it's requested.",
+            "oneLiner": "Singleton = one instance for the whole app; Scoped = one per HTTP request; Transient = a new one every time it's requested.",
             "keyPoints": [
-              "**Singleton** — created once, shared everywhere; must be thread-safe; great for stateless/config/caches",
-              "**Scoped** — one per request; the default for things like `DbContext` and per-request state",
-              "**Transient** — new each injection; cheap, stateless helpers"
+              "**Singleton** — created once, shared; must be thread-safe",
+              "**Scoped** — one per request; default for `DbContext`",
+              "**Transient** — new each injection; cheap stateless helpers"
             ],
-            "detail": "In a web app the 'scope' is the HTTP request. Within a single request, every component that asks for a scoped service gets the *same* instance; across requests they differ.\n\nChoosing wrong causes bugs: a singleton holding request data leaks across users; a transient `DbContext` breaks change tracking.",
+            "detail": "In a web app the 'scope' is the HTTP request. Get the lifetime wrong and you get bugs: a singleton holding request data leaks across users; a transient `DbContext` breaks change tracking.",
             "code": {
               "lang": "csharp",
               "snippet": "builder.Services.AddSingleton<IClock, SystemClock>();\nbuilder.Services.AddScoped<IOrderRepo, OrderRepo>();\nbuilder.Services.AddTransient<IEmailFormatter, EmailFormatter>();"
@@ -172,11 +172,11 @@
           "freq": "high",
           "tags": ["di", "ioc", "testability"],
           "answer": {
-            "oneLiner": "DI inverts control of creating dependencies to a container, giving you loose coupling, easy testability (swap in mocks), and centralized lifetime management.",
+            "oneLiner": "DI hands creation of dependencies to a container, giving you loose coupling, easy testability (swap in mocks), and centralized lifetime management.",
             "keyPoints": [
-              "Depend on **abstractions** (interfaces), not concretions — supports the 'D' in SOLID",
-              "Swap implementations without changing consumers (testing, different environments)",
-              "The container manages object creation and disposal"
+              "Depend on **abstractions**, not concretions — the 'D' in SOLID",
+              "Swap implementations without touching consumers",
+              "Container manages creation and disposal"
             ]
           }
         },
@@ -187,11 +187,11 @@
           "freq": "high",
           "tags": ["captive-dependency", "scoped", "singleton"],
           "answer": {
-            "oneLiner": "When a singleton depends on a scoped (or transient) service, the short-lived service gets 'captured' and lives as long as the singleton — effectively becoming a singleton, which causes stale data and thread-safety bugs.",
+            "oneLiner": "When a singleton depends on a scoped service, the short-lived service gets 'captured' and lives as long as the singleton — effectively becoming a singleton, causing stale data and threading bugs.",
             "keyPoints": [
-              "A scoped `DbContext` captured in a singleton is reused across all requests → corruption / threading errors",
-              "The DI container detects some of these and throws at startup in development",
-              "Fix: don't inject scoped into singleton — instead inject `IServiceScopeFactory` and create a scope when you need the service"
+              "A scoped `DbContext` in a singleton is reused across all requests",
+              "The container detects some cases and throws at startup in dev",
+              "Fix: inject `IServiceScopeFactory` and create a scope when needed"
             ],
             "code": {
               "lang": "csharp",
@@ -207,11 +207,11 @@
           "freq": "medium",
           "tags": ["di", "register", "resolve"],
           "answer": {
-            "oneLiner": "Register in `builder.Services` with Add{Lifetime}<TInterface, TImpl>(); resolve via constructor injection (preferred) or `IServiceProvider.GetRequiredService<T>()`.",
+            "oneLiner": "Register in `builder.Services` with Add{Lifetime}<TInterface, TImpl>(); resolve via constructor injection or `GetRequiredService<T>()`.",
             "keyPoints": [
-              "Constructor injection is the idiomatic way — list the interface as a ctor parameter",
-              "`GetRequiredService<T>` throws if unregistered; `GetService<T>` returns null",
-              "Avoid the service locator anti-pattern (resolving manually all over the code)"
+              "Constructor injection is the idiomatic way",
+              "`GetRequiredService<T>` throws if missing; `GetService<T>` returns null",
+              "Avoid the service locator anti-pattern"
             ]
           }
         },
@@ -222,11 +222,11 @@
           "freq": "medium",
           "tags": ["constructor-injection"],
           "answer": {
-            "oneLiner": "Constructor injection declares dependencies as constructor parameters, making them explicit, required, and immutable — the class can't be built in an invalid state.",
+            "oneLiner": "It declares dependencies as constructor parameters, making them explicit, required, and immutable — the class can't be built in an invalid state.",
             "keyPoints": [
-              "Dependencies are visible and required (vs hidden service-locator calls)",
-              "Easy to unit test — just pass mocks to the constructor",
-              "Encourages keeping the dependency count low (a fat constructor signals an SRP violation)"
+              "Dependencies are visible and required",
+              "Easy to test — just pass mocks to the constructor",
+              "A fat constructor signals an SRP violation"
             ]
           }
         },
@@ -237,7 +237,7 @@
           "freq": "low",
           "tags": ["keyed-services", "dotnet8"],
           "answer": {
-            "oneLiner": "Keyed services let you register multiple implementations of the same interface under different keys and resolve a specific one with `[FromKeyedServices(\"key\")]` or `GetRequiredKeyedService`.",
+            "oneLiner": "They let you register multiple implementations of the same interface under different keys and resolve a specific one with `[FromKeyedServices(\"key\")]`.",
             "code": {
               "lang": "csharp",
               "snippet": "builder.Services.AddKeyedScoped<INotifier, EmailNotifier>(\"email\");\nbuilder.Services.AddKeyedScoped<INotifier, SmsNotifier>(\"sms\");\n// ctor: ([FromKeyedServices(\"sms\")] INotifier notifier)"
@@ -251,7 +251,7 @@
           "freq": "low",
           "tags": ["container", "ioc"],
           "answer": {
-            "oneLiner": "It's the built-in IoC container (IServiceProvider) that holds service registrations and is responsible for creating, injecting, and disposing service instances according to their lifetime."
+            "oneLiner": "It's the built-in IoC container (`IServiceProvider`) that holds registrations and creates, injects, and disposes service instances per their lifetime."
           }
         }
       ]
@@ -268,13 +268,12 @@
           "freq": "high",
           "tags": ["rest", "http", "statelessness"],
           "answer": {
-            "oneLiner": "A RESTful API is stateless, models resources with URIs, uses HTTP verbs for actions and status codes for outcomes, and returns representations (usually JSON) — following REST's architectural constraints.",
+            "oneLiner": "It's stateless, models resources with URIs, uses HTTP verbs for actions and status codes for outcomes, and returns representations like JSON.",
             "keyPoints": [
-              "**Stateless** — each request carries everything needed; the server keeps no client session",
-              "**Resource-based URIs** — nouns not verbs (`/orders/42`, not `/getOrder`)",
-              "**HTTP verbs** — GET (read), POST (create), PUT/PATCH (update), DELETE",
-              "**Status codes** — 2xx success, 4xx client error, 5xx server error",
-              "Often described with the Richardson Maturity Model (levels 0-3, HATEOAS at the top)"
+              "**Stateless** — each request is self-contained; no server session",
+              "**Resource URIs** — nouns not verbs (`/orders/42`)",
+              "**HTTP verbs** — GET, POST, PUT/PATCH, DELETE",
+              "**Status codes** — 2xx success, 4xx client, 5xx server"
             ],
             "redFlags": ["Verbs in URLs", "Using GET to mutate data", "Returning 200 for everything"]
           }
@@ -288,9 +287,9 @@
           "answer": {
             "oneLiner": "PUT replaces the entire resource (full update, idempotent); PATCH applies a partial update to specific fields.",
             "keyPoints": [
-              "PUT — send the whole representation; missing fields are typically reset",
-              "PATCH — send only the changes (e.g. JSON Patch or a partial body)",
-              "Both should be idempotent; PUT is idempotent by definition"
+              "PUT — send the whole representation; missing fields reset",
+              "PATCH — send only the changes",
+              "PUT is idempotent by definition"
             ]
           }
         },
@@ -301,12 +300,11 @@
           "freq": "high",
           "tags": ["exception-handling", "middleware", "problemdetails"],
           "answer": {
-            "oneLiner": "Use a global mechanism — `app.UseExceptionHandler`, a custom exception-handling middleware, or `IExceptionHandler` (.NET 8) — to catch unhandled exceptions and return a consistent `ProblemDetails` response.",
+            "oneLiner": "Use a global mechanism — `UseExceptionHandler`, custom middleware, or `IExceptionHandler` (.NET 8) — to catch unhandled exceptions and return a consistent `ProblemDetails` response.",
             "keyPoints": [
-              "Centralizes error formatting and logging instead of try/catch everywhere",
-              "Return RFC 7807 `ProblemDetails` for consistency",
-              "Map known exceptions to status codes (e.g. NotFoundException → 404)",
-              ".NET 8 adds `IExceptionHandler` + `AddExceptionHandler` for a clean approach"
+              "Centralizes error formatting and logging vs try/catch everywhere",
+              "Return RFC 7807 `ProblemDetails`",
+              "Map known exceptions to status codes (NotFound → 404)"
             ],
             "code": {
               "lang": "csharp",
@@ -321,13 +319,13 @@
           "freq": "high",
           "tags": ["authentication", "authorization"],
           "answer": {
-            "oneLiner": "Authentication verifies WHO you are (identity); Authorization decides WHAT you're allowed to do (permissions). AuthN comes first, then AuthZ.",
+            "oneLiner": "Authentication verifies WHO you are; Authorization decides WHAT you can do. AuthN comes first, then AuthZ.",
             "keyPoints": [
-              "AuthN — login, validating a JWT/cookie → establishes the `ClaimsPrincipal`",
-              "AuthZ — roles, policies, claims checks → grants/denies access",
-              "In the pipeline: `UseAuthentication()` then `UseAuthorization()`"
+              "AuthN — login, validating a JWT/cookie → builds the `ClaimsPrincipal`",
+              "AuthZ — roles, policies, claims checks → grants/denies",
+              "Pipeline: `UseAuthentication()` then `UseAuthorization()`"
             ],
-            "analogy": "Authentication is showing your passport at the airport; authorization is whether your boarding pass lets you into the business-class lounge."
+            "analogy": "AuthN is showing your passport; AuthZ is whether your boarding pass gets you into the lounge."
           }
         },
         {
@@ -337,15 +335,14 @@
           "freq": "high",
           "tags": ["jwt", "token", "auth"],
           "answer": {
-            "oneLiner": "The client logs in, the server issues a signed JWT containing claims; the client sends it in the `Authorization: Bearer` header on each request, and the server validates the signature and expiry to authenticate the user — no server-side session needed.",
+            "oneLiner": "The client logs in, the server returns a signed JWT with claims; the client sends it as `Authorization: Bearer` on each request and the server validates signature and expiry — no server session needed.",
             "keyPoints": [
-              "JWT = Header.Payload.Signature (Base64URL), signed with a secret/key",
-              "**Stateless** — the server doesn't store the token; it just validates the signature",
-              "Claims (sub, roles, exp) live in the payload — never put secrets there (it's not encrypted, just signed)",
-              "Short-lived access token + long-lived refresh token is the common pattern"
+              "JWT = Header.Payload.Signature, signed with a key",
+              "**Stateless** — server validates the signature, doesn't store it",
+              "Payload is signed not encrypted — never put secrets there",
+              "Short-lived access token + refresh token is the common pattern"
             ],
-            "detail": "1) Client POSTs credentials → 2) server validates and returns a signed JWT → 3) client stores it and adds `Authorization: Bearer <token>` to requests → 4) the JWT middleware validates signature, issuer, audience, and expiry, then builds the `ClaimsPrincipal` → 5) authorization runs against the claims.",
-            "redFlags": ["Putting sensitive data in the payload (it's readable)", "Never expiring tokens", "Storing tokens in localStorage without considering XSS"]
+            "redFlags": ["Putting sensitive data in the payload", "Never expiring tokens", "Storing tokens in localStorage despite XSS"]
           }
         },
         {
@@ -355,13 +352,12 @@
           "freq": "medium",
           "tags": ["versioning", "api"],
           "answer": {
-            "oneLiner": "API versioning lets you evolve an API without breaking existing clients, by exposing multiple versions; common approaches are URL path, query string, custom header, or media-type (content negotiation).",
+            "oneLiner": "Versioning lets you evolve an API without breaking existing clients; common approaches are URL path, query string, header, or media-type.",
             "keyPoints": [
-              "**URL path** — `/api/v1/orders` (most common, visible)",
+              "**URL path** — `/api/v1/orders` (most common)",
               "**Query string** — `?api-version=1.0`",
               "**Header** — `api-version: 1.0`",
-              "**Media type** — `Accept: application/json;v=1.0`",
-              "Use the `Asp.Versioning` package to wire it up"
+              "Use the `Asp.Versioning` package"
             ]
           }
         },
@@ -372,12 +368,12 @@
           "freq": "medium",
           "tags": ["idempotency", "http"],
           "answer": {
-            "oneLiner": "An idempotent operation produces the same result no matter how many times it's repeated; GET, PUT, DELETE, and HEAD are idempotent, while POST is not.",
+            "oneLiner": "An idempotent operation gives the same result no matter how many times it repeats; GET, PUT, DELETE, and HEAD are idempotent, POST is not.",
             "keyPoints": [
               "GET/HEAD — read-only, naturally idempotent",
-              "PUT — replacing with the same body repeatedly yields the same state",
-              "DELETE — deleting twice leaves it deleted (same end state)",
-              "POST — each call typically creates a new resource, so not idempotent"
+              "PUT — same body repeatedly yields the same state",
+              "DELETE — deleting twice ends in the same state",
+              "POST — typically creates a new resource each call"
             ]
           }
         },
@@ -388,11 +384,11 @@
           "freq": "medium",
           "tags": ["model-binding", "validation", "apicontroller"],
           "answer": {
-            "oneLiner": "Model binding maps incoming request data (route, query, body, form, headers) to action-method parameters; validation runs via data annotations and, with `[ApiController]`, automatically returns 400 with the error details on failure.",
+            "oneLiner": "Model binding maps request data (route, query, body, form, headers) to action parameters; with `[ApiController]`, validation runs from data annotations and auto-returns 400 on failure.",
             "keyPoints": [
               "Sources: `[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromForm]`, `[FromHeader]`",
-              "`[ApiController]` enables automatic 400 responses for invalid `ModelState`",
-              "Annotations like `[Required]`, `[Range]`, `[StringLength]` drive validation"
+              "`[ApiController]` auto-returns 400 for invalid `ModelState`",
+              "Annotations like `[Required]`, `[Range]` drive validation"
             ]
           }
         }
@@ -410,12 +406,12 @@
           "freq": "high",
           "tags": ["jwt", "oauth", "security"],
           "answer": {
-            "oneLiner": "OAuth 2.0 is an authorization framework defining how a client obtains an access token from an authorization server; JWT is a common token format used to carry that access token's claims.",
+            "oneLiner": "OAuth 2.0 is the authorization framework defining how a client gets an access token; JWT is a common token *format* used to carry that token's claims.",
             "keyPoints": [
-              "OAuth = the *protocol/flow* (e.g. Authorization Code flow) for getting tokens",
-              "JWT = the *format* of the token (self-contained, signed)",
-              "OpenID Connect sits on top of OAuth to add authentication (identity)",
-              "Your API validates the bearer JWT; it doesn't need to talk to the auth server per request"
+              "OAuth = the *flow* (e.g. Authorization Code) for getting tokens",
+              "JWT = the *format* (self-contained, signed)",
+              "OpenID Connect sits on OAuth to add authentication",
+              "Your API just validates the bearer JWT"
             ],
             "redFlags": ["Saying OAuth and JWT are the same thing"]
           }
@@ -427,12 +423,12 @@
           "freq": "high",
           "tags": ["filters", "middleware"],
           "answer": {
-            "oneLiner": "Middleware operates on the raw HTTP pipeline for every request; filters run inside the MVC/controller pipeline and have access to MVC context (the action, model state, results), so use middleware for cross-cutting HTTP concerns and filters for MVC-specific concerns.",
+            "oneLiner": "Middleware works on the raw HTTP pipeline for every request; filters run inside the MVC pipeline with access to the action and model state — so use middleware for HTTP concerns, filters for MVC concerns.",
             "keyPoints": [
-              "Middleware — earliest, knows nothing about controllers/actions; great for logging, auth, CORS, compression",
-              "Filters — MVC-aware; know the action, arguments, `ModelState`, and the result",
-              "Filter types: Authorization → Resource → Action → Exception → Result",
-              "Use a filter when you need action/model context (e.g. validation, action-level caching)"
+              "Middleware — knows nothing about controllers; great for logging, auth, CORS",
+              "Filters — MVC-aware; know the action, args, `ModelState`, result",
+              "Filter order: Authorization → Resource → Action → Exception → Result",
+              "Use a filter when you need action/model context"
             ]
           }
         },
@@ -446,10 +442,10 @@
             "oneLiner": "Authorization, Resource, Action, Exception, and Result filters — each runs at a specific stage of the MVC action pipeline.",
             "keyPoints": [
               "**Authorization** — runs first, short-circuits unauthorized requests",
-              "**Resource** — runs before/after model binding (good for caching, short-circuiting)",
-              "**Action** — runs before/after the action method executes",
-              "**Exception** — handles unhandled exceptions from the action",
-              "**Result** — runs before/after the action result executes"
+              "**Resource** — around model binding; good for caching",
+              "**Action** — before/after the action method",
+              "**Exception** — handles action exceptions",
+              "**Result** — before/after the result executes"
             ]
           }
         },
@@ -460,14 +456,14 @@
           "freq": "medium",
           "tags": ["action-result", "iactionresult", "status-codes"],
           "answer": {
-            "oneLiner": "Action results (`IActionResult`) represent the HTTP response an action returns, with helper methods that pair the right status code with a payload — `Ok()`, `CreatedAtAction()`, `BadRequest()`, `NotFound()`, `NoContent()`, etc.",
+            "oneLiner": "`IActionResult` represents the HTTP response an action returns, with helpers pairing the right status code and payload — `Ok()`, `CreatedAtAction()`, `BadRequest()`, `NotFound()`, `NoContent()`.",
             "keyPoints": [
-              "`Ok(obj)` → 200, `CreatedAtAction(...)` → 201 with Location header",
-              "`BadRequest()` → 400, `Unauthorized()` → 401, `Forbid()` → 403, `NotFound()` → 404",
+              "`Ok(obj)` → 200, `CreatedAtAction(...)` → 201 with Location",
+              "`BadRequest()` → 400, `Unauthorized()` → 401, `NotFound()` → 404",
               "`NoContent()` → 204 (e.g. successful DELETE)",
-              "Return `ActionResult<T>` to combine a typed body with result helpers"
+              "`ActionResult<T>` combines a typed body with helpers"
             ],
-            "redFlags": ["Returning 200 with an error message instead of the correct 4xx/5xx code"]
+            "redFlags": ["Returning 200 with an error message instead of the right 4xx/5xx"]
           }
         },
         {
@@ -477,11 +473,11 @@
           "freq": "medium",
           "tags": ["cors", "browser", "security"],
           "answer": {
-            "oneLiner": "CORS (Cross-Origin Resource Sharing) is a browser security mechanism that blocks JS calls to a different origin unless the server opts in via response headers; in ASP.NET Core you enable it with a named policy and `UseCors`.",
+            "oneLiner": "CORS is a browser security mechanism that blocks JS calls to a different origin unless the server opts in via headers; in ASP.NET Core you enable it with a named policy and `UseCors`.",
             "keyPoints": [
-              "It's enforced by the **browser**, not the server (other clients ignore it)",
-              "Configure allowed origins, headers, and methods in a policy",
-              "Place `UseCors` after `UseRouting` and before `UseAuthorization`"
+              "Enforced by the **browser**, not the server",
+              "Configure allowed origins, headers, methods in a policy",
+              "Place `UseCors` after `UseRouting`, before `UseAuthorization`"
             ],
             "code": {
               "lang": "csharp",
@@ -496,10 +492,10 @@
           "freq": "medium",
           "tags": ["authorization", "claims", "policy", "roles"],
           "answer": {
-            "oneLiner": "Role-based auth checks a user's role (`[Authorize(Roles=\"Admin\")]`); policy-based auth checks flexible requirements built from claims/logic (`[Authorize(Policy=\"Over18\")]`), which is more expressive and recommended.",
+            "oneLiner": "Role-based checks a user's role (`[Authorize(Roles=\"Admin\")]`); policy-based checks flexible requirements from claims/logic (`[Authorize(Policy=\"Over18\")]`), which is more expressive.",
             "keyPoints": [
               "Roles are a simple, coarse claim",
-              "Policies can combine multiple claims and custom requirement handlers",
+              "Policies combine multiple claims and custom handlers",
               "Policy-based scales better as rules get complex"
             ]
           }
@@ -511,11 +507,11 @@
           "freq": "medium",
           "tags": ["refresh-token", "jwt"],
           "answer": {
-            "oneLiner": "Because access tokens should be short-lived to limit damage if stolen, a long-lived refresh token lets the client silently obtain a new access token without forcing the user to log in again.",
+            "oneLiner": "Access tokens are kept short-lived to limit damage if stolen, so a long-lived refresh token lets the client get a new access token silently without re-login.",
             "keyPoints": [
               "Access token short (minutes), refresh token longer (days)",
-              "Refresh tokens are stored server-side / revocable, unlike stateless JWTs",
-              "Enables logout/revocation that pure JWTs can't do alone"
+              "Refresh tokens are stored server-side and revocable",
+              "Enables logout/revocation that pure JWTs can't"
             ]
           }
         }
