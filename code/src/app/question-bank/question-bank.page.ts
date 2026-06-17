@@ -29,7 +29,7 @@ import { ButtonModule } from 'primeng/button';
       <header class="topbar">
         <div class="topbar-left">
           <button class="menu-btn" (click)="drawerOpen.set(true)">☰ <span class="lbl">Topics</span></button>
-          <span class="app-brand">🚀 <span class="lbl">crackInterview</span></span>
+          <a routerLink="/" class="app-brand">🚀 <span class="lbl">crackInterview</span></a>
         </div>
         <div class="topbar-center">
           <qb-global-search />
@@ -178,6 +178,9 @@ import { ButtonModule } from 'primeng/button';
       font-weight: 700;
       font-size: 1em;
       letter-spacing: -0.01em;
+      color: var(--text);
+      text-decoration: none;
+      &:hover { opacity: 0.8; text-decoration: none; }
     }
 
     .stats-pill {

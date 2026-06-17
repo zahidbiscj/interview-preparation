@@ -19,7 +19,7 @@ type Mode = 'add' | 'review';
       <!-- ── Top bar ── -->
       <header class="topbar">
         <a routerLink="/" class="back-link">← <span class="lbl">Question Bank</span></a>
-        <span class="app-brand">🗂 <span class="lbl">Question Sets</span></span>
+        <a routerLink="/" class="app-brand">🚀 <span class="lbl">crackInterview</span></a>
         <span class="topbar-spacer">
           <a routerLink="/simulator" class="nav-link"><span class="ico">🎯</span><span class="lbl">Simulator</span></a>
           <a routerLink="/dashboard" class="nav-link"><span class="ico">📊</span><span class="lbl">Dashboard</span></a>
@@ -186,7 +186,7 @@ type Mode = 'add' | 'review';
     }
     .back-link { color: var(--text-muted); font-size: 0.85em; }
     .back-link:hover { color: var(--text); text-decoration: none; }
-    .app-brand { font-weight: 700; }
+    .app-brand { font-weight: 700; color: var(--text); text-decoration: none; &:hover { opacity: 0.8; } }
     .topbar-spacer { display: flex; align-items: center; gap: 8px; }
     .nav-link {
       background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));

@@ -191,7 +191,8 @@ export class QuestionBankService {
         subtopicId: subtopic.subtopicId,
         subtopicName: subtopic.subtopicName,
         bookmarked: bookmarks.has(q.id),
-      }));
+      }))
+      .sort((a, b) => (b.bookmarked ? 1 : 0) - (a.bookmarked ? 1 : 0));
   });
 
   async init(): Promise<void> {

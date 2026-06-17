@@ -22,7 +22,7 @@ interface TopicRow {
     <div class="dash-shell" [attr.data-theme]="isDark() ? 'dark' : 'light'">
 
       <header class="topbar">
-        <span class="app-brand">📊 <span class="lbl">Dashboard</span></span>
+        <a routerLink="/" class="app-brand">🚀 <span class="lbl">crackInterview</span></a>
         <nav class="nav">
           <a routerLink="/" class="nav-link"><span class="ico">📚</span><span class="lbl">Bank</span></a>
           <a routerLink="/sets" class="nav-link"><span class="ico">🗂</span><span class="lbl">Sets</span></a>
