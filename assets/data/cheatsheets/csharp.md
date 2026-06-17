@@ -71,9 +71,15 @@ Statically-typed, managed, multi-paradigm language on the .NET CLR — JIT-compi
 ---
 
 ## Async & Threading Essentials
+- **What `await` does** — runs sync up to the await; if the task isn't done it **returns to the caller and releases the thread** to the pool, then a **continuation** (compiler state machine) resumes after I/O. Completed task → no thread hop (sync fast path).
+- **Async ≠ multithreading** — it's **concurrency, not parallelism**. I/O-bound await uses *fewer* threads (none while waiting). CPU-bound → real parallelism via **`Task.Run`/`Parallel`/PLINQ**; `await` alone won't speed up CPU work.
+- **Blocking is the enemy** — `.Result`/`.Wait()` holds a pool thread idle for the whole I/O → **thread-pool starvation** (pool grows only ~1 thread/500ms) → queued requests, latency spikes. Fix: await all the way.
 - **Deadlock** — blocking with `.Result`/`.Wait()` on a thread with a `SynchronizationContext` (UI, classic ASP.NET) → continuation can't resume. Fix: **async all the way**; libraries use `ConfigureAwait(false)`. ASP.NET Core has no SyncContext.
-- **`async void`** — only for event handlers; its exceptions are unobserved and can crash the app. Else `async Task`.
-- **`Task.WhenAll`** — concurrent I/O; **`WhenAny`** — first to finish (timeouts). Start tasks before awaiting.
+- **Return types** — `Task`/`Task<T>` are awaitable + capture exceptions. **`async void`** only for event handlers (exceptions escape onto the context → can crash app). Else always `async Task`.
+- **Exceptions** — stored on the Task, **rethrown (unwrapped) at the `await`** → normal `try/catch` works. `.Result`/`.Wait()` throw **`AggregateException`**. Never-awaited faulted task → `UnobservedTaskException`.
+- **`Task.WhenAll`** — concurrent independent I/O (total ≈ slowest, not sum); throws first exception, holds all in `AggregateException`. **`WhenAny`** — first to finish; race vs `Task.Delay` for timeouts (or `.WaitAsync(TimeSpan)` on .NET 6+), then cancel the loser. Start tasks before awaiting.
+- **Async in a loop** — `await` inside `foreach` = sequential (sum of calls). Collect tasks then `WhenAll` = concurrent — but **throttle** unbounded fan-out (`SemaphoreSlim(n)` or `Parallel.ForEachAsync` with `MaxDegreeOfParallelism`) to avoid rate-limits/connection exhaustion.
+- **`ConfigureAwait(false)`** — skip the captured context. **ASP.NET Core: no-op** (no SyncContext) → don't add it. **Libraries: use it everywhere** (context-agnostic, avoids deadlocking callers). UI continuations must keep default (true).
 - **`volatile`** — orders single field reads/writes; does NOT make `i++` atomic → use **`Interlocked`** (counters) or **`lock`** (multi-step).
 - **`lock`/`Monitor`** (in-process, 1 thread) < **`Mutex`** (cross-process) ; **`SemaphoreSlim`** (N holders, awaitable — use instead of `lock` around `await`).
 - **`ValueTask`** — struct, avoids `Task` alloc on synchronous/cache-hit paths; await once, never block. Default to `Task`.
@@ -109,8 +115,12 @@ Statically-typed, managed, multi-paradigm language on the .NET CLR — JIT-compi
 - [ ] Value vs reference; struct vs class; boxing
 - [ ] GC generations (0/1/2 + LOH); Server vs Workstation GC; Dispose vs finalizer
 - [ ] `Span<T>` vs `Memory<T>`; why Span can't cross `await`
-- [ ] `async`/`await` state machine; `.Result` deadlock; `ConfigureAwait(false)`
-- [ ] `async void` vs `async Task`; `ValueTask`; `IAsyncEnumerable`
+- [ ] `async`/`await` state machine; thread released at await; `.Result` deadlock + thread-pool starvation; `ConfigureAwait(false)` (library vs ASP.NET Core)
+- [ ] async ≠ multithreading (concurrency vs parallelism; I/O vs CPU, `Task.Run`)
+- [ ] `WhenAll` (parallel I/O) vs `WhenAny` (timeout/first); throttled fan-out in loops
+- [ ] async exceptions: rethrown at await vs `AggregateException` from blocking
+- [ ] `CancellationToken` end-to-end (`RequestAborted`, `ThrowIfCancellationRequested`)
+- [ ] `async void` vs `async Task`; `ValueTask`; `IAsyncEnumerable`/`await foreach` streaming
 - [ ] `volatile` vs `Interlocked` vs `lock`/`SemaphoreSlim`; race conditions
 - [ ] Delegates/events/`Func`/`Action`/`Predicate`; multicast semantics
 - [ ] Generics + constraints; covariance/contravariance
