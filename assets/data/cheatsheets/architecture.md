@@ -1,6 +1,7 @@
 # System Design & Architecture Cheat Sheet
 
 Master reference for senior .NET/Azure engineers — scan before walking into the room.
+Mirrors `data/questions/architecture.json` (32 questions across 3 subtopics).
 
 ---
 
@@ -9,9 +10,23 @@ Master reference for senior .NET/Azure engineers — scan before walking into th
 - **Separation of concerns** — each layer/service owns one slice of behaviour, nothing else.
 - **Depend on abstractions**, not concretions (DIP — the D in SOLID).
 - **Design for failure** — assume every network call, disk, and dependency will fail eventually.
-- **CAP theorem** — distributed systems can guarantee only two of: Consistency, Availability, Partition-tolerance. Pick your trade-off explicitly.
-- **Eventual consistency** is acceptable for most read paths; choose strong consistency only where business rules demand it.
-- **Premature optimisation** (including premature decomposition into microservices) is still evil.
+- **CAP theorem** — pick two of Consistency, Availability, Partition-tolerance; choose your trade-off explicitly.
+- **Eventual consistency** is fine for most read paths; reserve strong consistency for rules that demand it.
+- **Premature optimisation** (including premature microservices) is still evil — start with a modular monolith.
+- **Name your trade-offs out loud** — it signals senior-level thinking.
+
+---
+
+## Subtopic Map (what's in the bank)
+
+### 1. Architecture Patterns (`patterns`, 14 Qs)
+Clean/Onion architecture & dependency rule · Repository pattern (+ EF criticism) · Unit of Work · CQRS · Monolith vs microservices · Scalability & resilience (retry, circuit breaker) · API Gateway & service comms · CORS · N-Tier vs Clean · Mediator / MediatR · DDD core concepts · SAGA vs 2PC · Sync vs async comms · Idempotency.
+
+### 2. Real-World Scenarios (`realworld`, 9 Qs)
+Deciding architecture (ADRs) · STAR technical challenge · Framing a perf improvement · Production incident process · Debugging a 200ms→3s regression · Designing a notification system · Choosing a caching strategy · Production memory leak · Scaling a read-heavy API.
+
+### 3. Advanced Patterns (`patterns-advanced`, 9 Qs)
+DDD building blocks · Event sourcing vs CRUD · Cache-aside/write-through/write-behind · Modular monolith vs monolith vs microservices · Multi-tenancy (DB-per-tenant vs shared schema) · API backward compatibility · Bulkhead pattern · Vertical vs horizontal scaling · Zero-downtime deployment.
 
 ---
 
@@ -27,50 +42,41 @@ Master reference for senior .NET/Azure engineers — scan before walking into th
 [ Infrastructure (EF Core, HTTP clients, blob storage, message bus) ]
 ```
 
-**Dependency rule: arrows point inward only.** Infrastructure implements interfaces defined in Domain; Domain knows nothing about EF Core, Azure, or HTTP.
+**Dependency rule: arrows point inward only.** Inner layers define interfaces; Infrastructure implements them. Domain knows nothing about EF Core, Azure, or HTTP.
 
 | Layer | Owns | Must NOT reference |
 |---|---|---|
 | Domain | Entities, value objects, domain events, repo interfaces | EF Core, ASP.NET, any framework |
 | Application | Use cases, command/query handlers, DTOs, validators | Infrastructure details |
 | Infrastructure | DbContext, external APIs, messaging | Application/Domain logic |
-| API / UI | Controllers, minimal-API endpoints, Razor pages | Domain directly (go through Application) |
+| API / UI | Controllers, minimal-API endpoints | Domain directly (go through Application) |
 
-**Key benefit:** swap infrastructure (SQL → Cosmos, RabbitMQ → Service Bus) without touching domain logic. Testability is free because Domain/Application have zero framework dependencies.
+**Payoff:** swap infrastructure (SQL → Cosmos, RabbitMQ → Service Bus) and test domain in milliseconds — zero framework deps.
 
 ---
 
 ## Repository + Unit of Work
 
-**Repository** abstracts the persistence mechanism behind a collection-like interface (`IRepository<T>`). **Unit of Work** groups multiple repository operations into a single transaction (`SaveChangesAsync`).
-
-**Why bother?**
-- Testable use cases — swap real DB for in-memory fake.
-- Single place to apply cross-cutting persistence concerns (soft-delete, audit fields).
-
-**Common criticism with EF Core:**
-> `DbContext` *is already* a Unit of Work and `DbSet<T>` *is already* a Repository. Wrapping them adds indirection without benefit unless you need provider-agnostic tests or truly intend to swap ORMs.
-
-Pragmatic stance for interviews: *"I use the pattern at the Application layer boundary; inside the Infrastructure project I let DbContext play the UoW role directly."*
+- **Repository** = collection-like interface over persistence. **Unit of Work** = group changes into one transaction.
+- **EF Core criticism:** `DbContext` *is already* a UoW and `DbSet<T>` *is already* a Repository — wrapping adds leaky indirection unless you need provider-agnostic tests or strict Clean boundaries.
+- Prefer **specific** repos (`IOrderRepository`) over generic `IRepository<T>` exposing `IQueryable` (leaks EF).
+- **Commit once at the use-case boundary** — never `SaveChanges` per repository call (partial commits).
+- Register `DbContext` as **Scoped** (not thread-safe; not Singleton).
 
 ---
 
 ## CQRS
 
-**Command Query Responsibility Segregation** — separate the write model (commands that mutate state) from the read model (queries that return data).
+Separate the **write model** (commands that mutate, full domain validation) from the **read model** (queries that project straight to DTOs, can bypass domain/aggregates).
 
-**When it helps:**
-- Read/write load are asymmetric (10:1 reads → scale read side independently).
-- Read model needs a different shape than the write model (denormalised views, projections).
-- Event sourcing companion — commands produce events, read model is a projection.
-- Large teams — command and query sides can evolve independently.
+| When it helps | When it's overkill |
+|---|---|
+| Reads dwarf writes (scale read side independently) | Simple CRUD with balanced load |
+| Read shape ≠ write shape (denormalised projections) | Small team / MVP — ceremony slows delivery |
+| Event-sourcing companion | No perf or domain-complexity justification |
+| Large teams evolving sides independently | — |
 
-**When it's overkill:**
-- CRUD apps with balanced read/write — two models means two code paths to maintain.
-- Small teams/MVPs — the ceremony (handlers, mediator, two models) slows delivery.
-- No clear performance or domain complexity justification.
-
-In .NET: **MediatR** + **FluentValidation** is the idiomatic stack. Commands return `Unit` or a result id; queries return DTOs.
+.NET stack: **MediatR** + **FluentValidation** pipeline behaviour. Separate read store ⇒ **eventual consistency** (update via write events). MediatR ≠ CQRS — it only *facilitates* it.
 
 ---
 
@@ -78,81 +84,133 @@ In .NET: **MediatR** + **FluentValidation** is the idiomatic stack. Commands ret
 
 | Dimension | Monolith | Microservices |
 |---|---|---|
-| **Deployment** | Single artefact, simple CI/CD | Per-service pipelines, orchestration overhead |
-| **Dev speed (early)** | Fast — no network, shared types | Slow — cross-service contracts, local orchestration |
-| **Dev speed (scaled team)** | Slows — merge conflicts, coupling | Fast per team when bounded contexts are right |
-| **Scaling** | Scale-out whole app | Scale hotspot services independently |
-| **Reliability** | One process crash = full outage | Partial failures possible; resilience complexity rises |
-| **Data** | Shared DB, easy transactions | Per-service DB, distributed transactions are hard |
-| **Observability** | Simple logs/traces | Requires distributed tracing (OpenTelemetry), correlation IDs |
-| **When to choose** | Greenfield, small team, unclear domain boundaries | Proven domain, independent scaling needs, multiple teams |
+| Deployment | Single artefact, simple CI/CD | Per-service pipelines, orchestration overhead |
+| Dev speed (early) | Fast — no network, shared types | Slow — contracts, local orchestration |
+| Dev speed (scaled team) | Slows — coupling, merge conflicts | Fast per team with right bounded contexts |
+| Scaling | Scale-out whole app | Scale hotspot services independently |
+| Reliability | One crash = full outage | Partial failure; resilience complexity rises |
+| Data | Shared DB, ACID easy | Per-service DB, **distributed txns hard (SAGA)** |
+| Observability | Simple logs/traces | Needs distributed tracing + correlation IDs |
+| Choose when | Greenfield, small team, unclear boundaries | Proven domain, independent scale, multiple teams |
 
-**Recommended path:** start modular monolith → extract services only when a specific scaling or team-autonomy need justifies it.
+**Path:** modular monolith → extract a service only when a specific scaling/team-autonomy need proves itself. A **modular monolith** ≠ big ball of mud — it enforces clean module boundaries with in-process calls.
 
 ---
 
 ## Scalability & Resilience
 
-**Horizontal vs vertical:**
-- **Vertical** (scale-up) — bigger VM. Fast but has a ceiling and creates a single point of failure.
-- **Horizontal** (scale-out) — more instances behind a load balancer. Requires stateless services; session state in Redis/cache, not in-process.
+- **Vertical** (scale-up): bigger box; simple, no code change, but hard ceiling + SPOF.
+- **Horizontal** (scale-out): more instances behind LB; needs **stateless** services — session/cache in **Redis**, not in-process.
+- **Retry:** exponential back-off **+ jitter** (Polly / .NET 8 resilience handler). Transient errors only (5xx/timeout), never 4xx.
+- **Circuit breaker:** Closed → Open (fail fast after N) → Half-Open (probe). Stops cascades.
+- **Ordering:** timeout **wraps** circuit breaker **wraps** retry — innermost runs first.
+- **Bulkhead:** isolate a resource pool per dependency so one slow call can't exhaust everything (complements breaker + timeout).
+- **Idempotency:** client `Idempotency-Key`; store result keyed by it (Redis `SET NX` for races) with TTL. GET/PUT/DELETE idempotent by spec; POST is not.
 
-**Retry:** exponential back-off with jitter (`Polly` in .NET). Retry only on transient errors (5xx, timeout); never on 4xx.
+### Read-heavy scaling ladder (cheapest first)
+CDN → response/output cache → IMemoryCache → Redis → DB **read replica** (mind replication lag) → horizontal API scale → pre-materialised read model.
 
-**Circuit breaker:** after N consecutive failures, open the circuit (fail-fast) for a cooldown window, then half-open to probe recovery. Prevents cascade failure. `Polly.CircuitBreaker` or Resilience HTTP client in .NET 8.
+---
 
-**Idempotency:** design POST/PUT operations so repeating them produces the same result. Use client-supplied `Idempotency-Key` header; store processed keys with TTL. Critical for retry safety.
+## Caching Strategies
 
-**Caching strategy:**
+| Pattern | How it works | Trade-off |
+|---|---|---|
+| **Cache-aside** (default) | App loads on miss, stores, returns; invalidate on write | Simple, lazy; brief staleness, app owns invalidation |
+| **Write-through** | Write cache + DB together | Strong consistency, warm reads; slower writes |
+| **Write-behind** | Write cache now, flush to DB async | Fast writes; **data loss on crash** without durability |
+| **Read-through** | Cache layer fetches from DB on miss | Transparent to app; needs cache-managed loading |
+| **CDN / output cache** | Edge-cache HTTP responses | Great for static/public; no per-user data |
 
-| Pattern | When |
-|---|---|
-| Cache-aside | General reads; app manages cache population |
-| Write-through | Writes go to cache + DB together; read path always warm |
-| Read-through | Cache layer fetches from DB on miss (e.g., Azure Cache for Redis) |
-| CDN / output cache | Static or semi-static HTTP responses |
+Pick layer by **freshness + access pattern + sharing**. **Define invalidation before adding any cache.** Don't cache always-fresh data (financial totals) — optimise the query. Never cache user data under a shared key. Prevent **stampede** with a per-key lock or stale-while-revalidate. Azure: **Cache for Redis** (distributed), **Front Door/CDN** (edge).
 
-On Azure: **Azure Cache for Redis** for distributed cache; **Azure CDN / Front Door** for edge caching.
+---
+
+## Distributed Transactions: SAGA vs 2PC
+
+| | Two-Phase Commit (2PC) | SAGA |
+|---|---|---|
+| Consistency | Strong, immediate | Eventual |
+| Mechanism | Coordinator locks all resources, then commits | Chain of local txns; events trigger next step |
+| Failure handling | Rollback via coordinator | **Compensating transactions** undo prior steps |
+| Coupling/locks | Distributed lock + coordinator bottleneck | No distributed lock |
+| Fit for microservices | Poor (availability hit) | Good (default) |
+
+**Idempotency is mandatory** — retries replay messages, so every step + compensation must dedupe (processed message ID). **Choreography** (events, no coordinator) vs **Orchestration** (central controller, e.g. Azure Durable Functions). Dual-write problem on "save + publish" ⇒ **Transactional Outbox** or CDC.
 
 ---
 
 ## Service Communication
 
-**Synchronous (request/response):**
-- **REST** — ubiquitous, human-readable, HTTP/1.1+. Use when simplicity and broad interoperability matter.
-- **gRPC** — binary (Protobuf), strongly typed, HTTP/2 multiplexing. Use for internal service-to-service where latency and throughput matter.
+- **Sync** — REST (ubiquitous, human-readable) or **gRPC** (binary/Protobuf, HTTP/2, internal low-latency). Use when caller needs an answer now; couples availability, stacks latency across hops.
+- **Async** — **Queue** (Service Bus/Storage Queue: point-to-point, at-least-once, load-levelling) or **Topic/pub-sub** (Service Bus topics, Event Grid, Kafka: loose coupling, fan-out). Always use a **DLQ** for poison messages; sessions for ordering.
+- **API Gateway** (Azure APIM / App Gateway / YARP): single ingress — routing, JWT validation, rate limiting, SSL, aggregation. It's a SPOF → run redundant. **BFF** = gateway per client type. **Gateway** = north-south; **service mesh** = east-west (mTLS).
+- **CORS** governs browser→server only (never server→server / broker consumers). `AddCors` + `UseCors` *before* auth; explicit origins, never `AllowAnyOrigin()` with credentials.
 
-**Asynchronous (fire-and-forget / event-driven):**
-- **Queue** (Azure Service Bus, Storage Queue) — point-to-point, guaranteed at-least-once delivery, natural load levelling.
-- **Event / pub-sub** (Azure Event Grid, Service Bus topics, Kafka) — one publisher, multiple independent consumers; loose coupling.
+---
 
-**API Gateway** (`Azure API Management`): single ingress for external clients. Handles auth (JWT validation), rate limiting, SSL termination, routing to downstream services, API versioning, and observability (metrics, logs).
+## DDD Building Blocks
 
-**Rule of thumb:** prefer async when the caller does not need an immediate result or when the downstream service must be decoupled from caller availability.
+- **Entity** — identity + lifecycle (persists as attributes change).
+- **Value Object** — immutable, equality by value (Money, Address).
+- **Aggregate Root** — single entry point enforcing invariants; reference other aggregates **by ID**; keep small.
+- **Bounded Context** — boundary where one model/language stays consistent; often one per microservice.
+- **Ubiquitous Language** — same terms in code, tests, conversation. **Domain Events** dispatched after `SaveChanges` (via MediatR).
+- **Anti-Corruption Layer** — translates an external model so it doesn't leak into yours.
+- Best for **complex domains**, not CRUD.
+
+---
+
+## Event Sourcing vs CRUD
+
+| | CRUD | Event Sourcing |
+|---|---|---|
+| Storage | Current state, overwritten | Append-only event log = source of truth |
+| History | Lost on update | Full audit + time-travel |
+| State | Read directly | Rebuilt by replaying events (use **snapshots**) |
+| Schema change | Migrate table | **Version + upcast** events |
+| Cost | Low | Steep learning curve, replay cost |
+
+Pairs naturally with CQRS (events feed projections) but **doesn't require** it.
+
+---
+
+## Deployment, Multi-Tenancy & API Evolution
+
+- **Zero-downtime:** rolling (batch replace), **blue-green** (two envs, instant rollback), **canary** (small % first, watch metrics), **feature flags** (ship dark, release ≠ deploy). All need **backward-compatible DB migrations** via **expand/contract**.
+- **Multi-tenancy** (isolation ↔ cost): DB-per-tenant (best isolation, costly) → schema-per-tenant (middle) → shared schema + `TenantId` (cheapest/densest, **enforce EF global query filters** to stop leakage; handle noisy neighbours).
+- **API backward compat:** additive changes are safe; **tolerant reader** ignores unknown fields; version (v1/v2) only for real breaks; deprecate with Sunset headers + migration window before removal.
 
 ---
 
 ## How to Answer a "Design X" Question — 5-Step Framework
 
-1. **Requirements** — clarify functional (what the system does) and non-functional (scale, latency SLA, consistency, availability target). Ask: *"How many users / requests per second at peak?"*
-2. **API contract** — sketch the key endpoints or events. Drives the conversation to concrete interactions before you dive into internals.
-3. **Data model & storage** — choose storage type (relational, document, time-series, blob) and justify. Discuss schema at a high level; call out indexing needs.
-4. **Scale & resilience** — identify bottlenecks (hot DB table, single queue consumer, stateful service). Apply horizontal scaling, caching, async messaging, circuit breakers as appropriate.
-5. **Trade-offs** — every design choice has a cost. Name the trade-offs you accepted (eventual consistency vs complexity, microservices vs operational overhead) and what you would revisit given more time or changed constraints.
+1. **Requirements** — functional + NFRs (scale, latency SLA, consistency, availability). Ask "RPS at peak? read/write ratio?"
+2. **API contract** — sketch key endpoints/events first.
+3. **Data model & storage** — pick store (relational/document/blob/time-series) and justify; call out indexing.
+4. **Scale & resilience** — find bottlenecks; apply caching, horizontal scaling, async messaging, circuit breakers.
+5. **Trade-offs** — name what you accepted (eventual consistency, ops overhead) and what you'd revisit.
 
-**Tip:** draw a box diagram early (even verbally) — components, arrows, and data stores. Interviewers reward structured thinking over exhaustive detail.
+**Tip:** draw a box diagram early — components, arrows, data stores. Structured thinking beats exhaustive detail.
 
 ---
 
 ## Quick-Recall Checklist
 
-- [ ] State the requirements before designing anything.
-- [ ] Dependency rule: outer layers depend on inner; never the reverse.
-- [ ] Repository pattern is optional on top of EF Core — justify if you add it.
-- [ ] CQRS adds value only when read/write profiles diverge meaningfully.
-- [ ] Stateless services = free horizontal scaling. Put state in Redis / DB.
-- [ ] Retry + circuit breaker on every external call (`Polly` / `HttpResilienceHandler`).
-- [ ] Make mutations idempotent; return `409 Conflict` on duplicate key, not 500.
-- [ ] Use async messaging to decouple producers from consumer availability.
-- [ ] API gateway for auth, rate-limiting, and single public ingress.
-- [ ] Name your trade-offs explicitly — it signals senior-level thinking.
+- [ ] State requirements/NFRs before designing anything.
+- [ ] Dependency rule: outer depends on inner, never the reverse; interfaces live in inner layers.
+- [ ] Repository is optional on top of EF Core — justify it; return DTOs/specifics, not `IQueryable`.
+- [ ] Commit once at the use-case boundary; `DbContext` is Scoped.
+- [ ] CQRS only when read/write profiles diverge; separate read store ⇒ eventual consistency.
+- [ ] Start modular monolith; extract services only with a proven need.
+- [ ] Stateless services = free horizontal scaling; state in Redis/DB.
+- [ ] Retry (backoff + jitter) + circuit breaker + timeout (+ bulkhead) on external calls.
+- [ ] Make mutations idempotent (`Idempotency-Key`, Redis `SET NX`, TTL); return 409 on duplicate, not 500.
+- [ ] Distributed txn ⇒ SAGA + compensations, not 2PC; idempotent steps; outbox for dual-write.
+- [ ] Async messaging to decouple availability; always a DLQ.
+- [ ] API gateway for auth/rate-limit/ingress; CORS for browsers only, explicit origins.
+- [ ] Define cache invalidation before caching; never cache user data under a shared key.
+- [ ] Incident: detect → mitigate (roll back first) → root-cause → prevent (blameless post-mortem).
+- [ ] Perf: baseline → profile (don't guess) → fix with trade-off → measure (p95).
+- [ ] Backward-compatible DB migrations (expand/contract) for zero-downtime deploys.
+- [ ] Name your trade-offs explicitly.

@@ -13,7 +13,12 @@
           "level": "junior",
           "type": "comparison",
           "freq": "high",
-          "tags": ["unit", "integration", "e2e", "fundamentals"],
+          "tags": [
+            "unit",
+            "integration",
+            "e2e",
+            "fundamentals"
+          ],
           "answer": {
             "oneLiner": "Unit tests check one piece in isolation, integration tests check several pieces working together, and E2E tests drive the whole system like a real user.",
             "keyPoints": [
@@ -22,13 +27,56 @@
               "E2E: full stack through the UI or public API",
               "Scope and speed go down the list; cost and flakiness go up"
             ],
-            "followUps": [
-              "Where do API/component tests fit?",
-              "Why not just write E2E tests for everything?"
-            ],
             "redFlags": [
               "Calling a test that hits a real DB a 'unit test'",
               "Thinking E2E can replace unit coverage"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Walk me through unit vs integration vs E2E tests."
+              },
+              {
+                "role": "me",
+                "text": "A unit test checks one class or method in isolation with dependencies mocked. Integration wires real collaborators like a DB or HTTP together, and E2E drives the whole system like a real user."
+              },
+              {
+                "role": "interviewer",
+                "text": "So which is fastest and which is most fragile?"
+              },
+              {
+                "role": "me",
+                "text": "Unit tests are fastest and most stable since they run in memory in milliseconds. E2E is the slowest and flakiest because it touches the full stack and the network."
+              },
+              {
+                "role": "interviewer",
+                "text": "Say an order total is wrong in production. Which level catches it cheapest?"
+              },
+              {
+                "role": "me",
+                "text": "A unit test on the pricing logic, because it pins the exact calculation cheaply. I'd reserve E2E for confirming the critical checkout journey works end to end, not for arithmetic."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Where do API/component tests fit?",
+                "a": "In the middle layer: broader than a unit, narrower and faster than full E2E."
+              },
+              {
+                "q": "Why not just write E2E tests for everything?",
+                "a": "They're slow, flaky, and expensive to maintain, so you'd get slow feedback and poor coverage.",
+                "relatedId": "testing-fundamentals-003"
+              },
+              {
+                "q": "What makes a true unit test?",
+                "a": "It hits no DB, network, or real clock and runs in milliseconds.",
+                "relatedId": "testing-fundamentals-011"
+              },
+              {
+                "q": "How do you test a Web API integration in .NET?",
+                "a": "Use WebApplicationFactory plus HttpClient to hit endpoints in-memory.",
+                "relatedId": "testing-dotnet-004"
+              }
             ]
           }
         },
@@ -38,7 +86,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["mocking", "isolation", "dependencies"],
+          "tags": [
+            "mocking",
+            "isolation",
+            "dependencies"
+          ],
           "answer": {
             "oneLiner": "Mocking replaces a real dependency with a controllable fake so you can test code in isolation, fast and deterministically.",
             "keyPoints": [
@@ -47,13 +99,55 @@
               "Lets you assert interactions (was this called?)",
               "Requires dependencies behind interfaces / DI"
             ],
-            "followUps": [
-              "What's the risk of over-mocking?",
-              "How is a mock different from a stub?"
-            ],
             "redFlags": [
               "Mocking everything including the class under test",
               "Tests that only assert mocks were called, never real behavior"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is mocking and why do we do it?"
+              },
+              {
+                "role": "me",
+                "text": "Mocking swaps a real dependency for a controllable fake so I can test code in isolation, fast and deterministically. It removes slow or external things like a DB or network."
+              },
+              {
+                "role": "interviewer",
+                "text": "What else does it buy you beyond speed?"
+              },
+              {
+                "role": "me",
+                "text": "It lets me force edge cases and error paths that are hard to reproduce for real, and I can assert interactions, like verifying a method was actually called."
+              },
+              {
+                "role": "interviewer",
+                "text": "Your service depends on a concrete `SmtpClient` you can't mock. What now?"
+              },
+              {
+                "role": "me",
+                "text": "I'd wrap it behind an `IEmailSender` interface and inject that, then mock the interface. Mocking needs a seam, usually an interface plus DI."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the risk of over-mocking?",
+                "a": "Tests become brittle and assert calls instead of real behavior."
+              },
+              {
+                "q": "How is a mock different from a stub?",
+                "a": "A stub just returns canned data; a mock verifies how it was called.",
+                "relatedId": "testing-dotnet-006"
+              },
+              {
+                "q": "How do you mock in .NET?",
+                "a": "Use Moq or NSubstitute to generate an interface implementation.",
+                "relatedId": "testing-dotnet-002"
+              },
+              {
+                "q": "What if the dependency is a concrete class?",
+                "a": "Wrap it behind an interface you own, then mock the wrapper."
+              }
             ]
           }
         },
@@ -63,7 +157,10 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["test-pyramid", "strategy"],
+          "tags": [
+            "test-pyramid",
+            "strategy"
+          ],
           "answer": {
             "oneLiner": "The test pyramid says have many fast unit tests at the base, fewer integration tests in the middle, and a few E2E tests at the top.",
             "keyPoints": [
@@ -72,13 +169,55 @@
               "Thin layer of E2E for critical user journeys",
               "Avoid the 'ice-cream cone' (mostly slow E2E)"
             ],
-            "followUps": [
-              "What is the testing trophy and how does it differ?",
-              "Why are too many E2E tests a problem?"
-            ],
             "redFlags": [
               "Inverting the pyramid with mostly manual/E2E tests",
               "No unit tests because 'E2E covers it'"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Explain the test pyramid."
+              },
+              {
+                "role": "me",
+                "text": "It says have a wide base of many fast unit tests, fewer integration tests in the middle for wiring and contracts, and a thin tip of E2E for critical journeys."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why that shape and not equal layers?"
+              },
+              {
+                "role": "me",
+                "text": "Lower tests are cheaper, faster, and more reliable, so you want most of your coverage there. The expensive, flaky E2E tests should be few and focused."
+              },
+              {
+                "role": "interviewer",
+                "text": "A team has 200 E2E tests and almost no unit tests. What's wrong?"
+              },
+              {
+                "role": "me",
+                "text": "That's the inverted ice-cream cone: slow, flaky feedback and hard-to-localize failures. I'd push logic coverage down into unit tests and keep only key E2E flows."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is the testing trophy and how does it differ?",
+                "a": "It weights integration tests more heavily, common in frontend where wiring matters most."
+              },
+              {
+                "q": "Why are too many E2E tests a problem?",
+                "a": "They're slow and flaky, so they erode trust and slow the pipeline."
+              },
+              {
+                "q": "How does this map to a CI pipeline?",
+                "a": "Run unit first, then integration, then a small E2E suite.",
+                "relatedId": "testing-frontend-e2e-007"
+              },
+              {
+                "q": "What's at the base of the pyramid?",
+                "a": "Fast, isolated, deterministic unit tests.",
+                "relatedId": "testing-fundamentals-011"
+              }
             ]
           }
         },
@@ -88,7 +227,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["aaa", "structure", "readability"],
+          "tags": [
+            "aaa",
+            "structure",
+            "readability"
+          ],
           "answer": {
             "oneLiner": "AAA structures a test into three clear phases: Arrange the setup, Act by invoking the thing under test, and Assert the outcome.",
             "keyPoints": [
@@ -102,13 +245,54 @@
               "snippet": "[Fact]\npublic void Add_TwoPositives_ReturnsSum()\n{\n    // Arrange\n    var calc = new Calculator();\n\n    // Act\n    var result = calc.Add(2, 3);\n\n    // Assert\n    Assert.Equal(5, result);\n}",
               "note": "Blank lines or comments make the three phases obvious."
             },
-            "followUps": [
-              "How does Given-When-Then relate to AAA?",
-              "Is multiple asserts per test okay?"
-            ],
             "redFlags": [
               "Multiple unrelated Acts in one test",
               "Asserting before the Act has run"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the AAA pattern?"
+              },
+              {
+                "role": "me",
+                "text": "Arrange, Act, Assert. You set up inputs and the system under test, make a single call to the thing being tested, then verify the outcome."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why keep the Act to a single call?"
+              },
+              {
+                "role": "me",
+                "text": "So the test has one clear reason to fail. If there are multiple acts, a failure is ambiguous about which behavior broke."
+              },
+              {
+                "role": "interviewer",
+                "text": "How is AAA different from Given-When-Then?"
+              },
+              {
+                "role": "me",
+                "text": "They map almost one to one: Given is Arrange, When is Act, Then is Assert. GWT is just the BDD vocabulary for the same structure."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How does Given-When-Then relate to AAA?",
+                "a": "It's the same three phases in BDD language: Given/When/Then equals Arrange/Act/Assert."
+              },
+              {
+                "q": "Is multiple asserts per test okay?",
+                "a": "Yes if they verify one logical outcome; avoid asserting unrelated behaviors."
+              },
+              {
+                "q": "What naming pairs well with AAA?",
+                "a": "Method_Scenario_Expected, so the name states what the Assert checks.",
+                "relatedId": "testing-fundamentals-006"
+              },
+              {
+                "q": "How do you keep the phases visible?",
+                "a": "Separate them with blank lines or short comments."
+              }
             ]
           }
         },
@@ -118,7 +302,11 @@
           "level": "mid",
           "type": "scenario",
           "freq": "high",
-          "tags": ["business-logic", "unit", "design"],
+          "tags": [
+            "business-logic",
+            "unit",
+            "design"
+          ],
           "answer": {
             "oneLiner": "Pull the logic into a pure, dependency-free class, inject its collaborators, then cover happy path, edge cases, and error paths with focused tests.",
             "keyPoints": [
@@ -127,13 +315,54 @@
               "Cover happy path + boundaries + invalid input + exceptions",
               "Use parameterized tests (Theory/InlineData) for variations"
             ],
-            "followUps": [
-              "How do you decide what's a boundary worth testing?",
-              "How do you test logic that depends on the current time?"
-            ],
             "redFlags": [
               "Only testing the happy path",
               "Logic so tangled with EF/HTTP it can't be unit tested"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you unit test a piece of business logic?"
+              },
+              {
+                "role": "me",
+                "text": "First I'd pull the logic into a pure, dependency-free class and inject its collaborators via interfaces. Then I'd cover the happy path, boundaries, invalid input, and exceptions."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you handle the variations efficiently?"
+              },
+              {
+                "role": "me",
+                "text": "I use parameterized tests, `[Theory]` with `[InlineData]` in xUnit, so one test method covers many input combinations without copy-paste."
+              },
+              {
+                "role": "interviewer",
+                "text": "The logic decides discounts based on `DateTime.Now`. How do you test that?"
+              },
+              {
+                "role": "me",
+                "text": "I'd inject a time abstraction like `TimeProvider` or `IClock` so the test controls the date deterministically, instead of reading the real system clock."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you decide what's a boundary worth testing?",
+                "a": "Test the values where behavior changes: zero, limits, off-by-one edges."
+              },
+              {
+                "q": "How do you test logic that depends on the current time?",
+                "a": "Inject a clock abstraction like TimeProvider and feed fixed values.",
+                "relatedId": "testing-fundamentals-011"
+              },
+              {
+                "q": "What if the logic is tangled with EF?",
+                "a": "Extract the pure rules out of the data-access code so they're unit-testable."
+              },
+              {
+                "q": "How do you cover many input cases?",
+                "a": "Use [Theory]/[InlineData] parameterized tests."
+              }
             ]
           }
         },
@@ -143,7 +372,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["naming", "readability", "conventions"],
+          "tags": [
+            "naming",
+            "readability",
+            "conventions"
+          ],
           "answer": {
             "oneLiner": "A common convention is MethodUnderTest_Scenario_ExpectedResult, so a failing test name alone tells you what broke and under what conditions.",
             "keyPoints": [
@@ -152,13 +385,54 @@
               "Should_When and Given_When_Then are valid alternatives",
               "The test report should read like requirements"
             ],
-            "followUps": [
-              "What naming do you use for the test class?",
-              "How do you name parameterized test cases clearly?"
-            ],
             "redFlags": [
               "Names like Test1, TestMethod that say nothing",
               "Renaming method but leaving stale test name"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What naming convention do you use for tests?"
+              },
+              {
+                "role": "me",
+                "text": "Usually `MethodUnderTest_Scenario_ExpectedResult`, like `Withdraw_AmountExceedsBalance_ThrowsException`. A failing name alone tells me what broke and under what conditions."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does that matter so much?"
+              },
+              {
+                "role": "me",
+                "text": "The test names become living documentation. A green report reads like a spec of behavior, which helps onboarding and review."
+              },
+              {
+                "role": "interviewer",
+                "text": "You rename a method but the test name still references the old one. What's the impact?"
+              },
+              {
+                "role": "me",
+                "text": "It's misleading documentation and noise in failures. I treat stale test names as a real defect and rename them alongside the production code."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What naming do you use for the test class?",
+                "a": "Name it after the class under test, e.g. CalculatorTests or AddTests."
+              },
+              {
+                "q": "How do you name parameterized test cases clearly?",
+                "a": "Use descriptive InlineData or DisplayName so each case is identifiable."
+              },
+              {
+                "q": "Are alternatives valid?",
+                "a": "Yes, Should_When or Given_When_Then are fine if consistent."
+              },
+              {
+                "q": "How does naming support AAA?",
+                "a": "The Expected part states exactly what the Assert verifies.",
+                "relatedId": "testing-fundamentals-004"
+              }
             ]
           }
         },
@@ -168,7 +442,12 @@
           "level": "senior",
           "type": "scenario",
           "freq": "medium",
-          "tags": ["coverage", "mutation-testing", "stryker", "quality"],
+          "tags": [
+            "coverage",
+            "mutation-testing",
+            "stryker",
+            "quality"
+          ],
           "answer": {
             "oneLiner": "Coverage tells you what code ran, not whether assertions are meaningful; mutation testing (e.g. Stryker.NET) tweaks your code and checks if tests actually catch the change.",
             "keyPoints": [
@@ -177,13 +456,54 @@
               "Mutation testing introduces faults; surviving mutants = weak tests",
               "Stryker.NET reports a mutation score for true quality"
             ],
-            "followUps": [
-              "Why can 100% coverage still ship bugs?",
-              "How do you handle slow mutation runs in CI?"
-            ],
             "redFlags": [
               "Chasing 100% coverage as the only goal",
               "Tests with no assertions just to bump coverage"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you achieve meaningful high coverage?"
+              },
+              {
+                "role": "me",
+                "text": "I target behavior and branches rather than a vanity percentage. Coverage only tells me what code ran, not whether the assertions are meaningful."
+              },
+              {
+                "role": "interviewer",
+                "text": "So how do you check the tests are actually strong?"
+              },
+              {
+                "role": "me",
+                "text": "Mutation testing. A tool like Stryker.NET tweaks the code, flips an operator or return, and checks if a test fails. Surviving mutants mean weak tests."
+              },
+              {
+                "role": "interviewer",
+                "text": "Mutation runs take 40 minutes in CI. How do you handle that?"
+              },
+              {
+                "role": "me",
+                "text": "I'd run it incrementally on changed files for PRs and do a full run nightly, so devs get fast feedback without blocking every merge."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why can 100% coverage still ship bugs?",
+                "a": "Code can execute with no real assertions, so faults go undetected."
+              },
+              {
+                "q": "How do you handle slow mutation runs in CI?",
+                "a": "Run incrementally on diffs per PR and do full runs nightly."
+              },
+              {
+                "q": "What's a mutation score?",
+                "a": "The percentage of injected faults your tests catch."
+              },
+              {
+                "q": "How do you stop coverage gaming?",
+                "a": "Pair the gate with mutation score so assertion-free tests don't pass.",
+                "relatedId": "testing-dotnet-011"
+              }
             ]
           }
         },
@@ -193,7 +513,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["tdd", "red-green-refactor", "process"],
+          "tags": [
+            "tdd",
+            "red-green-refactor",
+            "process"
+          ],
           "answer": {
             "oneLiner": "TDD is red-green-refactor: write a failing test, write just enough code to pass, then refactor. It drives design but adds upfront cost.",
             "keyPoints": [
@@ -202,13 +526,53 @@
               "Drawbacks: slower upfront, learning curve, can over-test trivia",
               "Less suited to exploratory/spike or UI-heavy work"
             ],
-            "followUps": [
-              "What is BDD and how does it relate?",
-              "Where would you NOT use TDD?"
-            ],
             "redFlags": [
               "Claiming TDD means writing tests after the code",
               "Treating TDD as dogma for every line"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is TDD and what are its trade-offs?"
+              },
+              {
+                "role": "me",
+                "text": "It's red-green-refactor: write a failing test, write just enough code to pass, then refactor. The benefits are testable design, fast feedback, and a built-in safety net."
+              },
+              {
+                "role": "interviewer",
+                "text": "And the downsides?"
+              },
+              {
+                "role": "me",
+                "text": "It's slower upfront, has a learning curve, and you can over-test trivia. It's also awkward for exploratory spikes or rapidly changing UI."
+              },
+              {
+                "role": "interviewer",
+                "text": "You're prototyping an idea you might throw away. Would you TDD it?"
+              },
+              {
+                "role": "me",
+                "text": "No, I'd spike first to learn, then add tests once the design stabilizes. TDD is a design tool, not dogma for every line."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is BDD and how does it relate?",
+                "a": "BDD frames tests as behavior in Given-When-Then, often layered on top of TDD."
+              },
+              {
+                "q": "Where would you NOT use TDD?",
+                "a": "Exploratory spikes, throwaway prototypes, or heavy visual UI work."
+              },
+              {
+                "q": "Does TDD mean tests after code?",
+                "a": "No, the failing test is written first by definition."
+              },
+              {
+                "q": "What is the refactor step for?",
+                "a": "Improving design safely while tests stay green."
+              }
             ]
           }
         },
@@ -218,7 +582,11 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "low",
-          "tags": ["contract-testing", "pact", "microservices"],
+          "tags": [
+            "contract-testing",
+            "pact",
+            "microservices"
+          ],
           "answer": {
             "oneLiner": "Contract testing verifies a consumer and provider agree on an API shape without a full integration environment; Pact captures consumer expectations and replays them against the provider.",
             "keyPoints": [
@@ -227,13 +595,53 @@
               "Catches breaking API changes early, decoupled from E2E",
               "Great for microservices with many service-to-service calls"
             ],
-            "followUps": [
-              "How is a Pact broker used in CI?",
-              "Contract testing vs full integration tests?"
-            ],
             "redFlags": [
               "Confusing contract testing with schema validation only",
               "Thinking it replaces all integration testing"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is contract testing and when would you reach for Pact?"
+              },
+              {
+                "role": "me",
+                "text": "It verifies a consumer and provider agree on an API shape without a full integration environment. The consumer generates a contract of expected requests and responses, and the provider verifies it honors it."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why not just run full integration tests?"
+              },
+              {
+                "role": "me",
+                "text": "Contract tests are far cheaper and decoupled. They catch breaking API changes early without spinning up every service together, which is great in a microservices estate."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does this work across teams in CI?"
+              },
+              {
+                "role": "me",
+                "text": "Through a Pact broker: the consumer publishes its contract, and the provider's pipeline pulls and verifies it, so a breaking change fails the provider's build before release."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How is a Pact broker used in CI?",
+                "a": "It stores contracts so providers can pull and verify them, gating releases."
+              },
+              {
+                "q": "Contract testing vs full integration tests?",
+                "a": "Contract tests are cheaper and isolated; they don't replace all integration coverage."
+              },
+              {
+                "q": "Is it the same as schema validation?",
+                "a": "No, it captures real consumer expectations, not just a static schema."
+              },
+              {
+                "q": "Where's it most valuable?",
+                "a": "Microservices with many service-to-service calls."
+              }
             ]
           }
         },
@@ -243,7 +651,11 @@
           "level": "mid",
           "type": "scenario",
           "freq": "high",
-          "tags": ["flaky-tests", "reliability", "ci"],
+          "tags": [
+            "flaky-tests",
+            "reliability",
+            "ci"
+          ],
           "answer": {
             "oneLiner": "Flaky tests pass and fail without code changes, usually from timing, shared state, ordering, or external dependencies; fix the root cause instead of retrying.",
             "keyPoints": [
@@ -252,13 +664,54 @@
               "Control time/randomness via injected abstractions",
               "Quarantine and fix; blind retries hide real bugs"
             ],
-            "followUps": [
-              "How do you detect flakiness in CI?",
-              "When is an auto-retry acceptable?"
-            ],
             "redFlags": [
               "Adding Thread.Sleep to 'fix' flakiness",
               "Just retrying until green and ignoring the cause"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What causes flaky tests?"
+              },
+              {
+                "role": "me",
+                "text": "Usually timing, shared state, test ordering, or external dependencies. Things like race conditions, `Thread.Sleep`, the real clock, or a shared DB that isn't reset between tests."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you fix them?"
+              },
+              {
+                "role": "me",
+                "text": "I fix the root cause: wait on a condition instead of a fixed delay, isolate state per test, and inject time and randomness so they're controllable."
+              },
+              {
+                "role": "interviewer",
+                "text": "A test only fails in CI when run in parallel. What's likely wrong?"
+              },
+              {
+                "role": "me",
+                "text": "Almost certainly shared mutable state, like a static field or a shared database row. I'd isolate per-test data or scope state so parallel runs don't collide."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you detect flakiness in CI?",
+                "a": "Re-run suites and track tests that fail intermittently without code changes."
+              },
+              {
+                "q": "When is an auto-retry acceptable?",
+                "a": "Only as a temporary safety net for known-external flakiness, while you fix the cause."
+              },
+              {
+                "q": "Why is Thread.Sleep bad?",
+                "a": "It's a fixed guess that's either slow or still races; wait on conditions instead."
+              },
+              {
+                "q": "How do you make time deterministic?",
+                "a": "Inject a clock abstraction instead of reading the real system time.",
+                "relatedId": "testing-fundamentals-011"
+              }
             ]
           }
         },
@@ -268,7 +721,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["best-practices", "first", "quality"],
+          "tags": [
+            "best-practices",
+            "first",
+            "quality"
+          ],
           "answer": {
             "oneLiner": "A good unit test is Fast, Isolated, Repeatable/deterministic, and tests one behavior with a clear name (the FIRST principles).",
             "keyPoints": [
@@ -277,13 +734,54 @@
               "Deterministic: same result every run, no clock/network/random",
               "Readable: clear name, one logical assertion of behavior"
             ],
-            "followUps": [
-              "How do you make time-dependent code deterministic?",
-              "What does 'isolated' mean for parallel test runs?"
-            ],
             "redFlags": [
               "Tests that depend on run order",
               "Tests that hit the network or real time"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What makes a good unit test?"
+              },
+              {
+                "role": "me",
+                "text": "I think of FIRST: Fast, Isolated, Repeatable or deterministic, Self-validating, and Timely. Practically that means it runs in milliseconds, tests one behavior, and has a clear name."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does isolated mean in practice?"
+              },
+              {
+                "role": "me",
+                "text": "No dependence on run order and no shared mutable state. Each test sets up its own world so it can run alone or in parallel and still pass."
+              },
+              {
+                "role": "interviewer",
+                "text": "Your test reads `DateTime.Now` and passes today but fails at midnight UTC. Why?"
+              },
+              {
+                "role": "me",
+                "text": "It isn't deterministic, it depends on the real clock. I'd inject a time abstraction and feed a fixed value so it passes every run regardless of when it runs."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you make time-dependent code deterministic?",
+                "a": "Inject a clock like TimeProvider and supply fixed values in the test."
+              },
+              {
+                "q": "What does 'isolated' mean for parallel test runs?",
+                "a": "No shared mutable state, so concurrent tests don't interfere."
+              },
+              {
+                "q": "What does the F in FIRST cover?",
+                "a": "Fast, so the suite runs in seconds and devs run it constantly."
+              },
+              {
+                "q": "How does this relate to flaky tests?",
+                "a": "Violating FIRST, like real clock or shared state, is what makes tests flaky.",
+                "relatedId": "testing-fundamentals-010"
+              }
             ]
           }
         }
@@ -300,7 +798,12 @@
           "level": "junior",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["xunit", "nunit", "mstest", "frameworks"],
+          "tags": [
+            "xunit",
+            "nunit",
+            "mstest",
+            "frameworks"
+          ],
           "answer": {
             "oneLiner": "All three are .NET test frameworks; xUnit is the modern default, NUnit is feature-rich and mature, and MSTest is Microsoft's built-in option.",
             "keyPoints": [
@@ -309,13 +812,54 @@
               "MSTest: ships with VS, [TestMethod]/[DataRow]",
               "xUnit favors constructor/IDisposable over setup attributes"
             ],
-            "followUps": [
-              "Why does xUnit create a new instance per test?",
-              "How do you share expensive setup in xUnit?"
-            ],
             "redFlags": [
               "Insisting one framework is objectively best",
               "Not knowing xUnit has no [SetUp] attribute"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between xUnit, NUnit, and MSTest?"
+              },
+              {
+                "role": "me",
+                "text": "All three are .NET test frameworks. xUnit is the modern default with `[Fact]` and `[Theory]`, NUnit is feature-rich and mature, and MSTest is Microsoft's built-in option that ships with Visual Studio."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's distinctive about xUnit's design?"
+              },
+              {
+                "role": "me",
+                "text": "It creates a new class instance per test and has no `[SetUp]` attribute. You use the constructor for setup and `IDisposable` for teardown, which enforces isolation."
+              },
+              {
+                "role": "interviewer",
+                "text": "You have expensive setup, like a DB container, shared across many xUnit tests. How?"
+              },
+              {
+                "role": "me",
+                "text": "I'd use a class fixture via `IClassFixture<T>`, or a collection fixture to share it across multiple classes, so the costly setup runs once instead of per test."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why does xUnit create a new instance per test?",
+                "a": "To guarantee isolation so tests can't leak state into each other."
+              },
+              {
+                "q": "How do you share expensive setup in xUnit?",
+                "a": "Use IClassFixture or a collection fixture to create it once.",
+                "relatedId": "testing-dotnet-004"
+              },
+              {
+                "q": "Where does setup logic go in xUnit?",
+                "a": "In the constructor, with cleanup in Dispose."
+              },
+              {
+                "q": "Is one framework objectively best?",
+                "a": "No, all are capable; xUnit is just the common modern default."
+              }
             ]
           }
         },
@@ -325,7 +869,12 @@
           "level": "mid",
           "type": "code",
           "freq": "high",
-          "tags": ["moq", "nsubstitute", "mocking", "code"],
+          "tags": [
+            "moq",
+            "nsubstitute",
+            "mocking",
+            "code"
+          ],
           "answer": {
             "oneLiner": "Mocking libraries generate a runtime implementation of an interface; you Setup what methods return and optionally Verify they were called.",
             "keyPoints": [
@@ -339,13 +888,54 @@
               "snippet": "var repo = new Mock<IOrderRepository>();\nrepo.Setup(r => r.GetByIdAsync(42))\n    .ReturnsAsync(new Order { Id = 42, Total = 100m });\n\nvar service = new OrderService(repo.Object);\n\nvar order = await service.GetOrderAsync(42);\n\norder.Total.Should().Be(100m);\nrepo.Verify(r => r.GetByIdAsync(42), Times.Once);",
               "note": "NSubstitute: repo.GetByIdAsync(42).Returns(order); and repo.Received(1).GetByIdAsync(42);"
             },
-            "followUps": [
-              "How do you mock a method that takes any argument?",
-              "How do you make a mock throw an exception?"
-            ],
             "redFlags": [
               "Trying to mock a concrete class with no virtual members",
               "Over-verifying every interaction (brittle tests)"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does mocking work with Moq or NSubstitute?"
+              },
+              {
+                "role": "me",
+                "text": "The library generates a runtime implementation of an interface. In Moq I create a `Mock<IRepo>`, `Setup` what a method returns, inject `.Object`, and then `Verify` calls if needed."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you stub an async method's return value?"
+              },
+              {
+                "role": "me",
+                "text": "`Setup(r => r.GetByIdAsync(42)).ReturnsAsync(order)`. ReturnsAsync wraps the value in a completed Task so the awaited call resolves correctly."
+              },
+              {
+                "role": "interviewer",
+                "text": "You need it to match any id, not just 42. How?"
+              },
+              {
+                "role": "me",
+                "text": "Use an argument matcher: `Setup(r => r.GetByIdAsync(It.IsAny<int>()))`. In NSubstitute that's `Arg.Any<int>()`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you mock a method that takes any argument?",
+                "a": "Use It.IsAny<T>() in Moq or Arg.Any<T>() in NSubstitute."
+              },
+              {
+                "q": "How do you make a mock throw an exception?",
+                "a": "Setup(...).Throws<TException>() or ThrowsAsync for async."
+              },
+              {
+                "q": "Why must the member be virtual to mock a class?",
+                "a": "Moq overrides members, and only virtual/interface members can be overridden."
+              },
+              {
+                "q": "What's the risk of over-verifying?",
+                "a": "Brittle tests that break on harmless refactors.",
+                "relatedId": "testing-dotnet-006"
+              }
             ]
           }
         },
@@ -355,7 +945,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["fluentassertions", "assertions", "readability"],
+          "tags": [
+            "fluentassertions",
+            "assertions",
+            "readability"
+          ],
           "answer": {
             "oneLiner": "FluentAssertions is an assertion library giving readable, chainable assertions and far clearer failure messages than raw Assert calls.",
             "keyPoints": [
@@ -369,13 +963,54 @@
               "snippet": "result.Should().Be(5);\norders.Should().HaveCount(3)\n      .And.Contain(o => o.Total > 50);\nactual.Should().BeEquivalentTo(expected);\nact.Should().Throw<ArgumentException>();",
               "note": "BeEquivalentTo compares by structure, not reference."
             },
-            "followUps": [
-              "Difference between Be and BeEquivalentTo?",
-              "How do you assert on a thrown exception's message?"
-            ],
             "redFlags": [
               "Mixing many assertion styles in one codebase",
               "Using BeEquivalentTo when reference equality is meant"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is FluentAssertions and why use it?"
+              },
+              {
+                "role": "me",
+                "text": "It's an assertion library with readable, chainable assertions like `result.Should().Be(5)`. The big win is far clearer failure messages that show expected versus actual automatically."
+              },
+              {
+                "role": "interviewer",
+                "text": "When would you reach for `BeEquivalentTo` over `Be`?"
+              },
+              {
+                "role": "me",
+                "text": "`Be` checks equality, often reference equality for objects, while `BeEquivalentTo` compares by structure, member by member. So for comparing two object graphs by value I use `BeEquivalentTo`."
+              },
+              {
+                "role": "interviewer",
+                "text": "You assert two DTOs are equal with `Be` and it fails though the data matches. Why?"
+              },
+              {
+                "role": "me",
+                "text": "They're different instances without value equality, so `Be` compares references. I'd switch to `BeEquivalentTo` to compare property values instead."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Difference between Be and BeEquivalentTo?",
+                "a": "Be checks equality/reference; BeEquivalentTo compares structure by member."
+              },
+              {
+                "q": "How do you assert on a thrown exception's message?",
+                "a": "act.Should().Throw<T>().WithMessage(\"...\")."
+              },
+              {
+                "q": "Does it work across frameworks?",
+                "a": "Yes, with xUnit, NUnit, and MSTest."
+              },
+              {
+                "q": "How do you assert thrown exceptions overall?",
+                "a": "Use Should().Throw<T>() or ThrowAsync for async.",
+                "relatedId": "testing-dotnet-008"
+              }
             ]
           }
         },
@@ -385,7 +1020,12 @@
           "level": "mid",
           "type": "code",
           "freq": "high",
-          "tags": ["webapplicationfactory", "integration", "httpclient", "code"],
+          "tags": [
+            "webapplicationfactory",
+            "integration",
+            "httpclient",
+            "code"
+          ],
           "answer": {
             "oneLiner": "WebApplicationFactory<T> boots your app in-memory and hands you an HttpClient, so you can hit real endpoints through the full pipeline without a network.",
             "keyPoints": [
@@ -399,13 +1039,55 @@
               "snippet": "public class OrdersApiTests : IClassFixture<WebApplicationFactory<Program>>\n{\n    private readonly HttpClient _client;\n    public OrdersApiTests(WebApplicationFactory<Program> factory)\n        => _client = factory.CreateClient();\n\n    [Fact]\n    public async Task GetOrder_Returns200()\n    {\n        var resp = await _client.GetAsync(\"/api/orders/42\");\n        resp.StatusCode.Should().Be(HttpStatusCode.OK);\n    }\n}",
               "note": "Use IClassFixture so the factory is created once per test class."
             },
-            "followUps": [
-              "How do you replace the real database for these tests?",
-              "How do you fake authentication in integration tests?"
-            ],
             "redFlags": [
               "Hitting a real external DB without isolation",
               "Recreating the factory per test (slow)"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you write integration tests for a Web API?"
+              },
+              {
+                "role": "me",
+                "text": "`WebApplicationFactory<Program>` boots the app in-memory and gives me an `HttpClient` from `CreateClient()`. I hit real endpoints through the full pipeline, no network needed."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does that actually exercise compared to a unit test?"
+              },
+              {
+                "role": "me",
+                "text": "The real DI container, middleware, routing, model binding, serialization, auth, and filters end to end. It catches wiring bugs a unit test can't see."
+              },
+              {
+                "role": "interviewer",
+                "text": "You don't want these tests hitting the real production database. What do you do?"
+              },
+              {
+                "role": "me",
+                "text": "I override services in `WithWebHostBuilder`, swapping the DbContext for an in-memory or Testcontainers database, so the tests are isolated and repeatable."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you replace the real database for these tests?",
+                "a": "Override the DbContext registration via WithWebHostBuilder, using in-memory or Testcontainers."
+              },
+              {
+                "q": "How do you fake authentication in integration tests?",
+                "a": "Register a test auth handler that injects a known claims principal."
+              },
+              {
+                "q": "Why use IClassFixture with the factory?",
+                "a": "So the factory is created once per class, not per test.",
+                "relatedId": "testing-dotnet-001"
+              },
+              {
+                "q": "What hosts the app under the hood?",
+                "a": "TestServer, which runs in-process with no real port.",
+                "relatedId": "testing-dotnet-005"
+              }
             ]
           }
         },
@@ -415,7 +1097,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["testserver", "in-memory", "aspnetcore"],
+          "tags": [
+            "testserver",
+            "in-memory",
+            "aspnetcore"
+          ],
           "answer": {
             "oneLiner": "TestServer hosts your ASP.NET Core app in-process without binding a real port, letting requests flow through the actual middleware pipeline in memory.",
             "keyPoints": [
@@ -424,13 +1110,54 @@
               "Exercises real middleware, filters, model binding",
               "Pair with in-memory or test-container DB for full coverage"
             ],
-            "followUps": [
-              "How is TestServer different from running on Kestrel?",
-              "Why prefer WebApplicationFactory over raw TestServer?"
-            ],
             "redFlags": [
               "Confusing in-memory hosting with mocking the whole app",
               "Assuming TestServer covers real network behavior"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is TestServer or in-memory testing in ASP.NET Core?"
+              },
+              {
+                "role": "me",
+                "text": "TestServer hosts the app in-process without binding a real port, so requests flow through the actual middleware pipeline in memory. It's fast and isolated."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does that relate to WebApplicationFactory?"
+              },
+              {
+                "role": "me",
+                "text": "WebApplicationFactory uses TestServer under the hood and adds convenient bootstrapping, like `CreateClient()` and easy service overrides, so I usually prefer it over raw TestServer."
+              },
+              {
+                "role": "interviewer",
+                "text": "A bug only appears with real TLS and keep-alive over the wire. Will TestServer catch it?"
+              },
+              {
+                "role": "me",
+                "text": "No, TestServer skips the real TCP stack, so transport-level issues won't show up. For that I'd need a test against Kestrel on a real port."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How is TestServer different from running on Kestrel?",
+                "a": "TestServer skips the real network stack; Kestrel binds a real port."
+              },
+              {
+                "q": "Why prefer WebApplicationFactory over raw TestServer?",
+                "a": "It adds bootstrapping, a ready HttpClient, and easy service overrides.",
+                "relatedId": "testing-dotnet-004"
+              },
+              {
+                "q": "What does TestServer exercise?",
+                "a": "Real middleware, filters, routing, and model binding in-process."
+              },
+              {
+                "q": "What do you pair it with for full coverage?",
+                "a": "An in-memory or Testcontainers database."
+              }
             ]
           }
         },
@@ -440,7 +1167,12 @@
           "level": "mid",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["mock", "fake", "stub", "test-doubles"],
+          "tags": [
+            "mock",
+            "fake",
+            "stub",
+            "test-doubles"
+          ],
           "answer": {
             "oneLiner": "They're all test doubles: a stub returns canned data, a fake is a lightweight working implementation, and a mock verifies interactions.",
             "keyPoints": [
@@ -449,13 +1181,54 @@
               "Mock: records and asserts how it was called",
               "Choose mock only when the interaction itself is the behavior"
             ],
-            "followUps": [
-              "When is a fake better than a mock?",
-              "What is a spy?"
-            ],
             "redFlags": [
               "Using the terms interchangeably with no distinction",
               "Mocking when a simple stub would do"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between a mock, a fake, and a stub?"
+              },
+              {
+                "role": "me",
+                "text": "They're all test doubles. A stub returns canned data, a fake is a lightweight working implementation like an in-memory DB, and a mock verifies interactions, how it was called."
+              },
+              {
+                "role": "interviewer",
+                "text": "When do you actually need a mock?"
+              },
+              {
+                "role": "me",
+                "text": "Only when the interaction itself is the behavior, like confirming an email was sent or an event published. Otherwise a stub or fake is simpler and less brittle."
+              },
+              {
+                "role": "interviewer",
+                "text": "You're testing a repository-backed service and want realistic query behavior. Mock or fake?"
+              },
+              {
+                "role": "me",
+                "text": "A fake, like an in-memory repository, because it gives real-ish query logic without asserting call counts, which keeps the test robust to refactors."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "When is a fake better than a mock?",
+                "a": "When you want working behavior without coupling to exact call sequences."
+              },
+              {
+                "q": "What is a spy?",
+                "a": "A stub that also records how it was called for later assertions."
+              },
+              {
+                "q": "What library generates these in .NET?",
+                "a": "Moq or NSubstitute for stubs and mocks.",
+                "relatedId": "testing-dotnet-002"
+              },
+              {
+                "q": "Why not mock everything?",
+                "a": "Over-mocking makes tests assert calls instead of behavior."
+              }
             ]
           }
         },
@@ -465,7 +1238,11 @@
           "level": "mid",
           "type": "code",
           "freq": "high",
-          "tags": ["async", "await", "task"],
+          "tags": [
+            "async",
+            "await",
+            "task"
+          ],
           "answer": {
             "oneLiner": "Make the test method async Task and await the call; never use .Result or .Wait() which can deadlock and hide exceptions.",
             "keyPoints": [
@@ -479,13 +1256,54 @@
               "snippet": "[Fact]\npublic async Task GetOrder_NotFound_Throws()\n{\n    repo.Setup(r => r.GetByIdAsync(99))\n        .ReturnsAsync((Order?)null);\n\n    Func<Task> act = () => service.GetOrderAsync(99);\n\n    await act.Should().ThrowAsync<NotFoundException>();\n}",
               "note": "Return Task (not void) so the framework awaits failures."
             },
-            "followUps": [
-              "Why is async void bad for tests?",
-              "How do you test code that uses Task.Delay?"
-            ],
             "redFlags": [
               "async void test methods",
               "Blocking with .Result causing deadlocks/flakiness"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you test asynchronous code in .NET?"
+              },
+              {
+                "role": "me",
+                "text": "I make the test `async Task` and await the call to the system under test. I never use `.Result` or `.Wait()` because they can deadlock and swallow exceptions."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you stub async dependencies?"
+              },
+              {
+                "role": "me",
+                "text": "`ReturnsAsync(...)` in Moq, or `Task.FromResult(...)`. For assertions on thrown exceptions I use `await act.Should().ThrowAsync<T>()`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why exactly is an `async void` test method dangerous?"
+              },
+              {
+                "role": "me",
+                "text": "The framework can't await it, so failures and exceptions may be missed and the test can report green even when it actually failed. Always return `Task`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is async void bad for tests?",
+                "a": "The runner can't await it, so failures get lost and tests false-pass."
+              },
+              {
+                "q": "How do you test code that uses Task.Delay?",
+                "a": "Abstract the delay or use fake time so the test doesn't really wait."
+              },
+              {
+                "q": "How do you assert async exceptions?",
+                "a": "await act.Should().ThrowAsync<T>() or Assert.ThrowsAsync<T>.",
+                "relatedId": "testing-dotnet-008"
+              },
+              {
+                "q": "Why avoid .Result in tests?",
+                "a": "It can deadlock and hides the real exception in an AggregateException."
+              }
             ]
           }
         },
@@ -495,7 +1313,10 @@
           "level": "junior",
           "type": "code",
           "freq": "high",
-          "tags": ["exceptions", "assertions"],
+          "tags": [
+            "exceptions",
+            "assertions"
+          ],
           "answer": {
             "oneLiner": "Capture the action and assert it throws the expected type, then optionally check the message or parameters.",
             "keyPoints": [
@@ -509,13 +1330,54 @@
               "snippet": "Action act = () => calc.Divide(10, 0);\n\nact.Should().Throw<DivideByZeroException>();\n\n// Or xUnit native:\nAssert.Throws<DivideByZeroException>(() => calc.Divide(10, 0));",
               "note": "Pass the delegate, not the already-invoked result."
             },
-            "followUps": [
-              "How do you assert on the exception's inner exception?",
-              "How do you test exceptions in async methods?"
-            ],
             "redFlags": [
               "Invoking the method before passing it to Throws",
               "Using try/catch with empty body to 'test' throws"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you test that a method throws an exception?"
+              },
+              {
+                "role": "me",
+                "text": "I capture the action as a delegate and assert it throws the expected type, then check the message or parameters if they matter. The key is passing the delegate, not the already-invoked result."
+              },
+              {
+                "role": "interviewer",
+                "text": "Show me both an xUnit and a FluentAssertions style."
+              },
+              {
+                "role": "me",
+                "text": "xUnit: `Assert.Throws<DivideByZeroException>(() => calc.Divide(10,0))`. FluentAssertions: `act.Should().Throw<DivideByZeroException>().WithMessage(...)`."
+              },
+              {
+                "role": "interviewer",
+                "text": "The method is async and throws. How does that change things?"
+              },
+              {
+                "role": "me",
+                "text": "I use the async variants: `await Assert.ThrowsAsync<T>(...)` or `await act.Should().ThrowAsync<T>()`, awaiting so the thrown exception is actually observed."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you assert on the exception's inner exception?",
+                "a": "Use .WithInnerException<T>() or inspect the caught exception's InnerException."
+              },
+              {
+                "q": "How do you test exceptions in async methods?",
+                "a": "Use ThrowsAsync / ThrowAsync and await the assertion.",
+                "relatedId": "testing-dotnet-007"
+              },
+              {
+                "q": "Why pass a delegate, not the result?",
+                "a": "So the assertion controls invocation and can catch the throw."
+              },
+              {
+                "q": "Should you assert just that it threw?",
+                "a": "No, also check the type and relevant details."
+              }
             ]
           }
         },
@@ -525,7 +1387,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "low",
-          "tags": ["autofixture", "bogus", "test-data"],
+          "tags": [
+            "autofixture",
+            "bogus",
+            "test-data"
+          ],
           "answer": {
             "oneLiner": "AutoFixture auto-generates anonymous objects so tests focus on what matters, while Bogus produces realistic fake data (names, emails) for richer fixtures.",
             "keyPoints": [
@@ -539,13 +1405,53 @@
               "snippet": "var fixture = new Fixture();\nvar order = fixture.Build<Order>()\n                   .With(o => o.Total, 100m)\n                   .Create();\n\nvar faker = new Faker<Customer>()\n    .RuleFor(c => c.Email, f => f.Internet.Email());",
               "note": "Set only meaningful fields; let the library fill the rest."
             },
-            "followUps": [
-              "What is AutoFixture's AutoMoq integration?",
-              "Risk of auto-generated data hiding intent?"
-            ],
             "redFlags": [
               "Auto-generating data where exact values matter to the assertion",
               "Random data that makes failures non-reproducible"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you generate test data with AutoFixture or Bogus?"
+              },
+              {
+                "role": "me",
+                "text": "AutoFixture auto-fills anonymous objects with `fixture.Create<Order>()` so the test only sets fields it cares about. Bogus produces realistic fake data like names and emails via `Faker<T>`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why bother instead of hand-building objects?"
+              },
+              {
+                "role": "me",
+                "text": "It reduces brittle, noisy setup. I customize only the meaningful fields and let the library fill the rest, so the test's intent is clearer."
+              },
+              {
+                "role": "interviewer",
+                "text": "A test asserts `order.Total == 100` but uses an auto-generated Total. What happens?"
+              },
+              {
+                "role": "me",
+                "text": "It'll fail or pass unpredictably because the value is random. When an exact value matters to the assertion, I set it explicitly with `.With(o => o.Total, 100m)`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is AutoFixture's AutoMoq integration?",
+                "a": "It auto-creates mocks for dependencies so the SUT can be built with one call."
+              },
+              {
+                "q": "Risk of auto-generated data hiding intent?",
+                "a": "Random values can mask which inputs actually drive the assertion."
+              },
+              {
+                "q": "How do you keep failures reproducible?",
+                "a": "Pin meaningful fields explicitly and avoid asserting on random values."
+              },
+              {
+                "q": "What does Bogus add over AutoFixture?",
+                "a": "Realistic, domain-shaped values like emails and addresses."
+              }
             ]
           }
         },
@@ -555,7 +1461,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["coverlet", "reportgenerator", "coverage"],
+          "tags": [
+            "coverlet",
+            "reportgenerator",
+            "coverage"
+          ],
           "answer": {
             "oneLiner": "Coverlet collects coverage during dotnet test, and ReportGenerator turns the raw output into readable HTML/summary reports.",
             "keyPoints": [
@@ -569,13 +1479,54 @@
               "snippet": "// dotnet test --collect:\"XPlat Code Coverage\"\n// reportgenerator -reports:**/coverage.cobertura.xml \\\n//   -targetdir:coveragereport -reporttypes:Html",
               "note": "Coverlet for collection, ReportGenerator for presentation."
             },
-            "followUps": [
-              "Difference between line and branch coverage?",
-              "How do you exclude generated code from coverage?"
-            ],
             "redFlags": [
               "Reporting line coverage as a quality guarantee",
               "No coverage in CI at all"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What tooling do you use to measure coverage in .NET?"
+              },
+              {
+                "role": "me",
+                "text": "Coverlet collects coverage during `dotnet test`, typically via `--collect \"XPlat Code Coverage\"`, and ReportGenerator turns the raw Cobertura output into readable HTML."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the difference between line and branch coverage?"
+              },
+              {
+                "role": "me",
+                "text": "Line coverage says a line ran; branch coverage says each path through a condition ran. Branch is stricter, so an `if` with an untested else shows as a gap."
+              },
+              {
+                "role": "interviewer",
+                "text": "Auto-generated EF migrations are tanking your coverage number. What do you do?"
+              },
+              {
+                "role": "me",
+                "text": "I exclude generated code with `[ExcludeFromCodeCoverage]` or Coverlet exclude filters, so the metric reflects code I actually own and test."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Difference between line and branch coverage?",
+                "a": "Line means executed; branch means every decision path was taken."
+              },
+              {
+                "q": "How do you exclude generated code from coverage?",
+                "a": "Use [ExcludeFromCodeCoverage] or Coverlet exclude filters."
+              },
+              {
+                "q": "What format does Coverlet emit?",
+                "a": "Cobertura or OpenCover XML."
+              },
+              {
+                "q": "How do you enforce a minimum in CI?",
+                "a": "Set a Coverlet threshold that fails the build.",
+                "relatedId": "testing-dotnet-011"
+              }
             ]
           }
         },
@@ -585,7 +1536,11 @@
           "level": "senior",
           "type": "scenario",
           "freq": "medium",
-          "tags": ["coverage", "ci", "quality-gates"],
+          "tags": [
+            "coverage",
+            "ci",
+            "quality-gates"
+          ],
           "answer": {
             "oneLiner": "Set a minimum coverage threshold that fails the build when not met, ideally on changed/diff coverage rather than the whole repo.",
             "keyPoints": [
@@ -594,13 +1549,54 @@
               "Wire into the pipeline so it blocks merges",
               "Pair with mutation score to avoid gaming the gate"
             ],
-            "followUps": [
-              "Why is diff coverage often better than total coverage?",
-              "How do you avoid teams writing assertion-free tests to pass the gate?"
-            ],
             "redFlags": [
               "A hard 100% gate that encourages junk tests",
               "Gate exists but never actually blocks the build"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you enforce a coverage gate in CI?"
+              },
+              {
+                "role": "me",
+                "text": "I set a minimum threshold that fails the build when not met, for example Coverlet's `/p:Threshold=80`. Ideally I gate on changed or diff coverage rather than the whole repo."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why diff coverage over total coverage?"
+              },
+              {
+                "role": "me",
+                "text": "So legacy untested code doesn't block every PR. New and changed lines must be covered, which steadily improves quality without an impossible cleanup mandate."
+              },
+              {
+                "role": "interviewer",
+                "text": "Devs start writing assertion-free tests just to hit the number. How do you respond?"
+              },
+              {
+                "role": "me",
+                "text": "I'd pair the gate with a mutation score so coverage without real assertions still fails, and reinforce it in code review. The gate measures behavior, not just executed lines."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is diff coverage often better than total coverage?",
+                "a": "It enforces quality on new code without blocking PRs on legacy gaps."
+              },
+              {
+                "q": "How do you avoid teams writing assertion-free tests to pass the gate?",
+                "a": "Add a mutation-score gate and catch it in review.",
+                "relatedId": "testing-fundamentals-007"
+              },
+              {
+                "q": "What's the risk of a hard 100% gate?",
+                "a": "It encourages junk tests written just to pass."
+              },
+              {
+                "q": "Where does the gate live?",
+                "a": "In the pipeline, blocking merges when the threshold isn't met."
+              }
             ]
           }
         }
@@ -617,7 +1613,12 @@
           "level": "mid",
           "type": "code",
           "freq": "high",
-          "tags": ["jest", "react-testing-library", "rtl", "code"],
+          "tags": [
+            "jest",
+            "react-testing-library",
+            "rtl",
+            "code"
+          ],
           "answer": {
             "oneLiner": "Jest is the test runner/assertion engine and React Testing Library renders components and queries them the way a user would, by role and text rather than implementation.",
             "keyPoints": [
@@ -631,13 +1632,54 @@
               "snippet": "import { render, screen } from '@testing-library/react';\n\ntest('shows the greeting', () => {\n  render(<Greeting name=\"Sam\" />);\n  expect(screen.getByText('Hello, Sam')).toBeInTheDocument();\n});",
               "note": "Query by accessible role/text to keep tests resilient to refactors."
             },
-            "followUps": [
-              "Why does RTL discourage testing implementation details?",
-              "Difference between getBy, queryBy, and findBy?"
-            ],
             "redFlags": [
               "Asserting on component state or instance methods",
               "Heavy use of container.querySelector with CSS selectors"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you test React components with Jest and React Testing Library?"
+              },
+              {
+                "role": "me",
+                "text": "Jest is the runner and assertion engine. RTL renders the component and queries it like a user would, by role, label, or text, then I assert on what the user sees."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does RTL push you away from implementation details?"
+              },
+              {
+                "role": "me",
+                "text": "Because testing state or internal methods makes tests break on refactors that don't change behavior. Querying by accessible role and text keeps tests resilient and closer to real usage."
+              },
+              {
+                "role": "interviewer",
+                "text": "A list item appears only after an async fetch. How do you query it?"
+              },
+              {
+                "role": "me",
+                "text": "I use `findBy*`, like `await screen.findByText(...)`, which retries until the element appears, instead of `getBy` which fails immediately."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why does RTL discourage testing implementation details?",
+                "a": "So tests survive refactors and reflect real user behavior."
+              },
+              {
+                "q": "Difference between getBy, queryBy, and findBy?",
+                "a": "getBy throws if missing, queryBy returns null, findBy waits for async appearance."
+              },
+              {
+                "q": "How do you simulate user actions?",
+                "a": "Use @testing-library/user-event with awaited calls.",
+                "relatedId": "testing-frontend-e2e-002"
+              },
+              {
+                "q": "What should you avoid querying by?",
+                "a": "CSS classes or test-specific internals."
+              }
             ]
           }
         },
@@ -647,7 +1689,12 @@
           "level": "mid",
           "type": "code",
           "freq": "high",
-          "tags": ["user-event", "interaction", "rtl", "code"],
+          "tags": [
+            "user-event",
+            "interaction",
+            "rtl",
+            "code"
+          ],
           "answer": {
             "oneLiner": "@testing-library/user-event simulates realistic user actions (typing, clicking, tabbing) more faithfully than fireEvent, and its methods are async.",
             "keyPoints": [
@@ -661,13 +1708,54 @@
               "snippet": "import userEvent from '@testing-library/user-event';\n\ntest('submits the form', async () => {\n  const user = userEvent.setup();\n  render(<LoginForm />);\n  await user.type(screen.getByLabelText('Email'), 'a@b.com');\n  await user.click(screen.getByRole('button', { name: /submit/i }));\n  expect(await screen.findByText('Welcome')).toBeInTheDocument();\n});",
               "note": "Always await user-event calls; they return promises."
             },
-            "followUps": [
-              "Why is user-event preferred over fireEvent?",
-              "How do you test debounced inputs?"
-            ],
             "redFlags": [
               "Forgetting to await user-event actions",
               "Mixing fireEvent and user-event inconsistently"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you test user interactions with user-event?"
+              },
+              {
+                "role": "me",
+                "text": "I call `userEvent.setup()` then `await user.click()` or `user.type()`. It simulates realistic action sequences more faithfully than `fireEvent`, and all its methods are async."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why prefer user-event over fireEvent?"
+              },
+              {
+                "role": "me",
+                "text": "`fireEvent` dispatches a single raw event, but `user-event` fires the full sequence a real user triggers, like focus, keydown, input, and change, so it catches more realistic bugs."
+              },
+              {
+                "role": "interviewer",
+                "text": "You have a search box debounced by 300ms. How do you test it fires once?"
+              },
+              {
+                "role": "me",
+                "text": "I'd use fake timers, type the input, advance the timers past the debounce, then assert the handler ran once with the final value."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is user-event preferred over fireEvent?",
+                "a": "It fires the full realistic event sequence, not a single raw event."
+              },
+              {
+                "q": "How do you test debounced inputs?",
+                "a": "Use fake timers and advance past the debounce window."
+              },
+              {
+                "q": "What's a common mistake with user-event?",
+                "a": "Forgetting to await its calls, which return promises."
+              },
+              {
+                "q": "How do you await resulting UI changes?",
+                "a": "Combine with findBy* queries.",
+                "relatedId": "testing-frontend-e2e-001"
+              }
             ]
           }
         },
@@ -677,7 +1765,11 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["playwright", "cypress", "e2e"],
+          "tags": [
+            "playwright",
+            "cypress",
+            "e2e"
+          ],
           "answer": {
             "oneLiner": "Both are modern E2E tools; Playwright is cross-browser with true parallelism and multi-tab support, while Cypress has a great DX and time-travel debugging but is more single-browser focused.",
             "keyPoints": [
@@ -686,13 +1778,54 @@
               "Playwright auto-waits; Cypress also retries assertions",
               "Cypress historically weaker at multi-tab/multi-origin"
             ],
-            "followUps": [
-              "How do both handle auto-waiting for elements?",
-              "Which would you pick for cross-browser coverage?"
-            ],
             "redFlags": [
               "Adding fixed sleeps instead of relying on auto-wait",
               "Not knowing either supports CI parallelization"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Playwright vs Cypress for E2E. How do they compare?"
+              },
+              {
+                "role": "me",
+                "text": "Both are modern E2E tools. Playwright is cross-browser across Chromium, Firefox, and WebKit with true parallelism and multi-tab support. Cypress has excellent DX and time-travel debugging but is more single-browser focused."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do they handle waiting for elements?"
+              },
+              {
+                "role": "me",
+                "text": "Both auto-wait. Playwright waits for elements to be actionable before interacting, and Cypress retries assertions and commands. So you rarely need fixed sleeps in either."
+              },
+              {
+                "role": "interviewer",
+                "text": "You need to verify a flow across two tabs and a third-party origin. Which do you pick?"
+              },
+              {
+                "role": "me",
+                "text": "Playwright, because it handles multiple tabs and cross-origin navigation natively, which Cypress historically struggled with."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do both handle auto-waiting for elements?",
+                "a": "Playwright waits for actionability; Cypress retries commands and assertions."
+              },
+              {
+                "q": "Which would you pick for cross-browser coverage?",
+                "a": "Playwright, since it supports Chromium, Firefox, and WebKit."
+              },
+              {
+                "q": "Why avoid fixed sleeps in E2E?",
+                "a": "Auto-wait is more reliable; sleeps cause flakiness and slowness.",
+                "relatedId": "testing-fundamentals-010"
+              },
+              {
+                "q": "Do both support CI parallelization?",
+                "a": "Yes, both can shard and run tests in parallel."
+              }
             ]
           }
         },
@@ -702,7 +1835,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["snapshot", "jest", "regression"],
+          "tags": [
+            "snapshot",
+            "jest",
+            "regression"
+          ],
           "answer": {
             "oneLiner": "Snapshot testing serializes rendered output and compares it to a stored snapshot to catch unintended changes; it's handy for stable UI but easily becomes noise if overused.",
             "keyPoints": [
@@ -711,13 +1848,54 @@
               "Devs rubber-stamp updates, defeating the purpose",
               "Prefer small, focused snapshots over whole pages"
             ],
-            "followUps": [
-              "What is inline snapshot testing?",
-              "How do you keep snapshots from becoming noise?"
-            ],
             "redFlags": [
               "Blindly running --updateSnapshot on every failure",
               "Giant page-level snapshots no one reviews"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is snapshot testing and when is it useful?"
+              },
+              {
+                "role": "me",
+                "text": "It serializes rendered output and compares it to a stored snapshot to catch unintended changes. It's handy for stable UI where you want to detect accidental markup changes."
+              },
+              {
+                "role": "interviewer",
+                "text": "When does it become harmful?"
+              },
+              {
+                "role": "me",
+                "text": "When snapshots are huge or change constantly, devs just rubber-stamp `--updateSnapshot` on every failure, which defeats the purpose. I prefer small, focused snapshots."
+              },
+              {
+                "role": "interviewer",
+                "text": "A snapshot test fails on every PR because it includes generated ids and timestamps. Fix?"
+              },
+              {
+                "role": "me",
+                "text": "I'd stabilize the output, mocking the clock and ids, or use property matchers so volatile fields are ignored, leaving a meaningful, stable snapshot."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is inline snapshot testing?",
+                "a": "The snapshot is stored inline in the test file rather than a separate file."
+              },
+              {
+                "q": "How do you keep snapshots from becoming noise?",
+                "a": "Keep them small and focused, and stabilize volatile values."
+              },
+              {
+                "q": "Why is blindly updating snapshots bad?",
+                "a": "It hides real regressions behind a rubber stamp."
+              },
+              {
+                "q": "What's better for behavior than snapshots?",
+                "a": "Querying by role/text and asserting outcomes.",
+                "relatedId": "testing-frontend-e2e-001"
+              }
             ]
           }
         },
@@ -727,7 +1905,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "low",
-          "tags": ["storybook", "components", "isolation"],
+          "tags": [
+            "storybook",
+            "components",
+            "isolation"
+          ],
           "answer": {
             "oneLiner": "Storybook renders components in isolation across their states as 'stories', which doubles as living documentation and a base for visual and interaction tests.",
             "keyPoints": [
@@ -736,13 +1918,53 @@
               "Play functions enable interaction tests inside stories",
               "Pairs with visual regression tools (Chromatic)"
             ],
-            "followUps": [
-              "What is a Storybook play function?",
-              "How does Storybook support visual regression testing?"
-            ],
             "redFlags": [
               "Treating Storybook as a replacement for unit tests",
               "Stories that never cover edge/error states"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does Storybook help with component testing and isolation?"
+              },
+              {
+                "role": "me",
+                "text": "It renders components in isolation across their states as stories, so you can develop and review UI without running the whole app. It doubles as living documentation."
+              },
+              {
+                "role": "interviewer",
+                "text": "Can it do more than just display components?"
+              },
+              {
+                "role": "me",
+                "text": "Yes, play functions run interaction tests inside a story, and it pairs with visual regression tools like Chromatic to catch unintended visual changes."
+              },
+              {
+                "role": "interviewer",
+                "text": "A teammate says Storybook replaces their unit tests. Do you agree?"
+              },
+              {
+                "role": "me",
+                "text": "No. Storybook is great for isolation, docs, and visual or interaction checks, but it doesn't replace fast logic-focused unit tests. They complement each other."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is a Storybook play function?",
+                "a": "A script attached to a story that drives interactions for testing."
+              },
+              {
+                "q": "How does Storybook support visual regression testing?",
+                "a": "It feeds tools like Chromatic that diff rendered story snapshots."
+              },
+              {
+                "q": "What is a story?",
+                "a": "A component rendered in one specific state."
+              },
+              {
+                "q": "Does it replace unit tests?",
+                "a": "No, it complements them; it's for isolation and visuals."
+              }
             ]
           }
         },
@@ -752,7 +1974,12 @@
           "level": "senior",
           "type": "scenario",
           "freq": "low",
-          "tags": ["load-testing", "k6", "azure-load-testing", "performance"],
+          "tags": [
+            "load-testing",
+            "k6",
+            "azure-load-testing",
+            "performance"
+          ],
           "answer": {
             "oneLiner": "Load testing drives realistic concurrent traffic against the system to measure latency, throughput, and breaking points; k6 scripts scenarios in JS, and Azure Load Testing scales them in the cloud.",
             "keyPoints": [
@@ -766,13 +1993,54 @@
               "snippet": "import http from 'k6/http';\nimport { check } from 'k6';\nexport const options = {\n  vus: 50, duration: '30s',\n  thresholds: { http_req_duration: ['p(95)<500'] },\n};\nexport default function () {\n  const res = http.get('https://api.example.com/orders');\n  check(res, { 'status 200': r => r.status === 200 });\n}",
               "note": "Thresholds turn a load test into a pass/fail CI gate."
             },
-            "followUps": [
-              "Difference between load, stress, and soak testing?",
-              "Why test against a production-like environment?"
-            ],
             "redFlags": [
               "Load testing on a tiny dev box and trusting the numbers",
               "No thresholds, just eyeballing graphs"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you load test a system with something like k6?"
+              },
+              {
+                "role": "me",
+                "text": "I drive realistic concurrent traffic to measure latency, throughput, and the breaking point. k6 scripts scenarios in JavaScript with virtual users, and Azure Load Testing scales that in the cloud."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you turn a load test into a pass/fail gate?"
+              },
+              {
+                "role": "me",
+                "text": "With thresholds, like p95 latency under 500ms and error rate under 1%. If a threshold is breached, the run fails, so it works as a CI gate, not just graphs."
+              },
+              {
+                "role": "interviewer",
+                "text": "Someone runs the load test against a dev box and reports the numbers. Trust them?"
+              },
+              {
+                "role": "me",
+                "text": "No. Dev hardware and config differ from production, so the numbers are misleading. I'd test against a production-like environment to get meaningful results."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Difference between load, stress, and soak testing?",
+                "a": "Load tests expected traffic, stress finds the breaking point, soak runs long to find leaks."
+              },
+              {
+                "q": "Why test against a production-like environment?",
+                "a": "Dev hardware and config skew latency and throughput numbers."
+              },
+              {
+                "q": "What defines a k6 scenario?",
+                "a": "Virtual users, ramp-up, duration, and thresholds."
+              },
+              {
+                "q": "Where does load testing fit in CI?",
+                "a": "Later stages against a deployed prod-like env, not every commit.",
+                "relatedId": "testing-frontend-e2e-007"
+              }
             ]
           }
         },
@@ -782,7 +2050,11 @@
           "level": "senior",
           "type": "design",
           "freq": "medium",
-          "tags": ["ci", "pipeline", "strategy"],
+          "tags": [
+            "ci",
+            "pipeline",
+            "strategy"
+          ],
           "answer": {
             "oneLiner": "Run fast unit tests first on every push, then integration tests, then a small E2E suite on a deployed environment, failing fast and parallelizing where possible.",
             "keyPoints": [
@@ -791,13 +2063,55 @@
               "Stage 3: E2E/smoke against a deployed preview env",
               "Parallelize, cache deps, gate merges on coverage/results"
             ],
-            "followUps": [
-              "Where do load and contract tests fit in the pipeline?",
-              "How do you keep the pipeline fast as suites grow?"
-            ],
             "redFlags": [
               "Running slow E2E on every commit, blocking everyone",
               "No fail-fast, so devs wait for the whole suite to learn unit tests broke"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you structure the different test types in a CI pipeline?"
+              },
+              {
+                "role": "me",
+                "text": "Fast first: lint and unit tests on every push in seconds, then integration tests against test containers or in-memory, then a small E2E or smoke suite on a deployed preview environment."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why that ordering specifically?"
+              },
+              {
+                "role": "me",
+                "text": "To fail fast and give cheap feedback early. If unit tests break, you find out in seconds instead of waiting for slow E2E. I also parallelize and cache deps to keep it fast."
+              },
+              {
+                "role": "interviewer",
+                "text": "The pipeline is creeping toward 40 minutes as suites grow. What do you do?"
+              },
+              {
+                "role": "me",
+                "text": "I'd shard tests across parallel runners, run only impacted tests on PRs, move the full E2E and load suites to a nightly run, and cache dependencies and build artifacts."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Where do load and contract tests fit in the pipeline?",
+                "a": "Contract tests near integration; load tests later against a prod-like env or nightly.",
+                "relatedId": "testing-fundamentals-009"
+              },
+              {
+                "q": "How do you keep the pipeline fast as suites grow?",
+                "a": "Parallelize, shard, run impacted tests on PRs, cache deps, full suites nightly."
+              },
+              {
+                "q": "Why fail fast?",
+                "a": "So devs learn about cheap unit failures in seconds, not after slow E2E."
+              },
+              {
+                "q": "What does this ordering reflect?",
+                "a": "The test pyramid: many fast tests first, few slow ones last.",
+                "relatedId": "testing-fundamentals-003"
+              }
             ]
           }
         }

@@ -1,66 +1,59 @@
 # JavaScript & React — Cheatsheet
 
-## Types & Values
-- **Dynamic typing** — check with `typeof`. Returns `number | string | boolean | undefined | object | function | symbol | bigint`.
-- **`typeof null === 'object'`** (legacy bug). **`Array.isArray()`** for arrays.
-- **NaN** — "Not a Number", `typeof NaN === 'number'`, `NaN !== NaN` → use **`Number.isNaN()`**.
-- **null vs undefined** — `undefined` = unassigned (by JS); `null` = intentional empty (by you). `null == undefined` true, `===` false.
-- **Falsy:** `0`, `''`, `null`, `undefined`, `NaN`, `false`. Everything else truthy (`[]` and `{}` are truthy!).
+> Covers 39 questions across **JS Fundamentals**, **Async & Event Loop**, **React**. Each question card now ships a 6-turn mock dialogue + 3–5 follow-up Q&As.
 
-## Variables & Scope
-- **var** = function-scoped, hoisted to `undefined`, redeclarable. **let/const** = block-scoped, **TDZ**, no redeclare. **const** = no reassign (contents still mutable).
-- Default to **const** → **let** → avoid **var**.
+## Quick-Recall Checklist
+- [ ] `typeof` returns `number/string/boolean/undefined/object/function/symbol/bigint`; `typeof null==='object'`; arrays → `Array.isArray()`.
+- [ ] `NaN !== NaN` → test with `Number.isNaN()` (not global `isNaN`); `typeof NaN==='number'`.
+- [ ] Hoisting: `var`→`undefined`; `function`→callable; `let`/`const`→TDZ ReferenceError.
+- [ ] `var`=function-scoped/redeclarable; `let`/`const`=block-scoped/TDZ; `const` locks binding not value. Default `const`.
+- [ ] `null` (intentional empty) vs `undefined` (unassigned). `null==undefined` true, `===` false.
+- [ ] `this`: regular = call-site; arrow = lexical (ignores `call/apply/bind`).
+- [ ] Closure = inner fn remembers outer scope after return (privacy, counters). var-in-loop → use `let`.
+- [ ] Coercion: `+` concats with string, other math → number. Falsy: `0 '' null undefined NaN false`.
+- [ ] Shallow copy (`{...o}`, `Object.assign`, `slice`) shares nested refs; deep = `structuredClone`.
+- [ ] `prototype` (on constructors) vs `__proto__` (instance link). `inst.__proto__===Fn.prototype`.
+- [ ] Object create: literal / `new` / `class` / `Object.create` / factory. Iterate: `Object.entries`, `for...in` (+`hasOwnProperty`).
+- [ ] Spread expands (shallow), destructuring unpacks, rest collects. Strict mode = `'use strict'` (default in modules/classes).
+- [ ] Pure fn = same input→same output, no side effects (basis of reducers/memo).
+- [ ] Memory leaks = forgotten timers/listeners, detached DOM, stray globals; clean up + `WeakMap`.
+- [ ] localStorage persists / sessionStorage per-tab; strings only (`JSON.stringify`), ~5–10MB, not sent to server.
+- [ ] Event loop: all sync → drain **microtasks** (promise `.then`, `await`, `queueMicrotask`) → one **macrotask** (`setTimeout`, I/O, UI) → repeat.
+- [ ] JS single-threaded; runtime handles I/O; **Web Workers** = real threads (no DOM, `postMessage`).
+- [ ] Callbacks (nest) → Promises (1 value, not cancellable) → Observables (N values, lazy, cancellable, RxJS).
+- [ ] Offline = Service Worker cache + IndexedDB + Background Sync; detect via `navigator.onLine`.
+- [ ] React: Virtual DOM + reconciliation (O(n) heuristic); diff applies minimal real-DOM updates.
+- [ ] Keys = stable/unique per list item (never array index for reorderable lists).
+- [ ] `useMemo` caches a VALUE by deps (`useCallback`=fn version); `useRef` = mutable `.current`, no re-render.
+- [ ] Context shares to deep children (theme/auth/locale); consumers re-render on value change → split for hot state.
+- [ ] Share data: props (down), callbacks (up), lift state (siblings), Context/Redux (global).
+- [ ] AOT (build-time, fast start) vs JIT (runtime) — mainly Angular; React ships pre-transpiled JSX.
+- [ ] Skip direct DOM in React except focus/scroll/measure/media/3rd-party → reach via `useRef`.
 
-## Hoisting
-- `var` → hoisted, value `undefined` before its line.
-- `function foo(){}` → fully hoisted, callable before its line.
-- `let` / `const` → hoisted but in **Temporal Dead Zone** → ReferenceError if used early.
-
-## `this`
-- **Regular function** — bound by call-site (object before the dot; undefined/global if plain call). Changeable via `call/apply/bind`.
-- **Arrow function** — no own `this`, inherits from enclosing (lexical) scope. Use for callbacks.
-
-## Functions
-- **Higher-order** — takes/returns functions (`map`, `filter`, `reduce`, closure factories).
-- **Pure** — same input → same output, no side effects. Testable, cacheable.
-- **Closure** — inner function remembers outer-scope variables after the outer returns (privacy, counters).
-
-## Objects
-- **Create:** literal `{}`, `new Constructor()`, `class`, `Object.create(proto)`, factory fn.
-- **Iterate:** `Object.keys/values/entries`, `for...in` (incl. inherited — guard `hasOwnProperty`).
-- **`prototype`** = blueprint on a constructor; **`__proto__`** = instance's link to its prototype. `inst.__proto__ === Fn.prototype`.
-- **Shallow copy** (`{...o}`, `Object.assign`, `slice`) shares nested refs. **Deep copy** = `structuredClone(o)` (or `JSON.parse(JSON.stringify(o))`, drops fns/Dates).
-
-## ES6+
-- **Template literals** — `` `Hi ${x}` ``, multi-line, tagged templates.
-- **Spread** `...` expands; **destructuring** unpacks; **rest** collects (`[head, ...tail]`).
-- **Strict mode** — `'use strict';` (modules/classes are strict by default). Blocks accidental globals; `this` undefined in plain calls.
-
-## Async & Event Loop
-- **Single-threaded** — one call stack. Async I/O handled by the runtime; **Web Workers** = real parallel threads (no DOM, message passing).
-- **Order:** all sync → drain **microtasks** (promises, `await` continuations, `queueMicrotask`) → one **macrotask** (setTimeout, I/O, events) → repeat.
-- **Callback → Promise → Observable:** callbacks nest; promises = 1 future value (`.then`/`async-await`); observables = stream of N values, lazy, cancellable (RxJS).
-- **Offline:** Service Worker caching + IndexedDB + Background Sync (PWA); detect with `navigator.onLine`.
-
-## React
-- **Virtual DOM** — in-memory tree, diffed (reconciliation) against previous render; only minimal real-DOM updates applied. Declarative + component-based.
-- **Keys** — stable, unique per list item (not array index for reorderable lists).
-- **useMemo** — caches a computed VALUE, recomputes when deps change. (`useCallback` = useMemo for functions.)
-- **useRef** — mutable `.current` box, persists across renders, **no re-render** on change. DOM access + mutable values.
-- **useMemo vs useRef** — useMemo recomputes by dependencies; useRef just remembers, you mutate manually.
-- **Context API** — share data to deep children without prop drilling (`createContext` → `Provider` → `useContext`). Best for theme/auth/locale; consumers re-render on value change.
-- **Sharing data** — props (down), callbacks (up), lift state (siblings), Context/Redux (global).
-- **AOT vs JIT** — AOT compiles at build (fast start, smaller); JIT at runtime. Mainly Angular; React ships pre-transpiled JSX.
+## Code-Trace Outputs (memorize)
+| Snippet | Output | Why |
+|---|---|---|
+| `log(A); setTimeout(B,0); Promise.then(C); log(D)` | **A, D, C, B** | sync → microtask → macrotask |
+| `setTimeout(()=>log(2),0); log(5)` | **5, 2** | sync beats macrotask |
+| `Start; setTimeout(Timeout,0); Promise.then(Promise); End` | **Start, End, Promise, Timeout** | micro before macro |
+| `var a=20; Abc(); fn{var a=10; log(a)}` | **10** | fn hoisted + scoped shadowing |
+| `a=[..10..]; a[40]=40; a.length` | **41** | length = max index + 1 (sparse) |
+| `[1,2,3,4].filter(n=>n%2).map(n=>n*10)` | **[10, 30]** | chaining via returned arrays |
 
 ## Gotchas
-
 | Topic | Gotcha |
 |---|---|
 | Hoisting | `var`→`undefined`; function→callable; `let`/`const`→TDZ ReferenceError |
-| `this` | Regular = call-site; arrow = lexical (outer) scope |
+| `this` | Regular = call-site; arrow = lexical; arrow ignores `bind` |
 | `==` vs `===` | `==` coerces (`0 == ''` true); always prefer `===` |
-| Event loop | Sync → microtasks (promises) → macrotask (setTimeout 0). `console.log(5); setTimeout(()=>log(2),0)` → **5 then 2** |
-| Shallow vs deep | Spread/assign share nested refs; use `structuredClone` for deep |
-| Closures in loops | `var` in a loop shares one binding → use `let` per-iteration |
-| Sparse array | `a[40]=40` → `a.length === 41` (max index + 1, holes = undefined) |
-| const | Locks the binding, not the value — object contents still mutate |
+| `typeof null` | Returns `'object'` (legacy bug) |
+| NaN | `NaN === NaN` is false; use `Number.isNaN`, avoid global `isNaN` (coerces) |
+| Shallow vs deep | Spread/assign share nested refs; use `structuredClone` |
+| Closures in loops | `var` shares one binding → use `let` per iteration |
+| Sparse array | `a[40]=40` → `length 41`, holes read `undefined` |
+| const | Locks the binding, not the value — contents still mutate |
+| JSON deep-copy | Drops functions, `undefined`, Dates, symbols |
+| `for...in` | Walks inherited keys — guard with `hasOwnProperty` |
+| Context | Every consumer re-renders on value change — split hot contexts |
+| List keys | Array index as key breaks on reorder/insert (wrong node reuse) |
+| useMemo/useRef | Neither re-renders on change; useMemo recomputes by deps, useRef is manual |

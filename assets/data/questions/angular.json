@@ -13,7 +13,12 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["component", "decorator", "template", "basics"],
+          "tags": [
+            "component",
+            "decorator",
+            "template",
+            "basics"
+          ],
           "answer": {
             "oneLiner": "A Component is the basic UI building block — a TypeScript class with @Component that bundles a template, styles, and logic into a reusable unit.",
             "keyPoints": [
@@ -28,15 +33,57 @@
               "note": "Minimal standalone component with an @Input binding"
             },
             "analogy": "Like a LEGO brick — shape (template), colour (styles), connection points (@Input/@Output).",
-            "followUps": [
-              "Standalone component vs one declared in an NgModule?",
-              "How does Angular pick the component for a route?",
-              "How would you share state between siblings?"
-            ],
             "redFlags": [
               "Confusing a component with a directive",
               "Not knowing what the selector is for",
               "Assuming it works exactly like a React function component"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "So, in your own words, what is a component in Angular?"
+              },
+              {
+                "role": "me",
+                "text": "It's the basic UI building block: a TypeScript class decorated with `@Component` that bundles a template, styles, and logic into one reusable unit."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does the selector actually give you?"
+              },
+              {
+                "role": "me",
+                "text": "It registers a custom HTML tag, so I can drop the component into another template as `<app-greeting>`."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do components relate to each other in an app?"
+              },
+              {
+                "role": "me",
+                "text": "They form a tree rooted at the bootstrapped `AppComponent`, with data flowing down via inputs and events bubbling up via outputs."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Standalone component vs one declared in an NgModule?",
+                "a": "Standalone declares its own imports in the decorator; NgModule-based components are declared and wired up in a module.",
+                "relatedId": "angular-basics-008"
+              },
+              {
+                "q": "How does Angular pick the component for a route?",
+                "a": "The router matches the URL to a route config and renders its `component` (or lazily `loadComponent`) in the router outlet.",
+                "relatedId": "angular-basics-007"
+              },
+              {
+                "q": "How would you share state between siblings?",
+                "a": "Lift it into a shared service (often a BehaviorSubject or signal) that both siblings inject.",
+                "relatedId": "angular-binding-007"
+              },
+              {
+                "q": "Is a component a directive?",
+                "a": "Yes, a component is technically a directive with a template."
+              }
             ]
           }
         },
@@ -46,7 +93,14 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["directives", "structural", "attribute", "ngIf", "ngFor", "ngClass"],
+          "tags": [
+            "directives",
+            "structural",
+            "attribute",
+            "ngIf",
+            "ngFor",
+            "ngClass"
+          ],
           "answer": {
             "oneLiner": "Directives add behaviour to elements. Structural directives change the DOM layout (add/remove nodes); attribute directives change the look or behaviour of an existing element.",
             "keyPoints": [
@@ -61,15 +115,55 @@
               "snippet": "<!-- Structural (old syntax) -->\n<div *ngIf=\"isLoggedIn; else guest\">Welcome back!</div>\n<ng-template #guest><p>Please log in.</p></ng-template>\n\n<!-- Structural (Angular 17+ new syntax) -->\n@if (isLoggedIn) {\n  <div>Welcome back!</div>\n} @else {\n  <p>Please log in.</p>\n}\n\n<!-- Attribute directive -->\n<p [ngClass]=\"{ 'active': isActive, 'disabled': !isActive }\">Status</p>",
               "note": "Old *ngIf vs Angular 17 @if control flow, plus ngClass attribute directive"
             },
-            "followUps": [
-              "How would you build a custom structural directive?",
-              "What is `ng-container` and why is it useful?",
-              "Difference between `ngClass` and `[class.active]`?"
-            ],
             "redFlags": [
               "Saying *ngIf only hides elements (it removes from DOM)",
               "Not knowing `*` expands to `<ng-template>`",
               "Unaware of Angular 17 `@if` / `@for`"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between structural and attribute directives?"
+              },
+              {
+                "role": "me",
+                "text": "Structural directives change the DOM layout by adding or removing nodes, like `*ngIf` and `*ngFor`; attribute directives just change the look or behaviour of an existing element, like `ngClass`."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does that asterisk in `*ngIf` really mean?"
+              },
+              {
+                "role": "me",
+                "text": "It's syntactic sugar that wraps the element in an `<ng-template>` so Angular can stamp it in or out."
+              },
+              {
+                "role": "interviewer",
+                "text": "Is there a newer way to do this in Angular 17?"
+              },
+              {
+                "role": "me",
+                "text": "Yes, the built-in control flow blocks `@if`, `@for`, and `@switch` replace the structural directives with less boilerplate."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How would you build a custom structural directive?",
+                "a": "Inject `TemplateRef` and `ViewContainerRef`, then create or clear the embedded view based on your input.",
+                "relatedId": "angular-advanced-014"
+              },
+              {
+                "q": "What is ng-container and why is it useful?",
+                "a": "A logical grouping element that renders nothing, so you can apply structural directives without adding an extra DOM node."
+              },
+              {
+                "q": "Difference between ngClass and [class.active]?",
+                "a": "`[class.active]` toggles a single class; `ngClass` takes an object or string for multiple classes at once."
+              },
+              {
+                "q": "Can you put two structural directives on one element?",
+                "a": "No, only one per element; use `<ng-container>` or nest them."
+              }
             ]
           }
         },
@@ -79,7 +173,14 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["compiler", "AOT", "JIT", "Ivy", "build", "performance"],
+          "tags": [
+            "compiler",
+            "AOT",
+            "JIT",
+            "Ivy",
+            "build",
+            "performance"
+          ],
           "answer": {
             "oneLiner": "The compiler turns templates and decorators into optimised JS. AOT compiles at build time (the production default), JIT compiles in the browser, and Ivy is the current compile/render engine.",
             "keyPoints": [
@@ -94,15 +195,54 @@
               "snippet": "// tsconfig.json — AOT is on by default in Angular CLI\n// angular.json build options:\n// \"aot\": true  (default for production)\n// \"buildOptimizer\": true\n\n// Ivy locality: each component compiles to a self-contained factory\n// MyComponent.ɵcmp = /*@__PURE__*/ defineComponent({ ... })",
               "note": "AOT is on by default; Ivy factories are what the Angular runtime executes"
             },
-            "followUps": [
-              "Benefits of `strictTemplates`?",
-              "How does Ivy locality help large monorepo builds?",
-              "Is differential loading still relevant in Angular 17+?"
-            ],
             "redFlags": [
               "Thinking JIT is used in production",
               "Confusing Ivy with a specific Angular version",
               "Not knowing AOT catches template errors at build"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What does the Angular compiler do, and what's AOT versus JIT?"
+              },
+              {
+                "role": "me",
+                "text": "It turns templates and decorators into optimised JavaScript. AOT compiles at build time and is the production default; JIT compiles in the browser and is really just for dev now."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why prefer AOT for production?"
+              },
+              {
+                "role": "me",
+                "text": "Smaller bundles since the compiler isn't shipped, faster startup, and it catches template errors at build time instead of runtime."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where does Ivy fit in?"
+              },
+              {
+                "role": "me",
+                "text": "Ivy is the current compile and render engine, default since v9; it compiles each component independently, which improves tree-shaking and enables standalone and signals."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Benefits of strictTemplates?",
+                "a": "It type-checks bindings in templates, catching mismatched inputs and typos at build time."
+              },
+              {
+                "q": "How does Ivy locality help large monorepo builds?",
+                "a": "Each component compiles to a self-contained factory, so incremental rebuilds only touch what changed."
+              },
+              {
+                "q": "Is differential loading still relevant in Angular 17+?",
+                "a": "No, modern browsers are targeted directly so differential loading was dropped."
+              },
+              {
+                "q": "Is JIT ever used in production?",
+                "a": "No, production uses AOT; JIT is dev-only."
+              }
             ]
           }
         },
@@ -112,7 +252,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["lifecycle", "ngOnInit", "ngOnChanges", "ngOnDestroy", "hooks"],
+          "tags": [
+            "lifecycle",
+            "ngOnInit",
+            "ngOnChanges",
+            "ngOnDestroy",
+            "hooks"
+          ],
           "answer": {
             "oneLiner": "Components run through hooks from creation to destruction — the key ones are ngOnChanges, ngOnInit, ngAfterViewInit, and ngOnDestroy.",
             "keyPoints": [
@@ -127,15 +273,57 @@
               "snippet": "import { Component, Input, OnInit, OnChanges, OnDestroy, SimpleChanges } from '@angular/core';\nimport { Subject } from 'rxjs';\nimport { takeUntil } from 'rxjs/operators';\n\n@Component({ selector: 'app-demo', standalone: true, template: '' })\nexport class DemoComponent implements OnInit, OnChanges, OnDestroy {\n  @Input() userId!: string;\n  private destroy$ = new Subject<void>();\n\n  ngOnChanges(changes: SimpleChanges) {\n    if (changes['userId'] && !changes['userId'].firstChange) {\n      // React to userId change after initial load\n    }\n  }\n\n  ngOnInit() {\n    this.dataService.getUser(this.userId)\n      .pipe(takeUntil(this.destroy$))\n      .subscribe(user => this.user = user);\n  }\n\n  ngOnDestroy() {\n    this.destroy$.next();\n    this.destroy$.complete();\n  }\n}",
               "note": "Pattern: takeUntil + destroy$ Subject to auto-unsubscribe on component destruction"
             },
-            "followUps": [
-              "Difference between ngOnInit and the constructor?",
-              "Why can't you access @ViewChild in ngOnInit?",
-              "What does `takeUntilDestroyed()` do?"
-            ],
             "redFlags": [
               "Putting HTTP calls in the constructor",
               "Accessing @ViewChild in ngOnInit",
               "Not cleaning up subscriptions in ngOnDestroy"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Walk me through the main lifecycle hooks."
+              },
+              {
+                "role": "me",
+                "text": "`ngOnChanges` fires on every input change, `ngOnInit` runs once after the first inputs are set, `ngAfterViewInit` when the view is ready, and `ngOnDestroy` for cleanup."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where would you put your initial data fetch?"
+              },
+              {
+                "role": "me",
+                "text": "In `ngOnInit`, because inputs are guaranteed to be set by then and it only runs once."
+              },
+              {
+                "role": "interviewer",
+                "text": "And what's the one thing people forget in ngOnDestroy?"
+              },
+              {
+                "role": "me",
+                "text": "Unsubscribing from observables and clearing timers, otherwise you leak memory; I usually use `takeUntilDestroyed` or a `destroy$` subject."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Difference between ngOnInit and the constructor?",
+                "a": "The constructor is for DI and runs before inputs are set; ngOnInit runs after the first inputs are bound.",
+                "relatedId": "angular-advanced-018"
+              },
+              {
+                "q": "Why can't you access @ViewChild in ngOnInit?",
+                "a": "The view isn't rendered yet, so the query resolves only by ngAfterViewInit.",
+                "relatedId": "angular-basics-012"
+              },
+              {
+                "q": "What does takeUntilDestroyed() do?",
+                "a": "It auto-completes a subscription when the component is destroyed, using the injection context's DestroyRef.",
+                "relatedId": "angular-binding-006"
+              },
+              {
+                "q": "When does ngOnChanges fire relative to ngOnInit?",
+                "a": "Before the first ngOnInit, and again on every subsequent input change."
+              }
             ]
           }
         },
@@ -145,7 +333,14 @@
           "level": "mid",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["DOM", "virtual DOM", "incremental DOM", "Ivy", "React", "rendering"],
+          "tags": [
+            "DOM",
+            "virtual DOM",
+            "incremental DOM",
+            "Ivy",
+            "React",
+            "rendering"
+          ],
           "answer": {
             "oneLiner": "Angular uses the real DOM with an incremental DOM strategy via Ivy; React uses a virtual DOM that it diffs and patches. Angular's approach is more memory efficient since there's no shadow tree.",
             "keyPoints": [
@@ -156,15 +351,56 @@
             ],
             "detail": "Ivy's instructions live alongside the component, so no intermediate tree is built. Change detection (Zone.js or signals) decides when to run; Ivy instructions decide how. Both perform well in practice.",
             "analogy": "VDOM is redrawing the whole blueprint then comparing; incremental DOM is a checklist that only touches the listed items.",
-            "followUps": [
-              "How does OnPush reduce DOM work?",
-              "How do signals eliminate Zone.js overhead?",
-              "What is hydration in Angular SSR?"
-            ],
             "redFlags": [
               "Claiming Angular uses a virtual DOM",
               "Not knowing what Ivy is",
               "Saying one approach is always faster"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Does Angular use a virtual DOM like React?"
+              },
+              {
+                "role": "me",
+                "text": "No, Angular works on the real DOM with an incremental DOM strategy through Ivy; there's no in-memory shadow tree."
+              },
+              {
+                "role": "interviewer",
+                "text": "So how does it know what to update?"
+              },
+              {
+                "role": "me",
+                "text": "Ivy compiles templates into instructions that update only the nodes that actually changed, rather than diffing a whole tree."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the practical advantage versus a virtual DOM?"
+              },
+              {
+                "role": "me",
+                "text": "Lower memory because there's no intermediate tree to build, and it tree-shakes better; though in practice both approaches perform well."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How does OnPush reduce DOM work?",
+                "a": "It skips change detection for a component unless its input reference changes, an event fires, or an async pipe emits.",
+                "relatedId": "angular-advanced-010"
+              },
+              {
+                "q": "How do signals eliminate Zone.js overhead?",
+                "a": "Signals notify only their dependents on change, so Angular can update targeted views without Zone.js scanning the whole tree.",
+                "relatedId": "angular-advanced-004"
+              },
+              {
+                "q": "What is hydration in Angular SSR?",
+                "a": "It reuses server-rendered DOM on the client instead of re-rendering, avoiding flicker and improving startup."
+              },
+              {
+                "q": "Is incremental DOM always faster than VDOM?",
+                "a": "No, both are fast in practice; the main win is memory and tree-shaking."
+              }
             ]
           }
         },
@@ -174,7 +410,14 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["architecture", "MVVM", "component-based", "NgModule", "standalone", "DI"],
+          "tags": [
+            "architecture",
+            "MVVM",
+            "component-based",
+            "NgModule",
+            "standalone",
+            "DI"
+          ],
           "answer": {
             "oneLiner": "A component-based architecture with built-in dependency injection, loosely MVVM — components are the ViewModel binding templates (View) to services (Model).",
             "keyPoints": [
@@ -184,15 +427,56 @@
               "Full opinionated framework: routing, forms, HTTP built in"
             ],
             "detail": "NgModules grouped components historically but are being superseded by standalone components (default v17+). A service in `root` is a singleton; provided in a component it's scoped to that subtree.",
-            "followUps": [
-              "How does Angular DI differ from manual instantiation?",
-              "Advantages of standalone over NgModules?",
-              "How would you structure a large Angular app?"
-            ],
             "redFlags": [
               "Calling Angular a library",
               "Not knowing what DI is in Angular",
               "Confusing it with React's data flow model"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What architecture does Angular follow?"
+              },
+              {
+                "role": "me",
+                "text": "A component-based architecture with built-in hierarchical dependency injection, and it's loosely MVVM."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does it map to MVVM?"
+              },
+              {
+                "role": "me",
+                "text": "The component is the ViewModel, the template is the View, and services hold the Model or business logic."
+              },
+              {
+                "role": "interviewer",
+                "text": "Library or framework?"
+              },
+              {
+                "role": "me",
+                "text": "A full opinionated framework: routing, forms, and HTTP all come built in, unlike a library where you assemble those yourself."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How does Angular DI differ from manual instantiation?",
+                "a": "DI provides and injects dependencies for you, so classes are decoupled and easy to mock in tests.",
+                "relatedId": "angular-basics-009"
+              },
+              {
+                "q": "Advantages of standalone over NgModules?",
+                "a": "Less boilerplate, clearer dependencies, and better lazy-loading ergonomics.",
+                "relatedId": "angular-basics-008"
+              },
+              {
+                "q": "How would you structure a large Angular app?",
+                "a": "By feature folders with lazy-loaded routes, shared and core layers, and smart/dumb component separation."
+              },
+              {
+                "q": "Is a root-provided service a singleton?",
+                "a": "Yes, `providedIn: 'root'` gives one app-wide instance."
+              }
             ]
           }
         },
@@ -202,7 +486,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["lazy loading", "routing", "performance", "code splitting", "bundle"],
+          "tags": [
+            "lazy loading",
+            "routing",
+            "performance",
+            "code splitting",
+            "bundle"
+          ],
           "answer": {
             "oneLiner": "Lazy loading defers downloading a route's code until the user navigates to it, shrinking the initial bundle and speeding up startup.",
             "keyPoints": [
@@ -217,15 +507,55 @@
               "snippet": "// app.routes.ts — standalone lazy loading\nimport { Routes } from '@angular/router';\n\nexport const APP_ROUTES: Routes = [\n  { path: '', loadComponent: () =>\n      import('./home/home.component').then(m => m.HomeComponent) },\n  { path: 'dashboard', loadChildren: () =>\n      import('./dashboard/dashboard.routes').then(m => m.DASHBOARD_ROUTES) }\n];",
               "note": "loadComponent for a single component, loadChildren for a sub-route array"
             },
-            "followUps": [
-              "How do you implement a custom preloading strategy?",
-              "loadChildren with a module vs a route array?",
-              "How does lazy loading interact with DI scoping?"
-            ],
             "redFlags": [
               "Thinking lazy loading hides routes from users",
               "Not knowing `loadComponent` is the modern way",
               "Confusing it with ngIf show/hide"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is lazy loading and why use it?"
+              },
+              {
+                "role": "me",
+                "text": "It defers downloading a route's code until the user navigates there, which shrinks the initial bundle and speeds up startup."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you set it up with standalone components?"
+              },
+              {
+                "role": "me",
+                "text": "In the route I use `loadComponent` for a single component or `loadChildren` for a sub-route array, returning a dynamic `import()`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any side effect on dependency injection?"
+              },
+              {
+                "role": "me",
+                "text": "Lazy routes get their own injector scope, so services provided there are isolated and don't leak into the rest of the app."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you implement a custom preloading strategy?",
+                "a": "Extend `PreloadingStrategy` and decide per-route whether to preload, then pass it to `provideRouter(withPreloading(...))`."
+              },
+              {
+                "q": "loadChildren with a module vs a route array?",
+                "a": "Modern standalone apps return a route array; legacy apps return an NgModule.",
+                "relatedId": "angular-basics-008"
+              },
+              {
+                "q": "How does lazy loading interact with DI scoping?",
+                "a": "Each lazy route creates an environment injector, scoping its providers to that route subtree."
+              },
+              {
+                "q": "Does lazy loading hide routes from users?",
+                "a": "No, it only defers code download; it's not a security feature."
+              }
             ]
           }
         },
@@ -235,7 +565,13 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["standalone", "NgModule", "Angular 14", "Angular 17", "imports"],
+          "tags": [
+            "standalone",
+            "NgModule",
+            "Angular 14",
+            "Angular 17",
+            "imports"
+          ],
           "answer": {
             "oneLiner": "Standalone components declare their own imports directly in @Component instead of belonging to an NgModule, removing the NgModule boilerplate layer.",
             "keyPoints": [
@@ -250,15 +586,56 @@
               "snippet": "// main.ts — standalone bootstrap\nimport { bootstrapApplication } from '@angular/platform-browser';\nimport { AppComponent } from './app/app.component';\nimport { provideRouter } from '@angular/router';\nimport { APP_ROUTES } from './app/app.routes';\n\nbootstrapApplication(AppComponent, {\n  providers: [provideRouter(APP_ROUTES)]\n});",
               "note": "Standalone apps use bootstrapApplication instead of platformBrowserDynamic().bootstrapModule()"
             },
-            "followUps": [
-              "How do you provide a service to just a standalone subtree?",
-              "Can a standalone component use an NgModule directive?",
-              "Why use `provideRouter` instead of `RouterModule.forRoot`?"
-            ],
             "redFlags": [
               "Not knowing standalone is the default in v17",
               "Thinking standalone can't use NgModule libraries",
               "Confusing standalone with micro-frontends"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are standalone components?"
+              },
+              {
+                "role": "me",
+                "text": "Components that declare their own dependencies in `imports` directly in `@Component`, instead of belonging to an NgModule."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you bootstrap a standalone app?"
+              },
+              {
+                "role": "me",
+                "text": "With `bootstrapApplication(AppComponent, { providers: [...] })` in main.ts, no root NgModule needed."
+              },
+              {
+                "role": "interviewer",
+                "text": "Can standalone components still use older NgModule libraries?"
+              },
+              {
+                "role": "me",
+                "text": "Yes, you just add the NgModule, like `ReactiveFormsModule`, to the component's `imports` array."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you provide a service to just a standalone subtree?",
+                "a": "Add it to the component's `providers` array or use route-level providers.",
+                "relatedId": "angular-advanced-019"
+              },
+              {
+                "q": "Can a standalone component use an NgModule directive?",
+                "a": "Yes, import the NgModule that exports it into the component's imports."
+              },
+              {
+                "q": "Why use provideRouter instead of RouterModule.forRoot?",
+                "a": "It's the tree-shakable, standalone-friendly API and composes with features like `withPreloading`.",
+                "relatedId": "angular-basics-007"
+              },
+              {
+                "q": "Is standalone the default now?",
+                "a": "Yes, it's the default since Angular 17."
+              }
             ]
           }
         },
@@ -268,7 +645,13 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["service", "dependency injection", "DI", "providedIn", "singleton"],
+          "tags": [
+            "service",
+            "dependency injection",
+            "DI",
+            "providedIn",
+            "singleton"
+          ],
           "answer": {
             "oneLiner": "A Service is a reusable @Injectable class for logic, HTTP, or shared state. Angular's DI injects it via the constructor or the inject() function.",
             "keyPoints": [
@@ -283,15 +666,55 @@
               "snippet": "@Injectable({ providedIn: 'root' })\nexport class TodoService {\n  private http = inject(HttpClient); // modern inject() function\n  \n  getTodos() {\n    return this.http.get<Todo[]>('/api/todos');\n  }\n}\n\n@Component({ ... })\nexport class TodoListComponent {\n  private todoSvc = inject(TodoService); // inject() preferred in standalone\n  todos$ = this.todoSvc.getTodos();\n}",
               "note": "Modern Angular uses inject() function instead of constructor injection — works outside of constructors"
             },
-            "followUps": [
-              "inject() function vs constructor injection?",
-              "How to provide different impls per environment?",
-              "What is a multi-provider token?"
-            ],
             "redFlags": [
               "Not knowing what `providedIn: 'root'` means",
               "Creating services with `new` instead of injecting",
               "Not seeing how DI enables testing"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's a service and how does DI work?"
+              },
+              {
+                "role": "me",
+                "text": "A service is a reusable `@Injectable` class for logic, HTTP, or shared state, and Angular's DI injects it via the constructor or the `inject()` function."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does providedIn: 'root' mean?"
+              },
+              {
+                "role": "me",
+                "text": "It registers the service as an app-wide singleton and makes it tree-shakable if nothing uses it."
+              },
+              {
+                "role": "interviewer",
+                "text": "How would you scope a service to just one component tree?"
+              },
+              {
+                "role": "me",
+                "text": "Provide it in that component's `providers` array, so the hierarchical injector creates a fresh instance per component."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "inject() function vs constructor injection?",
+                "a": "`inject()` works anywhere in an injection context, including field initializers and functions, not just constructors."
+              },
+              {
+                "q": "How to provide different impls per environment?",
+                "a": "Use an injection token with `useClass`/`useFactory` and swap the provider per environment config."
+              },
+              {
+                "q": "What is a multi-provider token?",
+                "a": "A token registered with `multi: true` that collects multiple providers into an array, like interceptors."
+              },
+              {
+                "q": "How does DI enable testing?",
+                "a": "You can inject mock implementations in place of real services without changing the consumer.",
+                "relatedId": "angular-basics-006"
+              }
             ]
           }
         },
@@ -301,7 +724,14 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["CLI", "ng", "generate", "build", "serve", "test"],
+          "tags": [
+            "CLI",
+            "ng",
+            "generate",
+            "build",
+            "serve",
+            "test"
+          ],
           "answer": {
             "oneLiner": "The CLI scaffolds, builds, serves, tests, and lints Angular apps with no manual build config.",
             "keyPoints": [
@@ -311,15 +741,54 @@
               "`ng test`, `ng e2e`, `ng update` — test and safe migrations"
             ],
             "detail": "The CLI abstracts webpack and uses esbuild by default since v17 (the `application` builder) for much faster builds. `ng add` runs a package's schematic to install and configure it.",
-            "followUps": [
-              "How to configure environment-specific builds?",
-              "`ng build` vs `ng build --configuration production`?",
-              "What is the v17 `application` builder?"
-            ],
             "redFlags": [
               "Not knowing the basic generate commands",
               "Editing webpack config directly",
               "Confusing `ng update` with `npm update`"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is the Angular CLI and what do you use it for?"
+              },
+              {
+                "role": "me",
+                "text": "It scaffolds, builds, serves, tests, and lints Angular apps without manual build config; the day-to-day commands are `ng new`, `ng serve`, and `ng generate`."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does ng generate save you from?"
+              },
+              {
+                "role": "me",
+                "text": "Hand-writing boilerplate; `ng g c` creates a component with its class, template, styles, and wiring in one go."
+              },
+              {
+                "role": "interviewer",
+                "text": "What changed in builds recently?"
+              },
+              {
+                "role": "me",
+                "text": "Since v17 the CLI uses the esbuild-based `application` builder by default, so production builds are much faster than the old webpack pipeline."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How to configure environment-specific builds?",
+                "a": "Use build configurations in angular.json with file replacements per environment."
+              },
+              {
+                "q": "ng build vs ng build --configuration production?",
+                "a": "The production configuration enables AOT, minification, and budgets for an optimised bundle."
+              },
+              {
+                "q": "What is the v17 application builder?",
+                "a": "An esbuild/Vite-based builder that replaces the webpack browser builder for faster builds and dev server."
+              },
+              {
+                "q": "What does ng add do?",
+                "a": "It runs a library's schematic to install and configure it in one step."
+              }
             ]
           }
         },
@@ -329,7 +798,13 @@
           "level": "mid",
           "type": "design",
           "freq": "medium",
-          "tags": ["smart components", "dumb components", "presentational", "container", "design pattern"],
+          "tags": [
+            "smart components",
+            "dumb components",
+            "presentational",
+            "container",
+            "design pattern"
+          ],
           "answer": {
             "oneLiner": "Smart (container) components manage state and services; dumb (presentational) components just take @Input and emit @Output with no service dependencies.",
             "keyPoints": [
@@ -339,15 +814,55 @@
               "Improves testability and reusability"
             ],
             "detail": "It's a guideline, not a rule — some components legitimately need both. Maps to flux/redux: smart = connected, dumb = presentational.",
-            "followUps": [
-              "When is it OK to inject a service in a dumb component?",
-              "How does this interact with NgRx or a signal store?",
-              "How does OnPush benefit dumb components?"
-            ],
             "redFlags": [
               "Not knowing the pattern for a senior role",
               "Thinking 'dumb' means bad",
               "Injecting services into presentational components"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Explain smart versus dumb components."
+              },
+              {
+                "role": "me",
+                "text": "Smart or container components manage state and inject services; dumb or presentational components just take inputs and emit outputs with no service dependencies."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why bother with the split?"
+              },
+              {
+                "role": "me",
+                "text": "It improves reusability and testability, since dumb components are pure UI you can test with just inputs and outputs."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does it pair with change detection?"
+              },
+              {
+                "role": "me",
+                "text": "Dumb components work great with OnPush because they're driven entirely by input references."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "When is it OK to inject a service in a dumb component?",
+                "a": "For purely presentational concerns like a translation pipe; avoid injecting state or data services."
+              },
+              {
+                "q": "How does this interact with NgRx or a signal store?",
+                "a": "Smart components select state and dispatch; dumb components stay store-agnostic."
+              },
+              {
+                "q": "How does OnPush benefit dumb components?",
+                "a": "With immutable inputs they only re-render when a reference changes, cutting CD work.",
+                "relatedId": "angular-advanced-010"
+              },
+              {
+                "q": "Is the split a hard rule?",
+                "a": "No, it's a guideline; some components legitimately need both roles."
+              }
             ]
           }
         },
@@ -357,7 +872,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["ViewChild", "ContentChild", "template reference", "ng-content", "ElementRef"],
+          "tags": [
+            "ViewChild",
+            "ContentChild",
+            "template reference",
+            "ng-content",
+            "ElementRef"
+          ],
           "answer": {
             "oneLiner": "@ViewChild queries the component's own template; @ContentChild queries projected content (ng-content). Each is ready only after its AfterInit hook.",
             "keyPoints": [
@@ -372,15 +893,55 @@
               "snippet": "// Signal-based alternative (Angular 17.1+)\nimport { viewChild, contentChild } from '@angular/core';\n\nexport class MyComponent {\n  canvas = viewChild<ElementRef>('myCanvas');\n  // canvas() returns ElementRef | undefined — reactive, no lifecycle hook needed\n}",
               "note": "viewChild() signal function — reactive alternative to @ViewChild decorator"
             },
-            "followUps": [
-              "@ViewChild vs @ViewChildren?",
-              "Why is @ViewChild undefined in ngOnInit?",
-              "How do signal-based viewChild()/contentChild() improve things?"
-            ],
             "redFlags": [
               "Accessing @ViewChild in the constructor/ngOnInit without static",
               "Confusing ViewChild with ContentChild",
               "Not knowing ViewChildren returns a QueryList"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between ViewChild and ContentChild?"
+              },
+              {
+                "role": "me",
+                "text": "`@ViewChild` queries the component's own template, while `@ContentChild` queries content projected in through `<ng-content>`."
+              },
+              {
+                "role": "interviewer",
+                "text": "When are those queries actually available?"
+              },
+              {
+                "role": "me",
+                "text": "In their AfterInit hooks: `ngAfterViewInit` for ViewChild and `ngAfterContentInit` for ContentChild, not in `ngOnInit`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any modern alternative?"
+              },
+              {
+                "role": "me",
+                "text": "Yes, the signal-based `viewChild()` and `contentChild()` functions from v17.1 give reactive access without coupling to lifecycle hooks."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "@ViewChild vs @ViewChildren?",
+                "a": "ViewChild returns the first match; ViewChildren returns a QueryList of all matches."
+              },
+              {
+                "q": "Why is @ViewChild undefined in ngOnInit?",
+                "a": "The view hasn't rendered yet, so the query resolves only by ngAfterViewInit.",
+                "relatedId": "angular-basics-004"
+              },
+              {
+                "q": "How do signal-based viewChild()/contentChild() improve things?",
+                "a": "They're reactive and available without waiting on a specific lifecycle hook."
+              },
+              {
+                "q": "What does { static: true } do?",
+                "a": "It resolves the query before ngOnInit, but only for elements always present in the DOM."
+              }
             ]
           }
         }
@@ -397,7 +958,14 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["data binding", "interpolation", "property binding", "event binding", "two-way binding", "ngModel"],
+          "tags": [
+            "data binding",
+            "interpolation",
+            "property binding",
+            "event binding",
+            "two-way binding",
+            "ngModel"
+          ],
           "answer": {
             "oneLiner": "Interpolation {{ }}, property binding [prop], event binding (event), and two-way binding [(ngModel)] which is just property + event combined.",
             "keyPoints": [
@@ -412,15 +980,55 @@
               "snippet": "<!-- All four binding types -->\n<h1>{{ title }}</h1>                         <!-- interpolation -->\n<input [value]=\"username\" />                 <!-- property binding -->\n<button (click)=\"submit()\">Go</button>       <!-- event binding -->\n<input [(ngModel)]=\"username\" />             <!-- two-way binding -->",
               "note": "Each binding type and its syntax at a glance"
             },
-            "followUps": [
-              "Difference between `[src]` and `src={{ }}`?",
-              "How to bind an HTML attribute vs a DOM property?",
-              "How does two-way binding work without ngModel?"
-            ],
             "redFlags": [
               "Confusing HTML attributes with DOM properties",
               "Using `[(ngModel)]` in reactive forms",
               "Forgetting to import FormsModule"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are the four types of data binding?"
+              },
+              {
+                "role": "me",
+                "text": "Interpolation with `{{ }}`, property binding with `[prop]`, event binding with `(event)`, and two-way binding with `[(ngModel)]`."
+              },
+              {
+                "role": "interviewer",
+                "text": "What is two-way binding really doing under the hood?"
+              },
+              {
+                "role": "me",
+                "text": "It's just property binding down plus event binding up combined; the banana-in-a-box is `[prop]` paired with `(propChange)`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Does property binding set attributes or DOM properties?"
+              },
+              {
+                "role": "me",
+                "text": "DOM properties; for actual HTML attributes I use `[attr.x]`, for example `[attr.colspan]`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Difference between [src] and src={{ }}?",
+                "a": "`[src]` is property binding to an expression; `src=\"{{ }}\"` interpolates into the attribute string, fine for simple cases but not for non-string values."
+              },
+              {
+                "q": "How to bind an HTML attribute vs a DOM property?",
+                "a": "Use `[attr.name]` for attributes and `[property]` for DOM properties."
+              },
+              {
+                "q": "How does two-way binding work without ngModel?",
+                "a": "Pair an `@Input() x` with an `@Output() xChange` and the `[(x)]` syntax works.",
+                "relatedId": "angular-binding-003"
+              },
+              {
+                "q": "What module does [(ngModel)] need?",
+                "a": "`FormsModule`."
+              }
             ]
           }
         },
@@ -430,7 +1038,13 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["Promise", "Observable", "RxJS", "async", "reactive"],
+          "tags": [
+            "Promise",
+            "Observable",
+            "RxJS",
+            "async",
+            "reactive"
+          ],
           "answer": {
             "oneLiner": "A Promise is eager, resolves once, and can't be cancelled. An Observable is lazy, cancellable, can emit many values, and composes via RxJS operators.",
             "keyPoints": [
@@ -440,15 +1054,55 @@
               "Angular HTTP returns Observables; async pipe auto-manages them"
             ],
             "detail": "Bridge with `firstValueFrom()`/`lastValueFrom()` (Observable to Promise) and `from()` (Promise to Observable). Prefer Observables for HTTP, streams, and complex async pipelines.",
-            "followUps": [
-              "Why does HttpClient return an Observable?",
-              "How do you convert an Observable to a Promise?",
-              "`firstValueFrom` vs deprecated `toPromise`?"
-            ],
             "redFlags": [
               "Saying Observables are just fancier Promises",
               "Not knowing Observables are lazy",
               "Not knowing how to cancel an HTTP request"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Promise versus Observable, what's the difference?"
+              },
+              {
+                "role": "me",
+                "text": "A Promise is eager, resolves once, and can't be cancelled; an Observable is lazy, cancellable, can emit many values, and composes with RxJS operators."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does HttpClient return an Observable for a single response?"
+              },
+              {
+                "role": "me",
+                "text": "So you get cancellation via unsubscribe, retry and other operators, and it plays nicely with the async pipe."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you bridge to a Promise when you need one?"
+              },
+              {
+                "role": "me",
+                "text": "With `firstValueFrom()` or `lastValueFrom()`, since `toPromise()` is deprecated."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why does HttpClient return an Observable?",
+                "a": "For cancellation, operator composition, and async-pipe integration.",
+                "relatedId": "angular-binding-005"
+              },
+              {
+                "q": "How do you convert an Observable to a Promise?",
+                "a": "Use `firstValueFrom()` or `lastValueFrom()`."
+              },
+              {
+                "q": "firstValueFrom vs deprecated toPromise?",
+                "a": "`firstValueFrom` resolves on the first emission and rejects on empty; `toPromise` is removed and resolved only on completion."
+              },
+              {
+                "q": "Are Observables just fancier Promises?",
+                "a": "No, they're lazy, multi-value, and cancellable, which Promises aren't."
+              }
             ]
           }
         },
@@ -458,7 +1112,13 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["@Input", "@Output", "EventEmitter", "component communication", "parent-child"],
+          "tags": [
+            "@Input",
+            "@Output",
+            "EventEmitter",
+            "component communication",
+            "parent-child"
+          ],
           "answer": {
             "oneLiner": "@Input passes data down from parent to child; @Output emits events up from child to parent via EventEmitter.",
             "keyPoints": [
@@ -473,15 +1133,56 @@
               "snippet": "// Modern signal-based (Angular 17.1+)\nimport { input, output } from '@angular/core';\n\nexport class ProductCardComponent {\n  product = input.required<Product>(); // required input signal\n  addToCart = output<Product>();        // output signal\n\n  onAdd() {\n    this.addToCart.emit(this.product()); // call signal to read value\n  }\n}",
               "note": "Signal inputs are reactive — usable in computed() and effect() without ngOnChanges"
             },
-            "followUps": [
-              "How do you alias an @Input?",
-              "How do signal inputs affect change detection?",
-              "How to pass data between sibling components?"
-            ],
             "redFlags": [
               "Mutating an @Input directly in the child",
               "Not knowing @Output uses EventEmitter",
               "Not knowing signal input/output for a senior role"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do @Input and @Output enable communication?"
+              },
+              {
+                "role": "me",
+                "text": "`@Input` passes data down from parent to child, and `@Output` emits events up from child to parent via an EventEmitter."
+              },
+              {
+                "role": "interviewer",
+                "text": "What if two components aren't in a parent-child relationship?"
+              },
+              {
+                "role": "me",
+                "text": "Then I use a shared service or a state store rather than inputs and outputs."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any modern reactive flavour of these?"
+              },
+              {
+                "role": "me",
+                "text": "Yes, signal `input()` and `output()` from v17.1; the input is readable in `computed` and `effect` without needing `ngOnChanges`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you alias an @Input?",
+                "a": "Pass an alias string, like `@Input('userId') id`, or `input(..., { alias: 'userId' })`."
+              },
+              {
+                "q": "How do signal inputs affect change detection?",
+                "a": "They integrate with fine-grained reactivity, so reads track dependencies and trigger targeted updates.",
+                "relatedId": "angular-binding-009"
+              },
+              {
+                "q": "How to pass data between sibling components?",
+                "a": "Through a shared service or store both siblings inject.",
+                "relatedId": "angular-binding-007"
+              },
+              {
+                "q": "Should a child mutate an @Input directly?",
+                "a": "No, emit a change via @Output and let the parent own the data."
+              }
             ]
           }
         },
@@ -491,7 +1192,14 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["reactive forms", "template-driven forms", "FormControl", "ngModel", "validation", "forms"],
+          "tags": [
+            "reactive forms",
+            "template-driven forms",
+            "FormControl",
+            "ngModel",
+            "validation",
+            "forms"
+          ],
           "answer": {
             "oneLiner": "Reactive forms define the model in TypeScript (FormGroup/FormControl) for full control and testability; template-driven forms use ngModel in the template and suit simple cases.",
             "keyPoints": [
@@ -501,15 +1209,54 @@
               "Reactive forms are typed since Angular 14+"
             ],
             "detail": "Use reactive for complex, dynamic, or cross-field-validated forms; template-driven for quick simple forms. Don't mix ngModel and formControl on one element.",
-            "followUps": [
-              "How do you do cross-field validation in reactive forms?",
-              "What is FormArray and when to use it?",
-              "How do typed reactive forms help?"
-            ],
             "redFlags": [
               "Mixing ngModel and formControl on one element",
               "Not knowing how to read validation errors",
               "Choosing template-driven for a dynamic wizard"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Reactive forms versus template-driven, when do you use each?"
+              },
+              {
+                "role": "me",
+                "text": "Reactive forms define the model in TypeScript with `FormGroup` and `FormControl` for full control; template-driven forms use `ngModel` in the template and suit simple cases."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which would you pick for a dynamic multi-step wizard?"
+              },
+              {
+                "role": "me",
+                "text": "Reactive, because I can build controls dynamically, run cross-field validation, and unit-test the form model easily."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any recent improvement to reactive forms?"
+              },
+              {
+                "role": "me",
+                "text": "They've been strictly typed since Angular 14, so control values and form state carry real types."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you do cross-field validation in reactive forms?",
+                "a": "Add a validator at the FormGroup level that compares sibling controls."
+              },
+              {
+                "q": "What is FormArray and when to use it?",
+                "a": "A dynamic list of controls, ideal for repeating fields like multiple phone numbers."
+              },
+              {
+                "q": "How do typed reactive forms help?",
+                "a": "They catch type mismatches at compile time and improve editor autocomplete."
+              },
+              {
+                "q": "Can you mix ngModel and formControl on one element?",
+                "a": "No, that's an anti-pattern and will throw."
+              }
             ]
           }
         },
@@ -519,7 +1266,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["RxJS", "Observable", "operator", "subscription", "reactive programming"],
+          "tags": [
+            "RxJS",
+            "Observable",
+            "operator",
+            "subscription",
+            "reactive programming"
+          ],
           "answer": {
             "oneLiner": "RxJS is a reactive library built on Observables — lazy, composable, cancellable streams — with operators like map, filter, and switchMap to transform and combine them.",
             "keyPoints": [
@@ -534,15 +1287,57 @@
               "snippet": "searchResults$ = this.searchControl.valueChanges.pipe(\n  debounceTime(300),           // wait 300ms after last keystroke\n  distinctUntilChanged(),      // ignore if same as last value\n  filter(q => q.length > 2),   // minimum 3 chars\n  switchMap(q => this.api.search(q)), // cancel previous request\n  catchError(err => of([]))    // handle errors gracefully\n);",
               "note": "Typical type-ahead pipeline with debounce, distinct, and switchMap"
             },
-            "followUps": [
-              "Difference between map and switchMap?",
-              "combineLatest vs forkJoin?",
-              "How to handle errors without killing the stream?"
-            ],
             "redFlags": [
               "Nested subscriptions instead of flattening operators",
               "Not unsubscribing from infinite Observables",
               "Misusing switchMap when concatMap is needed"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is RxJS and what are Observables, operators, and subscriptions?"
+              },
+              {
+                "role": "me",
+                "text": "RxJS is a reactive library built on Observables, which are lazy, composable, cancellable streams; operators transform them via `.pipe()`, and a subscription is the actual execution."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where does Angular use RxJS for me automatically?"
+              },
+              {
+                "role": "me",
+                "text": "In HttpClient, the Router events, and form `valueChanges`, among others."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you avoid leaking subscriptions in templates?"
+              },
+              {
+                "role": "me",
+                "text": "I prefer the async pipe, which subscribes and unsubscribes for me."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Difference between map and switchMap?",
+                "a": "`map` transforms a value synchronously; `switchMap` maps to an inner observable and flattens it, cancelling the previous.",
+                "relatedId": "angular-advanced-003"
+              },
+              {
+                "q": "combineLatest vs forkJoin?",
+                "a": "`combineLatest` emits on every source change once all have emitted; `forkJoin` emits once when all complete."
+              },
+              {
+                "q": "How to handle errors without killing the stream?",
+                "a": "Use `catchError` inside the inner observable so the outer stream survives.",
+                "relatedId": "angular-advanced-003"
+              },
+              {
+                "q": "What makes a Subject special?",
+                "a": "It's both an Observable and an Observer, so it can multicast.",
+                "relatedId": "angular-binding-007"
+              }
             ]
           }
         },
@@ -552,7 +1347,14 @@
           "level": "mid",
           "type": "scenario",
           "freq": "high",
-          "tags": ["memory leak", "unsubscribe", "async pipe", "takeUntilDestroyed", "takeUntil", "RxJS"],
+          "tags": [
+            "memory leak",
+            "unsubscribe",
+            "async pipe",
+            "takeUntilDestroyed",
+            "takeUntil",
+            "RxJS"
+          ],
           "answer": {
             "oneLiner": "Use the async pipe (auto-unsubscribes), takeUntilDestroyed() (v16+), or a destroy$ Subject with takeUntil.",
             "keyPoints": [
@@ -567,15 +1369,56 @@
               "snippet": "export class MyComponent {\n  private destroyRef = inject(DestroyRef);\n\n  ngOnInit() {\n    this.dataService.stream$\n      .pipe(takeUntilDestroyed(this.destroyRef))\n      .subscribe(data => this.data = data);\n  }\n}",
               "note": "takeUntilDestroyed with an injected DestroyRef — the modern pattern"
             },
-            "followUps": [
-              "What is the DestroyRef token?",
-              "How does toSignal() handle cleanup?",
-              "Are HttpClient subscriptions safe to leave?"
-            ],
             "redFlags": [
               "Not knowing subscription leaks exist",
               "Only knowing the destroy$ pattern, not takeUntilDestroyed",
               "Thinking all HttpClient subscriptions always complete"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you prevent memory leaks from RxJS subscriptions?"
+              },
+              {
+                "role": "me",
+                "text": "The cleanest options are the async pipe, which auto-unsubscribes, or `takeUntilDestroyed()` from v16 for imperative subscriptions."
+              },
+              {
+                "role": "interviewer",
+                "text": "What about before takeUntilDestroyed existed?"
+              },
+              {
+                "role": "me",
+                "text": "The classic pattern is a `destroy$` Subject with `takeUntil(destroy$)`, completed in `ngOnDestroy`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Do you always need to unsubscribe?"
+              },
+              {
+                "role": "me",
+                "text": "No, finite streams like HTTP or `take(1)` complete on their own; it's the long-lived ones like `interval` or `switchMap` pipelines that need cleanup."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is the DestroyRef token?",
+                "a": "An injectable that lets you register cleanup callbacks tied to the owner's destruction."
+              },
+              {
+                "q": "How does toSignal() handle cleanup?",
+                "a": "It unsubscribes automatically when its injection context is destroyed.",
+                "relatedId": "angular-binding-009"
+              },
+              {
+                "q": "Are HttpClient subscriptions safe to leave?",
+                "a": "Mostly, since they complete after one emission, but a never-resolving request could still hang."
+              },
+              {
+                "q": "Why prefer the async pipe?",
+                "a": "It manages subscription lifecycle in the template, so you can't forget to unsubscribe.",
+                "relatedId": "angular-binding-005"
+              }
             ]
           }
         },
@@ -585,7 +1428,13 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["Subject", "BehaviorSubject", "ReplaySubject", "RxJS", "multicast"],
+          "tags": [
+            "Subject",
+            "BehaviorSubject",
+            "ReplaySubject",
+            "RxJS",
+            "multicast"
+          ],
           "answer": {
             "oneLiner": "Subject is a basic multicast; BehaviorSubject holds a current value for late subscribers; ReplaySubject replays N past values; AsyncSubject emits only the last value on complete.",
             "keyPoints": [
@@ -600,15 +1449,55 @@
               "snippet": "@Injectable({ providedIn: 'root' })\nexport class CartService {\n  private items$ = new BehaviorSubject<CartItem[]>([]);\n  readonly cart$ = this.items$.asObservable(); // expose as read-only Observable\n  \n  addItem(item: CartItem) {\n    this.items$.next([...this.items$.value, item]);\n  }\n}",
               "note": "asObservable() prevents consumers from calling .next() directly"
             },
-            "followUps": [
-              "Why expose BehaviorSubject as asObservable()?",
-              "When to choose ReplaySubject over BehaviorSubject?",
-              "BehaviorSubject vs a Signal for state?"
-            ],
             "redFlags": [
               "Not knowing BehaviorSubject needs an initial value",
               "Exposing the Subject itself so consumers can call .next()",
               "Confusing Subject with BehaviorSubject"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Compare Subject, BehaviorSubject, ReplaySubject, and AsyncSubject."
+              },
+              {
+                "role": "me",
+                "text": "Subject is a plain multicast, BehaviorSubject holds a current value for late subscribers, ReplaySubject replays the last N, and AsyncSubject emits only the final value on complete."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which would you use for shared state in a service?"
+              },
+              {
+                "role": "me",
+                "text": "Usually a BehaviorSubject, since new subscribers immediately get the current value and I can read `.value` synchronously."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you protect that state from outside mutation?"
+              },
+              {
+                "role": "me",
+                "text": "Expose it as `asObservable()` so consumers can subscribe but can't call `.next()`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why expose BehaviorSubject as asObservable()?",
+                "a": "To prevent consumers from pushing values and to keep the service the single writer."
+              },
+              {
+                "q": "When to choose ReplaySubject over BehaviorSubject?",
+                "a": "When you need more than one past value replayed, or you have no sensible initial value."
+              },
+              {
+                "q": "BehaviorSubject vs a Signal for state?",
+                "a": "Signals are synchronous and simpler for UI state; BehaviorSubject composes with RxJS operators.",
+                "relatedId": "angular-binding-009"
+              },
+              {
+                "q": "Does BehaviorSubject need an initial value?",
+                "a": "Yes, you must seed it with one."
+              }
             ]
           }
         },
@@ -618,7 +1507,13 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["hot observable", "cold observable", "multicast", "RxJS", "share"],
+          "tags": [
+            "hot observable",
+            "cold observable",
+            "multicast",
+            "RxJS",
+            "share"
+          ],
           "answer": {
             "oneLiner": "Cold Observables create a new producer per subscriber (each subscribe re-runs the HTTP call); hot Observables share one producer among all subscribers (WebSocket, DOM events).",
             "keyPoints": [
@@ -633,15 +1528,55 @@
               "snippet": "const shared$ = this.http.get('/api/data').pipe(\n  shareReplay(1) // one HTTP call, cached for late subscribers\n);\nshared$.subscribe(d => console.log('A:', d)); // triggers request\nshared$.subscribe(d => console.log('B:', d)); // gets cached value",
               "note": "shareReplay(1) dedupes the request and caches the result"
             },
-            "followUps": [
-              "share() vs shareReplay(1)?",
-              "What happens with async pipe twice on the same cold http$?",
-              "How would you cache API calls with shareReplay?"
-            ],
             "redFlags": [
               "Not knowing async pipe twice = two HTTP requests",
               "Confusing multicasting with caching",
               "Not knowing what shareReplay does"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between hot and cold Observables?"
+              },
+              {
+                "role": "me",
+                "text": "Cold Observables create a new producer per subscriber, so each subscribe re-runs the work; hot Observables share one producer among all subscribers."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me an example of each in Angular."
+              },
+              {
+                "role": "me",
+                "text": "`HttpClient.get` is cold, so two subscriptions fire two requests; `Router.events` or a Subject is hot and shared."
+              },
+              {
+                "role": "interviewer",
+                "text": "How would you stop a cold HTTP Observable firing twice?"
+              },
+              {
+                "role": "me",
+                "text": "Pipe it through `shareReplay(1)`, which makes it hot and caches the last value for late subscribers."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "share() vs shareReplay(1)?",
+                "a": "`share` multicasts live emissions; `shareReplay(1)` also caches and replays the last value to new subscribers."
+              },
+              {
+                "q": "What happens with async pipe twice on the same cold http$?",
+                "a": "Two subscriptions means two HTTP requests unless you share it.",
+                "relatedId": "angular-binding-005"
+              },
+              {
+                "q": "How would you cache API calls with shareReplay?",
+                "a": "Apply `shareReplay(1)` once and reuse the same observable reference everywhere."
+              },
+              {
+                "q": "Is multicasting the same as caching?",
+                "a": "No, multicasting shares a live stream; caching also replays a stored value."
+              }
             ]
           }
         },
@@ -651,7 +1586,14 @@
           "level": "senior",
           "type": "comparison",
           "freq": "high",
-          "tags": ["signals", "RxJS", "reactivity", "computed", "effect", "Angular 16"],
+          "tags": [
+            "signals",
+            "RxJS",
+            "reactivity",
+            "computed",
+            "effect",
+            "Angular 16"
+          ],
           "answer": {
             "oneLiner": "Signals (v16+) are synchronous, fine-grained reactive values that auto-track dependencies; RxJS is better for async streams. Use signals for state, RxJS for async flows.",
             "keyPoints": [
@@ -666,15 +1608,56 @@
               "snippet": "export class CounterComponent {\n  count = signal(0);\n  doubled = computed(() => this.count() * 2); // auto-updates\n  \n  increment() { this.count.update(n => n + 1); }\n}",
               "note": "computed() derives reactively; read signals by calling them"
             },
-            "followUps": [
-              "signal.set() vs signal.update()?",
-              "How does computed() avoid recomputation?",
-              "What is zoneless change detection?"
-            ],
             "redFlags": [
               "Thinking signals replace RxJS entirely",
               "Not knowing toSignal/toObservable",
               "Using effect() for state derivation instead of computed()"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are signals and how do they compare to RxJS?"
+              },
+              {
+                "role": "me",
+                "text": "Signals are synchronous, fine-grained reactive values that auto-track their dependencies; RxJS is better for async streams. I use signals for state and RxJS for async flows."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you derive a value from a signal?"
+              },
+              {
+                "role": "me",
+                "text": "With `computed()`, which lazily recomputes only when a tracked signal changes."
+              },
+              {
+                "role": "interviewer",
+                "text": "Do they replace RxJS?"
+              },
+              {
+                "role": "me",
+                "text": "No; RxJS still wins for async, time-based, and multicast scenarios, and I bridge with `toSignal()` and `toObservable()`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "signal.set() vs signal.update()?",
+                "a": "`set` replaces the value; `update` derives the new value from the current one."
+              },
+              {
+                "q": "How does computed() avoid recomputation?",
+                "a": "It's lazy and memoised, recomputing only on read after a dependency changed.",
+                "relatedId": "angular-advanced-004"
+              },
+              {
+                "q": "What is zoneless change detection?",
+                "a": "Running Angular without Zone.js, relying on signals and the async pipe to trigger updates.",
+                "relatedId": "angular-advanced-001"
+              },
+              {
+                "q": "When should you use effect() vs computed()?",
+                "a": "Use computed for derived state, effect only for side effects."
+              }
             ]
           }
         }
@@ -691,7 +1674,13 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["change detection", "Zone.js", "OnPush", "dirty checking", "performance"],
+          "tags": [
+            "change detection",
+            "Zone.js",
+            "OnPush",
+            "dirty checking",
+            "performance"
+          ],
           "answer": {
             "oneLiner": "Zone.js intercepts async events, then Angular walks the component tree top-down checking bindings. OnPush skips a component unless its input reference changes, it emits an event, or an async pipe emits.",
             "keyPoints": [
@@ -706,15 +1695,56 @@
               "snippet": "@Component({\n  selector: 'app-list',\n  changeDetection: ChangeDetectionStrategy.OnPush,\n  template: `\n    @for (item of items(); track item.id) {\n      <li>{{ item.name }}</li>\n    }\n  `\n})\nexport class ListComponent {\n  items = input<Item[]>([]);  // signal input — fine-grained reactivity\n}",
               "note": "OnPush + signal input = minimal change detection overhead"
             },
-            "followUps": [
-              "What if you mutate an array @Input on an OnPush component?",
-              "detectChanges() vs markForCheck()?",
-              "How do signals remove the need for Zone.js?"
-            ],
             "redFlags": [
               "Not knowing what Zone.js does",
               "Mutating data with OnPush and expecting updates",
               "Using detach() without detectChanges()"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does Angular change detection work?"
+              },
+              {
+                "role": "me",
+                "text": "Zone.js intercepts async events and triggers a cycle, then Angular walks the component tree top-down checking bindings; OnPush lets a component skip that unless something relevant changed."
+              },
+              {
+                "role": "interviewer",
+                "text": "What exactly triggers an OnPush component to re-check?"
+              },
+              {
+                "role": "me",
+                "text": "An input reference change, an event inside it, an async pipe emission, or an explicit `markForCheck()`."
+              },
+              {
+                "role": "interviewer",
+                "text": "So what's the gotcha with OnPush?"
+              },
+              {
+                "role": "me",
+                "text": "You must treat data as immutable; if you mutate an array in place the reference doesn't change, so OnPush won't pick it up."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What if you mutate an array @Input on an OnPush component?",
+                "a": "The reference stays the same, so change detection skips it and the view goes stale.",
+                "relatedId": "angular-advanced-010"
+              },
+              {
+                "q": "detectChanges() vs markForCheck()?",
+                "a": "`detectChanges` runs CD now for this view; `markForCheck` flags the path dirty for the next cycle."
+              },
+              {
+                "q": "How do signals remove the need for Zone.js?",
+                "a": "Signal changes notify dependents directly, so Angular can update without Zone.js scanning everything.",
+                "relatedId": "angular-advanced-004"
+              },
+              {
+                "q": "When would you use markForCheck()?",
+                "a": "For updates outside the event flow, like a WebSocket push into an OnPush component."
+              }
             ]
           }
         },
@@ -724,7 +1754,14 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["route guards", "CanActivate", "CanDeactivate", "Resolve", "routing", "security"],
+          "tags": [
+            "route guards",
+            "CanActivate",
+            "CanDeactivate",
+            "Resolve",
+            "routing",
+            "security"
+          ],
           "answer": {
             "oneLiner": "Guards control navigation: CanActivate blocks entry, CanDeactivate prevents leaving, CanActivateChild guards children, and Resolve pre-fetches data before activation.",
             "keyPoints": [
@@ -739,15 +1776,56 @@
               "snippet": "// Functional role guard\nexport const roleGuard = (requiredRole: string): CanActivateFn => {\n  return () => {\n    const auth = inject(AuthService);\n    return auth.hasRole(requiredRole) || inject(Router).createUrlTree(['/forbidden']);\n  };\n};\n\n// Usage in routes:\n{ path: 'admin', canActivate: [roleGuard('ADMIN')], ... }",
               "note": "Factory function pattern to create parameterised guards"
             },
-            "followUps": [
-              "CanActivate vs CanMatch?",
-              "How to guard on an async condition?",
-              "Resolve vs fetching in ngOnInit — perf impact?"
-            ],
             "redFlags": [
               "Using class guards when functional is the modern way",
               "Not knowing a UrlTree redirects",
               "Using Resolve on every route"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Explain the route guards."
+              },
+              {
+                "role": "me",
+                "text": "`CanActivate` blocks entering a route, `CanDeactivate` prevents leaving, `CanActivateChild` guards children, and `Resolve` pre-fetches data before activation."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you redirect instead of just blocking?"
+              },
+              {
+                "role": "me",
+                "text": "Return a `UrlTree` from the guard instead of `false`, and the router navigates there."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the modern way to write guards?"
+              },
+              {
+                "role": "me",
+                "text": "Functional guards, which are plain functions using `inject()`, instead of injectable classes."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "CanActivate vs CanMatch?",
+                "a": "CanActivate runs after a route matches; CanMatch decides whether the route config matches at all, useful for lazy loading.",
+                "relatedId": "angular-basics-007"
+              },
+              {
+                "q": "How to guard on an async condition?",
+                "a": "Return an Observable or Promise of boolean or UrlTree from the guard."
+              },
+              {
+                "q": "Resolve vs fetching in ngOnInit, perf impact?",
+                "a": "Resolve delays navigation until data is ready; ngOnInit lets the route render then load with a skeleton.",
+                "relatedId": "angular-advanced-009"
+              },
+              {
+                "q": "What happens if any guard returns false?",
+                "a": "Navigation is cancelled."
+              }
             ]
           }
         },
@@ -757,7 +1835,14 @@
           "level": "senior",
           "type": "comparison",
           "freq": "high",
-          "tags": ["switchMap", "mergeMap", "concatMap", "exhaustMap", "RxJS", "flattening"],
+          "tags": [
+            "switchMap",
+            "mergeMap",
+            "concatMap",
+            "exhaustMap",
+            "RxJS",
+            "flattening"
+          ],
           "answer": {
             "oneLiner": "All map a value to an inner Observable and flatten it; they differ in concurrency: switchMap cancels the previous, concatMap queues, mergeMap runs in parallel, exhaustMap ignores new emissions while busy.",
             "keyPoints": [
@@ -772,15 +1857,55 @@
               "snippet": "// switchMap — search\nthis.searchControl.valueChanges.pipe(\n  debounceTime(300),\n  switchMap(query => this.api.search(query))\n).subscribe(results => ...);\n\n// exhaustMap — login button\nthis.loginClick$.pipe(\n  exhaustMap(creds => this.auth.login(creds))\n).subscribe(...);\n\n// concatMap — upload queue\nfrom(fileQueue).pipe(\n  concatMap(file => this.upload(file))\n).subscribe(...);",
               "note": "Each operator matched to its idiomatic use case"
             },
-            "followUps": [
-              "What happens to an in-flight request when switchMap switches?",
-              "When does mergeMap break where concatMap works?",
-              "How does exhaustMap prevent duplicate button clicks?"
-            ],
             "redFlags": [
               "Using mergeMap for type-ahead (stale, out-of-order)",
               "Using switchMap for a save queue (cancels saves)",
               "Not knowing these operators at senior level"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "switchMap, mergeMap, concatMap, exhaustMap, what's the difference?"
+              },
+              {
+                "role": "me",
+                "text": "They all map to an inner observable and flatten, but differ in concurrency: switchMap cancels the previous, concatMap queues in order, mergeMap runs in parallel, and exhaustMap ignores new emissions while busy."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which for a type-ahead search box?"
+              },
+              {
+                "role": "me",
+                "text": "switchMap, so an outdated request is cancelled when the user keeps typing."
+              },
+              {
+                "role": "interviewer",
+                "text": "And for a login button you don't want double-firing?"
+              },
+              {
+                "role": "me",
+                "text": "exhaustMap, since it ignores extra clicks while the login request is in flight."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What happens to an in-flight request when switchMap switches?",
+                "a": "It unsubscribes and cancels the previous inner observable.",
+                "relatedId": "angular-binding-008"
+              },
+              {
+                "q": "When does mergeMap break where concatMap works?",
+                "a": "When order matters, like sequential saves, mergeMap can interleave and corrupt order."
+              },
+              {
+                "q": "How does exhaustMap prevent duplicate button clicks?",
+                "a": "It drops new outer values until the current inner observable completes."
+              },
+              {
+                "q": "Which preserves order for a write queue?",
+                "a": "concatMap."
+              }
             ]
           }
         },
@@ -790,7 +1915,14 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["signals", "computed", "effect", "reactivity", "Angular 16", "zoneless"],
+          "tags": [
+            "signals",
+            "computed",
+            "effect",
+            "reactivity",
+            "Angular 16",
+            "zoneless"
+          ],
           "answer": {
             "oneLiner": "Signals track read dependencies automatically; when a signal changes it marks only its dependent computeds and effects as dirty and updates them, no Zone.js needed.",
             "keyPoints": [
@@ -805,15 +1937,55 @@
               "snippet": "import { signal, computed, effect } from '@angular/core';\n\nconst firstName = signal('Jane');\nconst lastName = signal('Doe');\nconst fullName = computed(() => `${firstName()} ${lastName()}`);\n\neffect(() => console.log('Name is now:', fullName()));\n// Console: 'Name is now: Jane Doe'\n\nfirstName.set('John');\n// Console: 'Name is now: John Doe'  (auto re-runs)",
               "note": "computed() lazily derives; effect() eagerly runs side effects on dependency change"
             },
-            "followUps": [
-              "signal.set() vs signal.update()?",
-              "Can you use signals outside components?",
-              "What is linkedSignal?"
-            ],
             "redFlags": [
               "Thinking signals are just a BehaviorSubject wrapper",
               "Using effect() to derive state instead of computed()",
               "Not knowing computed() is lazy"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do signals work internally?"
+              },
+              {
+                "role": "me",
+                "text": "Reading a signal in a reactive context registers it as a dependency; when it changes, it marks only its dependent computeds and effects dirty, no Zone.js involved."
+              },
+              {
+                "role": "interviewer",
+                "text": "Is computed eager or lazy?"
+              },
+              {
+                "role": "me",
+                "text": "Lazy; it only recomputes when you read it after a dependency changed, and the result is memoised."
+              },
+              {
+                "role": "interviewer",
+                "text": "How would you describe the propagation model?"
+              },
+              {
+                "role": "me",
+                "text": "Push-pull: a change pushes a dirty flag down the dependency graph, and consumers pull the recomputed value lazily on read."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "signal.set() vs signal.update()?",
+                "a": "`set` assigns a value; `update` computes the next value from the current one.",
+                "relatedId": "angular-binding-009"
+              },
+              {
+                "q": "Can you use signals outside components?",
+                "a": "Yes, signals work in services and plain functions; effects need an injection context or manual cleanup."
+              },
+              {
+                "q": "What is linkedSignal?",
+                "a": "A writable signal that derives from a source but can be locally overridden, added in v18+."
+              },
+              {
+                "q": "Are signals just a BehaviorSubject wrapper?",
+                "a": "No, they're a synchronous dependency-tracking primitive, not an RxJS construct."
+              }
             ]
           }
         },
@@ -823,7 +1995,14 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["trackBy", "ngFor", "@for", "performance", "DOM recycling", "change detection"],
+          "tags": [
+            "trackBy",
+            "ngFor",
+            "@for",
+            "performance",
+            "DOM recycling",
+            "change detection"
+          ],
           "answer": {
             "oneLiner": "trackBy gives each list item a stable identity so Angular reuses DOM nodes when the list changes instead of destroying and recreating everything.",
             "keyPoints": [
@@ -838,15 +2017,55 @@
               "snippet": "<!-- Old *ngFor syntax -->\n<li *ngFor=\"let item of items; trackBy: trackById\">{{ item.name }}</li>\n\n<!-- Angular 17+ @for syntax (track required) -->\n@for (item of items; track item.id) {\n  <li>{{ item.name }}</li>\n}",
               "note": "trackById is a class method returning item.id; @for makes track mandatory"
             },
-            "followUps": [
-              "What happens to child state on reload without trackBy?",
-              "When is tracking by index acceptable?",
-              "How does required track in @for differ from optional trackBy?"
-            ],
             "redFlags": [
               "Not knowing what trackBy does",
               "Tracking by index when items can reorder",
               "Not knowing @for requires track"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What does trackBy do and why does it matter?"
+              },
+              {
+                "role": "me",
+                "text": "It gives each list item a stable identity, so when the array changes Angular reuses existing DOM nodes instead of destroying and recreating everything."
+              },
+              {
+                "role": "interviewer",
+                "text": "When does that really bite you?"
+              },
+              {
+                "role": "me",
+                "text": "When a list reloads from an API: the same logical items get brand-new object references, so without trackBy the whole list re-renders and child state is lost."
+              },
+              {
+                "role": "interviewer",
+                "text": "What changed in Angular 17's @for?"
+              },
+              {
+                "role": "me",
+                "text": "`track` is mandatory, so you can't accidentally omit it."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What happens to child state on reload without trackBy?",
+                "a": "Child components are destroyed and recreated, losing local state like focus or input.",
+                "relatedId": "angular-advanced-010"
+              },
+              {
+                "q": "When is tracking by index acceptable?",
+                "a": "For static lists that never reorder or get items inserted in the middle."
+              },
+              {
+                "q": "How does required track in @for differ from optional trackBy?",
+                "a": "@for enforces track at compile time; trackBy in *ngFor is optional and easy to forget."
+              },
+              {
+                "q": "What should trackBy return?",
+                "a": "A unique, stable identifier, usually item.id."
+              }
             ]
           }
         },
@@ -856,7 +2075,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["pure pipe", "impure pipe", "pipes", "performance", "transform"],
+          "tags": [
+            "pure pipe",
+            "impure pipe",
+            "pipes",
+            "performance",
+            "transform"
+          ],
           "answer": {
             "oneLiner": "Pure pipes (default) only re-run when the input reference changes, so they're fast. Impure pipes run every change detection cycle — expensive but needed for mutable inputs.",
             "keyPoints": [
@@ -871,15 +2096,54 @@
               "snippet": "@Pipe({ name: 'currencyFormat', pure: true, standalone: true })\nexport class CurrencyFormatPipe implements PipeTransform {\n  transform(value: number, currency = 'GBP'): string {\n    return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(value);\n  }\n}",
               "note": "Pure pipe result is cached unless value or args change by reference"
             },
-            "followUps": [
-              "Why is the async pipe impure?",
-              "How would you make an impure filter pipe pure?",
-              "Perf impact of many impure pipes?"
-            ],
             "redFlags": [
               "Not knowing what the pure property does",
               "Making filter/sort pipes impure without cost awareness",
               "Not knowing async is impure"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between pure and impure pipes?"
+              },
+              {
+                "role": "me",
+                "text": "Pure pipes, the default, only re-run when the input reference changes, so they're memoised and fast; impure pipes run on every change detection cycle."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me an impure pipe you use every day."
+              },
+              {
+                "role": "me",
+                "text": "The `async` pipe is impure, because it has to react to emissions over time, not just reference changes."
+              },
+              {
+                "role": "interviewer",
+                "text": "What about a filter pipe over a mutable array?"
+              },
+              {
+                "role": "me",
+                "text": "Rather than making it impure, I'd return a new array reference and keep the pipe pure, since impure pipes run constantly."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is the async pipe impure?",
+                "a": "It must re-evaluate as the underlying observable emits, not just on reference change."
+              },
+              {
+                "q": "How would you make an impure filter pipe pure?",
+                "a": "Filter in the component and emit a new array reference so a pure pipe detects the change."
+              },
+              {
+                "q": "Perf impact of many impure pipes?",
+                "a": "Each runs on every CD cycle, which can dominate frame time on large views."
+              },
+              {
+                "q": "Must pure pipes be side-effect free?",
+                "a": "Yes, they must be stateless and deterministic."
+              }
             ]
           }
         },
@@ -889,7 +2153,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["interceptor", "HttpClient", "middleware", "auth token", "error handling"],
+          "tags": [
+            "interceptor",
+            "HttpClient",
+            "middleware",
+            "auth token",
+            "error handling"
+          ],
           "answer": {
             "oneLiner": "Interceptors are middleware that sit on every HttpClient request and response — used for auth tokens, error handling, logging, and caching without touching each service call.",
             "keyPoints": [
@@ -904,15 +2174,54 @@
               "snippet": "export const authInterceptor: HttpInterceptorFn = (req, next) => {\n  const token = inject(AuthService).getToken();\n  if (!token) return next(req);\n  const authReq = req.clone({\n    headers: req.headers.set('Authorization', `Bearer ${token}`)\n  });\n  return next(authReq);\n};",
               "note": "Clone the immutable request to add a header"
             },
-            "followUps": [
-              "How to skip an interceptor for a specific request?",
-              "How to queue requests during a token refresh?",
-              "Does interceptor order matter?"
-            ],
             "redFlags": [
               "Not knowing requests are immutable and must be cloned",
               "Not knowing the functional interceptor syntax",
               "Adding auth headers in every service call manually"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are HTTP interceptors used for?"
+              },
+              {
+                "role": "me",
+                "text": "They're middleware on every HttpClient request and response, used for auth tokens, error handling, logging, and caching without touching each service call."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you modify an outgoing request?"
+              },
+              {
+                "role": "me",
+                "text": "Requests are immutable, so I clone them with `req.clone({...})` to add headers, then pass it to `next`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Does order matter when you register several?"
+              },
+              {
+                "role": "me",
+                "text": "Yes; requests flow through them in registration order and responses come back in reverse."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How to skip an interceptor for a specific request?",
+                "a": "Use an HttpContext token and check it inside the interceptor to bypass logic."
+              },
+              {
+                "q": "How to queue requests during a token refresh?",
+                "a": "Catch the 401, refresh once, and use a BehaviorSubject to hold and retry queued requests."
+              },
+              {
+                "q": "Does interceptor order matter?",
+                "a": "Yes, requests run in order and responses unwind in reverse."
+              },
+              {
+                "q": "Why must you clone the request?",
+                "a": "HttpRequest is immutable, so direct mutation isn't allowed."
+              }
             ]
           }
         },
@@ -922,7 +2231,13 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["defer", "deferrable views", "lazy loading", "performance", "Angular 17"],
+          "tags": [
+            "defer",
+            "deferrable views",
+            "lazy loading",
+            "performance",
+            "Angular 17"
+          ],
           "answer": {
             "oneLiner": "@defer is template syntax that lazily loads a component on a trigger (viewport, interaction, idle, etc.), improving initial bundle size and Core Web Vitals.",
             "keyPoints": [
@@ -937,15 +2252,55 @@
               "snippet": "@defer (on interaction; prefetch on idle) {\n  <app-comment-section [postId]=\"postId\" />\n} @placeholder {\n  <button>Load comments</button>\n}",
               "note": "Shows a button; prefetches the chunk when browser is idle; renders comments on click"
             },
-            "followUps": [
-              "How does @defer differ from lazy routes?",
-              "Can @defer depend on auth state?",
-              "@placeholder vs @loading?"
-            ],
             "redFlags": [
               "Not knowing @defer as a senior dev",
               "Thinking lazy loading is route-only",
               "Confusing @placeholder with @loading"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are deferrable views with @defer?"
+              },
+              {
+                "role": "me",
+                "text": "It's template syntax that lazily loads a block of UI on a trigger like viewport, interaction, or idle, which cuts the initial bundle and improves Core Web Vitals."
+              },
+              {
+                "role": "interviewer",
+                "text": "What sub-blocks does it support?"
+              },
+              {
+                "role": "me",
+                "text": "`@placeholder` before load, `@loading` while loading, and `@error` if it fails."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does it differ from lazy routes?"
+              },
+              {
+                "role": "me",
+                "text": "It works at the template level on any block, not just whole routes, and the compiler code-splits the chunk automatically."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How does @defer differ from lazy routes?",
+                "a": "It defers any template block, while lazy routes defer entire routed components.",
+                "relatedId": "angular-basics-007"
+              },
+              {
+                "q": "Can @defer depend on auth state?",
+                "a": "Yes, use the `when` trigger with a boolean condition."
+              },
+              {
+                "q": "@placeholder vs @loading?",
+                "a": "`@placeholder` shows before loading starts; `@loading` shows during the fetch."
+              },
+              {
+                "q": "What does prefetch do?",
+                "a": "It loads the chunk in the background on one trigger while rendering on another."
+              }
             ]
           }
         },
@@ -955,7 +2310,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["resolver", "Resolve", "routing", "data prefetch", "UX"],
+          "tags": [
+            "resolver",
+            "Resolve",
+            "routing",
+            "data prefetch",
+            "UX"
+          ],
           "answer": {
             "oneLiner": "A Resolver pre-fetches data before a route activates, so the data is ready in the component immediately — no in-component loading state.",
             "keyPoints": [
@@ -970,15 +2331,56 @@
               "snippet": "export const userResolver: ResolveFn<User> = (route) => {\n  const userService = inject(UserService);\n  const router = inject(Router);\n  return userService.getUser(route.paramMap.get('id')!).pipe(\n    catchError(() => {\n      router.navigate(['/not-found']);\n      return EMPTY; // prevents navigation if data load fails\n    })\n  );\n};",
               "note": "Return EMPTY to cancel navigation on error"
             },
-            "followUps": [
-              "What happens if a resolver returns EMPTY or throws?",
-              "How to pass resolver data to child routes?",
-              "Resolver vs ngOnInit fetch — UX trade-off?"
-            ],
             "redFlags": [
               "Using resolvers for optional sidebar content",
               "Not handling resolver errors (navigation hangs)",
               "Accessing route data with the wrong key"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's a route resolver and when do you use it?"
+              },
+              {
+                "role": "me",
+                "text": "It pre-fetches data before a route activates, so the component has its data ready immediately with no internal loading state."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does the component read that data?"
+              },
+              {
+                "role": "me",
+                "text": "From `ActivatedRoute`, usually `snapshot.data['key']` or the `data` observable."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any downside?"
+              },
+              {
+                "role": "me",
+                "text": "Navigation feels slower because the router waits, so for most pages a component skeleton gives better perceived UX; I reserve resolvers for data that's essential to render."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What happens if a resolver returns EMPTY or throws?",
+                "a": "Returning EMPTY cancels navigation; an unhandled error can leave navigation hanging, so handle it.",
+                "relatedId": "angular-advanced-002"
+              },
+              {
+                "q": "How to pass resolver data to child routes?",
+                "a": "Child routes can read parent route data via the ActivatedRoute hierarchy."
+              },
+              {
+                "q": "Resolver vs ngOnInit fetch, UX trade-off?",
+                "a": "Resolver delays the page until ready; ngOnInit renders fast with a skeleton.",
+                "relatedId": "angular-advanced-002"
+              },
+              {
+                "q": "What's the modern resolver syntax?",
+                "a": "A functional `ResolveFn<T>` using `inject()`."
+              }
             ]
           }
         },
@@ -988,7 +2390,13 @@
           "level": "senior",
           "type": "scenario",
           "freq": "high",
-          "tags": ["OnPush", "change detection", "immutability", "performance", "ChangeDetectorRef"],
+          "tags": [
+            "OnPush",
+            "change detection",
+            "immutability",
+            "performance",
+            "ChangeDetectorRef"
+          ],
           "answer": {
             "oneLiner": "OnPush skips a component's change detection unless its @Input reference changes, it emits an event, an async pipe emits, or markForCheck() is called — a big win for large trees.",
             "keyPoints": [
@@ -1003,15 +2411,56 @@
               "snippet": "// Works with OnPush (new reference):\nthis.items = [...this.items, newItem];\n\n// Breaks OnPush (mutation, same reference):\nthis.items.push(newItem);\n\n// Mark dirty from a WebSocket push:\nthis.price = price;\nthis.cd.markForCheck();",
               "note": "Immutable updates trigger OnPush; mutations don't"
             },
-            "followUps": [
-              "markForCheck() vs detectChanges()?",
-              "OnPush with data from a service (not @Input)?",
-              "Risks of ChangeDetectorRef.detach()?"
-            ],
             "redFlags": [
               "Mutating data and expecting OnPush to detect it",
               "Not knowing markForCheck vs detectChanges",
               "Not realising async pipe calls markForCheck"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does OnPush work in practice?"
+              },
+              {
+                "role": "me",
+                "text": "It skips a component's change detection unless its input reference changes, it emits an event, an async pipe emits, or `markForCheck()` is called."
+              },
+              {
+                "role": "interviewer",
+                "text": "Show me an update that works and one that breaks it."
+              },
+              {
+                "role": "me",
+                "text": "`this.items = [...this.items, x]` works because it's a new reference; `this.items.push(x)` breaks it because the reference is unchanged."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you handle a WebSocket push into an OnPush component?"
+              },
+              {
+                "role": "me",
+                "text": "Update the field and call `markForCheck()`, or pass the data as a signal so it propagates automatically."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "markForCheck() vs detectChanges()?",
+                "a": "`markForCheck` schedules a check up the tree for next cycle; `detectChanges` runs CD synchronously now.",
+                "relatedId": "angular-advanced-001"
+              },
+              {
+                "q": "OnPush with data from a service (not @Input)?",
+                "a": "Use the async pipe or signals, or call markForCheck on updates.",
+                "relatedId": "angular-binding-006"
+              },
+              {
+                "q": "Risks of ChangeDetectorRef.detach()?",
+                "a": "The view stops updating entirely until you reattach or call detectChanges manually."
+              },
+              {
+                "q": "Does the async pipe trigger OnPush?",
+                "a": "Yes, it calls markForCheck on each emission."
+              }
             ]
           }
         },
@@ -1021,7 +2470,13 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "low",
-          "tags": ["schematics", "CLI", "ng generate", "code generation", "automation"],
+          "tags": [
+            "schematics",
+            "CLI",
+            "ng generate",
+            "code generation",
+            "automation"
+          ],
           "answer": {
             "oneLiner": "Schematics are code-transformation scripts the CLI runs to scaffold files, modify code, and migrate APIs — behind ng generate, ng add, and ng update.",
             "keyPoints": [
@@ -1031,14 +2486,53 @@
               "Custom schematics enforce team architecture patterns"
             ],
             "detail": "Changes are atomic — only written if the whole schematic succeeds. Schematics can do AST manipulation (add imports, edit decorators).",
-            "followUps": [
-              "How would you write a custom team schematic?",
-              "ng add vs ng install?",
-              "How do update schematics differ from a package bump?"
-            ],
             "redFlags": [
               "Not knowing what runs behind ng generate/ng add",
               "Updating Angular without ng update (misses migrations)"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are Angular schematics?"
+              },
+              {
+                "role": "me",
+                "text": "They're code-transformation scripts the CLI runs to scaffold files, modify code, and migrate APIs; they power `ng generate`, `ng add`, and `ng update`."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do they actually work?"
+              },
+              {
+                "role": "me",
+                "text": "A schematic is a function that takes a virtual file Tree and returns a modified Tree, applied atomically so nothing is written unless the whole thing succeeds."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does ng update matter beyond bumping a version?"
+              },
+              {
+                "role": "me",
+                "text": "It runs migration schematics that automatically update your code for breaking API changes across major versions."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How would you write a custom team schematic?",
+                "a": "Author a Rule that manipulates the Tree, optionally with AST edits, and publish it as a collection."
+              },
+              {
+                "q": "ng add vs ng install?",
+                "a": "`ng add` installs and runs the package's setup schematic; plain install just adds the dependency."
+              },
+              {
+                "q": "How do update schematics differ from a package bump?",
+                "a": "They rewrite your code for breaking changes, not just change the version number."
+              },
+              {
+                "q": "Are schematic changes atomic?",
+                "a": "Yes, the Tree is only committed if the whole schematic succeeds."
+              }
             ]
           }
         },
@@ -1048,7 +2542,14 @@
           "level": "senior",
           "type": "scenario",
           "freq": "high",
-          "tags": ["performance", "optimization", "OnPush", "lazy loading", "bundle", "profiling"],
+          "tags": [
+            "performance",
+            "optimization",
+            "OnPush",
+            "lazy loading",
+            "bundle",
+            "profiling"
+          ],
           "answer": {
             "oneLiner": "Profile first (Angular DevTools, bundle analyser), then apply OnPush/signals, lazy load and @defer, use track in loops, prefer pure pipes over template methods, and trim the bundle.",
             "keyPoints": [
@@ -1063,15 +2564,57 @@
               "snippet": "<!-- Bad: function called every CD cycle -->\n<li *ngFor=\"let i of getItems()\">{{ formatName(i) }}</li>\n\n<!-- Good: signal or pure pipe -->\n@for (i of items(); track i.id) { <li>{{ i.name | titlecase }}</li> }",
               "note": "Avoid method calls in templates; use signals/pure pipes with track"
             },
-            "followUps": [
-              "How to find which component causes excessive CD?",
-              "Method in template vs pure pipe — impact?",
-              "How does SSR improve performance metrics?"
-            ],
             "redFlags": [
               "Optimising without profiling first",
               "Applying OnPush everywhere without immutability",
               "Not knowing DevTools or bundle analyser"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you optimise a slow Angular app?"
+              },
+              {
+                "role": "me",
+                "text": "Profile first with Angular DevTools and a bundle analyser, then apply OnPush or signals, lazy load with routes and `@defer`, use track in loops, prefer pure pipes, and trim the bundle."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why profile before changing anything?"
+              },
+              {
+                "role": "me",
+                "text": "So I fix the real bottleneck instead of guessing; the slowdown might be change detection, a huge dependency, or a chatty template."
+              },
+              {
+                "role": "interviewer",
+                "text": "One template anti-pattern you'd hunt for?"
+              },
+              {
+                "role": "me",
+                "text": "Method calls in templates, since they re-run every change detection cycle; I'd switch to a signal or a pure pipe."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How to find which component causes excessive CD?",
+                "a": "Use Angular DevTools' profiler flame chart to see CD time per component."
+              },
+              {
+                "q": "Method in template vs pure pipe, impact?",
+                "a": "A method runs every CD cycle; a pure pipe is memoised and only re-runs on input change.",
+                "relatedId": "angular-advanced-006"
+              },
+              {
+                "q": "How does SSR improve performance metrics?",
+                "a": "It serves rendered HTML for faster LCP and better perceived load.",
+                "relatedId": "angular-basics-005"
+              },
+              {
+                "q": "What cuts the initial bundle most?",
+                "a": "Lazy routes and `@defer` blocks plus removing heavy dependencies.",
+                "relatedId": "angular-advanced-008"
+              }
             ]
           }
         },
@@ -1081,7 +2624,13 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["ViewEncapsulation", "viewProviders", "styles", "shadow DOM", "scoping"],
+          "tags": [
+            "ViewEncapsulation",
+            "viewProviders",
+            "styles",
+            "shadow DOM",
+            "scoping"
+          ],
           "answer": {
             "oneLiner": "ViewEncapsulation controls how a component's CSS is scoped; viewProviders is unrelated — it scopes DI providers to the component's view only (not its projected content).",
             "keyPoints": [
@@ -1095,8 +2644,55 @@
               "snippet": "@Component({\n  selector: 'app-card',\n  encapsulation: ViewEncapsulation.Emulated,\n  viewProviders: [CardStateService], // available to view, not projected content\n  template: `...`\n})\nexport class CardComponent {}",
               "note": "encapsulation = style scoping; viewProviders = DI scoping — different concerns."
             },
-            "followUps": ["Emulated vs ShadowDom trade-offs?", "providers vs viewProviders?"],
-            "redFlags": ["Conflating viewProviders with style encapsulation", "Using None and wondering why styles leak"]
+            "redFlags": [
+              "Conflating viewProviders with style encapsulation",
+              "Using None and wondering why styles leak"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Explain ViewEncapsulation and how viewProviders differs."
+              },
+              {
+                "role": "me",
+                "text": "ViewEncapsulation controls how a component's CSS is scoped; viewProviders is unrelated and scopes DI providers to the component's view only, not its projected content."
+              },
+              {
+                "role": "interviewer",
+                "text": "What are the encapsulation modes?"
+              },
+              {
+                "role": "me",
+                "text": "Emulated, the default, scopes styles with generated attributes; None makes them global; ShadowDom uses native Shadow DOM for true isolation."
+              },
+              {
+                "role": "interviewer",
+                "text": "So what does viewProviders actually do?"
+              },
+              {
+                "role": "me",
+                "text": "It provides a service to the component's own view but withholds it from content projected in through `<ng-content>`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Emulated vs ShadowDom trade-offs?",
+                "a": "Emulated is portable and works everywhere; ShadowDom gives real isolation but limits global style theming."
+              },
+              {
+                "q": "providers vs viewProviders?",
+                "a": "`providers` is visible to the view and projected content; `viewProviders` only to the view.",
+                "relatedId": "angular-advanced-019"
+              },
+              {
+                "q": "Why do styles leak with None?",
+                "a": "Because Angular doesn't scope them, so they become global CSS."
+              },
+              {
+                "q": "Is viewProviders about styling?",
+                "a": "No, it's purely DI scoping."
+              }
+            ]
           }
         },
         {
@@ -1105,7 +2701,13 @@
           "level": "mid",
           "type": "code",
           "freq": "medium",
-          "tags": ["custom directive", "structural directive", "attribute directive", "selector", "TemplateRef"],
+          "tags": [
+            "custom directive",
+            "structural directive",
+            "attribute directive",
+            "selector",
+            "TemplateRef"
+          ],
           "answer": {
             "oneLiner": "A directive is an @Directive class with a CSS selector; attribute directives change an element via ElementRef/HostBinding, while structural directives inject TemplateRef + ViewContainerRef to add/remove DOM.",
             "keyPoints": [
@@ -1119,8 +2721,56 @@
               "snippet": "@Directive({ selector: '[appUnless]', standalone: true })\nexport class UnlessDirective {\n  constructor(private tpl: TemplateRef<any>, private vcr: ViewContainerRef) {}\n  @Input() set appUnless(cond: boolean) {\n    cond ? this.vcr.clear() : this.vcr.createEmbeddedView(this.tpl);\n  }\n}",
               "note": "Structural directive: TemplateRef + ViewContainerRef to conditionally render."
             },
-            "followUps": ["Why only one structural directive per element?", "How does *appUnless expand?"],
-            "redFlags": ["Not knowing structural directives use TemplateRef/ViewContainerRef", "Confusing the * sugar"]
+            "redFlags": [
+              "Not knowing structural directives use TemplateRef/ViewContainerRef",
+              "Confusing the * sugar"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you write a custom directive?"
+              },
+              {
+                "role": "me",
+                "text": "Create an `@Directive` class with a CSS attribute selector; an attribute directive changes the host via ElementRef or HostBinding, while a structural one injects `TemplateRef` and `ViewContainerRef`."
+              },
+              {
+                "role": "interviewer",
+                "text": "So what makes it structural specifically?"
+              },
+              {
+                "role": "me",
+                "text": "It uses `TemplateRef` and `ViewContainerRef` to add or remove DOM, like building your own `*ngIf`."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the asterisk doing for a structural directive?"
+              },
+              {
+                "role": "me",
+                "text": "It's sugar that wraps the host element in an `<ng-template>` and passes the directive input to it."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why only one structural directive per element?",
+                "a": "Each needs its own template wrapper, so they'd conflict; use ng-container to combine.",
+                "relatedId": "angular-basics-002"
+              },
+              {
+                "q": "How does *appUnless expand?",
+                "a": "Into an `<ng-template [appUnless]=\"...\">` wrapping the element."
+              },
+              {
+                "q": "What does an attribute directive inject?",
+                "a": "Typically ElementRef and uses HostBinding/HostListener to affect the host.",
+                "relatedId": "angular-advanced-015"
+              },
+              {
+                "q": "What selector form marks an attribute directive?",
+                "a": "A bracketed selector like `[appHighlight]`."
+              }
+            ]
           }
         },
         {
@@ -1129,7 +2779,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["HostListener", "HostBinding", "directive", "host element", "DOM events"],
+          "tags": [
+            "HostListener",
+            "HostBinding",
+            "directive",
+            "host element",
+            "DOM events"
+          ],
           "answer": {
             "oneLiner": "@HostListener subscribes to events on the host element; @HostBinding binds a property/attribute/class/style of the host element — both commonly used inside directives.",
             "keyPoints": [
@@ -1143,8 +2799,55 @@
               "snippet": "@Directive({ selector: '[appHover]', standalone: true })\nexport class HoverDirective {\n  @HostBinding('class.hovered') hovered = false;\n  @HostListener('mouseenter') onEnter() { this.hovered = true; }\n  @HostListener('mouseleave') onLeave() { this.hovered = false; }\n}",
               "note": "HostListener reacts to events; HostBinding reflects state onto the host."
             },
-            "followUps": ["HostBinding vs Renderer2?", "How to pass $event to a HostListener?"],
-            "redFlags": ["Manipulating the DOM directly instead of HostBinding", "Not knowing they work in directives"]
+            "redFlags": [
+              "Manipulating the DOM directly instead of HostBinding",
+              "Not knowing they work in directives"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are @HostListener and @HostBinding for?"
+              },
+              {
+                "role": "me",
+                "text": "`@HostListener` subscribes to events on the host element, and `@HostBinding` binds a property, class, or style of the host; both are common inside directives."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why use them instead of ElementRef and Renderer2?"
+              },
+              {
+                "role": "me",
+                "text": "They're declarative and avoid manual DOM wiring, which is cleaner and integrates with change detection."
+              },
+              {
+                "role": "interviewer",
+                "text": "How would you build a hover-highlight directive?"
+              },
+              {
+                "role": "me",
+                "text": "HostListener for `mouseenter`/`mouseleave` to flip a flag, and HostBinding on `class.hovered` to reflect it."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "HostBinding vs Renderer2?",
+                "a": "HostBinding is declarative for the host; Renderer2 is imperative and works on any element safely across platforms."
+              },
+              {
+                "q": "How to pass $event to a HostListener?",
+                "a": "Add `['$event']` as the second argument, like `@HostListener('click', ['$event'])`."
+              },
+              {
+                "q": "Can these be used outside directives?",
+                "a": "Yes, they also work in components since a component is a directive.",
+                "relatedId": "angular-advanced-014"
+              },
+              {
+                "q": "Why prefer HostBinding over direct DOM writes?",
+                "a": "It stays in Angular's rendering pipeline and is SSR-safe."
+              }
+            ]
           }
         },
         {
@@ -1153,7 +2856,13 @@
           "level": "junior",
           "type": "code",
           "freq": "low",
-          "tags": ["component", "manual", "decorator", "no CLI", "bootstrap"],
+          "tags": [
+            "component",
+            "manual",
+            "decorator",
+            "no CLI",
+            "bootstrap"
+          ],
           "answer": {
             "oneLiner": "Write a TypeScript class, decorate it with @Component (selector, template/templateUrl, styles), make it standalone or declare it in a module, then use its selector in a parent template.",
             "keyPoints": [
@@ -1167,8 +2876,55 @@
               "snippet": "import { Component } from '@angular/core';\n\n@Component({\n  selector: 'app-badge',\n  standalone: true,\n  template: `<span class=\"badge\">{{ label }}</span>`\n})\nexport class BadgeComponent { label = 'New'; }",
               "note": "No CLI needed — the @Component decorator is all that defines a component."
             },
-            "followUps": ["What does the CLI actually generate beyond this?", "How to register it without standalone?"],
-            "redFlags": ["Thinking the CLI is required to make a component", "Forgetting to import a standalone component"]
+            "redFlags": [
+              "Thinking the CLI is required to make a component",
+              "Forgetting to import a standalone component"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you create a component without the CLI?"
+              },
+              {
+                "role": "me",
+                "text": "Write a TypeScript class, decorate it with `@Component` giving a selector, template, and styles, mark it standalone, then use its selector in a parent."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does the parent get to use it?"
+              },
+              {
+                "role": "me",
+                "text": "For a standalone component, add it to the parent's `imports` array, then reference it by its selector tag."
+              },
+              {
+                "role": "interviewer",
+                "text": "So is the CLI strictly necessary?"
+              },
+              {
+                "role": "me",
+                "text": "No, the `@Component` decorator is all that defines a component; the CLI just saves you the boilerplate and wiring."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does the CLI actually generate beyond this?",
+                "a": "The class, template, styles, a spec file, and any module or import wiring."
+              },
+              {
+                "q": "How to register it without standalone?",
+                "a": "Declare it in an NgModule's `declarations` and export it if other modules need it.",
+                "relatedId": "angular-basics-008"
+              },
+              {
+                "q": "What's the minimum a component needs?",
+                "a": "A class with `@Component` specifying at least a template."
+              },
+              {
+                "q": "Why might you forget to import a standalone component?",
+                "a": "There's no module declaration, so it must be in the consumer's imports or it won't render."
+              }
+            ]
           }
         },
         {
@@ -1177,7 +2933,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["styles", "ViewEncapsulation", "scoped CSS", "component styles", "host"],
+          "tags": [
+            "styles",
+            "ViewEncapsulation",
+            "scoped CSS",
+            "component styles",
+            "host"
+          ],
           "answer": {
             "oneLiner": "Put styles in the component's `styles`/`styleUrls`; with default Emulated encapsulation Angular rewrites selectors with a unique attribute so they only apply to that component's own elements.",
             "keyPoints": [
@@ -1191,8 +2953,55 @@
               "snippet": "@Component({\n  selector: 'app-panel',\n  styles: [`:host { display: block; } .title { color: navy; }`],\n  template: `<h2 class=\"title\">Panel</h2>`\n})\nexport class PanelComponent {}",
               "note": ".title here won't affect any other component's .title elements."
             },
-            "followUps": ["What does :host do?", "Why avoid ::ng-deep?"],
-            "redFlags": ["Using ::ng-deep as the default tool", "Not knowing styles are scoped by default"]
+            "redFlags": [
+              "Using ::ng-deep as the default tool",
+              "Not knowing styles are scoped by default"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you scope styles to a component?"
+              },
+              {
+                "role": "me",
+                "text": "Put them in the component's `styles` or `styleUrls`; with the default Emulated encapsulation Angular rewrites selectors with a unique attribute so they only hit that component's elements."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you style the component's own root element?"
+              },
+              {
+                "role": "me",
+                "text": "With the `:host` selector, and `:host-context(...)` to react to an ancestor class."
+              },
+              {
+                "role": "interviewer",
+                "text": "What about reaching into a child's styles?"
+              },
+              {
+                "role": "me",
+                "text": "I avoid `::ng-deep` since it's deprecated; I'd expose CSS custom properties or restructure instead."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does :host do?",
+                "a": "It targets the component's own host element from inside its styles."
+              },
+              {
+                "q": "Why avoid ::ng-deep?",
+                "a": "It's deprecated and breaks encapsulation by leaking styles into children."
+              },
+              {
+                "q": "Are component styles scoped by default?",
+                "a": "Yes, Emulated encapsulation scopes them automatically.",
+                "relatedId": "angular-advanced-013"
+              },
+              {
+                "q": "How do you intentionally make a style global?",
+                "a": "Use ViewEncapsulation.None or put it in global styles.css."
+              }
+            ]
           }
         },
         {
@@ -1201,7 +3010,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["constructor", "ngOnChanges", "ngOnInit", "lifecycle", "inputs"],
+          "tags": [
+            "constructor",
+            "ngOnChanges",
+            "ngOnInit",
+            "lifecycle",
+            "inputs"
+          ],
           "answer": {
             "oneLiner": "The constructor runs before @Inputs are set and is for DI only; logic that reacts to inputs belongs in ngOnChanges (every input change) or ngOnInit (after first inputs are bound).",
             "keyPoints": [
@@ -1215,8 +3030,55 @@
               "snippet": "ngOnChanges(changes: SimpleChanges) {\n  if (changes['userId']) {\n    this.loadUser(this.userId); // react to input changes here, not in ctor\n  }\n}",
               "note": "Inputs are guaranteed set in ngOnChanges/ngOnInit, never in the constructor."
             },
-            "followUps": ["Why are @Inputs undefined in the constructor?", "ngOnChanges vs ngOnInit?"],
-            "redFlags": ["Reading @Input values in the constructor", "Doing HTTP in the constructor"]
+            "redFlags": [
+              "Reading @Input values in the constructor",
+              "Doing HTTP in the constructor"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Why shouldn't the constructor do heavy work?"
+              },
+              {
+                "role": "me",
+                "text": "Because it runs before inputs are set and is really only for dependency injection; reading inputs there gives undefined and heavy or async work hurts testability and timing."
+              },
+              {
+                "role": "interviewer",
+                "text": "So where does input-reactive logic go?"
+              },
+              {
+                "role": "me",
+                "text": "In `ngOnChanges`, which fires on every input change with old and new values, or `ngOnInit` after the first inputs are bound."
+              },
+              {
+                "role": "interviewer",
+                "text": "Quick example of something that belongs in ngOnChanges?"
+              },
+              {
+                "role": "me",
+                "text": "Reloading a user when an `@Input() userId` changes, since the constructor wouldn't see the new value."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why are @Inputs undefined in the constructor?",
+                "a": "Inputs are set during binding, which happens after construction.",
+                "relatedId": "angular-basics-004"
+              },
+              {
+                "q": "ngOnChanges vs ngOnInit?",
+                "a": "ngOnChanges runs on every input change; ngOnInit runs once after the first inputs are set."
+              },
+              {
+                "q": "Is doing HTTP in the constructor a problem?",
+                "a": "Yes, it couples construction to side effects and hurts testability; do it in ngOnInit."
+              },
+              {
+                "q": "What is the constructor good for?",
+                "a": "Injecting dependencies and simple field initialization."
+              }
+            ]
           }
         },
         {
@@ -1225,7 +3087,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["providers", "component scope", "DI", "service instance", "hierarchical injector"],
+          "tags": [
+            "providers",
+            "component scope",
+            "DI",
+            "service instance",
+            "hierarchical injector"
+          ],
           "answer": {
             "oneLiner": "Add the service to the component's `providers: []` array — Angular's hierarchical injector then creates a fresh instance per component instance, destroyed with the component.",
             "keyPoints": [
@@ -1239,8 +3107,55 @@
               "snippet": "@Component({\n  selector: 'app-widget',\n  standalone: true,\n  providers: [WidgetStateService], // new instance per <app-widget>\n  template: `...`\n})\nexport class WidgetComponent {\n  private state = inject(WidgetStateService);\n}",
               "note": "Component-level providers scope and isolate the service to that component subtree."
             },
-            "followUps": ["providers vs viewProviders?", "What happens to the instance on destroy?"],
-            "redFlags": ["Thinking providedIn:'root' can be per-component", "Not knowing the hierarchical injector"]
+            "redFlags": [
+              "Thinking providedIn:'root' can be per-component",
+              "Not knowing the hierarchical injector"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you give a service a single instance per component?"
+              },
+              {
+                "role": "me",
+                "text": "Add it to the component's `providers` array; the hierarchical injector then creates a fresh instance per component instance."
+              },
+              {
+                "role": "interviewer",
+                "text": "When is that instance destroyed?"
+              },
+              {
+                "role": "me",
+                "text": "When the component is destroyed, so it's perfect for per-component state isolation."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does that differ from providedIn: 'root'?"
+              },
+              {
+                "role": "me",
+                "text": "`providedIn: 'root'` is one shared singleton for the whole app, whereas component providers give a separate instance per component."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "providers vs viewProviders?",
+                "a": "`providers` is visible to the view and projected content; `viewProviders` only to the view.",
+                "relatedId": "angular-advanced-013"
+              },
+              {
+                "q": "What happens to the instance on destroy?",
+                "a": "It's torn down with the component, and ngOnDestroy on the service runs."
+              },
+              {
+                "q": "Can providedIn: 'root' be per-component?",
+                "a": "No, it's always an app-wide singleton."
+              },
+              {
+                "q": "Why use a component-scoped service?",
+                "a": "To isolate state so each component instance has its own."
+              }
+            ]
           }
         },
         {
@@ -1249,7 +3164,14 @@
           "level": "mid",
           "type": "scenario",
           "freq": "medium",
-          "tags": ["forms", "state", "CanDeactivate", "service", "navigation", "UX"],
+          "tags": [
+            "forms",
+            "state",
+            "CanDeactivate",
+            "service",
+            "navigation",
+            "UX"
+          ],
           "answer": {
             "oneLiner": "Lift the form state out of the component into a shared service (or a store), and optionally use a CanDeactivate guard to warn before discarding unsaved changes.",
             "keyPoints": [
@@ -1263,8 +3185,57 @@
               "snippet": "export const unsavedGuard: CanDeactivateFn<FormComponent> =\n  (cmp) => cmp.form.pristine || confirm('Discard unsaved changes?');",
               "note": "Guard prevents accidental data loss; a service preserves data on intentional navigation."
             },
-            "followUps": ["Service state vs sessionStorage trade-off?", "How does CanDeactivate get the component?"],
-            "redFlags": ["Keeping all state inside the component (lost on destroy)", "No warning before discarding edits"]
+            "redFlags": [
+              "Keeping all state inside the component (lost on destroy)",
+              "No warning before discarding edits"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you preserve form data when a user navigates away and back?"
+              },
+              {
+                "role": "me",
+                "text": "Lift the form state out of the component into a shared service or store, so it survives the component being destroyed, and rehydrate the form in ngOnInit."
+              },
+              {
+                "role": "interviewer",
+                "text": "What about warning them before they lose unsaved edits?"
+              },
+              {
+                "role": "me",
+                "text": "A `CanDeactivate` guard that checks if the form is dirty and confirms before leaving."
+              },
+              {
+                "role": "interviewer",
+                "text": "And surviving a full page reload?"
+              },
+              {
+                "role": "me",
+                "text": "Persist to sessionStorage or localStorage and restore on init."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Service state vs sessionStorage trade-off?",
+                "a": "Service state survives navigation within the app; storage also survives reloads but needs serialization.",
+                "relatedId": "angular-binding-007"
+              },
+              {
+                "q": "How does CanDeactivate get the component?",
+                "a": "The router passes the component instance as the first argument to the guard.",
+                "relatedId": "angular-advanced-002"
+              },
+              {
+                "q": "Where do you rehydrate the form?",
+                "a": "In ngOnInit from the service or storage.",
+                "relatedId": "angular-basics-004"
+              },
+              {
+                "q": "What's the risk of keeping all state in the component?",
+                "a": "It's lost when the component is destroyed on navigation."
+              }
+            ]
           }
         }
       ]
@@ -1280,7 +3251,13 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["micro-frontends", "module federation", "webpack", "architecture", "scaling"],
+          "tags": [
+            "micro-frontends",
+            "module federation",
+            "webpack",
+            "architecture",
+            "scaling"
+          ],
           "answer": {
             "oneLiner": "Micro-frontends split a UI into independently built and deployed apps; Module Federation (webpack) lets one app load another's code at runtime, even sharing dependencies.",
             "keyPoints": [
@@ -1294,8 +3271,54 @@
               "snippet": "// webpack.config — Module Federation remote\nnew ModuleFederationPlugin({\n  name: 'checkout',\n  exposes: { './Cart': './src/app/cart/cart.component.ts' },\n  shared: ['@angular/core', '@angular/common']\n});",
               "note": "Host imports remote modules at runtime; shared singletons avoid duplicate framework loads."
             },
-            "followUps": ["What are the downsides of micro-frontends?", "How are shared dependencies handled?"],
-            "redFlags": ["Adopting micro-frontends for a tiny single-team app", "Not knowing about shared deps"]
+            "redFlags": [
+              "Adopting micro-frontends for a tiny single-team app",
+              "Not knowing about shared deps"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are micro-frontends and Module Federation?"
+              },
+              {
+                "role": "me",
+                "text": "Micro-frontends split a UI into independently built and deployed apps; Module Federation, a webpack feature, lets a host app load another app's code at runtime and share dependencies."
+              },
+              {
+                "role": "interviewer",
+                "text": "How are shared frameworks handled so you don't ship Angular twice?"
+              },
+              {
+                "role": "me",
+                "text": "You list them in the `shared` config so the host and remotes dedupe them to a single shared singleton."
+              },
+              {
+                "role": "interviewer",
+                "text": "When would you avoid this architecture?"
+              },
+              {
+                "role": "me",
+                "text": "For a small single-team app, where the operational complexity outweighs the benefit; it really pays off when many teams ship independently."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What are the downsides of micro-frontends?",
+                "a": "Operational complexity, version skew across teams, and harder cross-app consistency."
+              },
+              {
+                "q": "How are shared dependencies handled?",
+                "a": "Via the `shared` config that dedupes common libs into singletons."
+              },
+              {
+                "q": "What is a host vs a remote?",
+                "a": "The host loads and orchestrates remotes, which expose modules to be consumed at runtime."
+              },
+              {
+                "q": "Is Module Federation tied to webpack?",
+                "a": "It originated in webpack 5, though Native Federation brings the concept to esbuild builds."
+              }
+            ]
           }
         },
         {
@@ -1304,7 +3327,13 @@
           "level": "mid",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["react", "virtual DOM", "reconciliation", "diffing", "rendering"],
+          "tags": [
+            "react",
+            "virtual DOM",
+            "reconciliation",
+            "diffing",
+            "rendering"
+          ],
           "answer": {
             "oneLiner": "React keeps an in-memory virtual DOM tree, diffs the new tree against the old (reconciliation), and patches only the changed real DOM nodes; Angular uses incremental DOM with no virtual tree.",
             "keyPoints": [
@@ -1313,8 +3342,56 @@
               "Only the minimal real-DOM changes are applied",
               "Angular's Ivy compiles templates to instructions — no intermediate tree"
             ],
-            "followUps": ["What is reconciliation?", "Why do keys matter in React lists?"],
-            "redFlags": ["Saying the VDOM is always faster than the real DOM", "Not knowing Angular has no VDOM"]
+            "redFlags": [
+              "Saying the VDOM is always faster than the real DOM",
+              "Not knowing Angular has no VDOM"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's React's virtual DOM and how does Angular differ?"
+              },
+              {
+                "role": "me",
+                "text": "React keeps an in-memory virtual DOM, diffs the new tree against the old in reconciliation, and patches only the changed real nodes; Angular uses incremental DOM with no virtual tree."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does reconciliation buy React?"
+              },
+              {
+                "role": "me",
+                "text": "It minimises real-DOM mutations by computing the smallest set of changes from the diff."
+              },
+              {
+                "role": "interviewer",
+                "text": "So how does Angular avoid a virtual tree?"
+              },
+              {
+                "role": "me",
+                "text": "Ivy compiles each template into instructions that update specific nodes directly, so there's no intermediate tree to build or diff."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is reconciliation?",
+                "a": "React's process of diffing the new virtual DOM against the previous one to find minimal real-DOM updates."
+              },
+              {
+                "q": "Why do keys matter in React lists?",
+                "a": "They give items stable identity so React reuses nodes instead of re-rendering, like Angular's trackBy.",
+                "relatedId": "angular-advanced-005"
+              },
+              {
+                "q": "Does Angular have a virtual DOM?",
+                "a": "No, it uses incremental DOM via Ivy.",
+                "relatedId": "angular-basics-005"
+              },
+              {
+                "q": "Is the virtual DOM always faster?",
+                "a": "No, it's a strategy with overhead; both approaches perform well in practice."
+              }
+            ]
           }
         },
         {
@@ -1323,7 +3400,13 @@
           "level": "mid",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["react", "hooks", "useMemo", "useRef", "memoization"],
+          "tags": [
+            "react",
+            "hooks",
+            "useMemo",
+            "useRef",
+            "memoization"
+          ],
           "answer": {
             "oneLiner": "useMemo caches an expensive computed value between renders until its dependencies change; useRef holds a mutable value (or a DOM node) that persists across renders without causing re-renders.",
             "keyPoints": [
@@ -1337,8 +3420,55 @@
               "snippet": "const sorted = useMemo(() => items.sort(cmp), [items]);\nconst inputRef = useRef<HTMLInputElement>(null);\n// inputRef.current?.focus();",
               "note": "useMemo recomputes only when deps change; useRef.current mutates silently."
             },
-            "followUps": ["useMemo vs useCallback?", "Why doesn't updating a ref re-render?"],
-            "redFlags": ["Using state for a value that shouldn't trigger renders", "Memoising trivial computations"]
+            "redFlags": [
+              "Using state for a value that shouldn't trigger renders",
+              "Memoising trivial computations"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are useMemo and useRef, and when do you use each?"
+              },
+              {
+                "role": "me",
+                "text": "`useMemo` caches an expensive computed value between renders until its deps change; `useRef` holds a mutable value or DOM node that persists across renders without triggering a re-render."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why doesn't changing a ref re-render the component?"
+              },
+              {
+                "role": "me",
+                "text": "Because `useRef` writes to `.current` outside React's state system, so React doesn't schedule a render."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any caution on useMemo?"
+              },
+              {
+                "role": "me",
+                "text": "Don't overuse it; memoisation has its own cost, so it's only worth it for genuinely expensive work."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "useMemo vs useCallback?",
+                "a": "`useMemo` memoises a value; `useCallback` memoises a function reference."
+              },
+              {
+                "q": "Why doesn't updating a ref re-render?",
+                "a": "Ref writes bypass state, so no render is scheduled."
+              },
+              {
+                "q": "What's the Angular analogue of useMemo?",
+                "a": "A `computed()` signal, which memoises a derived value.",
+                "relatedId": "angular-binding-009"
+              },
+              {
+                "q": "How do you grab a DOM node with a ref?",
+                "a": "Attach the ref to an element and read `ref.current`."
+              }
+            ]
           }
         },
         {
@@ -1347,7 +3477,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["react", "context", "prop drilling", "state sharing", "provider"],
+          "tags": [
+            "react",
+            "context",
+            "prop drilling",
+            "state sharing",
+            "provider"
+          ],
           "answer": {
             "oneLiner": "Context lets you provide a value at a high level and consume it anywhere below without threading props through every intermediate component — it solves prop drilling.",
             "keyPoints": [
@@ -1361,8 +3497,55 @@
               "snippet": "const ThemeCtx = createContext('light');\n// <ThemeCtx.Provider value={theme}>...</ThemeCtx.Provider>\nconst theme = useContext(ThemeCtx); // read anywhere below",
               "note": "Conceptually similar to an Angular service provided high in the injector tree."
             },
-            "followUps": ["When use a state library over Context?", "Why can Context hurt performance?"],
-            "redFlags": ["Using Context for high-frequency updates", "Not knowing it solves prop drilling"]
+            "redFlags": [
+              "Using Context for high-frequency updates",
+              "Not knowing it solves prop drilling"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's React's Context API and what problem does it solve?"
+              },
+              {
+                "role": "me",
+                "text": "Context lets you provide a value high in the tree and consume it anywhere below with `useContext`, so it solves prop drilling through components that don't need the data."
+              },
+              {
+                "role": "interviewer",
+                "text": "What kind of values suit Context?"
+              },
+              {
+                "role": "me",
+                "text": "Relatively stable cross-cutting values like theme, auth, or locale."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the performance caveat?"
+              },
+              {
+                "role": "me",
+                "text": "When the context value changes, all consumers re-render, so it's a poor fit for high-frequency updates."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "When use a state library over Context?",
+                "a": "For frequent updates or complex global state where selective subscriptions matter."
+              },
+              {
+                "q": "Why can Context hurt performance?",
+                "a": "Every consumer re-renders on any value change."
+              },
+              {
+                "q": "What's the Angular analogue?",
+                "a": "A service provided high in the injector tree and injected where needed.",
+                "relatedId": "angular-basics-009"
+              },
+              {
+                "q": "What three pieces make up Context?",
+                "a": "`createContext`, a `Provider`, and `useContext` to read."
+              }
+            ]
           }
         }
       ]

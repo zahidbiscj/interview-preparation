@@ -13,7 +13,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["typeof", "types", "fundamentals"],
+          "tags": [
+            "typeof",
+            "types",
+            "fundamentals"
+          ],
           "answer": {
             "oneLiner": "JS is dynamically typed and checks the type at runtime; you inspect it with the `typeof` operator.",
             "keyPoints": [
@@ -27,7 +31,50 @@
               "snippet": "typeof 42;        // 'number'\ntypeof 'hi';      // 'string'\ntypeof null;      // 'object'  (!)\ntypeof undefined; // 'undefined'\ntypeof [];        // 'object'\nArray.isArray([]);// true",
               "note": "typeof null === 'object' is the famous gotcha"
             },
-            "followUps": ["Why is typeof null 'object'?", "How do you check if something is an array?"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you check the type of a value in JavaScript?"
+              },
+              {
+                "role": "me",
+                "text": "I'd use the `typeof` operator since JS is dynamically typed and resolves types at runtime."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any cases where `typeof` misleads you?"
+              },
+              {
+                "role": "me",
+                "text": "Yes — `typeof null` returns `'object'`, which is a legacy bug, and arrays also report `'object'`."
+              },
+              {
+                "role": "interviewer",
+                "text": "So how do you reliably detect an array?"
+              },
+              {
+                "role": "me",
+                "text": "I use `Array.isArray()`, and for class instances I'd reach for `instanceof` to walk the prototype chain."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why is `typeof null` 'object'?",
+                "a": "A first-version bug — null's type tag overlapped with objects and was kept for back-compat."
+              },
+              {
+                "q": "How do you check if something is an array?",
+                "a": "`Array.isArray(x)` — `typeof` just says 'object'."
+              },
+              {
+                "q": "What does `typeof` return for a function?",
+                "a": "`'function'`, even though functions are objects."
+              },
+              {
+                "q": "How do you check a value is a plain object?",
+                "a": "`Object.prototype.toString.call(x) === '[object Object]'` or check it's an object and not array/null."
+              }
+            ]
           }
         },
         {
@@ -36,7 +83,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["NaN", "number", "coercion"],
+          "tags": [
+            "NaN",
+            "number",
+            "coercion"
+          ],
           "answer": {
             "oneLiner": "NaN means 'Not a Number' — the result of an invalid numeric operation, and it's the only value not equal to itself.",
             "keyPoints": [
@@ -49,7 +100,54 @@
               "snippet": "Number('abc');      // NaN\nNaN === NaN;        // false\nNumber.isNaN(NaN);  // true",
               "note": "Output: NaN, false, true"
             },
-            "redFlags": ["Using `x === NaN` to test", "Thinking NaN is its own type"]
+            "redFlags": [
+              "Using `x === NaN` to test",
+              "Thinking NaN is its own type"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is `NaN`?"
+              },
+              {
+                "role": "me",
+                "text": "It stands for 'Not a Number' — the result of an invalid numeric operation like `Number('abc')` or `0/0`."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's surprising about comparing it?"
+              },
+              {
+                "role": "me",
+                "text": "`NaN === NaN` is `false` — it's the only JS value not equal to itself, so equality checks don't work."
+              },
+              {
+                "role": "interviewer",
+                "text": "So how do you test for it safely?"
+              },
+              {
+                "role": "me",
+                "text": "I use `Number.isNaN()`, which is reliable; I avoid the global `isNaN()` because it coerces its argument first."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does `typeof NaN` return?",
+                "a": "`'number'` — NaN is a numeric value."
+              },
+              {
+                "q": "Why avoid the global `isNaN()`?",
+                "a": "It coerces — `isNaN('abc')` is true; `Number.isNaN('abc')` is false."
+              },
+              {
+                "q": "Name two ways to produce NaN.",
+                "a": "`0/0` and `Number('abc')` (or `parseInt('x')`)."
+              },
+              {
+                "q": "How else can you detect NaN?",
+                "a": "`x !== x` is true only for NaN."
+              }
+            ]
           }
         },
         {
@@ -58,7 +156,13 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["hoisting", "var", "let", "const", "tdz"],
+          "tags": [
+            "hoisting",
+            "var",
+            "let",
+            "const",
+            "tdz"
+          ],
           "answer": {
             "oneLiner": "Declarations are moved to the top of their scope: `var` is hoisted and initialized to undefined, function declarations are fully hoisted, and `let`/`const` are hoisted but sit in the Temporal Dead Zone until declared.",
             "keyPoints": [
@@ -72,7 +176,51 @@
               "snippet": "console.log(a); // undefined (var hoisted)\nvar a = 1;\nbar();          // works (function hoisted)\nfunction bar(){}\nconsole.log(b); // ReferenceError (TDZ)\nlet b = 2;",
               "note": "var=undefined, function=callable, let=TDZ ReferenceError"
             },
-            "followUps": ["What is the Temporal Dead Zone?"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Walk me through hoisting for `var`, function declarations, and `let`/`const`."
+              },
+              {
+                "role": "me",
+                "text": "`var` is hoisted and initialized to `undefined`, function declarations are hoisted whole, and `let`/`const` are hoisted but stay in the Temporal Dead Zone."
+              },
+              {
+                "role": "interviewer",
+                "text": "So what happens if I read a `let` before its line?"
+              },
+              {
+                "role": "me",
+                "text": "You get a `ReferenceError` — it exists but isn't initialized yet, that's the TDZ."
+              },
+              {
+                "role": "interviewer",
+                "text": "And calling a function before its declaration?"
+              },
+              {
+                "role": "me",
+                "text": "That works for a function *declaration* since it's fully hoisted; a function *expression* follows its variable's hoisting rules instead."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is the Temporal Dead Zone?",
+                "a": "The span from entering scope until a `let`/`const` is declared, where accessing it throws.",
+                "relatedId": "js-fund-003"
+              },
+              {
+                "q": "Is a function expression hoisted?",
+                "a": "Only its variable is — the assignment isn't, so calling early fails."
+              },
+              {
+                "q": "What value does a hoisted `var` have before assignment?",
+                "a": "`undefined`."
+              },
+              {
+                "q": "Are `let` and `const` hoisted at all?",
+                "a": "Yes, to the top of the block, but uninitialized (TDZ) until declared."
+              }
+            ]
           }
         },
         {
@@ -81,7 +229,12 @@
           "level": "junior",
           "type": "comparison",
           "freq": "high",
-          "tags": ["var", "let", "const", "scope"],
+          "tags": [
+            "var",
+            "let",
+            "const",
+            "scope"
+          ],
           "answer": {
             "oneLiner": "`var` is function-scoped and hoisted; `let` and `const` are block-scoped with a TDZ, and `const` can't be reassigned.",
             "keyPoints": [
@@ -95,7 +248,54 @@
               "snippet": "const obj = { x: 1 };\nobj.x = 2;     // OK — contents mutable\n// obj = {};   // TypeError — can't reassign",
               "note": "const locks the binding, not the value"
             },
-            "redFlags": ["Saying const makes objects immutable"]
+            "redFlags": [
+              "Saying const makes objects immutable"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between `var`, `let`, and `const`?"
+              },
+              {
+                "role": "me",
+                "text": "`var` is function-scoped and hoisted; `let` and `const` are block-scoped with a TDZ, and `const` can't be reassigned."
+              },
+              {
+                "role": "interviewer",
+                "text": "If `const` can't change, can I mutate a const object?"
+              },
+              {
+                "role": "me",
+                "text": "Yes — `const` locks the binding, not the value, so I can still mutate the object's contents."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which would you default to?"
+              },
+              {
+                "role": "me",
+                "text": "I default to `const`, switch to `let` only when I need reassignment, and avoid `var` entirely."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Does `const` make an object immutable?",
+                "a": "No — only the binding is fixed; use `Object.freeze` for shallow immutability."
+              },
+              {
+                "q": "Can you redeclare a `let` in the same scope?",
+                "a": "No — it throws a SyntaxError; `var` allows redeclaration."
+              },
+              {
+                "q": "What scope does `var` use?",
+                "a": "Function scope (or global), ignoring block braces.",
+                "relatedId": "js-fund-004"
+              },
+              {
+                "q": "Why avoid `var`?",
+                "a": "Function-scoping and hoisting-to-undefined cause subtle bugs; block scope is clearer."
+              }
+            ]
           }
         },
         {
@@ -104,7 +304,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["template-literals", "strings", "es6"],
+          "tags": [
+            "template-literals",
+            "strings",
+            "es6"
+          ],
           "answer": {
             "oneLiner": "Backtick strings that support `${}` interpolation, multi-line text, and tagged templates.",
             "keyPoints": [
@@ -116,7 +320,47 @@
               "lang": "javascript",
               "snippet": "const name = 'Sam';\nconst msg = `Hi ${name},\nwelcome!`;",
               "note": "Interpolation + multi-line"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are template literals?"
+              },
+              {
+                "role": "me",
+                "text": "Backtick strings that support `${}` interpolation and span multiple lines without manual concatenation."
+              },
+              {
+                "role": "interviewer",
+                "text": "What advantage over normal string concatenation?"
+              },
+              {
+                "role": "me",
+                "text": "Cleaner embedding of expressions and real multi-line text, so no `+` and `\\n` clutter."
+              },
+              {
+                "role": "interviewer",
+                "text": "Heard of tagged templates?"
+              },
+              {
+                "role": "me",
+                "text": "Yes — you prefix the literal with a function that receives the string parts and interpolated values, handy for escaping or i18n."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Can you nest expressions inside `${}`?",
+                "a": "Yes — any valid JS expression, including ternaries or function calls."
+              },
+              {
+                "q": "What is a tagged template used for?",
+                "a": "Custom processing of parts — e.g. styled-components, SQL escaping, i18n."
+              },
+              {
+                "q": "Do template literals support multi-line strings?",
+                "a": "Yes — line breaks inside the backticks are preserved."
+              }
+            ]
           }
         },
         {
@@ -125,7 +369,11 @@
           "level": "junior",
           "type": "comparison",
           "freq": "high",
-          "tags": ["null", "undefined", "types"],
+          "tags": [
+            "null",
+            "undefined",
+            "types"
+          ],
           "answer": {
             "oneLiner": "`undefined` means a variable was declared but never assigned (set by JS); `null` is an intentional 'no value' that you assign.",
             "keyPoints": [
@@ -137,7 +385,51 @@
               "lang": "javascript",
               "snippet": "let a;            // undefined\nlet b = null;     // null\nnull == undefined;// true\nnull === undefined;// false",
               "note": "== is true, === is false"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Difference between `null` and `undefined`?"
+              },
+              {
+                "role": "me",
+                "text": "`undefined` means a variable was declared but never assigned — JS sets it; `null` is an intentional 'no value' that I assign."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do they compare with `==` versus `===`?"
+              },
+              {
+                "role": "me",
+                "text": "`null == undefined` is `true` due to coercion, but `null === undefined` is `false` since the types differ."
+              },
+              {
+                "role": "interviewer",
+                "text": "And their `typeof`?"
+              },
+              {
+                "role": "me",
+                "text": "`typeof undefined` is `'undefined'`, while `typeof null` is `'object'` — the classic legacy quirk."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "When would you deliberately use `null`?",
+                "a": "To explicitly signal 'no value' — e.g. clearing a reference or an empty API field."
+              },
+              {
+                "q": "What does `typeof null` return?",
+                "a": "`'object'` — a known legacy bug."
+              },
+              {
+                "q": "How does `??` treat them?",
+                "a": "Nullish coalescing falls back only for `null` or `undefined`, not other falsy values."
+              },
+              {
+                "q": "Is `null == 0` true?",
+                "a": "No — `null` only loosely equals `undefined`."
+              }
+            ]
           }
         },
         {
@@ -146,7 +438,11 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["this", "arrow-functions", "binding"],
+          "tags": [
+            "this",
+            "arrow-functions",
+            "binding"
+          ],
           "answer": {
             "oneLiner": "Regular functions bind `this` by how they're called (call-site); arrow functions have no own `this` — they inherit it from the enclosing scope (lexical).",
             "keyPoints": [
@@ -160,7 +456,51 @@
               "snippet": "const obj = {\n  val: 1,\n  reg() { return this.val; },          // 1\n  arr: () => this?.val                   // undefined (lexical this)\n};",
               "note": "Regular this=obj, arrow this=outer scope"
             },
-            "followUps": ["What does this point to in a plain function call?", "How does bind work?"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does `this` differ between regular and arrow functions?"
+              },
+              {
+                "role": "me",
+                "text": "A regular function's `this` is set by the call-site, while an arrow function has no own `this` and inherits it lexically."
+              },
+              {
+                "role": "interviewer",
+                "text": "So in a method called as `obj.fn()`, what is `this`?"
+              },
+              {
+                "role": "me",
+                "text": "It's `obj` — the object before the dot. If I called it plain it'd be `undefined` in strict mode or the global object otherwise."
+              },
+              {
+                "role": "interviewer",
+                "text": "Can `bind` change an arrow function's `this`?"
+              },
+              {
+                "role": "me",
+                "text": "No — arrows ignore `call`/`apply`/`bind`; that's why they're great for callbacks where you want to keep the outer `this`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does `this` point to in a plain function call?",
+                "a": "`undefined` in strict mode, otherwise the global object.",
+                "relatedId": "js-fund-007"
+              },
+              {
+                "q": "How does `bind` work?",
+                "a": "It returns a new function with `this` permanently set to the given object."
+              },
+              {
+                "q": "Why use an arrow for a callback?",
+                "a": "It keeps the enclosing `this`, avoiding the lost-`this` bug in handlers."
+              },
+              {
+                "q": "Can you change an arrow function's `this`?",
+                "a": "No — it's lexically fixed; `call/apply/bind` have no effect."
+              }
+            ]
           }
         },
         {
@@ -169,7 +509,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["higher-order", "functional", "callbacks"],
+          "tags": [
+            "higher-order",
+            "functional",
+            "callbacks"
+          ],
           "answer": {
             "oneLiner": "Functions that take other functions as arguments and/or return a function — the basis of functional programming in JS.",
             "keyPoints": [
@@ -181,7 +525,47 @@
               "lang": "javascript",
               "snippet": "const double = x => x * 2;\n[1, 2, 3].map(double); // [2, 4, 6]\n\nconst adder = a => b => a + b; // returns a function",
               "note": "map takes a function; adder returns one"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's a higher-order function?"
+              },
+              {
+                "role": "me",
+                "text": "A function that takes another function as an argument and/or returns a function."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me an everyday example."
+              },
+              {
+                "role": "me",
+                "text": "`Array.prototype.map` — it takes a callback. And a curried adder like `a => b => a + b` returns a function."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why do they matter?"
+              },
+              {
+                "role": "me",
+                "text": "They enable composition and reuse — the foundation of functional patterns like map/filter/reduce."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Name three built-in higher-order array methods.",
+                "a": "`map`, `filter`, `reduce`."
+              },
+              {
+                "q": "Is a closure factory a higher-order function?",
+                "a": "Yes — it returns a function, which qualifies."
+              },
+              {
+                "q": "What's a callback?",
+                "a": "A function passed to another function to be invoked later."
+              }
+            ]
           }
         },
         {
@@ -190,7 +574,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["coercion", "type-conversion", "equality"],
+          "tags": [
+            "coercion",
+            "type-conversion",
+            "equality"
+          ],
           "answer": {
             "oneLiner": "JS auto-converts types when operators or comparisons require it — implicit coercion that drives many surprising results.",
             "keyPoints": [
@@ -204,7 +592,54 @@
               "snippet": "'5' + 1;   // '51' (string concat)\n'5' - 1;   // 4    (numeric)\n0 == '';   // true (coerced)\n0 === '';  // false",
               "note": "'5'+1='51', '5'-1=4, 0=='' true, 0==='' false"
             },
-            "redFlags": ["Using == everywhere", "Not knowing the falsy list"]
+            "redFlags": [
+              "Using == everywhere",
+              "Not knowing the falsy list"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is type coercion?"
+              },
+              {
+                "role": "me",
+                "text": "It's JS automatically converting a value's type when an operator or comparison needs it."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does `'5' + 1` give versus `'5' - 1`?"
+              },
+              {
+                "role": "me",
+                "text": "`'5' + 1` is `'51'` because `+` concatenates with a string, but `'5' - 1` is `4` since `-` forces numeric conversion."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you avoid coercion surprises?"
+              },
+              {
+                "role": "me",
+                "text": "I always use `===` over `==`, and I keep the falsy list memorized: `0`, `''`, `null`, `undefined`, `NaN`, `false`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why prefer `===` over `==`?",
+                "a": "`===` skips coercion, so comparisons are predictable."
+              },
+              {
+                "q": "List the falsy values.",
+                "a": "`0`, `''`, `null`, `undefined`, `NaN`, `false`."
+              },
+              {
+                "q": "Is `[]` truthy?",
+                "a": "Yes — all objects, including empty arrays and `{}`, are truthy."
+              },
+              {
+                "q": "What is `'5' - 1`?",
+                "a": "`4` — `-` coerces the string to a number."
+              }
+            ]
           }
         },
         {
@@ -213,7 +648,10 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["strict-mode", "use-strict"],
+          "tags": [
+            "strict-mode",
+            "use-strict"
+          ],
           "answer": {
             "oneLiner": "A safer JS mode enabled with `'use strict';` that turns silent mistakes into errors and disables some sloppy behaviour.",
             "keyPoints": [
@@ -226,7 +664,51 @@
               "lang": "javascript",
               "snippet": "'use strict';\nx = 10; // ReferenceError: x is not defined",
               "note": "Undeclared assignment throws in strict mode"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is strict mode?"
+              },
+              {
+                "role": "me",
+                "text": "A safer JS variant enabled with `'use strict';` that turns silent errors into thrown errors."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me a concrete thing it catches."
+              },
+              {
+                "role": "me",
+                "text": "Assigning to an undeclared variable throws a `ReferenceError` instead of silently creating a global."
+              },
+              {
+                "role": "interviewer",
+                "text": "Do I always need to add the directive?"
+              },
+              {
+                "role": "me",
+                "text": "Not in modules or class bodies — those run in strict mode by default."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you enable strict mode?",
+                "a": "Put `'use strict';` at the top of a file or function."
+              },
+              {
+                "q": "What is `this` in a plain call under strict mode?",
+                "a": "`undefined` instead of the global object."
+              },
+              {
+                "q": "Are ES modules strict by default?",
+                "a": "Yes — and so are class bodies."
+              },
+              {
+                "q": "Name a benefit of strict mode.",
+                "a": "It prevents accidental global variable creation."
+              }
+            ]
           }
         },
         {
@@ -235,7 +717,11 @@
           "level": "mid",
           "type": "code",
           "freq": "high",
-          "tags": ["closures", "scope", "counter"],
+          "tags": [
+            "closures",
+            "scope",
+            "counter"
+          ],
           "answer": {
             "oneLiner": "A closure is a function that remembers and accesses variables from its outer scope even after that outer function has returned.",
             "keyPoints": [
@@ -249,7 +735,51 @@
               "note": "Output: 1 then 2 — count is private and persists"
             },
             "analogy": "Like a backpack the function carries with the variables it needs.",
-            "followUps": ["How do closures cause memory leaks?", "Classic var-in-a-loop closure bug?"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is a closure?"
+              },
+              {
+                "role": "me",
+                "text": "A function that remembers and keeps accessing variables from its outer scope even after that outer function returns."
+              },
+              {
+                "role": "interviewer",
+                "text": "Walk me through the counter example output."
+              },
+              {
+                "role": "me",
+                "text": "`makeCounter` returns an arrow over a private `count`; calling `c()` logs `1` then `2` because the same `count` persists across calls."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does `count` survive after `makeCounter` returns?"
+              },
+              {
+                "role": "me",
+                "text": "Because the returned function holds a live reference to it, so the variable isn't garbage-collected — that's the closure."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do closures cause memory leaks?",
+                "a": "They keep outer variables alive; holding large objects in a long-lived closure leaks them."
+              },
+              {
+                "q": "Classic var-in-a-loop closure bug?",
+                "a": "`var` shares one binding so all callbacks see the final value; use `let` for per-iteration scope."
+              },
+              {
+                "q": "What's a real-world use of closures?",
+                "a": "Data privacy, counters, factories, memoization, and event handlers."
+              },
+              {
+                "q": "What does the counter print on the first two calls?",
+                "a": "`1` then `2` — `count` persists privately.",
+                "relatedId": "js-fund-011"
+              }
+            ]
           }
         },
         {
@@ -258,7 +788,11 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["shallow-copy", "deep-copy", "objects"],
+          "tags": [
+            "shallow-copy",
+            "deep-copy",
+            "objects"
+          ],
           "answer": {
             "oneLiner": "A shallow copy duplicates only the top level (nested objects are shared by reference); a deep copy recursively clones everything so nothing is shared.",
             "keyPoints": [
@@ -272,7 +806,54 @@
               "snippet": "const o = { a: 1, nested: { b: 2 } };\nconst shallow = { ...o };\nshallow.nested.b = 99;\no.nested.b; // 99 — shared reference!\nconst deep = structuredClone(o);",
               "note": "Shallow shares nested objects; deep does not"
             },
-            "redFlags": ["Thinking spread deep-copies", "JSON method for objects with functions/Dates"]
+            "redFlags": [
+              "Thinking spread deep-copies",
+              "JSON method for objects with functions/Dates"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Shallow copy versus deep copy?"
+              },
+              {
+                "role": "me",
+                "text": "Shallow copies only the top level so nested objects are shared by reference; deep copy recursively clones everything."
+              },
+              {
+                "role": "interviewer",
+                "text": "In the example, why does `o.nested.b` become `99`?"
+              },
+              {
+                "role": "me",
+                "text": "Because the spread only copied the top level, so `shallow.nested` is the same object as `o.nested` — mutating one affects both."
+              },
+              {
+                "role": "interviewer",
+                "text": "How would you do a true deep copy?"
+              },
+              {
+                "role": "me",
+                "text": "I'd use `structuredClone(o)`; the `JSON.parse(JSON.stringify())` trick works but drops functions, `undefined`, and Dates."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Does spread deep-copy?",
+                "a": "No — it's shallow; nested objects stay shared."
+              },
+              {
+                "q": "What does the JSON deep-copy trick drop?",
+                "a": "Functions, `undefined`, Dates (becomes string), and symbols."
+              },
+              {
+                "q": "What's the modern deep-copy API?",
+                "a": "`structuredClone(value)`."
+              },
+              {
+                "q": "Name three shallow-copy techniques.",
+                "a": "Spread `{...o}`, `Object.assign`, and `Array.slice`."
+              }
+            ]
           }
         },
         {
@@ -281,7 +862,11 @@
           "level": "junior",
           "type": "comparison",
           "freq": "high",
-          "tags": ["localStorage", "sessionStorage", "web-storage"],
+          "tags": [
+            "localStorage",
+            "sessionStorage",
+            "web-storage"
+          ],
           "answer": {
             "oneLiner": "Both store key/value strings per origin; localStorage persists until cleared, sessionStorage lasts only for the browser tab/session.",
             "keyPoints": [
@@ -294,7 +879,51 @@
               "lang": "javascript",
               "snippet": "localStorage.setItem('user', JSON.stringify({id: 1}));\nconst u = JSON.parse(localStorage.getItem('user'));\nsessionStorage.setItem('temp', 'x');",
               "note": "Values must be strings"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "localStorage versus sessionStorage?"
+              },
+              {
+                "role": "me",
+                "text": "Both store key/value strings per origin; localStorage persists until cleared, sessionStorage lives only for the tab session."
+              },
+              {
+                "role": "interviewer",
+                "text": "What happens to each when I close the tab?"
+              },
+              {
+                "role": "me",
+                "text": "sessionStorage is wiped, but localStorage survives a tab or browser restart."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any constraint I should remember when storing objects?"
+              },
+              {
+                "role": "me",
+                "text": "Both store strings only, so I `JSON.stringify` going in and `JSON.parse` coming out, within a ~5–10MB limit."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Is Web Storage sent to the server?",
+                "a": "No — unlike cookies, it stays on the client."
+              },
+              {
+                "q": "Is sessionStorage shared across tabs?",
+                "a": "No — it's per-tab; localStorage is shared across same-origin tabs."
+              },
+              {
+                "q": "What's the storage limit?",
+                "a": "Roughly 5–10MB per origin."
+              },
+              {
+                "q": "How do you store an object?",
+                "a": "`JSON.stringify` it on set, `JSON.parse` on get."
+              }
+            ]
           }
         },
         {
@@ -303,7 +932,12 @@
           "level": "mid",
           "type": "comparison",
           "freq": "low",
-          "tags": ["viewstate", "sessionstate", "state", "asp.net"],
+          "tags": [
+            "viewstate",
+            "sessionstate",
+            "state",
+            "asp.net"
+          ],
           "answer": {
             "oneLiner": "ViewState stores page-level data on the client (in a hidden field, per page); SessionState stores per-user data on the server across requests.",
             "keyPoints": [
@@ -312,7 +946,51 @@
               "ViewState bloats page size; SessionState consumes server memory",
               "ASP.NET WebForms concept — modern SPAs use localStorage/state libs instead"
             ],
-            "analogy": "ViewState = sticky note on the page; SessionState = file the server keeps about you."
+            "analogy": "ViewState = sticky note on the page; SessionState = file the server keeps about you.",
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between ViewState and SessionState?"
+              },
+              {
+                "role": "me",
+                "text": "ViewState stores page-level data on the client in a hidden field per page; SessionState stores per-user data on the server across requests."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where does each live and what does it cost?"
+              },
+              {
+                "role": "me",
+                "text": "ViewState travels in the page payload so it bloats page size; SessionState consumes server memory keyed by a session cookie."
+              },
+              {
+                "role": "interviewer",
+                "text": "Is this still relevant for modern frontends?"
+              },
+              {
+                "role": "me",
+                "text": "It's mainly an ASP.NET WebForms concept — modern SPAs use localStorage or state libraries instead."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Where is ViewState stored?",
+                "a": "Client-side, in a hidden form field on the page."
+              },
+              {
+                "q": "Where is SessionState stored?",
+                "a": "Server-side, keyed by a session cookie."
+              },
+              {
+                "q": "What's the modern equivalent?",
+                "a": "localStorage/sessionStorage and state libraries like Redux."
+              },
+              {
+                "q": "Which one bloats page size?",
+                "a": "ViewState — it ships in the page payload."
+              }
+            ]
           }
         },
         {
@@ -321,7 +999,11 @@
           "level": "senior",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["prototype", "__proto__", "inheritance"],
+          "tags": [
+            "prototype",
+            "__proto__",
+            "inheritance"
+          ],
           "answer": {
             "oneLiner": "`prototype` is a property on constructor functions used as the blueprint for new instances; `__proto__` is the actual link on an instance pointing to its prototype.",
             "keyPoints": [
@@ -335,7 +1017,54 @@
               "snippet": "function Dog(){}\nconst d = new Dog();\nd.__proto__ === Dog.prototype; // true",
               "note": "Output: true — instance links to constructor's prototype"
             },
-            "redFlags": ["Saying every object has a prototype property (only functions do)"]
+            "redFlags": [
+              "Saying every object has a prototype property (only functions do)"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Difference between `__proto__` and `prototype`?"
+              },
+              {
+                "role": "me",
+                "text": "`prototype` is a property on constructor functions used as the blueprint for instances; `__proto__` is the actual link on an instance to its prototype."
+              },
+              {
+                "role": "interviewer",
+                "text": "So how do they relate for `new Dog()`?"
+              },
+              {
+                "role": "me",
+                "text": "`d.__proto__ === Dog.prototype` is `true` — the instance's link points at the constructor's prototype object."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which does JS use during property lookup?"
+              },
+              {
+                "role": "me",
+                "text": "It walks the `__proto__` chain. I'd prefer `Object.getPrototypeOf()` over `__proto__` in real code."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Does every object have a `prototype` property?",
+                "a": "No — only functions; objects have `__proto__` (their prototype link)."
+              },
+              {
+                "q": "What's the preferred way to read an object's prototype?",
+                "a": "`Object.getPrototypeOf(obj)`."
+              },
+              {
+                "q": "What does `d.__proto__ === Dog.prototype` return?",
+                "a": "`true`.",
+                "relatedId": "js-fund-015"
+              },
+              {
+                "q": "What is the prototype chain?",
+                "a": "The series of `__proto__` links JS follows to resolve properties."
+              }
+            ]
           }
         },
         {
@@ -344,7 +1073,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["objects", "create", "constructor", "class"],
+          "tags": [
+            "objects",
+            "create",
+            "constructor",
+            "class"
+          ],
           "answer": {
             "oneLiner": "Object literal, constructor function with `new`, ES6 `class`, `Object.create()`, and factory functions.",
             "keyPoints": [
@@ -357,7 +1091,51 @@
               "lang": "javascript",
               "snippet": "const a = { x: 1 };                 // literal\nclass C { constructor(){ this.x=1; } }\nconst b = new C();                  // class\nconst c = Object.create(null);      // no prototype",
               "note": "Literal, class/new, Object.create"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are the ways to create an object in JS?"
+              },
+              {
+                "role": "me",
+                "text": "Object literal, constructor function with `new`, ES6 `class`, `Object.create()`, and factory functions."
+              },
+              {
+                "role": "interviewer",
+                "text": "When would you pick `Object.create(null)`?"
+              },
+              {
+                "role": "me",
+                "text": "When I want a pure dictionary with no inherited prototype — so no accidental `toString` or `__proto__` keys."
+              },
+              {
+                "role": "interviewer",
+                "text": "And literal versus class?"
+              },
+              {
+                "role": "me",
+                "text": "Literals for one-off objects; classes or constructors when I need many instances sharing methods."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does `Object.create(proto)` do?",
+                "a": "Creates a new object with the given prototype."
+              },
+              {
+                "q": "Why use a factory function?",
+                "a": "It returns a configured object without `new`, often closing over private state."
+              },
+              {
+                "q": "Most common creation method?",
+                "a": "The object literal `{}`."
+              },
+              {
+                "q": "What's special about `Object.create(null)`?",
+                "a": "It has no prototype — a clean map with no inherited keys."
+              }
+            ]
           }
         },
         {
@@ -366,7 +1144,12 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["objects", "iteration", "for-in", "Object.keys"],
+          "tags": [
+            "objects",
+            "iteration",
+            "for-in",
+            "Object.keys"
+          ],
           "answer": {
             "oneLiner": "Use `Object.keys/values/entries` with array methods, or `for...in` (which also walks inherited enumerable keys).",
             "keyPoints": [
@@ -379,7 +1162,51 @@
               "lang": "javascript",
               "snippet": "const o = { a: 1, b: 2 };\nfor (const [k, v] of Object.entries(o)) {\n  console.log(k, v);\n}",
               "note": "Output: a 1, b 2"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you iterate an object's properties?"
+              },
+              {
+                "role": "me",
+                "text": "I use `Object.keys/values/entries` with array methods, or `for...in` if I need inherited keys too."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the catch with `for...in`?"
+              },
+              {
+                "role": "me",
+                "text": "It walks inherited enumerable properties, so I guard with `hasOwnProperty` to avoid surprises."
+              },
+              {
+                "role": "interviewer",
+                "text": "Can `for...of` loop a plain object?"
+              },
+              {
+                "role": "me",
+                "text": "Not directly — plain objects aren't iterable, so I use `Object.entries(obj)` with `for...of`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does `Object.entries` return?",
+                "a": "An array of `[key, value]` pairs."
+              },
+              {
+                "q": "Why guard `for...in` with `hasOwnProperty`?",
+                "a": "To skip inherited enumerable keys from the prototype chain."
+              },
+              {
+                "q": "Can `for...of` iterate a plain object?",
+                "a": "No — objects aren't iterable; use `Object.entries`/`keys`."
+              },
+              {
+                "q": "Which method gives only own enumerable keys?",
+                "a": "`Object.keys(obj)`."
+              }
+            ]
           }
         },
         {
@@ -388,7 +1215,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["spread", "destructuring", "es6", "rest"],
+          "tags": [
+            "spread",
+            "destructuring",
+            "es6",
+            "rest"
+          ],
           "answer": {
             "oneLiner": "Spread (`...`) expands an iterable/object into elements; destructuring unpacks values from arrays/objects into variables.",
             "keyPoints": [
@@ -401,7 +1233,51 @@
               "lang": "javascript",
               "snippet": "const merged = { ...{a:1}, ...{b:2} }; // {a:1,b:2}\nconst [first, ...rest] = [1, 2, 3];     // 1, [2,3]\nconst { x = 0 } = {};                    // x = 0 default",
               "note": "Spread merges; destructuring unpacks"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Explain spread and destructuring."
+              },
+              {
+                "role": "me",
+                "text": "Spread `...` expands an iterable or object into elements; destructuring unpacks values from arrays or objects into variables."
+              },
+              {
+                "role": "interviewer",
+                "text": "Show me rest in destructuring."
+              },
+              {
+                "role": "me",
+                "text": "`const [head, ...tail] = arr` puts the first item in `head` and the remaining items in `tail`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Is object spread a deep merge?"
+              },
+              {
+                "role": "me",
+                "text": "No — `{...x, ...y}` is a shallow merge; nested objects are still shared by reference."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you set a default in destructuring?",
+                "a": "`const { x = 0 } = obj` uses `0` if `x` is undefined."
+              },
+              {
+                "q": "How do you rename while destructuring?",
+                "a": "`const { name: n } = obj` binds to `n`."
+              },
+              {
+                "q": "Is spread shallow or deep?",
+                "a": "Shallow — only the top level is copied."
+              },
+              {
+                "q": "What does rest collect?",
+                "a": "The remaining elements/properties into a new array or object."
+              }
+            ]
           }
         },
         {
@@ -410,7 +1286,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["pure-functions", "functional", "side-effects"],
+          "tags": [
+            "pure-functions",
+            "functional",
+            "side-effects"
+          ],
           "answer": {
             "oneLiner": "A function that, for the same inputs, always returns the same output and has no side effects (no mutating external state, no I/O).",
             "keyPoints": [
@@ -423,7 +1303,51 @@
               "lang": "javascript",
               "snippet": "const add = (a, b) => a + b;        // pure\nlet total = 0;\nconst impure = n => { total += n; };// impure (mutates)",
               "note": "add is pure; impure mutates external state"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's a pure function?"
+              },
+              {
+                "role": "me",
+                "text": "One that returns the same output for the same inputs and has no side effects."
+              },
+              {
+                "role": "interviewer",
+                "text": "What counts as a side effect?"
+              },
+              {
+                "role": "me",
+                "text": "Mutating external state, doing I/O, network or DB calls, or even logging — anything observable outside the return value."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why do we care in React?"
+              },
+              {
+                "role": "me",
+                "text": "Pure functions are easy to test, cache, and reason about — it's why reducers and render logic should be pure."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Are pure functions easy to test?",
+                "a": "Yes — deterministic with no setup or mocks needed."
+              },
+              {
+                "q": "Why must React reducers be pure?",
+                "a": "Predictable state transitions and safe re-runs in StrictMode."
+              },
+              {
+                "q": "Is `Math.random()` pure?",
+                "a": "No — different output each call."
+              },
+              {
+                "q": "Can a pure function mutate its arguments?",
+                "a": "No — that's a side effect; it should return new values."
+              }
+            ]
           }
         },
         {
@@ -432,7 +1356,11 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["memory-leaks", "gc", "performance"],
+          "tags": [
+            "memory-leaks",
+            "gc",
+            "performance"
+          ],
           "answer": {
             "oneLiner": "Leaks happen when references are unintentionally kept alive so the garbage collector can't reclaim memory.",
             "keyPoints": [
@@ -446,7 +1374,50 @@
               "snippet": "const id = setInterval(work, 1000);\n// later — must clear or it leaks\nclearInterval(id);\nel.removeEventListener('click', handler);",
               "note": "Always clean up timers and listeners"
             },
-            "followUps": ["How would you find a leak in DevTools?", "When use WeakMap/WeakRef?"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What causes memory leaks in JS?"
+              },
+              {
+                "role": "me",
+                "text": "Unintentionally keeping references alive so the garbage collector can't reclaim them."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me a couple of common sources."
+              },
+              {
+                "role": "me",
+                "text": "Forgotten `setInterval` timers and event listeners that were never removed, plus detached DOM nodes still referenced in JS."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you prevent them?"
+              },
+              {
+                "role": "me",
+                "text": "I clean up timers and listeners on teardown, avoid accidental globals, and use `WeakMap`/`WeakRef` for caches keyed by objects."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How would you find a leak in DevTools?",
+                "a": "Take heap snapshots over time and look for growing retained objects / detached nodes."
+              },
+              {
+                "q": "When use WeakMap/WeakRef?",
+                "a": "For caches keyed by objects so entries are GC'd when the key is gone."
+              },
+              {
+                "q": "What's a detached DOM node leak?",
+                "a": "A removed element still referenced by JS, so it can't be collected."
+              },
+              {
+                "q": "How do you clean up an interval?",
+                "a": "Store the id and call `clearInterval(id)`."
+              }
+            ]
           }
         },
         {
@@ -455,7 +1426,11 @@
           "level": "junior",
           "type": "code",
           "freq": "high",
-          "tags": ["scope", "hoisting", "trace"],
+          "tags": [
+            "scope",
+            "hoisting",
+            "trace"
+          ],
           "answer": {
             "oneLiner": "It logs 10 — the inner `var a` is function-scoped and shadows the outer one, and `Abc` runs because function declarations are hoisted.",
             "keyPoints": [
@@ -467,7 +1442,52 @@
               "lang": "javascript",
               "snippet": "var a = 20;\nAbc();\nfunction Abc() {\n  var a = 10;\n  console.log(a);\n}",
               "note": "Output: 10 (function-scoped shadowing + hoisting)"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What does this snippet print and why?"
+              },
+              {
+                "role": "me",
+                "text": "It logs `10` — the inner `var a = 10` is a separate function-scoped variable that shadows the outer one."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does `Abc()` run before it's defined?"
+              },
+              {
+                "role": "me",
+                "text": "Because function declarations are fully hoisted, so it's callable before its line in the source."
+              },
+              {
+                "role": "interviewer",
+                "text": "Does the inner `a` affect the outer `a`?"
+              },
+              {
+                "role": "me",
+                "text": "No — they're in different scopes, so the outer `a = 20` stays untouched."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the output?",
+                "a": "`10`.",
+                "relatedId": "js-fund-021"
+              },
+              {
+                "q": "Why can `Abc` be called early?",
+                "a": "Function declarations are hoisted in full."
+              },
+              {
+                "q": "Is the outer `a` changed?",
+                "a": "No — the inner `var a` shadows it within the function."
+              },
+              {
+                "q": "What scope is the inner `a`?",
+                "a": "Function scope of `Abc`."
+              }
+            ]
           }
         },
         {
@@ -476,7 +1496,12 @@
           "level": "mid",
           "type": "code",
           "freq": "medium",
-          "tags": ["arrays", "sparse-array", "length", "trace"],
+          "tags": [
+            "arrays",
+            "sparse-array",
+            "length",
+            "trace"
+          ],
           "answer": {
             "oneLiner": "It logs 41 — assigning to index 40 makes a sparse array, and `length` is always highest index + 1.",
             "keyPoints": [
@@ -488,7 +1513,52 @@
               "lang": "javascript",
               "snippet": "var a = [1,2,3,4,5,6,7,8,9,0];\na[40] = 40;\nconsole.log(a.length); // 41\nconsole.log(a[15]);    // undefined (hole)",
               "note": "Output: 41 (sparse array — length = max index + 1)"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What does `a.length` print after `a[40]=40`?"
+              },
+              {
+                "role": "me",
+                "text": "It prints `41` — `length` is the highest index plus one, not the element count."
+              },
+              {
+                "role": "interviewer",
+                "text": "What happened to indexes 10 through 39?"
+              },
+              {
+                "role": "me",
+                "text": "They became empty holes — the array is now sparse, and reading any of them returns `undefined`."
+              },
+              {
+                "role": "interviewer",
+                "text": "So length doesn't tell me how many real elements there are?"
+              },
+              {
+                "role": "me",
+                "text": "Right — there are only 11 actual values; `length` just tracks the largest index + 1."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the output?",
+                "a": "`41`.",
+                "relatedId": "js-fund-022"
+              },
+              {
+                "q": "What is a sparse array?",
+                "a": "An array with holes — missing indexes that read as `undefined`."
+              },
+              {
+                "q": "How is array `length` computed?",
+                "a": "Highest assigned index + 1."
+              },
+              {
+                "q": "What does `a[15]` return here?",
+                "a": "`undefined` — it's a hole."
+              }
+            ]
           }
         }
       ]
@@ -504,7 +1574,12 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["event-loop", "call-stack", "microtask", "macrotask"],
+          "tags": [
+            "event-loop",
+            "call-stack",
+            "microtask",
+            "macrotask"
+          ],
           "answer": {
             "oneLiner": "JS runs synchronous code on a single call stack; when it's empty the event loop drains all microtasks (promises) first, then one macrotask (timers/events), and repeats.",
             "keyPoints": [
@@ -518,7 +1593,52 @@
               "snippet": "console.log('A');\nsetTimeout(() => console.log('B'), 0);\nPromise.resolve().then(() => console.log('C'));\nconsole.log('D');",
               "note": "Output: A, D, C, B (sync, then microtask, then macrotask)"
             },
-            "analogy": "Sync work first; promises are the express lane drained before the next timer."
+            "analogy": "Sync work first; promises are the express lane drained before the next timer.",
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Explain the event loop with the call stack and queues."
+              },
+              {
+                "role": "me",
+                "text": "Sync code runs on the single call stack; when it empties, the loop drains all microtasks, then runs one macrotask, and repeats."
+              },
+              {
+                "role": "interviewer",
+                "text": "What goes in the microtask queue versus the macrotask queue?"
+              },
+              {
+                "role": "me",
+                "text": "Microtasks are promise `.then` callbacks, `await` continuations, and `queueMicrotask`; macrotasks are `setTimeout`, I/O, and UI events."
+              },
+              {
+                "role": "interviewer",
+                "text": "In the snippet, what's the print order?"
+              },
+              {
+                "role": "me",
+                "text": "`A`, `D`, `C`, `B` — sync first, then the promise microtask `C`, then the `setTimeout` macrotask `B`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Do all microtasks run before the next macrotask?",
+                "a": "Yes — the microtask queue is fully drained between macrotasks."
+              },
+              {
+                "q": "Is `await` continuation a microtask?",
+                "a": "Yes — code after `await` resumes as a microtask."
+              },
+              {
+                "q": "What's the output order?",
+                "a": "`A, D, C, B`.",
+                "relatedId": "js-async-001"
+              },
+              {
+                "q": "Where do UI events sit?",
+                "a": "In the macrotask queue."
+              }
+            ]
           }
         },
         {
@@ -527,7 +1647,12 @@
           "level": "junior",
           "type": "code",
           "freq": "high",
-          "tags": ["setTimeout", "event-loop", "trace", "async"],
+          "tags": [
+            "setTimeout",
+            "event-loop",
+            "trace",
+            "async"
+          ],
           "answer": {
             "oneLiner": "It prints 5 then 2 — synchronous `console.log(5)` runs first, and the setTimeout callback is a macrotask deferred until the stack is empty, even with a 0ms delay.",
             "keyPoints": [
@@ -539,7 +1664,52 @@
               "lang": "javascript",
               "snippet": "setTimeout(() => console.log(2), 0);\nconsole.log(5);",
               "note": "Output: 5 then 2 (sync before macrotask)"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What prints first here, 2 or 5?"
+              },
+              {
+                "role": "me",
+                "text": "`5` prints first, then `2` — the synchronous `console.log(5)` runs before the deferred callback."
+              },
+              {
+                "role": "interviewer",
+                "text": "But the timeout is `0ms` — doesn't it fire immediately?"
+              },
+              {
+                "role": "me",
+                "text": "No — `0ms` means 'as soon as possible after the sync code', the callback is still a macrotask queued for later."
+              },
+              {
+                "role": "interviewer",
+                "text": "So sync always beats a queued callback?"
+              },
+              {
+                "role": "me",
+                "text": "Exactly — the stack must empty before any queued callback can run."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the output?",
+                "a": "`5` then `2`.",
+                "relatedId": "js-async-002"
+              },
+              {
+                "q": "Does `setTimeout(fn, 0)` run immediately?",
+                "a": "No — it queues fn as a macrotask after current sync code."
+              },
+              {
+                "q": "Why does sync win?",
+                "a": "The call stack must be empty before queued callbacks execute."
+              },
+              {
+                "q": "What kind of task is a `setTimeout` callback?",
+                "a": "A macrotask."
+              }
+            ]
           }
         },
         {
@@ -548,7 +1718,12 @@
           "level": "mid",
           "type": "comparison",
           "freq": "high",
-          "tags": ["callbacks", "promises", "observables", "async"],
+          "tags": [
+            "callbacks",
+            "promises",
+            "observables",
+            "async"
+          ],
           "answer": {
             "oneLiner": "Callbacks are functions passed in to run later (prone to nesting); promises represent one future value with chaining; observables are streams of many values over time that you can cancel.",
             "keyPoints": [
@@ -561,7 +1736,51 @@
               "lang": "javascript",
               "snippet": "// callback\nfs.readFile('f', cb);\n// promise\nfetch('/x').then(r => r.json());\n// async/await\nconst r = await fetch('/x');",
               "note": "Callback → Promise → Observable in capability"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Compare callbacks, promises, and observables."
+              },
+              {
+                "role": "me",
+                "text": "Callbacks are functions passed to run later, promises represent one future value with chaining, and observables are cancellable streams of many values."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the main pain with callbacks?"
+              },
+              {
+                "role": "me",
+                "text": "Nesting leads to 'callback hell' and inversion of control — you hand off when your code runs."
+              },
+              {
+                "role": "interviewer",
+                "text": "Promise versus observable in one line?"
+              },
+              {
+                "role": "me",
+                "text": "A promise resolves once and isn't cancellable; an observable can emit repeatedly, is lazy, and can be unsubscribed."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Is a promise cancellable?",
+                "a": "Not natively — you'd use AbortController on the underlying request."
+              },
+              {
+                "q": "How many values does an observable emit?",
+                "a": "Zero to many, over time."
+              },
+              {
+                "q": "What library provides observables?",
+                "a": "RxJS."
+              },
+              {
+                "q": "What does `async/await` build on?",
+                "a": "Promises — it's syntactic sugar over them."
+              }
+            ]
           }
         },
         {
@@ -570,7 +1789,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["single-threaded", "concurrency", "web-workers", "event-loop"],
+          "tags": [
+            "single-threaded",
+            "concurrency",
+            "web-workers",
+            "event-loop"
+          ],
           "answer": {
             "oneLiner": "Yes — JS executes on a single main thread with one call stack, but it achieves concurrency by offloading async work to the runtime and using the event loop.",
             "keyPoints": [
@@ -580,7 +1804,51 @@
               "Long sync work blocks the UI — keep tasks small or offload"
             ],
             "analogy": "One chef (thread), but oven timers (browser APIs) cook in the background.",
-            "followUps": ["When would you reach for a Web Worker?"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Is JavaScript single-threaded?"
+              },
+              {
+                "role": "me",
+                "text": "Yes — it runs on one main thread with a single call stack, so one thing executes at a time."
+              },
+              {
+                "role": "interviewer",
+                "text": "Then how does it handle concurrency?"
+              },
+              {
+                "role": "me",
+                "text": "It offloads timers, network, and I/O to the browser or Node runtime, and the event loop schedules the callbacks back."
+              },
+              {
+                "role": "interviewer",
+                "text": "What if I genuinely need parallelism?"
+              },
+              {
+                "role": "me",
+                "text": "I'd use Web Workers — real background threads — keeping in mind they don't share the DOM and communicate via messages."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "When would you reach for a Web Worker?",
+                "a": "For CPU-heavy work that would otherwise block the UI thread.",
+                "relatedId": "js-async-005"
+              },
+              {
+                "q": "Who handles timers and network?",
+                "a": "The browser/Node runtime, not the JS engine itself."
+              },
+              {
+                "q": "What happens if sync work runs too long?",
+                "a": "It blocks the main thread and freezes the UI."
+              },
+              {
+                "q": "Do Web Workers share the DOM?",
+                "a": "No — they have no DOM access and use message passing."
+              }
+            ]
           }
         },
         {
@@ -589,7 +1857,11 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["web-workers", "threads", "performance"],
+          "tags": [
+            "web-workers",
+            "threads",
+            "performance"
+          ],
           "answer": {
             "oneLiner": "Web Workers run scripts on a separate background thread so heavy computation doesn't freeze the UI; they communicate with the main thread via messages.",
             "keyPoints": [
@@ -602,7 +1874,51 @@
               "lang": "javascript",
               "snippet": "const w = new Worker('worker.js');\nw.postMessage(data);\nw.onmessage = e => console.log(e.data);",
               "note": "Offload heavy work, talk via messages"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What are Web Workers?"
+              },
+              {
+                "role": "me",
+                "text": "Scripts that run on a separate background thread so heavy computation doesn't freeze the UI."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do they talk to the main thread?"
+              },
+              {
+                "role": "me",
+                "text": "Via messages — `postMessage` to send and `onmessage` to receive; there's no shared DOM access."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's a good use case?"
+              },
+              {
+                "role": "me",
+                "text": "CPU-bound work like parsing big files, image processing, or crypto — anything that would block rendering."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Can a Web Worker touch the DOM?",
+                "a": "No — it has no DOM access."
+              },
+              {
+                "q": "How is data passed to a worker?",
+                "a": "Copied via structured clone, unless using transferable objects."
+              },
+              {
+                "q": "What's a transferable?",
+                "a": "An object whose ownership moves to the worker without copying (e.g. ArrayBuffer)."
+              },
+              {
+                "q": "Name a typical workload.",
+                "a": "Image processing, parsing, or cryptographic computation."
+              }
+            ]
           }
         },
         {
@@ -611,7 +1927,12 @@
           "level": "senior",
           "type": "scenario",
           "freq": "medium",
-          "tags": ["offline", "service-worker", "pwa", "caching"],
+          "tags": [
+            "offline",
+            "service-worker",
+            "pwa",
+            "caching"
+          ],
           "answer": {
             "oneLiner": "Use a Service Worker to cache the app shell and API responses, store data locally (IndexedDB), and sync changes back when the connection returns.",
             "keyPoints": [
@@ -624,7 +1945,51 @@
               "lang": "javascript",
               "snippet": "self.addEventListener('fetch', e => {\n  e.respondWith(\n    caches.match(e.request).then(r => r || fetch(e.request))\n  );\n});",
               "note": "Cache-first strategy in a service worker"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you build an app that works offline?"
+              },
+              {
+                "role": "me",
+                "text": "I'd register a Service Worker to cache the app shell and API responses, and store data locally in IndexedDB."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you serve cached content?"
+              },
+              {
+                "role": "me",
+                "text": "The Service Worker intercepts `fetch` events and responds from Cache Storage, falling back to the network."
+              },
+              {
+                "role": "interviewer",
+                "text": "What about changes made while offline?"
+              },
+              {
+                "role": "me",
+                "text": "I queue the mutations locally and replay them with Background Sync when the connection returns; I detect status via `navigator.onLine`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What stores structured offline data?",
+                "a": "IndexedDB."
+              },
+              {
+                "q": "What intercepts network requests?",
+                "a": "The Service Worker's `fetch` handler."
+              },
+              {
+                "q": "How do you detect connectivity?",
+                "a": "`navigator.onLine` plus online/offline events."
+              },
+              {
+                "q": "What replays queued offline writes?",
+                "a": "Background Sync."
+              }
+            ]
           }
         },
         {
@@ -633,7 +1998,11 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "low",
-          "tags": ["method-chaining", "fluent", "this"],
+          "tags": [
+            "method-chaining",
+            "fluent",
+            "this"
+          ],
           "answer": {
             "oneLiner": "Calling multiple methods in sequence on the same object — each method returns `this` (or a new object) so the next call can continue.",
             "keyPoints": [
@@ -645,7 +2014,48 @@
               "lang": "javascript",
               "snippet": "[1,2,3,4]\n  .filter(n => n % 2)\n  .map(n => n * 10); // [10, 30]\n\nclass B { a(){return this;} b(){return this;} }",
               "note": "Output: [10, 30] — return this/new object to chain"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is method chaining?"
+              },
+              {
+                "role": "me",
+                "text": "Calling several methods in sequence on the same object, where each method returns something chainable."
+              },
+              {
+                "role": "interviewer",
+                "text": "What makes it work?"
+              },
+              {
+                "role": "me",
+                "text": "Each method returns `this` (or a new object), so the next call has something to operate on."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why do array methods chain so well?"
+              },
+              {
+                "role": "me",
+                "text": "Because `map` and `filter` return new arrays, you can keep chaining — like `.filter(...).map(...)`."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What must a method return to chain?",
+                "a": "`this` or another object exposing the next methods."
+              },
+              {
+                "q": "What does `[1,2,3,4].filter(n=>n%2).map(n=>n*10)` give?",
+                "a": "`[10, 30]`.",
+                "relatedId": "js-async-007"
+              },
+              {
+                "q": "Name a library known for chaining.",
+                "a": "jQuery (and array methods, builders)."
+              }
+            ]
           }
         },
         {
@@ -654,7 +2064,12 @@
           "level": "senior",
           "type": "code",
           "freq": "medium",
-          "tags": ["async-await", "promises", "event-loop", "trace"],
+          "tags": [
+            "async-await",
+            "promises",
+            "event-loop",
+            "trace"
+          ],
           "answer": {
             "oneLiner": "Logs Start, End, Promise, Timeout — sync runs first, the await continuation is a microtask (before the timer), and setTimeout is a macrotask last.",
             "keyPoints": [
@@ -666,7 +2081,52 @@
               "lang": "javascript",
               "snippet": "console.log('Start');\nsetTimeout(() => console.log('Timeout'), 0);\nPromise.resolve().then(() => console.log('Promise'));\nconsole.log('End');",
               "note": "Output: Start, End, Promise, Timeout"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Predict the output of this async ordering snippet."
+              },
+              {
+                "role": "me",
+                "text": "`Start`, `End`, `Promise`, `Timeout` — synchronous logs first, then the promise microtask, then the timer macrotask."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why does `Promise` beat `Timeout`?"
+              },
+              {
+                "role": "me",
+                "text": "Because the promise `.then` is a microtask, and microtasks run before any macrotask like `setTimeout`."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where would an `await` continuation fall?"
+              },
+              {
+                "role": "me",
+                "text": "Same place as a promise — it's a microtask, so it runs before the timer too."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the output order?",
+                "a": "`Start, End, Promise, Timeout`.",
+                "relatedId": "js-async-008"
+              },
+              {
+                "q": "Why does the promise log before the timeout?",
+                "a": "Microtasks run before macrotasks."
+              },
+              {
+                "q": "Is code after `await` sync or async?",
+                "a": "Async — it resumes as a microtask."
+              },
+              {
+                "q": "Which logs are synchronous?",
+                "a": "`Start` and `End`."
+              }
+            ]
           }
         }
       ]
@@ -682,7 +2142,11 @@
           "level": "junior",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["react", "virtual-dom", "rendering"],
+          "tags": [
+            "react",
+            "virtual-dom",
+            "rendering"
+          ],
           "answer": {
             "oneLiner": "React is a declarative component library that uses a Virtual DOM — an in-memory tree it diffs against the previous render to update the real DOM efficiently.",
             "keyPoints": [
@@ -691,7 +2155,52 @@
               "Component-based, reusable, large ecosystem",
               "Minimizes expensive direct DOM manipulation"
             ],
-            "analogy": "Like editing a draft (VDOM) then only applying the changed edits to the published page (DOM)."
+            "analogy": "Like editing a draft (VDOM) then only applying the changed edits to the published page (DOM).",
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Why use React, and what's the Virtual DOM?"
+              },
+              {
+                "role": "me",
+                "text": "React is declarative and component-based; the Virtual DOM is an in-memory tree it diffs against the previous render to update the real DOM efficiently."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why not just touch the real DOM directly?"
+              },
+              {
+                "role": "me",
+                "text": "Direct DOM manipulation is expensive and error-prone, so React batches and applies only the minimal changes."
+              },
+              {
+                "role": "interviewer",
+                "text": "What does 'declarative' buy me?"
+              },
+              {
+                "role": "me",
+                "text": "I describe the UI for a given state and React syncs the DOM — I don't write step-by-step update instructions."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is the Virtual DOM?",
+                "a": "A lightweight JS copy of the real DOM used for diffing."
+              },
+              {
+                "q": "Is the Virtual DOM always faster than the DOM?",
+                "a": "No — it minimizes updates but the diffing itself has a cost."
+              },
+              {
+                "q": "What does declarative mean in React?",
+                "a": "You describe the target UI; React figures out the DOM changes."
+              },
+              {
+                "q": "How does React decide what to update?",
+                "a": "By diffing the new Virtual DOM against the previous one.",
+                "relatedId": "js-react-002"
+              }
+            ]
           }
         },
         {
@@ -700,7 +2209,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["reconciliation", "diffing", "virtual-dom", "keys"],
+          "tags": [
+            "reconciliation",
+            "diffing",
+            "virtual-dom",
+            "keys"
+          ],
           "answer": {
             "oneLiner": "On a state change React builds a new Virtual DOM, diffs it against the old one with a fast heuristic algorithm, and applies only the minimal set of real DOM updates.",
             "keyPoints": [
@@ -709,7 +2223,54 @@
               "Lists use `key` to track which items moved/changed",
               "Bad/missing keys cause wrong reuse and bugs"
             ],
-            "redFlags": ["Using array index as key for reorderable lists", "Saying VDOM is faster than DOM always"]
+            "redFlags": [
+              "Using array index as key for reorderable lists",
+              "Saying VDOM is faster than DOM always"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How does reconciliation work?"
+              },
+              {
+                "role": "me",
+                "text": "On a state change React builds a new Virtual DOM, diffs it against the old tree with a fast heuristic, and applies only the minimal real-DOM updates."
+              },
+              {
+                "role": "interviewer",
+                "text": "What's the role of `key` in lists?"
+              },
+              {
+                "role": "me",
+                "text": "Keys tell React which list items moved, were added, or removed, so it can reuse the right DOM nodes."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why is using array index as a key risky?"
+              },
+              {
+                "role": "me",
+                "text": "If the list reorders or items are inserted, indexes shift and React reuses the wrong nodes, causing state and rendering bugs."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's the diffing complexity?",
+                "a": "O(n) heuristic, not a full tree diff."
+              },
+              {
+                "q": "What happens if an element's type changes?",
+                "a": "React tears down that subtree and rebuilds it."
+              },
+              {
+                "q": "When is index-as-key acceptable?",
+                "a": "Static lists that never reorder, insert, or delete."
+              },
+              {
+                "q": "What do bad keys cause?",
+                "a": "Wrong node reuse — stale state and render glitches."
+              }
+            ]
           }
         },
         {
@@ -718,7 +2279,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["useMemo", "hooks", "memoization", "performance"],
+          "tags": [
+            "useMemo",
+            "hooks",
+            "memoization",
+            "performance"
+          ],
           "answer": {
             "oneLiner": "`useMemo` caches the result of an expensive calculation and only recomputes it when its dependencies change.",
             "keyPoints": [
@@ -732,7 +2298,53 @@
               "snippet": "const sorted = useMemo(\n  () => bigList.slice().sort(compare),\n  [bigList]\n);",
               "note": "Recomputes only when bigList changes"
             },
-            "redFlags": ["Wrapping everything in useMemo by default"]
+            "redFlags": [
+              "Wrapping everything in useMemo by default"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is `useMemo` for?"
+              },
+              {
+                "role": "me",
+                "text": "It caches the result of an expensive calculation and only recomputes when its dependencies change."
+              },
+              {
+                "role": "interviewer",
+                "text": "Does it memoize a value or a function?"
+              },
+              {
+                "role": "me",
+                "text": "A value — `useCallback` is the equivalent for memoizing functions."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any downside to wrapping everything in it?"
+              },
+              {
+                "role": "me",
+                "text": "Yes — it has its own overhead and adds complexity, so I only use it for genuinely expensive work or stable references."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What triggers a recompute in `useMemo`?",
+                "a": "A change in its dependency array."
+              },
+              {
+                "q": "What's the function equivalent of `useMemo`?",
+                "a": "`useCallback`."
+              },
+              {
+                "q": "Should you wrap everything in `useMemo`?",
+                "a": "No — it costs memory and CPU; use it selectively."
+              },
+              {
+                "q": "What does `useMemo` return?",
+                "a": "A memoized value."
+              }
+            ]
           }
         },
         {
@@ -741,7 +2353,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["useRef", "hooks", "dom", "mutable"],
+          "tags": [
+            "useRef",
+            "hooks",
+            "dom",
+            "mutable"
+          ],
           "answer": {
             "oneLiner": "`useRef` returns a mutable `.current` container that persists across renders without causing a re-render — used for DOM access and storing mutable values.",
             "keyPoints": [
@@ -754,7 +2371,52 @@
               "lang": "javascript",
               "snippet": "const inputRef = useRef(null);\nconst focus = () => inputRef.current.focus();\nreturn <input ref={inputRef} />;",
               "note": "Persistent .current, no re-render on change"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is `useRef` used for?"
+              },
+              {
+                "role": "me",
+                "text": "It returns a mutable `.current` container that persists across renders without triggering a re-render."
+              },
+              {
+                "role": "interviewer",
+                "text": "Give me two common uses."
+              },
+              {
+                "role": "me",
+                "text": "Accessing a DOM node like an input to focus it, and storing mutable values like timer IDs or previous values."
+              },
+              {
+                "role": "interviewer",
+                "text": "What happens when I change `.current`?"
+              },
+              {
+                "role": "me",
+                "text": "Nothing visible — it doesn't cause a re-render, unlike updating state."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Does changing `.current` re-render?",
+                "a": "No — ref updates don't trigger renders."
+              },
+              {
+                "q": "How do you attach a ref to a DOM node?",
+                "a": "Pass it as the `ref` prop: `<input ref={inputRef} />`."
+              },
+              {
+                "q": "Why not use a normal variable instead?",
+                "a": "A normal variable resets each render; a ref persists."
+              },
+              {
+                "q": "How does `useRef` differ from `useState`?",
+                "a": "State re-renders on change; refs don't.",
+                "relatedId": "js-react-005"
+              }
+            ]
           }
         },
         {
@@ -763,7 +2425,12 @@
           "level": "senior",
           "type": "comparison",
           "freq": "medium",
-          "tags": ["useMemo", "useRef", "hooks", "comparison"],
+          "tags": [
+            "useMemo",
+            "useRef",
+            "hooks",
+            "comparison"
+          ],
           "answer": {
             "oneLiner": "`useMemo` caches a computed value and recomputes it when dependencies change; `useRef` holds a mutable box that persists across renders and never recomputes on its own.",
             "keyPoints": [
@@ -776,7 +2443,51 @@
               "lang": "javascript",
               "snippet": "const v = useMemo(() => calc(a), [a]); // recomputes on a change\nconst r = useRef(0);                    // you mutate r.current",
               "note": "useMemo recomputes by deps; useRef is a manual mutable box"
-            }
+            },
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Difference between `useMemo` and `useRef`?"
+              },
+              {
+                "role": "me",
+                "text": "`useMemo` caches a computed value and recomputes when dependencies change; `useRef` is a mutable box that persists and never recomputes on its own."
+              },
+              {
+                "role": "interviewer",
+                "text": "Do either of them cause a re-render?"
+              },
+              {
+                "role": "me",
+                "text": "No — neither triggers a render when its stored value changes."
+              },
+              {
+                "role": "interviewer",
+                "text": "So when would you pick one over the other?"
+              },
+              {
+                "role": "me",
+                "text": "`useMemo` for dependency-driven expensive calculations; `useRef` when I just need to remember a value and mutate it manually."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Does `useRef` recompute anything?",
+                "a": "No — it just holds whatever you put in `.current`."
+              },
+              {
+                "q": "Does `useMemo` re-render on dep change?",
+                "a": "No — it recomputes the value but doesn't itself trigger a render."
+              },
+              {
+                "q": "Which is dependency-driven?",
+                "a": "`useMemo`."
+              },
+              {
+                "q": "Which one do you mutate manually?",
+                "a": "`useRef` via `.current`."
+              }
+            ]
           }
         },
         {
@@ -785,7 +2496,12 @@
           "level": "mid",
           "type": "scenario",
           "freq": "high",
-          "tags": ["context", "props-drilling", "state", "hooks"],
+          "tags": [
+            "context",
+            "props-drilling",
+            "state",
+            "hooks"
+          ],
           "answer": {
             "oneLiner": "Context lets you share data through the component tree without passing props at every level — ideal for delivering values to a deeply nested child.",
             "keyPoints": [
@@ -799,7 +2515,53 @@
               "snippet": "const Theme = createContext('light');\n<Theme.Provider value=\"dark\">\n  <App />\n</Theme.Provider>;\n// deep child:\nconst theme = useContext(Theme);",
               "note": "Provider at top, useContext anywhere below"
             },
-            "redFlags": ["Using Context for high-frequency state (causes wide re-renders)"]
+            "redFlags": [
+              "Using Context for high-frequency state (causes wide re-renders)"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is the Context API and when do you use it?"
+              },
+              {
+                "role": "me",
+                "text": "Context shares data through the tree without passing props at each level — ideal for deeply nested children."
+              },
+              {
+                "role": "interviewer",
+                "text": "What problem does it solve?"
+              },
+              {
+                "role": "me",
+                "text": "Prop drilling — threading the same prop through many intermediate components that don't use it."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any performance concern?"
+              },
+              {
+                "role": "me",
+                "text": "Every consumer re-renders when the context value changes, so for hot/frequently-changing state I split contexts or use a state library."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What's prop drilling?",
+                "a": "Passing props through intermediate components that don't need them."
+              },
+              {
+                "q": "Good use cases for Context?",
+                "a": "Theme, auth/user, and locale — relatively stable values."
+              },
+              {
+                "q": "Why avoid Context for high-frequency state?",
+                "a": "It re-renders all consumers on every value change."
+              },
+              {
+                "q": "How do you read context?",
+                "a": "With the `useContext` hook."
+              }
+            ]
           }
         },
         {
@@ -808,7 +2570,12 @@
           "level": "mid",
           "type": "conceptual",
           "freq": "high",
-          "tags": ["props", "context", "state-management", "lifting-state"],
+          "tags": [
+            "props",
+            "context",
+            "state-management",
+            "lifting-state"
+          ],
           "answer": {
             "oneLiner": "Pass props down for parent→child, lift state to a common ancestor for siblings, use Context for deep trees, and a state library (Redux/Zustand) for large shared state.",
             "keyPoints": [
@@ -818,7 +2585,51 @@
               "Far/global: Context API or a state library"
             ],
             "analogy": "Props = handing a note down; Context = a noticeboard everyone can read.",
-            "followUps": ["When do you graduate from Context to Redux?"]
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you share data between components?"
+              },
+              {
+                "role": "me",
+                "text": "Props for parent-to-child, callback props for child-to-parent, lifting state for siblings, and Context or a state library for global data."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do two sibling components share state?"
+              },
+              {
+                "role": "me",
+                "text": "I lift the state up to their nearest common ancestor and pass it down to both."
+              },
+              {
+                "role": "interviewer",
+                "text": "When do you graduate to Redux?"
+              },
+              {
+                "role": "me",
+                "text": "When shared state is large, updated from many places, or Context causes too many re-renders — then a dedicated store helps."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "When do you graduate from Context to Redux?",
+                "a": "When state is large, widely shared, or Context re-renders hurt.",
+                "relatedId": "js-react-006"
+              },
+              {
+                "q": "How does a child update a parent?",
+                "a": "Via a callback prop passed down from the parent."
+              },
+              {
+                "q": "How do siblings share state?",
+                "a": "Lift it to their common parent."
+              },
+              {
+                "q": "What's the simplest sharing mechanism?",
+                "a": "Props passed down."
+              }
+            ]
           }
         },
         {
@@ -827,7 +2638,12 @@
           "level": "mid",
           "type": "comparison",
           "freq": "low",
-          "tags": ["aot", "jit", "compilation", "angular"],
+          "tags": [
+            "aot",
+            "jit",
+            "compilation",
+            "angular"
+          ],
           "answer": {
             "oneLiner": "AOT (Ahead-Of-Time) compiles code at build time before it ships; JIT (Just-In-Time) compiles at runtime in the browser.",
             "keyPoints": [
@@ -836,7 +2652,51 @@
               "Mostly an Angular distinction (AOT is the default in prod)",
               "React doesn't 'compile templates' the same way — JSX is transpiled by the bundler"
             ],
-            "note": "Primarily an Angular concept; React ships pre-transpiled JS."
+            "note": "Primarily an Angular concept; React ships pre-transpiled JS.",
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between AOT and JIT compilation?"
+              },
+              {
+                "role": "me",
+                "text": "AOT compiles at build time before shipping; JIT compiles at runtime in the browser."
+              },
+              {
+                "role": "interviewer",
+                "text": "What are the trade-offs?"
+              },
+              {
+                "role": "me",
+                "text": "AOT gives faster startup, a smaller bundle, and build-time errors; JIT means a slower first load and a larger bundle."
+              },
+              {
+                "role": "interviewer",
+                "text": "Does this apply to React?"
+              },
+              {
+                "role": "me",
+                "text": "It's mostly an Angular distinction — React's JSX is transpiled by the bundler ahead of time, so React ships pre-transpiled JS."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What does AOT stand for?",
+                "a": "Ahead-Of-Time compilation."
+              },
+              {
+                "q": "Which has faster startup?",
+                "a": "AOT — work is done at build time."
+              },
+              {
+                "q": "Is this mainly an Angular concept?",
+                "a": "Yes — React relies on bundler transpilation instead."
+              },
+              {
+                "q": "When does JIT compile?",
+                "a": "At runtime, in the browser."
+              }
+            ]
           }
         },
         {
@@ -845,7 +2705,12 @@
           "level": "senior",
           "type": "conceptual",
           "freq": "medium",
-          "tags": ["dom", "virtual-dom", "useRef", "performance"],
+          "tags": [
+            "dom",
+            "virtual-dom",
+            "useRef",
+            "performance"
+          ],
           "answer": {
             "oneLiner": "Direct DOM updates are slow and error-prone, so React batches changes through the Virtual DOM; you only drop to the real DOM (via refs) for things React can't express declaratively.",
             "keyPoints": [
@@ -854,7 +2719,54 @@
               "Use `useRef` to reach a DOM node imperatively",
               "Mixing manual DOM edits with React state causes inconsistency"
             ],
-            "redFlags": ["Calling document.getElementById to mutate React-managed nodes"]
+            "redFlags": [
+              "Calling document.getElementById to mutate React-managed nodes"
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Why doesn't React use direct DOM manipulation?"
+              },
+              {
+                "role": "me",
+                "text": "Direct DOM updates are slow and error-prone, so React batches changes through the Virtual DOM and writes the minimum to the real DOM."
+              },
+              {
+                "role": "interviewer",
+                "text": "When is manual DOM access still necessary?"
+              },
+              {
+                "role": "me",
+                "text": "For things React can't express declaratively — focus, scroll position, measuring size, media playback, or integrating third-party libraries."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you reach the DOM when you must?"
+              },
+              {
+                "role": "me",
+                "text": "I use `useRef` to get the node imperatively, and I'm careful not to fight React's state-driven updates."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you access a DOM node in React?",
+                "a": "Via `useRef` attached to the element.",
+                "relatedId": "js-react-004"
+              },
+              {
+                "q": "Name a valid manual-DOM use case.",
+                "a": "Focus management, scrolling, measuring, or media control."
+              },
+              {
+                "q": "Why is mixing manual DOM edits risky?",
+                "a": "It can desync React's view of the DOM, causing inconsistencies."
+              },
+              {
+                "q": "Why does React batch DOM writes?",
+                "a": "To minimize expensive reflows and repaints."
+              }
+            ]
           }
         }
       ]

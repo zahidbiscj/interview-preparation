@@ -141,3 +141,60 @@ Prefix `*` is syntactic sugar for `<ng-template>`.
 - [ ] Lazy template block? `@defer (on viewport)` with `@placeholder`
 - [ ] OnPush component? Immutable updates only; pass observables/signals as inputs
 - [ ] Perf profiling? Angular DevTools flame chart + `ng.profiler.timeChangeDetection()`
+
+---
+
+## Question-Bank Map (what to drill, by subtopic)
+
+### 1. Components & Basics (12)
+- Component = class + `@Component` (template/styles/logic); selector = custom tag; tree rooted at `AppComponent`.
+- Directives: structural (`*ngIf`/`*ngFor`, `*`→`<ng-template>`) vs attribute (`ngClass`); v17 `@if`/`@for`/`@switch`.
+- Compiler: **AOT** (build-time, prod default) vs **JIT** (browser, dev); **Ivy** engine (v9+, locality, tree-shaking).
+- Lifecycle: `ngOnChanges` → `ngOnInit` → `ngAfterViewInit` → `ngOnDestroy` (fetch in init, clean up in destroy).
+- DOM: real/incremental DOM via Ivy — **no virtual DOM**.
+- Architecture: component-based + hierarchical DI, loosely MVVM; full framework.
+- Lazy loading: `loadComponent`/`loadChildren`; own injector scope; smaller initial bundle.
+- Standalone vs NgModule: own `imports`, `bootstrapApplication`, default in v17.
+- Service + DI: `@Injectable({providedIn:'root'})` singleton; `inject()`; hierarchical injector.
+- CLI: `ng new/serve/generate/build/test/update`; esbuild `application` builder (v17+).
+- Smart (container) vs dumb (presentational) components; dumb + OnPush.
+- `@ViewChild` (own template) vs `@ContentChild` (projected); ready in AfterInit; signal `viewChild()`.
+
+### 2. Data Binding & Reactivity (9)
+- 4 bindings: `{{ }}`, `[prop]`, `(event)`, `[(ngModel)]` (= property + event).
+- Promise (eager, 1, not cancellable) vs Observable (lazy, 0–N, cancellable, operators).
+- `@Input`/`@Output` (+`EventEmitter`); signal `input()`/`output()` (v17.1).
+- Reactive forms (TS model, typed v14+) vs template-driven (`ngModel`, simple).
+- RxJS: lazy streams, `.pipe()` operators, subscription; prefer `async` pipe.
+- Memory leaks: `async` pipe / `takeUntilDestroyed()` / `destroy$` + `takeUntil`.
+- Subjects: Subject / BehaviorSubject (current value) / ReplaySubject(n) / AsyncSubject (last on complete); expose `asObservable()`.
+- Hot vs cold: cold = per-subscriber (HTTP), hot = shared (events); `shareReplay(1)` to dedupe+cache.
+- Signals vs RxJS: signals for sync state (`computed`/`effect`), RxJS for async; bridge `toSignal`/`toObservable`.
+
+### 3. Advanced Angular (20)
+- Change detection: Zone.js → top-down check; **OnPush** (input ref / event / async emit / `markForCheck()`).
+- Route guards: `CanActivate`/`CanDeactivate`/`CanActivateChild`/`Resolve`/`CanMatch`; functional + `UrlTree` redirect.
+- Flattening: `switchMap` (cancel/search), `concatMap` (queue), `mergeMap` (parallel), `exhaustMap` (ignore/login).
+- Signals internals: dependency tracking, `computed` lazy/memoised, push-pull, zoneless.
+- `trackBy` / `track` (required in `@for`) → DOM reuse + child-state preservation.
+- Pure (memoised, default) vs impure (every CD cycle, e.g. `async`) pipes.
+- HTTP interceptors: `HttpInterceptorFn`, clone immutable req, auth/401/logging; order matters.
+- `@defer` views: triggers (viewport/idle/interaction/hover/timer/when), `@placeholder`/`@loading`/`@error`, `prefetch`.
+- Route resolvers: pre-fetch before activate; `EMPTY` cancels nav; UX trade-off vs skeleton.
+- OnPush in practice: immutable updates (`[...arr]` not `push`); `markForCheck` for WebSocket pushes.
+- Schematics: Tree transforms behind `ng generate/add/update`; atomic; migrations.
+- Perf: profile first → OnPush/signals, lazy + `@defer`, `track`, pure pipes, trim bundle, SSR.
+- ViewEncapsulation (Emulated/None/ShadowDom) vs `viewProviders` (DI scoping, not styles).
+- Custom directive: `@Directive` + selector; structural = `TemplateRef` + `ViewContainerRef`.
+- `@HostListener` (host events) / `@HostBinding` (host class/style/attr).
+- Manual component: just a class + `@Component`; no CLI required.
+- Scoped styles: Emulated default, `:host`, `:host-context`, avoid `::ng-deep`.
+- Constructor = DI only (inputs undefined); react to inputs in `ngOnChanges`/`ngOnInit`.
+- Component-level `providers` → one instance per component, destroyed with it.
+- Preserve form data: shared service/store + `CanDeactivate` guard + storage.
+
+### 4. React & Micro-frontends (4)
+- Module Federation / micro-frontends: independent deploy, host loads remotes, `shared` deps.
+- React virtual DOM + reconciliation vs Angular incremental DOM.
+- `useMemo` (memoise value, ~`computed`) vs `useRef` (mutable `.current`, no re-render).
+- React Context (`createContext`/Provider/`useContext`) solves prop drilling (~Angular service).
