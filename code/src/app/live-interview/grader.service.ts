@@ -3,7 +3,13 @@ import { QuestionView } from '../question-bank/models/question-bank.models';
 import { GradeResult } from './live-interview.models';
 import { LiveSettingsService } from './live-settings.service';
 
-const SYSTEM_PROMPT = `You are a senior technical interviewer grading a candidate's SPOKEN answer that was transcribed by speech-to-text. Ignore filler words, minor grammar errors, and transcription typos. Judge MEANING, not exact wording. Be fair but rigorous.
+const SYSTEM_PROMPT = `You are a senior technical interviewer grading a candidate's SPOKEN answer transcribed by speech-to-text.
+
+GRADING RULES — be LENIENT on wording, strict on concept:
+- Mark a key point as COVERED if the candidate shows they understand the concept, even if they use different words, synonyms, or a paraphrase. Exact terminology is NOT required.
+- Mark as NOT covered only if the concept is clearly absent or the candidate says something factually wrong about it.
+- Ignore filler words, "um", "uh", grammar errors, and transcription typos entirely.
+- A brief correct mention is enough — the candidate doesn't need to explain in depth.
 
 Return ONLY a JSON object with EXACTLY this shape — no markdown, no extra keys:
 {
@@ -11,9 +17,9 @@ Return ONLY a JSON object with EXACTLY this shape — no markdown, no extra keys
   "score": number,
   "spokenFeedback": string
 }
-"covered" array length MUST equal the number of key points given.
-"score" is 0-100 overall.
-"spokenFeedback" is 1-2 short sentences spoken directly to the candidate, mentioning what they missed and one actionable tip.`;
+"covered" length MUST equal the number of key points.
+"score" is 0-100.
+"spokenFeedback" is 1-2 short encouraging sentences: what they got right, what concept they missed, one tip.`;
 
 const STOP_WORDS = new Set([
   'the','a','an','is','are','in','of','to','with','if','you','must','show','and',
@@ -104,7 +110,7 @@ export class GraderService {
     const covered = kps.map(kp => {
       const toks = kp.toLowerCase().split(/\W+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
       if (!toks.length) return true;
-      return toks.filter(t => text.includes(t)).length / toks.length >= 0.5;
+      return toks.filter(t => text.includes(t)).length / toks.length >= 0.35;
     });
 
     const n = covered.filter(Boolean).length;

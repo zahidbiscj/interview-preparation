@@ -2,7 +2,7 @@ import {
   ChangeDetectionStrategy, Component, computed, inject,
   OnDestroy, OnInit, signal,
 } from '@angular/core';
-import { RouterLink, ActivatedRoute, Router } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 import { QuestionBankService } from '../question-bank/question-bank.service';
 import { QuestionView } from '../question-bank/models/question-bank.models';
 import { ReviewLogService } from '../shared/review-log.service';
@@ -11,9 +11,7 @@ import { GraderService } from './grader.service';
 import { LiveSettingsService } from './live-settings.service';
 import { GradeResult, LiveResult } from './live-interview.models';
 
-type LivePhase = 'setup' | 'listening' | 'evaluating' | 'feedback' | 'done';
-
-interface TopicChoice { id: string; name: string; icon: string; selected: boolean; }
+type LivePhase = 'loading' | 'listening' | 'evaluating' | 'feedback' | 'done';
 
 @Component({
   selector: 'app-live-interview-page',
@@ -35,68 +33,16 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
 
       <main class="live-main">
 
-        <!-- ════════ SETUP ════════ -->
-        @if (phase() === 'setup') {
-          <div class="setup fade-slide-enter">
-            <h1 class="setup-title">🎤 Live Interview Mode</h1>
-            <p class="setup-sub">
-              Speak your answer. Your voice is converted to text, graded by AI, and
-              missed key points are highlighted instantly.
-            </p>
-
-            <section class="setup-block">
-              <h3>1 · Topics</h3>
-              <div class="chip-row">
-                <button class="chip" [class.on]="allTopicsOn()" (click)="toggleAllTopics()">All</button>
-                @for (t of topicChoices(); track t.id) {
-                  <button class="chip" [class.on]="t.selected" (click)="toggleTopic(t.id)">
-                    {{ t.icon }} {{ t.name }}
-                  </button>
-                }
-              </div>
-            </section>
-
-            <section class="setup-block">
-              <h3>2 · Difficulty</h3>
-              <div class="chip-row">
-                @for (lvl of levels; track lvl.value) {
-                  <button class="chip" [class.on]="selectedLevels().includes(lvl.value)" (click)="toggleLevel(lvl.value)">
-                    {{ lvl.label }}
-                  </button>
-                }
-              </div>
-            </section>
-
-            <section class="setup-block">
-              <h3>3 · Number of questions</h3>
-              <div class="chip-row">
-                @for (c of countOptions; track c) {
-                  <button class="chip" [class.on]="count() === c" (click)="count.set(c)">
-                    {{ c === 0 ? 'All' : c }}
-                  </button>
-                }
-              </div>
-            </section>
-
-            <div class="setup-footer">
-              @if (setupError()) { <p class="setup-error">{{ setupError() }}</p> }
-
-              @if (!hasKey()) {
-                <div class="no-key-warn">
-                  ⚠ No OpenRouter key — grading will use keyword matching. Add a key in ⚙ settings.
-                </div>
-              }
-
-              <button class="settings-link-btn" (click)="openSettings()">⚙ AI Settings (OpenRouter key &amp; voice)</button>
-              <button class="start-btn" [disabled]="loading()" (click)="start()">
-                {{ loading() ? 'Loading…' : 'Start Live Interview →' }}
-              </button>
-            </div>
+        <!-- ════════ LOADING ════════ -->
+        @if (phase() === 'loading') {
+          <div class="evaluating-zone fade-slide-enter" style="margin-top:4rem">
+            <div class="spinner"></div>
+            <span>Preparing questions…</span>
           </div>
         }
 
         <!-- ════════ RUNNING (listening / evaluating / feedback) ════════ -->
-        @if (phase() !== 'setup' && phase() !== 'done') {
+        @if (phase() !== 'loading' && phase() !== 'done') {
           <div class="runner">
             <!-- Progress -->
             <div class="progress-head">
@@ -189,7 +135,7 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
                     </ul>
                   }
 
-                  <!-- Spoken feedback (what was read aloud) -->
+                  <!-- Spoken feedback -->
                   @if (grade()!.spokenFeedback) {
                     <p class="spoken-feedback-text">💬 "{{ grade()!.spokenFeedback }}"</p>
                   }
@@ -201,9 +147,12 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
                     <span class="source-badge" [class.llm]="grade()!.source === 'llm'">
                       {{ grade()!.source === 'llm' ? '✦ ' + grade()!.providerId : 'local match' }}
                     </span>
-                    <button class="next-btn" (click)="advance()">
-                      {{ isLast() ? 'Finish →' : 'Next Question →' }}
-                    </button>
+                    <div class="feedback-actions">
+                      <button class="retry-btn" (click)="retryQuestion()">↩ Try Again</button>
+                      <button class="next-btn" (click)="advance()">
+                        {{ isLast() ? 'Finish →' : 'Next Question →' }}
+                      </button>
+                    </div>
                   </div>
 
                 </div>
@@ -264,7 +213,7 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
                   Retry weak questions ({{ weakList().length }})
                 </button>
               }
-              <button class="action-btn" (click)="resetToSetup()">New session</button>
+              <button class="action-btn" (click)="newSession()">New session</button>
               <a routerLink="/" class="action-btn link">Back to bank</a>
             </div>
           </div>
@@ -323,32 +272,17 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
   styleUrl: './live-interview.page.scss',
 })
 export class LiveInterviewPage implements OnInit, OnDestroy {
-  readonly svc         = inject(QuestionBankService);
-  readonly voice       = inject(VoiceService);
-  readonly grader      = inject(GraderService);
+  readonly svc          = inject(QuestionBankService);
+  readonly voice        = inject(VoiceService);
+  readonly grader       = inject(GraderService);
   readonly liveSettings = inject(LiveSettingsService);
-  private readonly reviewLog  = inject(ReviewLogService);
-  private readonly route      = inject(ActivatedRoute);
-  private readonly router     = inject(Router);
+  private readonly reviewLog = inject(ReviewLogService);
+  private readonly route     = inject(ActivatedRoute);
 
   readonly isDark = this.svc.isDark;
 
-  readonly levels = [
-    { value: 'junior', label: '🟢 Junior' },
-    { value: 'mid',    label: '🟡 Mid' },
-    { value: 'senior', label: '🔴 Senior' },
-  ];
-  readonly countOptions = [5, 10, 20, 40, 0];
-
-  // ── setup state ──
-  readonly topicChoices   = signal<TopicChoice[]>([]);
-  readonly selectedLevels = signal<string[]>(['junior', 'mid', 'senior']);
-  readonly count          = signal<number>(10);
-  readonly loading        = signal(false);
-  readonly setupError     = signal<string | null>(null);
-
   // ── session state ──
-  readonly phase     = signal<LivePhase>('setup');
+  readonly phase     = signal<LivePhase>('loading');
   readonly questions = signal<QuestionView[]>([]);
   readonly index     = signal(0);
   readonly transcript = signal('');
@@ -358,47 +292,32 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   readonly micError  = signal<string | null>(null);
 
   // ── settings panel ──
-  readonly showSettings   = signal(false);
-  readonly draftKey       = signal('');
-  readonly draftModel     = signal('');
+  readonly showSettings = signal(false);
+  readonly draftKey     = signal('');
+  readonly draftModel   = signal('');
 
   // ── computed ──
-  readonly current      = computed(() => this.questions()[this.index()] ?? null);
-  readonly allTopicsOn  = computed(() => this.topicChoices().every(t => t.selected));
-  readonly progressPct  = computed(() =>
+  readonly current     = computed(() => this.questions()[this.index()] ?? null);
+  readonly progressPct = computed(() =>
     this.questions().length ? Math.round((this.index() / this.questions().length) * 100) : 0);
-  readonly isLast       = computed(() => this.index() === this.questions().length - 1);
-  readonly passCount    = computed(() => this.results().filter(r => r.grade.score >= 60).length);
-  readonly weakCount    = computed(() => this.results().filter(r => r.grade.score < 60).length);
-  readonly weakList     = computed(() => this.results().filter(r => r.grade.score < 60));
-  readonly scorePct     = computed(() =>
+  readonly isLast      = computed(() => this.index() === this.questions().length - 1);
+  readonly passCount   = computed(() => this.results().filter(r => r.grade.score >= 60).length);
+  readonly weakCount   = computed(() => this.results().filter(r => r.grade.score < 60).length);
+  readonly weakList    = computed(() => this.results().filter(r => r.grade.score < 60));
+  readonly scorePct    = computed(() =>
     this.results().length ? Math.round((this.passCount() / this.results().length) * 100) : 0);
-  readonly coveredCount = computed(() => this.grade()?.covered.filter(Boolean).length ?? 0);
+  readonly coveredCount  = computed(() => this.grade()?.covered.filter(Boolean).length ?? 0);
   readonly keyPointCount = computed(() => this.current()?.answer.keyPoints?.length ?? 0);
-  readonly hasKey       = computed(() => !!this.liveSettings.settings().openrouterKey?.trim());
+  readonly hasKey        = computed(() => !!this.liveSettings.settings().openrouterKey?.trim());
 
   private timerId: ReturnType<typeof setInterval> | null = null;
   private startMs = 0;
 
   async ngOnInit(): Promise<void> {
     this.svc.applyStoredTheme();
+    this.phase.set('loading');
     if (!this.svc.topics().length) await this.svc.init();
-    this.topicChoices.set(
-      this.svc.topics().map(t => ({ id: t.id, name: t.name, icon: t.icon, selected: true }))
-    );
-
-    // ?set=<id> → skip setup, launch from a saved set directly
-    const setId = this.route.snapshot.queryParamMap.get('set');
-    if (setId) {
-      const set = this.svc.sets().find(s => s.id === setId);
-      if (set?.questionIds.length) {
-        this.loading.set(true);
-        const pool = await this.svc.buildPoolFromIds(set.questionIds);
-        this.loading.set(false);
-        if (pool.length) { this.beginSession(this.shuffle(pool)); return; }
-      }
-      this.setupError.set('That set is empty or could not be loaded.');
-    }
+    await this.launchSession();
   }
 
   ngOnDestroy(): void {
@@ -406,37 +325,21 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.voice.stopListening();
   }
 
-  // ── setup actions ──
-  toggleTopic(id: string): void {
-    this.topicChoices.update(list =>
-      list.map(t => t.id === id ? { ...t, selected: !t.selected } : t));
-  }
-  toggleAllTopics(): void {
-    const turnOn = !this.allTopicsOn();
-    this.topicChoices.update(list => list.map(t => ({ ...t, selected: turnOn })));
-  }
-  toggleLevel(lvl: string): void {
-    this.selectedLevels.update(arr =>
-      arr.includes(lvl) ? arr.filter(l => l !== lvl) : [...arr, lvl]);
-  }
-
-  async start(): Promise<void> {
-    this.setupError.set(null);
-    const topicIds = this.topicChoices().filter(t => t.selected).map(t => t.id);
-    const levels   = this.selectedLevels();
-    if (!topicIds.length) { this.setupError.set('Pick at least one topic.'); return; }
-    if (!levels.length)   { this.setupError.set('Pick at least one difficulty.'); return; }
-
-    this.loading.set(true);
-    const pool = await this.svc.buildPool(topicIds, levels);
-    this.loading.set(false);
-
-    if (!pool.length) { this.setupError.set('No questions match that selection.'); return; }
-
-    let sorted = this.shuffle(pool);
-    const n = this.count();
-    if (n > 0 && sorted.length > n) sorted = sorted.slice(0, n);
-    this.beginSession(sorted);
+  private async launchSession(): Promise<void> {
+    const setId = this.route.snapshot.queryParamMap.get('set');
+    if (setId) {
+      const set = this.svc.sets().find(s => s.id === setId);
+      if (set?.questionIds.length) {
+        const pool = await this.svc.buildPoolFromIds(set.questionIds);
+        if (pool.length) { this.beginSession(this.shuffle(pool)); return; }
+      }
+    }
+    const pool = await this.svc.buildPool(
+      this.svc.topics().map(t => t.id),
+      ['junior', 'mid', 'senior'],
+    );
+    const sorted = this.shuffle(pool).slice(0, 10);
+    this.beginSession(sorted.length ? sorted : pool.slice(0, 10));
   }
 
   private beginSession(pool: QuestionView[]): void {
@@ -470,9 +373,8 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
       msg => this.micError.set(msg),
     ).then(finalText => {
       this.transcript.set(finalText);
-      if (this.micError()) return;              // error shown → textarea visible, user types
+      if (this.micError()) return;
       if (!finalText.trim()) {
-        // STT ended with no captured speech — keep listening phase, show retry hint
         this.micError.set('No speech captured. Type your answer below, or refresh and allow mic access.');
         return;
       }
@@ -480,12 +382,10 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     });
   }
 
-  /** Called by "Done Speaking" button — triggers recognition.stop() → onend → evaluate() */
   doneSpeaking(): void {
     this.voice.stopListening();
   }
 
-  /** Called by "Submit Answer" button in textarea fallback mode */
   submitTyped(): void {
     void this.evaluate();
   }
@@ -508,6 +408,14 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.phase.set('feedback');
   }
 
+  retryQuestion(): void {
+    this.voice.stopListening();
+    this.transcript.set('');
+    this.grade.set(null);
+    this.micError.set(null);
+    this.openInput();
+  }
+
   advance(): void {
     const q = this.current();
     const g = this.grade();
@@ -525,7 +433,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     if (this.phase() === 'done') return;
     this.stopTimer();
     this.voice.stopListening();
-    // If we finish mid-question (End session tap), still record current if graded
     const q = this.current();
     const g = this.grade();
     if (q && g && this.phase() === 'feedback') {
@@ -540,16 +447,17 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.beginSession(this.shuffle(pool));
   }
 
-  resetToSetup(): void {
+  newSession(): void {
     this.stopTimer();
     this.voice.stopListening();
-    this.phase.set('setup');
+    this.phase.set('loading');
     this.questions.set([]);
     this.results.set([]);
     this.index.set(0);
     this.transcript.set('');
     this.grade.set(null);
     this.micError.set(null);
+    void this.launchSession();
   }
 
   // ── settings panel ──
