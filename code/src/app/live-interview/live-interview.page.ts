@@ -134,7 +134,7 @@ interface TopicChoice { id: string; name: string; icon: string; selected: boolea
                     <!-- STT mode -->
                     <div class="mic-row">
                       <div class="mic-dot"></div>
-                      <span class="mic-label">Listening… speak your answer, then say <strong>"done"</strong> to stop</span>
+                      <span class="mic-label">Listening… speak your answer, then click Done Speaking</span>
                     </div>
                     <div class="live-transcript">
                       @if (transcript()) {
@@ -470,8 +470,13 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
       msg => this.micError.set(msg),
     ).then(finalText => {
       this.transcript.set(finalText);
-      if (!this.micError()) void this.evaluate();
-      // else: mic denied → textarea visible, user types then taps "Submit Answer"
+      if (this.micError()) return;              // error shown → textarea visible, user types
+      if (!finalText.trim()) {
+        // STT ended with no captured speech — keep listening phase, show retry hint
+        this.micError.set('No speech captured. Type your answer below, or refresh and allow mic access.');
+        return;
+      }
+      void this.evaluate();
     });
   }
 

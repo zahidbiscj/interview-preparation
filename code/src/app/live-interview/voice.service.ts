@@ -49,7 +49,6 @@ export class VoiceService {
   listen(
     onText: (t: string) => void,
     onError?: (msg: string) => void,
-    silenceMs = 4000
   ): Promise<string> {
     return new Promise(resolve => {
       if (!this.sttSupported) { resolve(''); return; }
@@ -62,49 +61,35 @@ export class VoiceService {
       rec.lang = 'en-US';
 
       let finalText = '';
-      let silenceTimer: ReturnType<typeof setTimeout> | null = null;
-
-      const resetSilence = () => {
-        if (silenceTimer) clearTimeout(silenceTimer);
-        silenceTimer = setTimeout(() => rec.stop(), silenceMs);
-      };
 
       rec.onresult = (event: any) => {
         let interim = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const part = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            // "done" as a standalone utterance = stop command
-            if (/^\s*done\.?\s*$/i.test(part.trim())) {
-              rec.stop();
-              return;
-            }
-            finalText += part + ' ';
-          } else {
-            interim = part;
-          }
+          if (event.results[i].isFinal) finalText += part + ' ';
+          else interim = part;
         }
         onText(finalText + interim);
-        resetSilence();
       };
 
       rec.onend = () => {
-        if (silenceTimer) clearTimeout(silenceTimer);
         this.recognition = null;
         resolve(finalText.trim());
       };
 
       rec.onerror = (e: any) => {
-        if (silenceTimer) clearTimeout(silenceTimer);
         this.recognition = null;
         if (e.error === 'not-allowed') {
           onError?.('Microphone access was denied. Allow mic in browser settings, or type your answer below.');
+        } else if (e.error === 'network') {
+          onError?.('Speech recognition needs an internet connection (Chrome uses Google servers). Type your answer below.');
+        } else if (e.error !== 'no-speech') {
+          onError?.(`Mic error (${e.error}). Type your answer below.`);
         }
         resolve(finalText.trim());
       };
 
       rec.start();
-      resetSilence();
     });
   }
 
