@@ -2,6 +2,7 @@
 
 > Angular static site | GitHub Pages via GitHub Actions | Zero backend — all data in JSON files
 
+
 ---
 
 ## Core Concept
