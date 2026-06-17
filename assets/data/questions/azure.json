@@ -1,0 +1,1141 @@
+{
+  "topicId": "azure",
+  "topicName": "Azure & Cloud Integration",
+  "subtopics": [
+    {
+      "subtopicId": "compute",
+      "subtopicName": "Functions & Logic Apps",
+      "order": 1,
+      "questions": [
+        {
+          "id": "azure-compute-001",
+          "q": "What are Azure Functions?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["functions", "serverless"],
+          "answer": {
+            "oneLiner": "Serverless compute that runs small pieces of code on demand in response to a trigger, with no server management and pay-per-execution billing.",
+            "keyPoints": [
+              "Event-driven: code runs when a trigger fires",
+              "Auto-scales out based on load",
+              "Pay for execution time and resources used",
+              "Good for glue code, APIs, scheduled jobs, event processing"
+            ],
+            "followUps": ["What triggers can start a function?", "How does billing work on Consumption plan?"]
+          }
+        },
+        {
+          "id": "azure-compute-002",
+          "q": "What is a trigger in Azure Functions?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["functions", "triggers"],
+          "answer": {
+            "oneLiner": "A trigger is what causes a function to run — every function has exactly one.",
+            "keyPoints": [
+              "HTTP, Timer (CRON), Queue, Service Bus, Blob, Event Grid, Cosmos DB",
+              "Exactly one trigger per function",
+              "Carries the data that started the execution"
+            ],
+            "followUps": ["How is a trigger different from a binding?"]
+          }
+        },
+        {
+          "id": "azure-compute-003",
+          "q": "What are bindings, and how do they differ from triggers?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["functions", "bindings"],
+          "answer": {
+            "oneLiner": "Bindings are declarative connections to other services so you avoid writing boilerplate SDK code; input bindings pull data in, output bindings push data out.",
+            "keyPoints": [
+              "Trigger = what starts the function (one only)",
+              "Input binding = data fetched and handed to you",
+              "Output binding = where your return value goes",
+              "Configured via attributes or function.json"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "[Function(\"Save\")]\n[BlobOutput(\"out/{id}.json\")]\npublic string Run([QueueTrigger(\"orders\")] string msg) => msg;",
+              "note": "Queue trigger in, blob output out — no SDK calls written."
+            },
+            "followUps": ["Can you have multiple output bindings?"]
+          }
+        },
+        {
+          "id": "azure-compute-004",
+          "q": "Consumption plan vs Premium plan for Functions — when do you use each?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["functions", "hosting", "plans"],
+          "answer": {
+            "oneLiner": "Consumption is cheapest and scales to zero but has cold starts; Premium keeps pre-warmed instances, supports VNET, and removes cold start at higher cost.",
+            "keyPoints": [
+              "Consumption: pay-per-use, scales to zero, cold starts, 5–10 min timeout",
+              "Premium: pre-warmed instances (no cold start), VNET integration, unlimited duration",
+              "Use Consumption for spiky/low-traffic; Premium for latency-sensitive or VNET needs",
+              "Dedicated/App Service plan if you already have spare capacity"
+            ],
+            "followUps": ["How does Premium avoid cold starts?"]
+          }
+        },
+        {
+          "id": "azure-compute-005",
+          "q": "What are Durable Functions?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["functions", "durable", "orchestration"],
+          "answer": {
+            "oneLiner": "An extension that lets you write stateful orchestrations and long-running workflows in code, with state and checkpoints managed automatically.",
+            "keyPoints": [
+              "Orchestrator function coordinates activity functions",
+              "State persisted automatically (table/queue storage)",
+              "Patterns: function chaining, fan-out/fan-in, async HTTP, human interaction",
+              "Orchestrator code must be deterministic (no DateTime.Now, no random)"
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "var a = await ctx.CallActivityAsync<string>(\"Step1\", input);\nvar b = await ctx.CallActivityAsync<string>(\"Step2\", a);\nreturn b;",
+              "note": "Orchestrator replays to rebuild state — keep it deterministic."
+            },
+            "followUps": ["Why must orchestrator code be deterministic?", "What is fan-out/fan-in?"],
+            "redFlags": ["Calling DateTime.Now or HttpClient directly inside an orchestrator"]
+          }
+        },
+        {
+          "id": "azure-compute-006",
+          "q": "What is a cold start and how do you reduce it?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["functions", "cold-start", "performance"],
+          "answer": {
+            "oneLiner": "A cold start is the latency when a new instance spins up after the function was idle/scaled to zero — the first request waits for the runtime and dependencies to load.",
+            "keyPoints": [
+              "Use Premium plan (pre-warmed) or set min instances",
+              "Pick a faster runtime/smaller deployment, trim dependencies",
+              "Keep functions warm with a timer ping (Consumption workaround)",
+              "Avoid heavy static initialization in the constructor"
+            ],
+            "followUps": ["Why doesn't Premium plan suffer cold starts?"]
+          }
+        },
+        {
+          "id": "azure-compute-007",
+          "q": "Stateless vs stateful functions — what's the difference?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["functions", "state", "durable"],
+          "answer": {
+            "oneLiner": "Normal Functions are stateless — each invocation is independent; Durable Functions add stateful orchestration where execution state survives across awaits and restarts.",
+            "keyPoints": [
+              "Stateless: no memory between calls, scale freely, store state externally",
+              "Stateful (Durable): orchestration state + entities persisted",
+              "Default to stateless; reach for Durable only for workflows"
+            ],
+            "followUps": ["What are Durable Entities?"]
+          }
+        },
+        {
+          "id": "azure-compute-008",
+          "q": "What are Logic Apps?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["logic-apps", "integration"],
+          "answer": {
+            "oneLiner": "A low-code/no-code workflow service to automate and integrate apps and data using a visual designer and hundreds of prebuilt connectors.",
+            "keyPoints": [
+              "Trigger + sequence of actions = a workflow",
+              "300+ connectors (SAP, Salesforce, SQL, Office 365, etc.)",
+              "Great for integration with little code",
+              "Consumption (per-action) and Standard (single-tenant) tiers"
+            ],
+            "followUps": ["What is a connector?"]
+          }
+        },
+        {
+          "id": "azure-compute-009",
+          "q": "What is a workflow in Logic Apps?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["logic-apps", "workflow"],
+          "answer": {
+            "oneLiner": "A workflow is the trigger plus the ordered set of actions that run when it fires, defined visually or in JSON.",
+            "keyPoints": [
+              "One trigger starts it (HTTP, schedule, event)",
+              "Actions run in sequence or in parallel branches",
+              "Supports conditions, loops, scopes"
+            ]
+          }
+        },
+        {
+          "id": "azure-compute-010",
+          "q": "What are connectors in Logic Apps?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["logic-apps", "connectors"],
+          "answer": {
+            "oneLiner": "Connectors are prebuilt wrappers around external services and APIs that expose triggers and actions without writing integration code.",
+            "keyPoints": [
+              "Standard (free tier) and Premium (enterprise systems like SAP)",
+              "Built-in run in-process; managed call out to APIs",
+              "Custom connectors for your own APIs"
+            ]
+          }
+        },
+        {
+          "id": "azure-compute-011",
+          "q": "How do you implement conditions and branching in a Logic App?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["logic-apps", "conditions", "control-flow"],
+          "answer": {
+            "oneLiner": "Use the Condition action for if/else, Switch for multi-way branching, and Scopes to group actions and inspect their combined status.",
+            "keyPoints": [
+              "Condition → true/false branches",
+              "Switch → multiple cases on a value",
+              "For each / Until for loops",
+              "Expressions use the Workflow Definition Language"
+            ]
+          }
+        },
+        {
+          "id": "azure-compute-012",
+          "q": "How do you handle errors and retries in Logic Apps?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["logic-apps", "error-handling", "retry"],
+          "answer": {
+            "oneLiner": "Each action has a configurable retry policy, and you use Scopes with run-after settings (run on failed/timed out) to build try/catch-style error handling.",
+            "keyPoints": [
+              "Retry policy: none, fixed, or exponential with count/interval",
+              "Configure run-after to catch a prior scope's failure",
+              "Use Terminate action to fail the run cleanly",
+              "Surface failures via alerts / dead-letter pattern"
+            ],
+            "followUps": ["What's the default retry policy?"]
+          }
+        },
+        {
+          "id": "azure-compute-013",
+          "q": "Logic Apps vs Azure Functions — when do you choose each?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["logic-apps", "functions", "comparison"],
+          "answer": {
+            "oneLiner": "Logic Apps for low-code integration/orchestration across SaaS systems via connectors; Functions for custom code and compute-heavy logic.",
+            "keyPoints": [
+              "Logic Apps: visual, connector-driven, integration glue",
+              "Functions: code-first, full language control, performance",
+              "Often combined: Logic App orchestrates, calls a Function for logic",
+              "Logic Apps bill per action; Functions per execution"
+            ],
+            "followUps": ["Can a Logic App call a Function?"]
+          }
+        },
+        {
+          "id": "azure-compute-014",
+          "q": "How would you find which part or stored procedure is slow in a function/integration flow?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["performance", "monitoring", "app-insights"],
+          "answer": {
+            "oneLiner": "Use Application Insights end-to-end transaction view to see dependency timings — it breaks each call (SQL, HTTP, queue) out with duration so the slow stored proc or step is visible.",
+            "keyPoints": [
+              "App Insights tracks dependencies (SQL command text + duration)",
+              "End-to-end transaction / dependency map shows the bottleneck step",
+              "For SQL drill in with Query Store / execution plan / DMVs",
+              "Add custom TrackDependency / timers around suspect blocks"
+            ],
+            "followUps": ["How does App Insights capture SQL command text?"]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "messaging",
+      "subtopicName": "Messaging & Events",
+      "order": 2,
+      "questions": [
+        {
+          "id": "azure-messaging-001",
+          "q": "What is Azure Service Bus?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["service-bus", "messaging"],
+          "answer": {
+            "oneLiner": "A fully managed enterprise message broker for reliable, asynchronous messaging using queues and topics with at-least-once delivery.",
+            "keyPoints": [
+              "Decouples producers from consumers",
+              "Queues (point-to-point) and Topics (pub/sub)",
+              "Features: sessions, dead-letter, duplicate detection, transactions",
+              "Use for ordered, transactional, mission-critical messaging"
+            ],
+            "followUps": ["Queue vs Topic?"]
+          }
+        },
+        {
+          "id": "azure-messaging-002",
+          "q": "Queue vs Topic in Service Bus?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["service-bus", "queue", "topic"],
+          "answer": {
+            "oneLiner": "A queue delivers each message to one consumer (point-to-point); a topic broadcasts to multiple subscriptions (publish/subscribe).",
+            "keyPoints": [
+              "Queue: 1 message → 1 receiver, competing consumers",
+              "Topic: 1 message → N subscriptions, each filtered",
+              "Subscriptions use rules/filters to receive a subset",
+              "Pick queue for work distribution, topic for fan-out"
+            ]
+          }
+        },
+        {
+          "id": "azure-messaging-003",
+          "q": "Explain the publish/subscribe pattern.",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["pub-sub", "messaging", "patterns"],
+          "answer": {
+            "oneLiner": "Publishers send messages to a topic without knowing the receivers; subscribers register interest and each gets its own copy.",
+            "keyPoints": [
+              "Loose coupling between sender and receivers",
+              "One-to-many delivery",
+              "Easy to add new subscribers without touching publisher"
+            ]
+          }
+        },
+        {
+          "id": "azure-messaging-004",
+          "q": "What is a dead-letter queue (DLQ)?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["service-bus", "dlq", "error-handling"],
+          "answer": {
+            "oneLiner": "A sub-queue that holds messages that can't be processed or delivered, so they don't block the main queue and can be inspected later.",
+            "keyPoints": [
+              "Auto dead-letter on max delivery count exceeded or expiry",
+              "App can explicitly dead-letter a poison message",
+              "Drain/reprocess separately for diagnostics",
+              "Monitor DLQ depth with alerts"
+            ],
+            "followUps": ["What causes a message to be auto dead-lettered?"]
+          }
+        },
+        {
+          "id": "azure-messaging-005",
+          "q": "PeekLock vs ReceiveAndDelete?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["service-bus", "receive-modes"],
+          "answer": {
+            "oneLiner": "PeekLock locks the message while you process and you complete/abandon it (safe, at-least-once); ReceiveAndDelete removes it immediately (fast, at-most-once, risk of loss).",
+            "keyPoints": [
+              "PeekLock: lock → process → Complete (or Abandon/Dead-letter)",
+              "ReceiveAndDelete: gone on receive — crash = message lost",
+              "PeekLock is the default and safe choice",
+              "Lock has a timeout; renew for long processing"
+            ],
+            "redFlags": ["Using ReceiveAndDelete for critical messages"]
+          }
+        },
+        {
+          "id": "azure-messaging-006",
+          "q": "What is duplicate detection in Service Bus?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["service-bus", "duplicate-detection", "idempotency"],
+          "answer": {
+            "oneLiner": "When enabled, Service Bus discards messages with a MessageId it has already seen within a configured time window, preventing duplicates.",
+            "keyPoints": [
+              "Based on MessageId set by the sender",
+              "Configurable detection time window",
+              "Helps make producers idempotent on retries"
+            ],
+            "followUps": ["Why still make the consumer idempotent too?"]
+          }
+        },
+        {
+          "id": "azure-messaging-007",
+          "q": "What are Service Bus sessions and how do they relate to ordering?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["service-bus", "sessions", "ordering"],
+          "answer": {
+            "oneLiner": "Sessions group related messages by a SessionId and guarantee FIFO ordering within that session by locking it to a single consumer.",
+            "keyPoints": [
+              "Same SessionId → processed in order by one receiver",
+              "Enables ordered, stateful processing per entity",
+              "Without sessions, ordering across competing consumers isn't guaranteed"
+            ],
+            "followUps": ["How do you guarantee message ordering then?"]
+          }
+        },
+        {
+          "id": "azure-messaging-008",
+          "q": "How do you guarantee message ordering?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["service-bus", "ordering", "sessions"],
+          "answer": {
+            "oneLiner": "Use Service Bus sessions (partition by SessionId) so all related messages go to one consumer in FIFO order; otherwise design consumers to tolerate out-of-order delivery.",
+            "keyPoints": [
+              "Sessions = ordered within a partition key",
+              "Single consumer per session prevents reordering",
+              "Alternative: sequence numbers + reorder buffer on consumer",
+              "Trade-off: ordering limits parallelism"
+            ]
+          }
+        },
+        {
+          "id": "azure-messaging-009",
+          "q": "What is Azure Event Grid?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["event-grid", "events"],
+          "answer": {
+            "oneLiner": "A fully managed event routing service that delivers discrete events from publishers to subscribers using a pub/sub model with near-real-time push.",
+            "keyPoints": [
+              "Reactive: routes lightweight event notifications",
+              "Push-based to webhooks, Functions, queues, etc.",
+              "Built-in retry + dead-letter",
+              "Great for serverless event-driven architectures"
+            ],
+            "followUps": ["Event Grid vs Service Bus?"]
+          }
+        },
+        {
+          "id": "azure-messaging-010",
+          "q": "What is event-driven architecture?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["events", "architecture", "eda"],
+          "answer": {
+            "oneLiner": "A design where components communicate by producing and reacting to events rather than calling each other directly, giving loose coupling and scalability.",
+            "keyPoints": [
+              "Producers emit events; consumers react independently",
+              "Loose coupling, easy to extend",
+              "Event notification vs event-carried state transfer vs event sourcing",
+              "Eventual consistency is the trade-off"
+            ]
+          }
+        },
+        {
+          "id": "azure-messaging-011",
+          "q": "What are publishers and subscribers in an event system?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["events", "pub-sub"],
+          "answer": {
+            "oneLiner": "Publishers emit events to a topic/broker; subscribers register to receive events they care about — neither knows the other directly.",
+            "keyPoints": [
+              "Publisher = source of events",
+              "Subscriber = handler that reacts",
+              "Broker/topic decouples them"
+            ]
+          }
+        },
+        {
+          "id": "azure-messaging-012",
+          "q": "Event Grid vs Service Bus — when do you use each?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["event-grid", "service-bus", "comparison"],
+          "answer": {
+            "oneLiner": "Event Grid for reactive, lightweight event notifications (\"something happened\"); Service Bus for reliable commands/messages with ordering, transactions, and workflows.",
+            "keyPoints": [
+              "Event Grid: push, discrete events, high fan-out, cheap",
+              "Service Bus: pull, durable messages, sessions, transactions, DLQ",
+              "Event Grid = react; Service Bus = process work reliably",
+              "Event Hub if it's high-throughput streaming/telemetry"
+            ],
+            "followUps": ["Where does Event Hub fit?"]
+          }
+        },
+        {
+          "id": "azure-messaging-013",
+          "q": "What are webhooks and how does event routing work?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["webhooks", "event-grid", "routing"],
+          "answer": {
+            "oneLiner": "A webhook is an HTTP callback the service POSTs an event to; Event Grid routes events to handlers by topic and subscription filters (event type, subject prefix).",
+            "keyPoints": [
+              "Webhook = endpoint you expose for push delivery",
+              "Routing via subscriptions + filters",
+              "Handshake/validation step to prove ownership",
+              "Retries with back-off on failure"
+            ]
+          }
+        },
+        {
+          "id": "azure-messaging-014",
+          "q": "Kafka vs RabbitMQ vs Azure Service Bus?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["kafka", "rabbitmq", "service-bus", "comparison"],
+          "answer": {
+            "oneLiner": "Kafka is a high-throughput distributed log for streaming/replay; RabbitMQ is a flexible traditional broker; Service Bus is a managed enterprise broker with rich features and no ops.",
+            "keyPoints": [
+              "Kafka: log-based, replay, huge throughput, consumer offsets",
+              "RabbitMQ: routing flexibility, AMQP, self/managed",
+              "Service Bus: fully managed, sessions/DLQ/transactions, Azure-native",
+              "Streaming → Kafka/Event Hub; enterprise messaging → Service Bus"
+            ]
+          }
+        },
+        {
+          "id": "azure-messaging-015",
+          "q": "How do you guarantee a message is not lost?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["reliability", "service-bus", "outbox"],
+          "answer": {
+            "oneLiner": "Use durable messaging with PeekLock (complete only after successful processing), persist before publishing via the Outbox pattern, and rely on retries + dead-lettering.",
+            "keyPoints": [
+              "PeekLock + Complete after success (at-least-once)",
+              "Outbox pattern: write DB + message in one transaction",
+              "Retries with back-off; DLQ for poison messages",
+              "Idempotent consumers to tolerate the redelivery"
+            ],
+            "followUps": ["What is the Outbox pattern?"]
+          }
+        },
+        {
+          "id": "azure-messaging-016",
+          "q": "Synchronous vs asynchronous messaging?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["sync", "async", "messaging"],
+          "answer": {
+            "oneLiner": "Sync (e.g. HTTP request/response) blocks the caller until a reply; async (queues/events) decouples sender and receiver so the sender doesn't wait.",
+            "keyPoints": [
+              "Sync: simple, immediate result, tight coupling, cascading failures",
+              "Async: resilient, scalable, eventual consistency, more complex",
+              "Use async for load leveling and decoupling, sync for immediate reads"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "integration-patterns",
+      "subtopicName": "Integration Patterns",
+      "order": 3,
+      "questions": [
+        {
+          "id": "azure-integration-patterns-001",
+          "q": "Explain the Request-Reply pattern in messaging.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["patterns", "request-reply"],
+          "answer": {
+            "oneLiner": "A sender posts a message and waits for a correlated response on a reply queue, getting request/response semantics over an async transport.",
+            "keyPoints": [
+              "ReplyTo address + CorrelationId tie reply to request",
+              "Adds async resilience while keeping a response",
+              "Watch for timeouts and orphaned replies"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-002",
+          "q": "Explain the Publish-Subscribe pattern.",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["patterns", "pub-sub"],
+          "answer": {
+            "oneLiner": "One publisher sends an event and many subscribers each receive a copy, decoupling producer from consumers.",
+            "keyPoints": [
+              "One-to-many delivery",
+              "Add subscribers without changing publisher",
+              "Implemented with topics/Event Grid"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-003",
+          "q": "What is the Fan-out pattern?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["patterns", "fan-out"],
+          "answer": {
+            "oneLiner": "A single message/event is distributed to many parallel workers or handlers to spread the load or trigger multiple actions at once.",
+            "keyPoints": [
+              "Fan-out/fan-in: split work, then aggregate results",
+              "Durable Functions and topics make this easy",
+              "Increases parallelism and throughput"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-004",
+          "q": "What is Queue-based load leveling?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["patterns", "load-leveling", "queue"],
+          "answer": {
+            "oneLiner": "Put a queue between a bursty producer and a consumer so the consumer drains at its own pace, smoothing spikes and protecting the backend.",
+            "keyPoints": [
+              "Buffers traffic bursts",
+              "Decouples request rate from processing rate",
+              "Scale consumers based on queue depth",
+              "Prevents overload / throttling of downstream"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-005",
+          "q": "Explain the Retry pattern.",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["patterns", "retry", "resilience"],
+          "answer": {
+            "oneLiner": "Automatically retry transient failures with back-off (and jitter) instead of failing immediately, since many cloud faults are temporary.",
+            "keyPoints": [
+              "Only retry transient/idempotent operations",
+              "Exponential back-off + jitter to avoid thundering herd",
+              "Cap retries, then fail/dead-letter",
+              "Use Polly in .NET"
+            ],
+            "redFlags": ["Retrying non-idempotent calls and causing duplicates"]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-006",
+          "q": "What is the Circuit Breaker pattern?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["patterns", "circuit-breaker", "resilience"],
+          "answer": {
+            "oneLiner": "It stops calling a failing dependency after a threshold of failures (opens the circuit), failing fast for a cool-down period before testing recovery.",
+            "keyPoints": [
+              "States: Closed → Open → Half-Open",
+              "Prevents hammering a dead service and cascading failures",
+              "Half-open lets a trial request test recovery",
+              "Combine with retry + timeout (Polly)"
+            ],
+            "followUps": ["How is it different from retry?"]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-007",
+          "q": "What is the Bulkhead pattern?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["patterns", "bulkhead", "resilience"],
+          "answer": {
+            "oneLiner": "Isolate resources (thread pools, connections) into partitions so a failure or overload in one area can't sink the whole application — like watertight ship compartments.",
+            "keyPoints": [
+              "Limit/partition concurrency per dependency",
+              "One slow dependency can't exhaust all threads",
+              "Often paired with circuit breaker"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-008",
+          "q": "What is the Saga pattern?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["patterns", "saga", "distributed-transactions"],
+          "answer": {
+            "oneLiner": "A way to manage a distributed transaction as a sequence of local transactions, where each step has a compensating action to undo it if a later step fails.",
+            "keyPoints": [
+              "Replaces 2-phase commit across services",
+              "Orchestration (central coordinator) vs Choreography (events)",
+              "Compensating transactions roll back partial work",
+              "Eventual consistency, not ACID"
+            ],
+            "followUps": ["Orchestration vs choreography saga?"]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-009",
+          "q": "What is CQRS?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["patterns", "cqrs"],
+          "answer": {
+            "oneLiner": "Command Query Responsibility Segregation separates the write model (commands) from the read model (queries) so each can be optimized and scaled independently.",
+            "keyPoints": [
+              "Separate read and write paths/models",
+              "Often paired with event sourcing",
+              "Reads can use denormalized projections",
+              "Adds complexity — use when read/write needs diverge"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-010",
+          "q": "How do you ensure idempotency?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["idempotency", "reliability"],
+          "answer": {
+            "oneLiner": "Make repeated processing of the same message have the same effect as processing it once, typically by tracking a unique message/idempotency key.",
+            "keyPoints": [
+              "Store processed message IDs; skip if already seen",
+              "Use natural idempotent operations (upsert vs insert)",
+              "Idempotency key from the client/producer",
+              "Pair with duplicate detection at the broker"
+            ],
+            "followUps": ["Where do you store the dedup keys?"]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-011",
+          "q": "What is a correlation ID and why is it important?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["correlation-id", "tracing", "observability"],
+          "answer": {
+            "oneLiner": "A unique ID attached to a request and propagated through every service/message so you can trace one logical operation end-to-end across a distributed system.",
+            "keyPoints": [
+              "Generated at the edge, passed via headers/message properties",
+              "Ties together logs across services",
+              "Essential for distributed tracing and debugging",
+              "Foundation for request-reply correlation"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-012",
+          "q": "How do you handle distributed transactions across services?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["distributed-transactions", "saga", "outbox"],
+          "answer": {
+            "oneLiner": "Avoid 2-phase commit; use the Saga pattern with compensating actions and the Outbox pattern to atomically commit local state and outgoing events.",
+            "keyPoints": [
+              "Saga = sequence of local txns + compensations",
+              "Outbox ensures DB write and message publish are atomic",
+              "Embrace eventual consistency",
+              "Idempotency to survive retries"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-013",
+          "q": "How do you prevent duplicate messages?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["duplicates", "idempotency", "service-bus"],
+          "answer": {
+            "oneLiner": "Combine broker-side duplicate detection (by MessageId) with idempotent consumers that track processed IDs, since at-least-once delivery means duplicates will happen.",
+            "keyPoints": [
+              "Enable Service Bus duplicate detection window",
+              "Set a deterministic MessageId on the producer",
+              "Consumer dedup store / idempotent writes",
+              "Never assume exactly-once from the transport"
+            ]
+          }
+        },
+        {
+          "id": "azure-integration-patterns-014",
+          "q": "How do you ensure message ordering in an integration flow?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["ordering", "sessions", "partitioning"],
+          "answer": {
+            "oneLiner": "Partition by a key (Service Bus sessions / Kafka partition key) so related messages go to one consumer in FIFO, accepting reduced parallelism.",
+            "keyPoints": [
+              "Sessions/partition key = ordered per entity",
+              "Single consumer per partition",
+              "Or add sequence numbers + reorder on consumer",
+              "Trade-off: strict ordering limits scale-out"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "platform",
+      "subtopicName": "Cloud, Security & Containers",
+      "order": 4,
+      "questions": [
+        {
+          "id": "azure-platform-001",
+          "q": "IaaS vs PaaS vs SaaS?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["cloud", "service-models"],
+          "answer": {
+            "oneLiner": "They differ by how much the provider manages: IaaS gives you VMs/infra, PaaS gives you a platform to deploy code, SaaS gives you finished software.",
+            "keyPoints": [
+              "IaaS: VMs, network, storage (e.g. Azure VMs)",
+              "PaaS: managed runtime, you bring code (App Service, Functions)",
+              "SaaS: ready app (Office 365)",
+              "More you move up, less you manage"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-002",
+          "q": "What's the difference between scalability and high availability?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["cloud", "scalability", "ha"],
+          "answer": {
+            "oneLiner": "Scalability is handling more load (scale up/out); high availability is staying up despite failures via redundancy.",
+            "keyPoints": [
+              "Scale up (bigger) vs scale out (more instances)",
+              "HA: redundancy across zones/regions, no single point of failure",
+              "Measured by SLA / uptime",
+              "Different goals, often designed together"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-003",
+          "q": "What is fault tolerance?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["cloud", "fault-tolerance", "resilience"],
+          "answer": {
+            "oneLiner": "The ability of a system to keep operating correctly even when components fail, through redundancy, retries, and graceful degradation.",
+            "keyPoints": [
+              "Redundancy and failover",
+              "Retry/circuit breaker for transient faults",
+              "Graceful degradation over hard failure",
+              "Design assuming things will fail"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-004",
+          "q": "What is a managed identity and why use it?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["security", "managed-identity", "entra-id"],
+          "answer": {
+            "oneLiner": "An Entra ID identity automatically managed by Azure that lets your service authenticate to other Azure resources without storing any credentials.",
+            "keyPoints": [
+              "No secrets/connection strings in code",
+              "System-assigned (tied to resource) vs user-assigned (shared)",
+              "Used with Key Vault, SQL, Storage via RBAC",
+              "Azure rotates the credentials for you"
+            ],
+            "followUps": ["System-assigned vs user-assigned?"]
+          }
+        },
+        {
+          "id": "azure-platform-005",
+          "q": "What is Azure Key Vault?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["security", "key-vault", "secrets"],
+          "answer": {
+            "oneLiner": "A managed service to securely store and control access to secrets, keys, and certificates, with access governed by RBAC/policies and full audit logging.",
+            "keyPoints": [
+              "Stores secrets, keys, certs",
+              "Access via managed identity + RBAC",
+              "Versioning, soft-delete, audit logs",
+              "Keeps secrets out of code/config"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-006",
+          "q": "What is OAuth2?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["security", "oauth2", "auth"],
+          "answer": {
+            "oneLiner": "An authorization framework that lets an app obtain limited access (an access token) to a resource on a user's behalf without handling their password.",
+            "keyPoints": [
+              "About authorization (access), not authentication",
+              "Roles: resource owner, client, auth server, resource server",
+              "Auth Code flow (with PKCE) for apps, Client Credentials for service-to-service",
+              "Issues scoped, expiring access tokens"
+            ],
+            "followUps": ["Which flow for a SPA?", "What does OIDC add?"]
+          }
+        },
+        {
+          "id": "azure-platform-007",
+          "q": "What is a JWT?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["security", "jwt", "tokens"],
+          "answer": {
+            "oneLiner": "A JSON Web Token is a signed, self-contained token (header.payload.signature) carrying claims, so the resource can validate it without a server lookup.",
+            "keyPoints": [
+              "Base64url header.payload.signature",
+              "Claims: iss, aud, exp, sub, scopes/roles",
+              "Signature verified with issuer's key (no DB call)",
+              "Don't put secrets in the payload — it's only encoded"
+            ],
+            "redFlags": ["Thinking JWT payload is encrypted/hidden"]
+          }
+        },
+        {
+          "id": "azure-platform-008",
+          "q": "What is RBAC?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["security", "rbac", "authorization"],
+          "answer": {
+            "oneLiner": "Role-Based Access Control grants permissions by assigning roles to identities at a scope, so access is managed by role rather than per-user.",
+            "keyPoints": [
+              "Role definition + assignment + scope",
+              "Built-in roles (Reader/Contributor/Owner) or custom",
+              "Scopes: management group → subscription → RG → resource",
+              "Least privilege"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-009",
+          "q": "How do you handle secrets management in a cloud app?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["security", "secrets", "key-vault"],
+          "answer": {
+            "oneLiner": "Keep secrets out of code — store them in Key Vault and access them at runtime via managed identity, with rotation and audit enabled.",
+            "keyPoints": [
+              "Key Vault + managed identity (no secrets in config)",
+              "Rotate regularly; use references not literals",
+              "Never commit secrets to source control",
+              "Audit and least-privilege access"
+            ],
+            "redFlags": ["Connection strings/keys checked into the repo"]
+          }
+        },
+        {
+          "id": "azure-platform-010",
+          "q": "What is MSAL and how does app auth with Entra ID work?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["security", "msal", "entra-id"],
+          "answer": {
+            "oneLiner": "MSAL (Microsoft Authentication Library) handles acquiring and caching tokens from Entra ID (Azure AD); the app authenticates against Entra, gets tokens, and calls APIs with the access token.",
+            "keyPoints": [
+              "App registered in Entra ID (client ID, redirect, scopes)",
+              "MSAL runs the OAuth2/OIDC flow and caches tokens",
+              "User flows interactive; service uses client credentials",
+              "Tokens validated by the API against Entra"
+            ],
+            "followUps": ["Client credentials vs auth code flow?"]
+          }
+        },
+        {
+          "id": "azure-platform-011",
+          "q": "Access token vs ID token vs identity token?",
+          "level": "senior",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["security", "tokens", "oidc"],
+          "answer": {
+            "oneLiner": "An access token authorizes API calls (for the resource); an ID token (a.k.a. identity token, from OIDC) tells the client who the user is — they are not interchangeable.",
+            "keyPoints": [
+              "Access token: sent to API, defines scopes/permissions",
+              "ID token / identity token: proves authentication, consumed by the client",
+              "Don't use an ID token to call an API",
+              "Refresh token obtains new access tokens silently"
+            ],
+            "redFlags": ["Sending the ID token to an API as authorization"]
+          }
+        },
+        {
+          "id": "azure-platform-012",
+          "q": "What is Docker and why use it in microservices?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["containers", "docker", "microservices"],
+          "answer": {
+            "oneLiner": "Docker packages an app and its dependencies into a portable container image that runs consistently anywhere, which is ideal for independently deployable microservices.",
+            "keyPoints": [
+              "Same image runs on dev/test/prod (no 'works on my machine')",
+              "Lightweight vs VMs (shares the OS kernel)",
+              "Each microservice in its own container",
+              "Fast startup, easy scaling"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-013",
+          "q": "What is Kubernetes and what is a pod?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["containers", "kubernetes", "aks"],
+          "answer": {
+            "oneLiner": "Kubernetes is a container orchestrator that schedules, scales, and self-heals containers; a pod is the smallest deployable unit, wrapping one or more containers that share network/storage.",
+            "keyPoints": [
+              "Handles scheduling, scaling, rollouts, self-healing",
+              "Pod = one+ containers sharing IP/volumes",
+              "Deployments manage pod replicas; Services expose them",
+              "Azure offering is AKS"
+            ],
+            "followUps": ["Deployment vs Service vs Pod?"]
+          }
+        },
+        {
+          "id": "azure-platform-014",
+          "q": "Proxy vs reverse proxy?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "medium",
+          "tags": ["networking", "proxy", "reverse-proxy"],
+          "answer": {
+            "oneLiner": "A forward proxy sits in front of clients (hides/represents them outbound); a reverse proxy sits in front of servers, accepting client requests and routing to backends.",
+            "keyPoints": [
+              "Forward proxy: client-side, outbound filtering/anonymity",
+              "Reverse proxy: server-side, load balancing/TLS/routing",
+              "Reverse proxy examples: Nginx, APIM, App Gateway",
+              "Reverse proxy is the common API gateway role"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-015",
+          "q": "What is Azure API Management (APIM) and what do policies do?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["apim", "gateway", "policies"],
+          "answer": {
+            "oneLiner": "APIM is a managed API gateway that fronts your APIs to handle security, rate limiting, transformation, caching, versioning, and a developer portal; policies are the rules applied to requests/responses.",
+            "keyPoints": [
+              "Gateway: single entry point, auth, throttling",
+              "Policies: rate-limit, cache, transform, validate JWT (inbound/outbound)",
+              "Versioning + revisions for safe API evolution",
+              "Developer portal for docs and self-service keys"
+            ],
+            "followUps": ["How does rate limiting work in APIM?"]
+          }
+        },
+        {
+          "id": "azure-platform-016",
+          "q": "How does APIM handle rate limiting, caching, and versioning?",
+          "level": "senior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["apim", "rate-limiting", "caching", "versioning"],
+          "answer": {
+            "oneLiner": "Via policies: rate-limit/quota policies throttle callers, the cache-lookup/cache-store policies cache responses, and versions/revisions let you run multiple API versions safely.",
+            "keyPoints": [
+              "rate-limit-by-key / quota throttle per subscription or key",
+              "cache-store + cache-lookup reduce backend load",
+              "Versioning by path/header/query; revisions for non-breaking changes",
+              "Policies scoped at API/operation/product level"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-017",
+          "q": "How would you secure APIs in Azure?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["security", "apim", "apis"],
+          "answer": {
+            "oneLiner": "Front APIs with APIM, require OAuth2/JWT validation and subscription keys, enforce HTTPS and rate limits, use managed identity for backend calls, and keep secrets in Key Vault.",
+            "keyPoints": [
+              "validate-jwt policy + Entra ID for authn/authz",
+              "Subscription keys + IP filtering at the gateway",
+              "HTTPS only, rate limiting, input validation",
+              "Managed identity to backends; secrets in Key Vault"
+            ]
+          }
+        },
+        {
+          "id": "azure-platform-018",
+          "q": "How would you build a CI/CD pipeline for Azure Functions?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["devops", "ci-cd", "functions"],
+          "answer": {
+            "oneLiner": "Use a build stage (restore/test/package) and a release stage that deploys to a staging slot, runs smoke tests, then swaps to production — all in YAML with environment approvals.",
+            "keyPoints": [
+              "Build: restore, test, publish artifact (zip)",
+              "Deploy to a staging slot, run health checks, then slot swap",
+              "Per-environment config from Key Vault / app settings",
+              "Service connection via service principal / OIDC; gated approvals"
+            ],
+            "code": {
+              "lang": "yaml",
+              "snippet": "- task: AzureFunctionApp@2\n  inputs:\n    appType: functionApp\n    appName: $(funcApp)\n    package: $(Pipeline.Workspace)/drop/*.zip\n    deployToSlotOrASE: true\n    slotName: staging",
+              "note": "Deploy to staging slot, then swap for zero-downtime release."
+            },
+            "followUps": ["Why deploy to a slot and swap?"]
+          }
+        },
+        {
+          "id": "azure-platform-019",
+          "q": "How do you monitor a distributed integration solution?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["monitoring", "app-insights", "tracing"],
+          "answer": {
+            "oneLiner": "Use Application Insights with correlation IDs and distributed tracing so a request can be followed across Functions, queues, and APIs, plus metrics, logs, and alerts in one place.",
+            "keyPoints": [
+              "App Insights end-to-end transaction + dependency map",
+              "Propagate correlation/trace IDs across all hops",
+              "Centralize logs (Log Analytics / KQL queries)",
+              "Alerts on failures, latency, DLQ depth, queue length"
+            ],
+            "followUps": ["How does distributed tracing correlate across a queue?"]
+          }
+        }
+      ]
+    }
+  ]
+}
