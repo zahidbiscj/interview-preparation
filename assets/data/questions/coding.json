@@ -43,36 +43,36 @@
         },
         {
           "id": "coding-arr-002",
-          "q": "Given an integer array of size n, find all elements that appear more than ⌊n/3⌋ times. Constraints: 1 <= n <= 5*10^4, -10^9 <= nums[i] <= 10^9. Try O(n) time and O(1) space.",
-          "level": "senior",
+          "q": "Given an integer array of size n, find all elements that appear at least ⌊n/3⌋ times. Example: {3,2,3,1,1,1,2,2,3} → [1,2,3]. Constraints: 1 <= n <= 5*10^4, -10^9 <= nums[i] <= 10^9.",
+          "level": "mid",
           "type": "code",
           "freq": "medium",
-          "tags": ["arrays", "boyer-moore", "voting", "majority"],
+          "tags": ["arrays", "hashmap", "counting", "majority"],
           "answer": {
-            "oneLiner": "Boyer-Moore voting extended to n/3: there can be at most two elements above ⌊n/3⌋, so track two candidates with two counters, then a second pass verifies their real counts. O(n) time, O(1) space.",
+            "oneLiner": "Count every value with a hash map, then return all keys whose count is at least ⌊n/3⌋. O(n) time, O(n) space. Note the Boyer-Moore two-candidate trick does NOT apply here — that only works for strictly more than n/3 (≤2 winners); 'at least' can yield 3 or more answers.",
             "keyPoints": [
-              "Above n/3 means at most 2 winners (3 would need >n votes).",
-              "Pass 1: maintain (cand1,count1) and (cand2,count2) via voting.",
-              "Pass 2: re-count both candidates and keep only those > n/3.",
-              "Match an existing candidate first, then fill an empty one, else decrement both."
+              "Threshold is floor(n/3) and the test is >= (inclusive), so ties at the boundary qualify.",
+              "Up to 3 values can hit exactly n/3 (3 × n/3 = n), so a fixed 2-candidate scheme is wrong.",
+              "Hash-map count is O(n) time / O(n) space and handles any number of winners.",
+              "Sort the result only if a deterministic order is required."
             ],
             "code": {
               "lang": "csharp",
-              "snippet": "public static IList<int> MajorityElement(int[] nums)\n{\n    int cand1 = 0, cand2 = 1, c1 = 0, c2 = 0; // cand2 != cand1 initially\n    foreach (int x in nums)\n    {\n        if (x == cand1) c1++;\n        else if (x == cand2) c2++;\n        else if (c1 == 0) { cand1 = x; c1 = 1; }\n        else if (c2 == 0) { cand2 = x; c2 = 1; }\n        else { c1--; c2--; }\n    }\n\n    c1 = 0; c2 = 0;\n    foreach (int x in nums)\n    {\n        if (x == cand1) c1++;\n        else if (x == cand2) c2++;\n    }\n\n    var res = new List<int>();\n    if (c1 > nums.Length / 3) res.Add(cand1);\n    if (c2 > nums.Length / 3) res.Add(cand2);\n    return res;\n}\n\n// {3,2,3,1,1,1,2,2,3}: n=9, n/3=3.\n// counts -> 3 appears 3x, 2 appears 3x, 1 appears 3x; none is > 3, so result is empty.\n// Note: the classic answer people expect is 3, but strictly > floor(n/3) excludes all here.",
-              "note": "O(n) time, O(1) space"
+              "snippet": "public static IList<int> AtLeastNOverThree(int[] nums)\n{\n    int threshold = nums.Length / 3;          // floor(n/3)\n    var counts = new Dictionary<int, int>();\n    foreach (int x in nums)\n        counts[x] = counts.GetValueOrDefault(x) + 1;\n\n    var res = new List<int>();\n    foreach (var kv in counts)\n        if (kv.Value >= threshold)            // 'at least' -> use >=\n            res.Add(kv.Key);\n\n    res.Sort();                               // [1,2,3] rather than hash order\n    return res;\n}\n\n// {3,2,3,1,1,1,2,2,3}: n=9, floor(n/3)=3.\n// counts -> 1:3, 2:3, 3:3; all >= 3, so result is [1,2,3].\n// (If the rule were strictly > 3, none would qualify and the answer would be empty.)",
+              "note": "O(n) time, O(n) space — hash map, not Boyer-Moore"
             },
             "dialogue": [
-              { "role": "interviewer", "text": "Find all elements appearing more than n/3 times. Constraints push you toward O(n) time, O(1) space." },
-              { "role": "me", "text": "Brute force is a Dictionary count in O(n) time but O(n) space. To hit O(1) space I'd use Boyer-Moore voting, extended: at most two elements can exceed n/3." },
-              { "role": "interviewer", "text": "Why at most two, and how does the voting work?" },
-              { "role": "me", "text": "Three elements each over n/3 would need more than n total, which is impossible. So I track two (candidate, count) pairs: match an existing candidate, else fill an empty slot, else decrement both." },
-              { "role": "interviewer", "text": "Is one pass enough?" },
-              { "role": "me", "text": "No, voting only finds candidates; I do a second pass to re-count them and keep only those actually exceeding n/3, since a false candidate can survive pass one." }
+              { "role": "interviewer", "text": "Find all elements appearing at least ⌊n/3⌋ times. For {3,2,3,1,1,1,2,2,3} the answer is [1,2,3]." },
+              { "role": "me", "text": "Since each of 1, 2, 3 appears exactly 3 times and ⌊9/3⌋ = 3, an inclusive >= test keeps all three. I'd count with a hash map and return every key whose count is at least the threshold." },
+              { "role": "interviewer", "text": "Could you use Boyer-Moore voting to get O(1) space like the classic n/3 problem?" },
+              { "role": "me", "text": "No — that trick relies on at most two elements being able to exceed n/3. With 'at least', up to three values can each hit exactly n/3 (3 × n/3 = n), so a two-candidate scheme would miss one. The hash-map count is the safe approach." },
+              { "role": "interviewer", "text": "Complexity and edge cases?" },
+              { "role": "me", "text": "O(n) time and O(n) space. Watch the boundary: for small n, ⌊n/3⌋ can be 0, in which case every distinct value qualifies — worth confirming with the interviewer." }
             ],
             "followUpsQA": [
-              { "q": "Why are there at most 2 answers for the n/3 case?", "a": "Three elements each over n/3 would exceed n total votes." },
-              { "q": "How do you generalize to more than n/k times?", "a": "Track k-1 candidate/counter pairs, then verify each in a second pass." },
-              { "q": "What's the simpler trade-off?", "a": "A Dictionary of counts is O(n) space but far easier to reason about.", "relatedId": "coding-arr-003" }
+              { "q": "Why can't Boyer-Moore voting solve the 'at least n/3' variant?", "a": "Voting guarantees ≤2 candidates above n/3, but 'at least' (inclusive) allows up to 3 values at exactly n/3, so a fixed 2-slot scheme is insufficient." },
+              { "q": "What's the answer under the strict 'more than ⌊n/3⌋' rule instead?", "a": "For this balanced array it's empty, since no value exceeds 3; that version has at most 2 answers." },
+              { "q": "How do you keep it simple and correct?", "a": "A Dictionary of counts is O(n) space but trivially handles any number of winners.", "relatedId": "coding-arr-003" }
             ]
           }
         },
