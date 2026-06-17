@@ -7,6 +7,7 @@ import { TopicSidebarComponent } from './components/topic-sidebar/topic-sidebar.
 import { SearchFilterComponent } from './components/search-filter/search-filter.component';
 import { QuestionCardComponent } from './components/question-card/question-card.component';
 import { CheatSheetPanelComponent } from './components/cheat-sheet-panel/cheat-sheet-panel.component';
+import { GlobalSearchComponent } from './components/global-search/global-search.component';
 import { ButtonModule } from 'primeng/button';
 
 @Component({
@@ -18,6 +19,7 @@ import { ButtonModule } from 'primeng/button';
     SearchFilterComponent,
     QuestionCardComponent,
     CheatSheetPanelComponent,
+    GlobalSearchComponent,
     ButtonModule
   ],
   template: `
@@ -30,7 +32,7 @@ import { ButtonModule } from 'primeng/button';
           <span class="app-brand">🚀 <span class="lbl">crackInterview</span></span>
         </div>
         <div class="topbar-center">
-          <span class="stats-pill">{{ topicCount() }} topics · 522 questions</span>
+          <qb-global-search />
         </div>
         <div class="topbar-right">
           <a routerLink="/dashboard" class="sim-link"><span class="ico">📊</span><span class="lbl">Dashboard</span></a>

@@ -26,6 +26,16 @@ export interface QuestionSet {
   createdAt: number;
 }
 
+/** Lightweight record used by global search autocomplete. */
+export interface SearchItem {
+  id: string;
+  q: string;
+  topicId: string;
+  topicName: string;
+  type?: string;
+  tags: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class QuestionBankService {
   private http = inject(HttpClient);
@@ -40,6 +50,7 @@ export class QuestionBankService {
   private _daily = signal<Record<string, DailyStat>>(this.loadDaily());
   private _focusQuestionId = signal<string | null>(null);
   private _sets = signal<QuestionSet[]>(this.loadSets());
+  private _searchIndex = signal<SearchItem[]>([]);
 
   private topicCache = new Map<string, TopicFile>();
   private cheatSheetCache = new Map<string, string>();
@@ -311,6 +322,44 @@ export class QuestionBankService {
       }
     }
     return pool;
+  }
+
+  /**
+   * Build (once) a lightweight global search index across every topic.
+   * Loads all topic files on first call, then caches the index.
+   */
+  async ensureSearchIndex(): Promise<SearchItem[]> {
+    if (this._searchIndex().length) return this._searchIndex();
+    const pool = await this.buildPool([], []);
+    const index: SearchItem[] = pool.map(q => ({
+      id: q.id,
+      q: q.q,
+      topicId: q.topicId,
+      topicName: q.topicName,
+      type: q.type,
+      tags: q.tags ?? [],
+    }));
+    this._searchIndex.set(index);
+    return index;
+  }
+
+  /** Filter the search index by query (matches question text + tags), ranked. */
+  searchQuestions(query: string, limit = 8): SearchItem[] {
+    const query2 = query.toLowerCase().trim();
+    if (!query2) return [];
+    const terms = query2.split(/\s+/);
+    const scored: { item: SearchItem; score: number }[] = [];
+    for (const item of this._searchIndex()) {
+      const qText = item.q.toLowerCase();
+      const hay = (qText + ' ' + item.tags.join(' ') + ' ' + item.topicName).toLowerCase();
+      if (!terms.every(t => hay.includes(t))) continue;
+      let score = 0;
+      if (qText.startsWith(query2)) score += 100;      // strong prefix match
+      if (qText.includes(query2)) score += 40;          // whole-phrase in question
+      score += terms.filter(t => qText.includes(t)).length * 5; // term hits in question
+      scored.push({ item, score });
+    }
+    return scored.sort((a, b) => b.score - a.score).slice(0, limit).map(s => s.item);
   }
 
   /**
