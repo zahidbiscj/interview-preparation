@@ -8,14 +8,16 @@ import { QuestionBankService } from '../question-bank/question-bank.service';
 import { QuestionView } from '../question-bank/models/question-bank.models';
 import { ReviewLogService } from '../shared/review-log.service';
 
-type Phase = 'loading' | 'explain' | 'review' | 'done';
+type Phase = 'setup' | 'loading' | 'explain' | 'review' | 'done';
 type SelfGrade = 'nailed' | 'most' | 'missed';
+
+interface TopicChoice { id: string; name: string; icon: string; selected: boolean; }
 
 /** One key point matched (or not) against the learner's explanation. */
 interface PointMatch { text: string; covered: boolean; }
 
-/** Persisted Feynman self-assessment, keyed by question. */
-interface FeynmanScore {
+/** Persisted self-assessment, keyed by question. */
+interface GuessScore {
   questionId: string;
   topicId: string;
   grade: SelfGrade;
@@ -24,7 +26,7 @@ interface FeynmanScore {
   date: string;
 }
 
-const FEYNMAN_KEY = 'feynman_scores';
+const GUESS_KEY = 'guess_main_point_scores';
 
 const STOP = new Set([
   'the', 'and', 'for', 'that', 'with', 'this', 'from', 'have', 'are', 'was',
@@ -42,7 +44,7 @@ const STOP = new Set([
 
       <header class="topbar">
         <a routerLink="/dashboard" class="back-link">← <span class="lbl">Dashboard</span></a>
-        <span class="app-brand">🗣️ <span class="lbl">Feynman Mode</span></span>
+        <span class="app-brand">🧠 <span class="lbl">Guess the Main Point</span></span>
         <span class="topbar-spacer">
           <a routerLink="/simulator" class="nav-link"><span class="ico">🎯</span><span class="lbl">Simulator</span></a>
           <button class="theme-btn" (click)="svc.toggleTheme()">{{ isDark() ? '☀️' : '🌙' }}</button>
@@ -51,15 +53,63 @@ const STOP = new Set([
 
       <main class="fey-main">
 
+        <!-- ════════ SETUP ════════ -->
+        @if (phase() === 'setup') {
+          <div class="setup fade-slide-enter">
+            <h1 class="setup-title">Guess the Main Point</h1>
+            <p class="setup-sub">Pick your scope, then explain each answer in your own words. We check how many of the key points you hit — guess them all before revealing.</p>
+
+            <section class="setup-block">
+              <h3>1 · Topics</h3>
+              <div class="chip-row">
+                <button class="chip" [class.on]="allTopicsOn()" (click)="toggleAllTopics()">All</button>
+                @for (t of topicChoices(); track t.id) {
+                  <button class="chip" [class.on]="t.selected" (click)="toggleTopic(t.id)">
+                    {{ t.icon }} {{ t.name }}
+                  </button>
+                }
+              </div>
+            </section>
+
+            <section class="setup-block">
+              <h3>2 · Difficulty</h3>
+              <div class="chip-row">
+                @for (lvl of levels; track lvl.value) {
+                  <button class="chip" [class.on]="selectedLevels().includes(lvl.value)" (click)="toggleLevel(lvl.value)">
+                    {{ lvl.label }}
+                  </button>
+                }
+              </div>
+            </section>
+
+            <section class="setup-block">
+              <h3>3 · Number of questions</h3>
+              <div class="chip-row">
+                @for (c of countOptions; track c) {
+                  <button class="chip" [class.on]="count() === c" (click)="count.set(c)">
+                    {{ c === 0 ? 'All' : c }}
+                  </button>
+                }
+              </div>
+            </section>
+
+            @if (setupError()) { <p class="setup-error">{{ setupError() }}</p> }
+
+            <button class="start-btn" [disabled]="loading()" (click)="start()">
+              {{ loading() ? 'Loading…' : 'Start →' }}
+            </button>
+          </div>
+        }
+
         @if (phase() === 'loading') {
           <p class="state-msg">Loading questions…</p>
         }
 
-        @if (phase() !== 'loading' && !current()) {
+        @if ((phase() === 'explain' || phase() === 'review') && !current()) {
           <div class="state-msg fade-slide-enter">
             <h1>Nothing to explain yet</h1>
             <p>No questions with key points were found for this scope.</p>
-            <a routerLink="/dashboard" class="action-btn">Back to dashboard</a>
+            <button class="action-btn" (click)="resetToSetup()">Change scope</button>
           </div>
         }
 
@@ -81,7 +131,7 @@ const STOP = new Set([
               </div>
 
               <h2 class="q-text">{{ q.q }}</h2>
-              <p class="fey-prompt">💬 Explain this to a junior developer in your own words.</p>
+              <p class="fey-prompt">💬 Explain this to a junior developer in your own words — hit the main points.</p>
 
               <textarea
                 class="fey-input"
@@ -127,6 +177,8 @@ const STOP = new Set([
                     <button class="grade-btn most" (click)="grade('most')">🙂 Got most</button>
                     <button class="grade-btn nailed" (click)="grade('nailed')">🎯 Nailed it</button>
                   </div>
+
+                  <button class="retry-btn" (click)="retry()">↻ Retry this question</button>
                 </div>
               }
             </div>
@@ -149,7 +201,8 @@ const STOP = new Set([
 
             <div class="result-actions">
               <button class="action-btn primary" (click)="restart()">Explain more</button>
-              <a routerLink="/dashboard" class="action-btn">Back to dashboard</a>
+              <button class="action-btn" (click)="resetToSetup()">Change scope</button>
+              <a routerLink="/dashboard" class="action-btn link">Back to dashboard</a>
             </div>
           </div>
         }
@@ -164,27 +217,93 @@ export class FeynmanPage implements OnInit {
   private reviewLog = inject(ReviewLogService);
   readonly isDark = this.svc.isDark;
 
-  readonly phase = signal<Phase>('loading');
+  readonly levels = [
+    { value: 'junior', label: '🟢 Junior' },
+    { value: 'mid', label: '🟡 Mid' },
+    { value: 'senior', label: '🔴 Senior' },
+  ];
+  readonly countOptions = [5, 10, 20, 0];
+
+  // ── setup state ──
+  readonly topicChoices = signal<TopicChoice[]>([]);
+  readonly selectedLevels = signal<string[]>(['junior', 'mid', 'senior']);
+  readonly count = signal<number>(10);
+  readonly loading = signal(false);
+  readonly setupError = signal<string | null>(null);
+
+  // ── runner state ──
+  readonly phase = signal<Phase>('setup');
   readonly pool = signal<QuestionView[]>([]);
   readonly index = signal(0);
   readonly explanation = signal('');
   readonly matches = signal<PointMatch[]>([]);
-  readonly done = signal<FeynmanScore[]>([]);
+  readonly done = signal<GuessScore[]>([]);
 
   readonly current = computed(() => this.pool()[this.index()] ?? null);
   readonly coveredCount = computed(() => this.matches().filter(m => m.covered).length);
+  readonly allTopicsOn = computed(() => this.topicChoices().every(t => t.selected));
   readonly progressPct = computed(() =>
     this.pool().length ? Math.round((this.index() / this.pool().length) * 100) : 0);
 
   async ngOnInit(): Promise<void> {
     this.svc.applyStoredTheme();
     if (!this.svc.topics().length) await this.svc.init();
+    this.topicChoices.set(
+      this.svc.topics().map(t => ({ id: t.id, name: t.name, icon: t.icon, selected: true }))
+    );
 
+    // Deep link from the dashboard "study topic" action: /feynman?topic=<id>
     const topic = this.route.snapshot.queryParamMap.get('topic');
-    const topicIds = topic ? [topic] : [];
-    const all = await this.svc.buildPool(topicIds, []);
-    const withPoints = all.filter(q => (q.answer.keyPoints?.length ?? 0) > 0);
-    this.pool.set(this.shuffle(withPoints));
+    if (topic) {
+      this.topicChoices.update(list => list.map(t => ({ ...t, selected: t.id === topic })));
+      await this.start();
+    }
+  }
+
+  // ── setup actions ──
+  toggleTopic(id: string): void {
+    this.topicChoices.update(list =>
+      list.map(t => (t.id === id ? { ...t, selected: !t.selected } : t)));
+  }
+  toggleAllTopics(): void {
+    const turnOn = !this.allTopicsOn();
+    this.topicChoices.update(list => list.map(t => ({ ...t, selected: turnOn })));
+  }
+  toggleLevel(lvl: string): void {
+    this.selectedLevels.update(arr =>
+      arr.includes(lvl) ? arr.filter(l => l !== lvl) : [...arr, lvl]);
+  }
+
+  async start(): Promise<void> {
+    this.setupError.set(null);
+    const topicIds = this.topicChoices().filter(t => t.selected).map(t => t.id);
+    const levels = this.selectedLevels();
+    if (!topicIds.length) { this.setupError.set('Pick at least one topic.'); return; }
+    if (!levels.length) { this.setupError.set('Pick at least one difficulty.'); return; }
+
+    this.loading.set(true);
+    this.phase.set('loading');
+    const all = await this.svc.buildPool(topicIds, levels);
+    this.loading.set(false);
+
+    // Only questions that actually have key points to guess.
+    let withPoints = all.filter(q => (q.answer.keyPoints?.length ?? 0) > 0);
+    withPoints = this.shuffle(withPoints);
+    const n = this.count();
+    if (n > 0 && withPoints.length > n) withPoints = withPoints.slice(0, n);
+
+    if (!withPoints.length) {
+      this.pool.set([]);
+      this.setupError.set('No questions with key points match that selection.');
+      this.phase.set('setup');
+      return;
+    }
+
+    this.pool.set(withPoints);
+    this.index.set(0);
+    this.explanation.set('');
+    this.matches.set([]);
+    this.done.set([]);
     this.phase.set('explain');
   }
 
@@ -195,11 +314,18 @@ export class FeynmanPage implements OnInit {
     this.phase.set('review');
   }
 
+  /** Re-attempt the current question: clear the explanation and go back to explain. */
+  retry(): void {
+    this.explanation.set('');
+    this.matches.set([]);
+    this.phase.set('explain');
+  }
+
   grade(grade: SelfGrade): void {
     const q = this.current();
     if (!q) return;
 
-    const score: FeynmanScore = {
+    const score: GuessScore = {
       questionId: q.id, topicId: q.topicId, grade,
       covered: this.coveredCount(), total: this.matches().length,
       date: new Date().toISOString(),
@@ -218,7 +344,7 @@ export class FeynmanPage implements OnInit {
   }
 
   finish(): void {
-    if (this.phase() === 'loading') return;
+    if (this.phase() === 'loading' || this.phase() === 'setup') return;
     this.phase.set('done');
   }
 
@@ -228,7 +354,17 @@ export class FeynmanPage implements OnInit {
     this.matches.set([]);
     this.done.set([]);
     this.pool.update(p => this.shuffle(p));
-    this.phase.set(this.pool().length ? 'explain' : 'done');
+    this.phase.set(this.pool().length ? 'explain' : 'setup');
+  }
+
+  resetToSetup(): void {
+    this.explanation.set('');
+    this.matches.set([]);
+    this.done.set([]);
+    this.pool.set([]);
+    this.index.set(0);
+    this.setupError.set(null);
+    this.phase.set('setup');
   }
 
   countGrade(g: SelfGrade): number {
@@ -271,12 +407,12 @@ export class FeynmanPage implements OnInit {
     return s.replace(/[`*_>#\[\]()]/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  private persistScore(score: FeynmanScore): void {
+  private persistScore(score: GuessScore): void {
     try {
-      const raw = localStorage.getItem(FEYNMAN_KEY);
-      const list: FeynmanScore[] = raw ? JSON.parse(raw) : [];
+      const raw = localStorage.getItem(GUESS_KEY);
+      const list: GuessScore[] = raw ? JSON.parse(raw) : [];
       list.push(score);
-      localStorage.setItem(FEYNMAN_KEY, JSON.stringify(list));
+      localStorage.setItem(GUESS_KEY, JSON.stringify(list));
     } catch { /* quota / disabled storage */ }
   }
 

@@ -3745,6 +3745,531 @@
           }
         }
       ]
+    },
+    {
+      "subtopicId": "scenarios",
+      "subtopicName": "System Design Scenarios",
+      "order": 5,
+      "questions": [
+        {
+          "id": "architecture-scenarios-001",
+          "q": "Two users book the last available seat at the same time and both succeed - how do you prevent this double-booking?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "race-condition",
+            "optimistic-concurrency",
+            "concurrency-token",
+            "rowversion",
+            "ef-core"
+          ],
+          "answer": {
+            "oneLiner": "It's a lost-update race; add a concurrency token (RowVersion) so the second SaveChanges fails with a concurrency exception instead of silently overwriting.",
+            "keyPoints": [
+              "Both reads see 1 seat left, both decrement - the second write clobbers the first (lost update).",
+              "Add a RowVersion/concurrency token; EF Core includes it in the WHERE clause on UPDATE.",
+              "First commit wins; the loser matches 0 rows and throws DbUpdateConcurrencyException - catch, reload, retry or reject.",
+              "Alternatives: a pessimistic lock (SELECT ... FOR UPDATE) or an atomic conditional UPDATE."
+            ],
+            "detail": "EF Core reads the row and keeps the original snapshot. On SaveChanges it issues UPDATE ... WHERE Id=@id AND RowVersion=@original. Whoever commits first bumps the version, so the loser's WHERE matches nothing, EF sees 0 affected rows and raises a concurrency exception - then you reload the current state and decide whether to retry or tell the user it's sold out.",
+            "redFlags": [
+              "Checking 'seats > 0' in app code then updating with no guard - the classic time-of-check/time-of-use race.",
+              "Never heard of optimistic concurrency or RowVersion.",
+              "Assuming a transaction alone prevents lost updates - it doesn't without a lock or a version check."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Two users book the last seat at the same moment and both succeed. What went wrong?"
+              },
+              {
+                "role": "me",
+                "text": "It's a lost-update race - both reads saw one seat, both decremented, and the second SaveChanges overwrote the first without noticing."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you stop it without locking the whole table?"
+              },
+              {
+                "role": "me",
+                "text": "Optimistic concurrency - add a RowVersion token. EF Core puts it in the UPDATE's WHERE clause, so the first commit wins and the second matches zero rows and throws."
+              },
+              {
+                "role": "interviewer",
+                "text": "What do you do when that concurrency exception fires?"
+              },
+              {
+                "role": "me",
+                "text": "Catch DbUpdateConcurrencyException, reload the current seat count, and either retry the booking or tell the user it just sold out - never a silent overwrite."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Optimistic vs pessimistic concurrency - when each?",
+                "a": "Optimistic when conflicts are rare (typical web apps); pessimistic locks when contention is high and retries are costly."
+              },
+              {
+                "q": "How does SQL Server implement RowVersion?",
+                "a": "An 8-byte rowversion column the database auto-increments on every update to that row."
+              },
+              {
+                "q": "Could you solve it without a version column?",
+                "a": "Yes - an atomic UPDATE Seats=Seats-1 WHERE Id=@id AND Seats>0 plus a rows-affected check, or a pessimistic SELECT ... FOR UPDATE."
+              },
+              {
+                "q": "What is a TOCTOU bug?",
+                "a": "Time-of-check to time-of-use - the state changes between when you check it and when you act on it."
+              }
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class Flight\n{\n    public int Id { get; set; }\n    public int RemainingSeats { get; set; }\n\n    [Timestamp]                  // EF maps this to a SQL Server rowversion\n    public byte[] RowVersion { get; set; }\n}\n\n// Booking the seat\ntry\n{\n    flight.RemainingSeats--;     // EF still holds the original RowVersion snapshot\n    await db.SaveChangesAsync(); // UPDATE ... WHERE Id=@id AND RowVersion=@original\n}\ncatch (DbUpdateConcurrencyException)\n{\n    // someone booked first: reload current seats and retry, or report sold out\n}",
+              "note": "The token in the WHERE clause is what turns a silent lost update into a catchable conflict."
+            }
+          }
+        },
+        {
+          "id": "architecture-scenarios-002",
+          "q": "A client retries a payment after a timeout and the customer is charged twice - how do you make the endpoint safe to retry?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "idempotency",
+            "idempotency-key",
+            "payments",
+            "retries",
+            "at-least-once"
+          ],
+          "answer": {
+            "oneLiner": "Make the write idempotent with a client-supplied idempotency key the server stores, so a retry returns the original result instead of charging again.",
+            "keyPoints": [
+              "Networks give at-least-once delivery, so retries are inevitable - writes must be idempotent.",
+              "The client sends a unique Idempotency-Key header per logical operation.",
+              "The server stores key + result; a repeat key replays the saved response and skips processing.",
+              "Persist the key in the same transaction as the charge so they commit atomically."
+            ],
+            "detail": "On the first request you insert the idempotency key behind a unique constraint and process the charge in one transaction. A retry hits the duplicate key, so you skip the charge and replay the stored response. The key is owned by the client (stable across retries), scoped per operation, and expires via TTL.",
+            "redFlags": [
+              "Relying on the client not to retry.",
+              "Generating the key server-side per request - it must be stable across retries, so the client owns it.",
+              "Storing the key outside the charge transaction, leaving a window for a double charge."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "A timeout makes the client retry a payment and the customer is charged twice. How do you fix it?"
+              },
+              {
+                "role": "me",
+                "text": "Make the endpoint idempotent - the client sends an Idempotency-Key, and the server records it so a retry returns the first result instead of charging again."
+              },
+              {
+                "role": "interviewer",
+                "text": "Where do you store that key relative to the charge?"
+              },
+              {
+                "role": "me",
+                "text": "In the same database transaction as the charge, behind a unique constraint, so either both commit or neither does."
+              },
+              {
+                "role": "interviewer",
+                "text": "What happens on the duplicate request?"
+              },
+              {
+                "role": "me",
+                "text": "The insert hits the unique key, I detect the duplicate, skip the charge, and replay the saved response with the original status."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Which HTTP methods are idempotent by spec?",
+                "a": "GET, PUT, and DELETE are; POST is not, which is why payment POSTs need an explicit key."
+              },
+              {
+                "q": "Where should the idempotency store live?",
+                "a": "A durable, shared store (a DB table or Redis with persistence) that survives restarts and is seen by every instance."
+              },
+              {
+                "q": "How long do you keep keys?",
+                "a": "Long enough to cover realistic retry windows - hours to a day - then expire them via TTL."
+              },
+              {
+                "q": "How is this different from queue de-duplication?",
+                "a": "Same idea downstream - consumers de-dupe by message id so at-least-once delivery doesn't double-apply."
+              }
+            ]
+          }
+        },
+        {
+          "id": "architecture-scenarios-003",
+          "q": "How would you rate-limit an API to 100 requests per minute per API key across a fleet of servers?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "rate-limiting",
+            "token-bucket",
+            "sliding-window",
+            "redis",
+            "distributed"
+          ],
+          "answer": {
+            "oneLiner": "Keep the counter in a shared fast store like Redis, keyed per API key, using a token-bucket or sliding-window algorithm enforced at the gateway.",
+            "keyPoints": [
+              "Per-server counters don't work - a client spread across N servers gets N times the limit.",
+              "Use a central atomic counter in Redis keyed by api-key + window.",
+              "Token bucket smooths bursts; sliding window gives accurate per-window counts.",
+              "Enforce at the gateway before work hits downstream services; return 429 + Retry-After."
+            ],
+            "detail": "Use an atomic Redis operation - INCR with EXPIRE, or a Lua script for a token bucket - so two concurrent requests can't both pass the limit. A sliding-window counter is a good accuracy/cost balance. On a Redis outage you choose fail-open (protect availability) or fail-closed (protect the backend) deliberately.",
+            "redFlags": [
+              "An in-memory counter per instance - it breaks the moment you scale out.",
+              "Read-then-write without atomicity, letting the limit be exceeded under concurrency.",
+              "No 429 / Retry-After response contract for clients."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Rate-limit to 100 requests a minute per API key across many servers - how?"
+              },
+              {
+                "role": "me",
+                "text": "A per-server counter won't hold, so I keep one atomic counter in Redis keyed by the API key and time window, and enforce it at the gateway."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which algorithm, and why does it need to be atomic?"
+              },
+              {
+                "role": "me",
+                "text": "Token bucket or sliding window; atomic via INCR+EXPIRE or a Lua script, so two concurrent requests can't both slip past the limit."
+              },
+              {
+                "role": "interviewer",
+                "text": "What if Redis goes down?"
+              },
+              {
+                "role": "me",
+                "text": "A deliberate choice - fail-open to keep the API available, or fail-closed to protect the backend - documented, not accidental."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Token bucket vs sliding window?",
+                "a": "Token bucket allows controlled bursts; sliding window gives smoother, more accurate per-window counts."
+              },
+              {
+                "q": "Why enforce at the gateway?",
+                "a": "Reject early - before the request consumes app threads, the database, or downstream calls."
+              },
+              {
+                "q": "What status code and headers?",
+                "a": "429 Too Many Requests with Retry-After, often plus X-RateLimit-Remaining."
+              },
+              {
+                "q": "How do you keep it fair across users?",
+                "a": "Key the bucket per identity (API key/user/IP) rather than using one global counter."
+              }
+            ]
+          }
+        },
+        {
+          "id": "architecture-scenarios-004",
+          "q": "An order touches payment, inventory, and shipping in separate services - you can't use one ACID transaction. How do you keep it consistent?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "saga",
+            "distributed-transactions",
+            "compensating-actions",
+            "eventual-consistency",
+            "microservices"
+          ],
+          "answer": {
+            "oneLiner": "Use a Saga - a sequence of local transactions with compensating actions that undo earlier steps when a later one fails, accepting eventual consistency.",
+            "keyPoints": [
+              "There's no distributed ACID across services; two-phase commit is fragile and blocks.",
+              "A Saga is a local transaction per service plus a compensating action to roll it back.",
+              "Choreography (events) suits simple flows; orchestration (a coordinator) suits complex ones.",
+              "The end state is eventually consistent - make every step and compensation idempotent."
+            ],
+            "detail": "If payment succeeds but shipping fails, you run compensations in reverse - refund, release inventory. Orchestration centralizes the workflow in one service that issues commands and reacts to replies; choreography has services react to each other's events. Steps and compensations must be idempotent because messages can repeat.",
+            "redFlags": [
+              "Reaching for a distributed two-phase commit across microservices.",
+              "No compensation/rollback path when a later step fails.",
+              "Assuming strong consistency where the design is inherently eventual."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "An order spans payment, inventory, and shipping in different services. How do you keep it consistent without one big transaction?"
+              },
+              {
+                "role": "me",
+                "text": "A Saga: each service runs its own local transaction, and if a later step fails I run compensating actions to undo the earlier ones."
+              },
+              {
+                "role": "interviewer",
+                "text": "Orchestration or choreography?"
+              },
+              {
+                "role": "me",
+                "text": "Choreography via events for simple flows; an orchestrator when the workflow is complex and I want one place to see and control state."
+              },
+              {
+                "role": "interviewer",
+                "text": "Payment went through but shipping failed - then what?"
+              },
+              {
+                "role": "me",
+                "text": "Trigger the compensations - refund the payment and release the reserved inventory - so the system settles into a consistent cancelled state."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why not two-phase commit?",
+                "a": "It blocks resources and its coordinator is a fragile single point; it scales poorly across services."
+              },
+              {
+                "q": "Why must saga steps be idempotent?",
+                "a": "Messages are delivered at least once, so a step may run more than once and must not double-apply."
+              },
+              {
+                "q": "What is the outbox pattern's role here?",
+                "a": "It reliably publishes the events that drive the saga without a dual-write race.",
+                "relatedId": "architecture-scenarios-005"
+              },
+              {
+                "q": "What's the orchestration trade-off?",
+                "a": "Central visibility and control, at the cost of a coordinator service to build and run."
+              }
+            ]
+          }
+        },
+        {
+          "id": "architecture-scenarios-005",
+          "q": "After saving an order you publish an 'OrderPlaced' event to a broker, but sometimes the DB commits and the event never sends. How do you make it reliable?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "outbox-pattern",
+            "dual-write",
+            "reliable-messaging",
+            "eventual-consistency",
+            "cdc"
+          ],
+          "answer": {
+            "oneLiner": "It's the dual-write problem; use the Transactional Outbox - write the event to an outbox table in the same DB transaction, then a relay publishes it.",
+            "keyPoints": [
+              "Writing to the DB and the broker separately can't be atomic - either can fail after the other.",
+              "Outbox: insert the event into an outbox table inside the order's transaction.",
+              "A background relay or CDC reads the outbox and publishes to the broker, marking rows sent.",
+              "Delivery is at-least-once, so consumers must de-dupe."
+            ],
+            "detail": "Because the order row and the outbox row commit together, you never lose an event. A poller or change-data-capture process ships outbox rows to the broker and retries until acknowledged. Since the relay can re-publish after a crash, delivery is at-least-once and consumers must be idempotent.",
+            "redFlags": [
+              "Publishing to the broker inside the request and assuming it always succeeds.",
+              "Trying to wrap the database and the broker in one distributed transaction.",
+              "No relay/retry - events lost on a crash between commit and publish."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "The order commits but the OrderPlaced event sometimes never reaches the broker. Why?"
+              },
+              {
+                "role": "me",
+                "text": "Classic dual-write - the DB and the broker are two systems with no atomic write across them, so a crash in between loses the event."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you guarantee the event survives?"
+              },
+              {
+                "role": "me",
+                "text": "Transactional outbox - I insert the event into an outbox table in the same transaction as the order, so they commit or fail together."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does it actually reach the broker?"
+              },
+              {
+                "role": "me",
+                "text": "A relay or CDC process reads unsent outbox rows, publishes them, and marks them sent, retrying until the broker acks."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why are consumers still idempotent?",
+                "a": "The relay can publish a row more than once after a crash, so delivery is at-least-once."
+              },
+              {
+                "q": "Poller vs CDC for the relay?",
+                "a": "Polling is simple; CDC (e.g. Debezium) tails the transaction log with lower latency and load."
+              },
+              {
+                "q": "What is the inbox pattern?",
+                "a": "The consumer side - record processed message ids to drop duplicates."
+              },
+              {
+                "q": "How does this relate to sagas?",
+                "a": "Sagas rely on reliable events; the outbox is how each step publishes them safely.",
+                "relatedId": "architecture-scenarios-004"
+              }
+            ]
+          }
+        },
+        {
+          "id": "architecture-scenarios-006",
+          "q": "You run three instances of a service and a nightly job fires on each, so it runs three times. How do you ensure only one runs it?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "distributed-lock",
+            "leader-election",
+            "redis-lock",
+            "scheduling",
+            "idempotency"
+          ],
+          "answer": {
+            "oneLiner": "Coordinate with a distributed lock or lease - one instance acquires it and runs the job; the others see it's held and skip.",
+            "keyPoints": [
+              "Each instance has its own scheduler, so without coordination the job fires N times.",
+              "Use a shared lock/lease: a row with a unique constraint, or a Redis lock with a TTL.",
+              "The lock must auto-expire so a crashed holder doesn't block the job forever.",
+              "Make the job idempotent anyway as a safety net."
+            ],
+            "detail": "A simple version is an atomic acquire - INSERT a lock row, or SET NX with an expiry in Redis; whoever wins runs, the others back off. The TTL stops a dead holder from deadlocking the job, and for long jobs you renew the lease. Don't rely on the lock alone - keep the work idempotent.",
+            "redFlags": [
+              "Assuming only one instance is scheduled - it breaks when you scale out.",
+              "A lock with no expiry, so a crash blocks the job indefinitely.",
+              "Ignoring lease renewal for long-running jobs."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Three instances, a nightly job runs on each, so it executes three times. Fix it?"
+              },
+              {
+                "role": "me",
+                "text": "Add coordination - a distributed lock or lease in a shared store; one instance acquires it and runs, the others see it's taken and skip."
+              },
+              {
+                "role": "interviewer",
+                "text": "How do you stop a crash from blocking the job forever?"
+              },
+              {
+                "role": "me",
+                "text": "Give the lock a TTL so it auto-expires, and for long jobs renew the lease while the work is still in progress."
+              },
+              {
+                "role": "interviewer",
+                "text": "Anything beyond the lock?"
+              },
+              {
+                "role": "me",
+                "text": "Keep the job idempotent so even a rare double-run doesn't corrupt anything - belt and braces."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How does Redis SET NX work as a lock?",
+                "a": "SET key value NX PX ttl sets only if absent, with an expiry - an atomic acquire."
+              },
+              {
+                "q": "What is leader election?",
+                "a": "Electing one instance as leader (via ZooKeeper/etcd/Consul) to own singleton work."
+              },
+              {
+                "q": "Why is a DB unique constraint a lock?",
+                "a": "Only one INSERT of the same key can succeed; the rest fail and back off."
+              },
+              {
+                "q": "Risk of a TTL that's too short?",
+                "a": "The lease can expire mid-job and a second runner starts - size it above the job's runtime and renew it."
+              }
+            ]
+          }
+        },
+        {
+          "id": "architecture-scenarios-007",
+          "q": "Design a URL shortener like bit.ly - how do you generate the short codes and serve redirects at scale?",
+          "level": "senior",
+          "type": "scenario",
+          "freq": "high",
+          "tags": [
+            "url-shortener",
+            "system-design",
+            "base62",
+            "caching",
+            "read-heavy"
+          ],
+          "answer": {
+            "oneLiner": "Map a short code to the long URL in a key-value store; generate codes by base62-encoding a unique id, and serve cache-backed redirects.",
+            "keyPoints": [
+              "The core is a code -> long-URL lookup, and reads vastly outnumber writes.",
+              "Generate codes by base62-encoding a unique counter/id, or hash + a collision check.",
+              "Cache hot codes (Redis/CDN) and return a 301/302 redirect.",
+              "Scale reads with caching and replicas; partition by code if needed."
+            ],
+            "detail": "A 7-character base62 code gives about 3.5 trillion combinations. Encoding a unique auto-increment id avoids collisions entirely, whereas hashing needs a uniqueness check. Redirects are the hot path, so cache aggressively and keep the store a simple key-value lookup; push click analytics off the redirect path onto a queue.",
+            "redFlags": [
+              "Modeling a heavy relational schema when a key-value lookup suffices.",
+              "Random codes with no collision handling.",
+              "Doing analytics synchronously on the redirect, slowing the hot path."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Design bit.ly - how do you make the short codes?"
+              },
+              {
+                "role": "me",
+                "text": "Encode a unique id in base62 - seven characters is trillions of combinations, and because the id is unique there are no collisions to resolve."
+              },
+              {
+                "role": "interviewer",
+                "text": "It's extremely read-heavy. How do you serve redirects fast?"
+              },
+              {
+                "role": "me",
+                "text": "Cache hot code-to-URL pairs in Redis or a CDN and return a redirect; the database is just the source of truth behind the cache."
+              },
+              {
+                "role": "interviewer",
+                "text": "301 or 302?"
+              },
+              {
+                "role": "me",
+                "text": "302 if I want every hit to come back for analytics or future changes; 301 if I want browsers and proxies to cache the redirect for speed."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why base62 over base16?",
+                "a": "Shorter codes - 62 symbols pack more values per character than 16 do."
+              },
+              {
+                "q": "How do you support custom aliases?",
+                "a": "Let users claim a code, checked against the unique-code constraint before saving."
+              },
+              {
+                "q": "How do you add expiry?",
+                "a": "Store a TTL/expiry per code and lazily or batch-delete expired entries."
+              },
+              {
+                "q": "Where do clicks/analytics go?",
+                "a": "Emit an event off the hot path to a queue and aggregate asynchronously."
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }

@@ -95,8 +95,8 @@ interface TopicRow {
           <!-- Practice mode tiles (only implemented modes are active) -->
           <section class="tiles">
             <a routerLink="/feynman" class="tile">
-              <span class="tile-icon">🗣️</span>
-              <span class="tile-name">Feynman Mode</span>
+              <span class="tile-icon">🧠</span>
+              <span class="tile-name">Guess the Main Point</span>
               <span class="tile-sub">Explain &amp; check key points</span>
             </a>
             <div class="tile disabled" title="Coming soon">

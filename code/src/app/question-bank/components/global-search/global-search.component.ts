@@ -45,27 +45,32 @@ import { QuestionBankService, SearchItem } from '../../question-bank.service';
     </div>
   `,
   styles: [`
-    .gsearch { position: relative; width: 100%; max-width: 460px; }
+    .gsearch { position: relative; width: 100%; max-width: 680px; }
     .gs-icon {
-      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-      font-size: 0.8em; pointer-events: none; opacity: 0.7;
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 1em; pointer-events: none; opacity: 0.7;
     }
     .gs-input {
       width: 100%;
-      padding: 7px 30px 7px 30px;
+      height: 42px;
+      padding: 0 38px 0 40px;
       background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       color: var(--text);
-      font-size: 0.85em;
+      font-size: 0.95em;
       font-family: inherit;
       &::placeholder { color: var(--text-muted); }
-      &:focus { outline: none; border-color: var(--accent); }
+      &:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
     }
     .gs-clear {
-      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-      background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8em;
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9em;
+      padding: 4px;
       &:hover { color: var(--text); }
+    }
+    @media (max-width: 600px) {
+      .gs-input { height: 40px; font-size: 1em; }
     }
     .gs-results {
       position: absolute;
