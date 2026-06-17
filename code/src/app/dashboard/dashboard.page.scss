@@ -104,6 +104,67 @@
   margin-bottom: 20px;
 }
 
+/* ── Practice mode tiles ── */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.tile {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  transition: border-color 120ms, transform 120ms;
+  &:hover { border-color: var(--accent); transform: translateY(-2px); text-decoration: none; }
+}
+.tile-icon { font-size: 1.6em; }
+.tile-name { font-weight: 700; font-size: 0.9em; color: var(--text); }
+.tile-sub { font-size: 0.72em; color: var(--text-muted); }
+
+/* ── Two-column (chart + topics) ── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.topics-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.topic-rows { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.topic-row {
+  display: grid;
+  grid-template-columns: auto 1fr 70px auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 120ms;
+  &:hover { background: var(--surface-2); }
+}
+.t-icon { font-size: 1em; }
+.t-name { font-size: 0.85em; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.t-bar-fill { display: block; height: 100%; background: var(--accent); }
+.t-count { font-size: 0.82em; font-weight: 700; color: var(--text); min-width: 22px; text-align: right; }
+.t-status { font-size: 0.8em; }
+
+@media (max-width: 760px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .two-col { grid-template-columns: 1fr; }
+}
+
 /* ── Chart ── */
 .chart-card {
   background: var(--card-bg);

@@ -1,10 +1,11 @@
 import {
   ChangeDetectionStrategy, Component, computed, inject, OnInit, signal
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 import { MarkdownComponent } from 'ngx-markdown';
 import { QuestionBankService } from '../question-bank/question-bank.service';
 import { QuestionView } from '../question-bank/models/question-bank.models';
+import { ReviewLogService } from '../shared/review-log.service';
 
 type Phase = 'setup' | 'running' | 'done';
 type Grade = 'got' | 'review';
@@ -264,12 +265,26 @@ export class MockExamPage implements OnInit {
     return c ? '```' + c.lang + '\n' + c.snippet + '\n```' : '';
   });
 
+  private route = inject(ActivatedRoute);
+  private reviewLog = inject(ReviewLogService);
+
   async ngOnInit(): Promise<void> {
     this.svc.applyStoredTheme();
     if (!this.svc.topics().length) await this.svc.init();
     this.topicChoices.set(
       this.svc.topics().map(t => ({ id: t.id, name: t.name, icon: t.icon, selected: true }))
     );
+
+    // Quick-start preset (e.g. dashboard "Shuffle 10"): /simulator?quick=10
+    const quick = Number(this.route.snapshot.queryParamMap.get('quick'));
+    if (quick > 0) {
+      this.topicChoices.update(list => list.map(t => ({ ...t, selected: true })));
+      this.selectedLevels.set(['junior', 'mid', 'senior']);
+      this.count.set(quick);
+      this.order.set('shuffle');
+      this.predictOnly.set(false);
+      await this.start();
+    }
   }
 
   // ── setup actions ──
@@ -347,6 +362,7 @@ export class MockExamPage implements OnInit {
     const q = this.current();
     if (!q) return;
     this.graded.update(list => [...list, { question: q, grade: g }]);
+    this.reviewLog.log({ questionId: q.id, topicId: q.topicId, topicName: q.topicName, result: g });
     if (this.index() + 1 >= this.exam().length) {
       this.finish();
     } else {
