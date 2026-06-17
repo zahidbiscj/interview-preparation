@@ -87,12 +87,20 @@ type Mode = 'add' | 'review';
                 <h1 class="set-title">{{ activeSet()!.name }}</h1>
                 <span class="set-sub">{{ activeSet()!.questionIds.length }} question{{ activeSet()!.questionIds.length === 1 ? '' : 's' }}</span>
               </div>
-              <button
-                class="run-btn"
-                [disabled]="activeSet()!.questionIds.length === 0"
-                (click)="runSimulator()">
-                🎯 Run in Simulator
-              </button>
+              <div class="run-actions">
+                <button
+                  class="run-btn"
+                  [disabled]="activeSet()!.questionIds.length === 0"
+                  (click)="runSimulator()">
+                  🎯 Run in Simulator
+                </button>
+                <button
+                  class="run-btn run-btn-live"
+                  [disabled]="activeSet()!.questionIds.length === 0"
+                  (click)="runLive()">
+                  🎤 Run Live Interview
+                </button>
+              </div>
             </div>
 
             <!-- Mode tabs -->
@@ -118,6 +126,10 @@ type Mode = 'add' | 'review';
                 <select class="type-select" [ngModel]="typeFilter()" (ngModelChange)="typeFilter.set($event)">
                   <option value="all">All types</option>
                   @for (t of types; track t) { <option [value]="t">{{ t }}</option> }
+                </select>
+                <select class="type-select" [ngModel]="categoryFilter()" (ngModelChange)="categoryFilter.set($event)">
+                  <option value="all">All categories</option>
+                  @for (c of topicOptions(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
                 </select>
               </div>
 
@@ -305,10 +317,11 @@ type Mode = 'add' | 'review';
     .set-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
     .set-title { font-size: 1.3em; margin: 0; }
     .set-sub { font-size: 0.82em; color: var(--text-muted); }
+    .run-actions { display: flex; gap: 8px; flex-shrink: 0; }
     .run-btn {
-      background: var(--accent);
-      color: white;
-      border: none;
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
       border-radius: 8px;
       padding: 9px 16px;
       font-size: 0.88em;
@@ -316,7 +329,10 @@ type Mode = 'add' | 'review';
       cursor: pointer;
       white-space: nowrap;
     }
+    .run-btn:hover { border-color: var(--accent); color: var(--accent); }
     .run-btn:disabled { opacity: 0.5; cursor: default; }
+    .run-btn-live { background: var(--accent); color: white; border-color: var(--accent); }
+    .run-btn-live:hover { opacity: 0.88; color: white; border-color: var(--accent); }
 
     .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
     .tab {
@@ -392,6 +408,7 @@ type Mode = 'add' | 'review';
       .main-col { padding: 14px 14px 28px; }
 
       .set-head { flex-direction: column; align-items: stretch; gap: 10px; }
+      .run-actions { flex-direction: column; }
       .run-btn { width: 100%; }
       .add-controls { flex-direction: column; }
       .type-select { width: 100%; }
@@ -419,9 +436,18 @@ export class SetsPage implements OnInit {
   readonly mode = signal<Mode>('add');
   readonly search = signal('');
   readonly typeFilter = signal<QuestionType | 'all'>('all');
+  readonly categoryFilter = signal<string>('all');
 
   readonly activeSet = computed(() =>
     this.sets().find(s => s.id === this.activeSetId()) ?? null);
+
+  readonly topicOptions = computed(() => {
+    const seen = new Map<string, string>();
+    for (const q of this.allQuestions()) {
+      if (!seen.has(q.topicId)) seen.set(q.topicId, q.topicName);
+    }
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  });
 
   readonly activeIds = computed(() => new Set(this.activeSet()?.questionIds ?? []));
 
@@ -439,12 +465,14 @@ export class SetsPage implements OnInit {
       .filter((q): q is QuestionView => !!q);
   });
 
-  /** All questions filtered by the add-mode search + type controls. */
+  /** All questions filtered by the add-mode search + type + category controls. */
   readonly filteredQuestions = computed<QuestionView[]>(() => {
     const term = this.search().toLowerCase().trim();
     const type = this.typeFilter();
+    const cat  = this.categoryFilter();
     return this.allQuestions().filter(q => {
       if (type !== 'all' && q.type !== type) return false;
+      if (cat  !== 'all' && q.topicId !== cat) return false;
       if (term) {
         const inQ = q.q.toLowerCase().includes(term);
         const inTags = q.tags?.some(t => t.toLowerCase().includes(term)) ?? false;
@@ -510,5 +538,10 @@ export class SetsPage implements OnInit {
   runSimulator(): void {
     const id = this.activeSetId();
     if (id) this.router.navigate(['/simulator'], { queryParams: { set: id } });
+  }
+
+  runLive(): void {
+    const id = this.activeSetId();
+    if (id) this.router.navigate(['/live-interview'], { queryParams: { set: id } });
   }
 }
