@@ -370,6 +370,7 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
 
   private timerId: ReturnType<typeof setInterval> | null = null;
   private startMs = 0;
+  private listenCallId = 0; // guards against stale listen().then() calling evaluate()
 
   async ngOnInit(): Promise<void> {
     this.svc.applyStoredTheme();
@@ -431,12 +432,14 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
 
     if (!this.voice.sttSupported) return;
 
+    const callId = ++this.listenCallId;
+
     void this.voice.listen(
       t => this.transcript.set(t),
       msg => this.micError.set(msg),
     ).then(finalText => {
-      // Use finalText from the promise, but fall back to the live transcript signal
-      // in case the browser hadn't finalized the last utterance before Done was clicked
+      // Discard result if a newer listen call has started (retry / next question)
+      if (this.listenCallId !== callId) return;
       const text = finalText || this.transcript();
       this.transcript.set(text);
       if (this.micError()) return;

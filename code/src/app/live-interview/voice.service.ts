@@ -7,6 +7,9 @@ export class VoiceService {
     !!((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
 
   private recognition: any = null;
+  private sessionId = 0;           // bumped on every new listen() call
+  private activeResolve: ((text: string) => void) | null = null;
+  private capturedText = '';       // latest accumulated text, readable by stopListening()
   private manualStop = false;
 
   getVoices(): SpeechSynthesisVoice[] {
@@ -40,28 +43,50 @@ export class VoiceService {
   }
 
   /**
-   * Opens the mic and resolves with the final accumulated transcript when:
-   *  - stopListening() is called (Done Speaking tap), OR
-   *  - a fatal error occurs.
-   * Auto-restarts on silence so the mic stays open indefinitely.
-   * Interim text is included in the resolve so clicking Done never returns empty
-   * when the browser hasn't yet finalized the last utterance.
+   * Opens the mic and resolves with the full transcript when stopListening() is called.
+   * Calling listen() again while a previous session is active cleanly cancels the old one first.
    */
   listen(
     onText: (t: string) => void,
     onError?: (msg: string) => void,
   ): Promise<string> {
-    return new Promise(resolve => {
+    // ── Tear down any previous session ──────────────────────────────────────
+    this.sessionId++;               // all closures from previous calls now see a stale ID
+    const myId = this.sessionId;
+
+    if (this.recognition) {
+      try { this.recognition.stop(); } catch { /* ignore */ }
+      this.recognition = null;
+    }
+    // Resolve the previous promise (if any) so it doesn't leak
+    if (this.activeResolve) {
+      const prev = this.activeResolve;
+      this.activeResolve = null;
+      prev(this.capturedText);
+    }
+
+    this.manualStop = false;
+    this.capturedText = '';
+
+    // ── New session ──────────────────────────────────────────────────────────
+    return new Promise<string>(resolve => {
       if (!this.sttSupported) { resolve(''); return; }
 
-      const SpeechRec = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-      this.manualStop = false;
+      this.activeResolve = resolve;
 
+      const SpeechRec = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
       let finalText = '';
-      let interimText = '';  // tracks the latest unfinished utterance across all rec instances
+      let interimText = '';
       let errorShown = false;
 
+      const done = (text: string) => {
+        this.activeResolve = null;
+        resolve(text);
+      };
+
       const start = () => {
+        if (this.sessionId !== myId) return; // superseded — do not restart
+
         const rec = new SpeechRec();
         this.recognition = rec;
         rec.continuous = true;
@@ -69,67 +94,84 @@ export class VoiceService {
         rec.lang = 'en-US';
 
         rec.onresult = (event: any) => {
+          if (this.sessionId !== myId) return;
           let interim = '';
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const part = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalText += part + ' ';
-              interim = '';
-            } else {
-              interim = part;
-            }
+            if (event.results[i].isFinal) { finalText += part + ' '; interim = ''; }
+            else interim = part;
           }
           interimText = interim;
+          this.capturedText = (finalText + interimText).trim();
           onText(finalText + interim);
         };
 
         rec.onend = () => {
+          if (this.sessionId !== myId) { this.recognition = null; return; }
           this.recognition = null;
+          this.capturedText = (finalText + interimText).trim();
+
           if (this.manualStop) {
-            // Combine finalized + any pending interim so Done Speaking never loses words
-            resolve((finalText + interimText).trim());
+            done(this.capturedText);
           } else {
-            // Browser stopped on its own (silence timeout) — keep mic open
-            try { start(); } catch { resolve((finalText + interimText).trim()); }
+            // Auto-restart — browser killed recognition on silence
+            try { start(); } catch { done(this.capturedText); }
           }
         };
 
         rec.onerror = (e: any) => {
+          if (this.sessionId !== myId) { this.recognition = null; return; }
           this.recognition = null;
+
           if (e.error === 'not-allowed') {
             if (!errorShown) {
               errorShown = true;
               onError?.('Microphone access was denied. Allow mic in browser settings, or type your answer below.');
             }
-            resolve((finalText + interimText).trim());
+            done('');
           } else if (e.error === 'network') {
             if (!errorShown) {
               errorShown = true;
               onError?.('Speech recognition needs an internet connection. Type your answer below.');
             }
-            resolve((finalText + interimText).trim());
+            done('');
           } else if (e.error === 'aborted') {
-            // fired when we call .stop() — onend handles the resolve
+            // fired by rec.stop() — onend will handle resolve
           } else if (e.error === 'no-speech') {
-            // common on mobile; onend will fire and auto-restart
+            // browser will fire onend and we auto-restart
           } else {
             if (!errorShown) {
               errorShown = true;
               onError?.(`Mic error (${e.error}). Type your answer below.`);
             }
-            resolve((finalText + interimText).trim());
+            done('');
           }
         };
 
-        rec.start();
+        try { rec.start(); } catch { done(this.capturedText); }
       };
 
       start();
     });
   }
 
+  /**
+   * Stops the current STT session and resolves the listen() promise immediately.
+   * Safe to call even when recognition is null (e.g. during the auto-restart gap).
+   */
   stopListening(): void {
     this.manualStop = true;
-    this.recognition?.stop();
+    if (this.recognition) {
+      this.recognition.stop();
+      // onend will fire and call done() via the normal path
+    } else {
+      // Recognition is null (mid-restart gap) — resolve directly
+      // Bump sessionId so any pending start() from the old closure becomes a no-op
+      this.sessionId++;
+      const resolve = this.activeResolve;
+      const text = this.capturedText;
+      this.activeResolve = null;
+      if (resolve) resolve(text);
+    }
   }
 }
