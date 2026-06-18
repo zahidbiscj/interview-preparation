@@ -9,7 +9,7 @@ import { ReviewLogService } from '../shared/review-log.service';
 import { VoiceService } from './voice.service';
 import { GraderService } from './grader.service';
 import { LiveSettingsService } from './live-settings.service';
-import { GradeResult, LiveResult } from './live-interview.models';
+import { GradeResult, LiveResult, SavedSession } from './live-interview.models';
 
 type LivePhase = 'loading' | 'listening' | 'evaluating' | 'feedback' | 'done';
 
@@ -44,6 +44,15 @@ type LivePhase = 'loading' | 'listening' | 'evaluating' | 'feedback' | 'done';
         <!-- ════════ RUNNING (listening / evaluating / feedback) ════════ -->
         @if (phase() !== 'loading' && phase() !== 'done') {
           <div class="runner">
+
+            <!-- Resume banner -->
+            @if (sessionRestored()) {
+              <div class="resume-banner">
+                ↩ Session resumed — {{ results().length }} question{{ results().length !== 1 ? 's' : '' }} already answered
+                <button class="resume-dismiss" (click)="sessionRestored.set(false)">×</button>
+              </div>
+            }
+
             <!-- Progress -->
             <div class="progress-head">
               <div class="progress-bar"><div class="progress-fill" [style.width.%]="progressPct()"></div></div>
@@ -122,6 +131,14 @@ type LivePhase = 'loading' | 'listening' | 'evaluating' | 'feedback' | 'done';
                     <span class="coverage-fraction">{{ coveredCount() }}/{{ keyPointCount() }}</span>
                     key points.
                   </div>
+
+                  <!-- Your spoken answer -->
+                  @if (transcript()) {
+                    <div class="your-answer-box">
+                      <span class="section-label">Your answer</span>
+                      <p class="your-answer-text">{{ transcript() }}</p>
+                    </div>
+                  }
 
                   @if (current()!.answer.keyPoints?.length) {
                     <p class="section-label">Key Points</p>
@@ -207,6 +224,35 @@ type LivePhase = 'loading' | 'listening' | 'evaluating' | 'feedback' | 'done';
               <p class="all-good">🎉 You passed every question. Excellent session!</p>
             }
 
+            <!-- Full Session Transcript -->
+            @if (results().length) {
+              <section class="session-log">
+                <div class="log-header">
+                  <h3>📄 Full Session Transcript</h3>
+                  <button class="copy-log-btn" (click)="copyLog()">Copy as text</button>
+                </div>
+                <div class="log-entries">
+                  @for (r of results(); track r.question.id; let i = $index) {
+                    <details class="log-entry">
+                      <summary class="log-summary">
+                        <span class="log-q-num">Q{{ i + 1 }}</span>
+                        <span class="log-q-short">{{ r.question.q }}</span>
+                        <span class="log-score-chip" [class.pass]="r.grade.score >= 60" [class.fail]="r.grade.score < 60">
+                          {{ r.grade.score }}%
+                        </span>
+                      </summary>
+                      <div class="log-body">
+                        <div class="log-label">Your answer</div>
+                        <div class="log-transcript-text">{{ r.transcript || '(no answer given)' }}</div>
+                        <div class="log-label" style="margin-top:10px">Feedback</div>
+                        <div class="log-feedback-text">{{ r.grade.spokenFeedback }}</div>
+                      </div>
+                    </details>
+                  }
+                </div>
+              </section>
+            }
+
             <div class="result-actions">
               @if (weakList().length) {
                 <button class="action-btn primary" (click)="retryWeak()">
@@ -272,6 +318,8 @@ type LivePhase = 'loading' | 'listening' | 'evaluating' | 'feedback' | 'done';
   styleUrl: './live-interview.page.scss',
 })
 export class LiveInterviewPage implements OnInit, OnDestroy {
+  private static readonly SESSION_KEY = 'live.session';
+
   readonly svc          = inject(QuestionBankService);
   readonly voice        = inject(VoiceService);
   readonly grader       = inject(GraderService);
@@ -282,14 +330,15 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   readonly isDark = this.svc.isDark;
 
   // ── session state ──
-  readonly phase     = signal<LivePhase>('loading');
-  readonly questions = signal<QuestionView[]>([]);
-  readonly index     = signal(0);
-  readonly transcript = signal('');
-  readonly grade     = signal<GradeResult | null>(null);
-  readonly results   = signal<LiveResult[]>([]);
-  readonly elapsed   = signal('0:00');
-  readonly micError  = signal<string | null>(null);
+  readonly phase          = signal<LivePhase>('loading');
+  readonly questions      = signal<QuestionView[]>([]);
+  readonly index          = signal(0);
+  readonly transcript     = signal('');
+  readonly grade          = signal<GradeResult | null>(null);
+  readonly results        = signal<LiveResult[]>([]);
+  readonly elapsed        = signal('0:00');
+  readonly micError       = signal<string | null>(null);
+  readonly sessionRestored = signal(false);
 
   // ── settings panel ──
   readonly showSettings = signal(false);
@@ -297,18 +346,27 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   readonly draftModel   = signal('');
 
   // ── computed ──
-  readonly current     = computed(() => this.questions()[this.index()] ?? null);
-  readonly progressPct = computed(() =>
+  readonly current      = computed(() => this.questions()[this.index()] ?? null);
+  readonly progressPct  = computed(() =>
     this.questions().length ? Math.round((this.index() / this.questions().length) * 100) : 0);
-  readonly isLast      = computed(() => this.index() === this.questions().length - 1);
-  readonly passCount   = computed(() => this.results().filter(r => r.grade.score >= 60).length);
-  readonly weakCount   = computed(() => this.results().filter(r => r.grade.score < 60).length);
-  readonly weakList    = computed(() => this.results().filter(r => r.grade.score < 60));
-  readonly scorePct    = computed(() =>
+  readonly isLast       = computed(() => this.index() === this.questions().length - 1);
+  readonly passCount    = computed(() => this.results().filter(r => r.grade.score >= 60).length);
+  readonly weakCount    = computed(() => this.results().filter(r => r.grade.score < 60).length);
+  readonly weakList     = computed(() => this.results().filter(r => r.grade.score < 60));
+  readonly scorePct     = computed(() =>
     this.results().length ? Math.round((this.passCount() / this.results().length) * 100) : 0);
   readonly coveredCount  = computed(() => this.grade()?.covered.filter(Boolean).length ?? 0);
   readonly keyPointCount = computed(() => this.current()?.answer.keyPoints?.length ?? 0);
   readonly hasKey        = computed(() => !!this.liveSettings.settings().openrouterKey?.trim());
+
+  readonly sessionLogText = computed(() =>
+    this.results().map((r, i) => [
+      `Q${i + 1}: ${r.question.q}`,
+      `Your answer: ${r.transcript || '(no answer given)'}`,
+      `Score: ${r.grade.score}% | ${r.grade.covered.filter(Boolean).length}/${r.grade.covered.length} key points`,
+      `Feedback: ${r.grade.spokenFeedback}`,
+    ].join('\n')).join('\n\n---\n\n')
+  );
 
   private timerId: ReturnType<typeof setInterval> | null = null;
   private startMs = 0;
@@ -317,7 +375,9 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.svc.applyStoredTheme();
     this.phase.set('loading');
     if (!this.svc.topics().length) await this.svc.init();
-    await this.launchSession();
+    if (!this.tryRestoreSession()) {
+      await this.launchSession();
+    }
   }
 
   ngOnDestroy(): void {
@@ -349,6 +409,8 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.transcript.set('');
     this.grade.set(null);
     this.micError.set(null);
+    this.sessionRestored.set(false);
+    this.startMs = Date.now();
     this.startTimer();
     void this.askQuestion(0);
   }
@@ -360,21 +422,25 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.transcript.set('');
     this.grade.set(null);
     this.micError.set(null);
+    this.saveSession();
     this.openInput();
   }
 
   private openInput(): void {
     this.phase.set('listening');
 
-    if (!this.voice.sttSupported) return; // textarea mode — user taps "Submit Answer"
+    if (!this.voice.sttSupported) return;
 
     void this.voice.listen(
       t => this.transcript.set(t),
       msg => this.micError.set(msg),
     ).then(finalText => {
-      this.transcript.set(finalText);
+      // Use finalText from the promise, but fall back to the live transcript signal
+      // in case the browser hadn't finalized the last utterance before Done was clicked
+      const text = finalText || this.transcript();
+      this.transcript.set(text);
       if (this.micError()) return;
-      if (!finalText.trim()) {
+      if (!text.trim()) {
         this.micError.set('No speech captured. Type your answer below, or refresh and allow mic access.');
         return;
       }
@@ -405,6 +471,7 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
       result: result.score >= 60 ? 'got' : 'review',
     });
 
+    this.saveSession();
     this.phase.set('feedback');
   }
 
@@ -419,7 +486,10 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   advance(): void {
     const q = this.current();
     const g = this.grade();
-    if (q && g) this.results.update(r => [...r, { question: q, grade: g }]);
+    if (q && g) {
+      this.results.update(r => [...r, { question: q, grade: g, transcript: this.transcript() }]);
+    }
+    this.saveSession();
 
     if (this.index() + 1 >= this.questions().length) {
       this.finish();
@@ -436,18 +506,21 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     const q = this.current();
     const g = this.grade();
     if (q && g && this.phase() === 'feedback') {
-      this.results.update(r => [...r, { question: q, grade: g }]);
+      this.results.update(r => [...r, { question: q, grade: g, transcript: this.transcript() }]);
     }
     this.svc.recordPractice(this.results().length, this.passCount());
+    this.clearSession();
     this.phase.set('done');
   }
 
   retryWeak(): void {
+    this.clearSession();
     const pool = this.weakList().map(r => r.question);
     this.beginSession(this.shuffle(pool));
   }
 
   newSession(): void {
+    this.clearSession();
     this.stopTimer();
     this.voice.stopListening();
     this.phase.set('loading');
@@ -458,6 +531,10 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.grade.set(null);
     this.micError.set(null);
     void this.launchSession();
+  }
+
+  copyLog(): void {
+    navigator.clipboard.writeText(this.sessionLogText()).catch(() => {});
   }
 
   // ── settings panel ──
@@ -476,6 +553,55 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.showSettings.set(false);
   }
 
+  // ── session persistence ──
+  private saveSession(): void {
+    const phase = this.phase();
+    if (phase === 'done' || phase === 'loading' || phase === 'evaluating') return;
+    try {
+      const data: SavedSession = {
+        questions:  this.questions(),
+        index:      this.index(),
+        results:    this.results(),
+        transcript: this.transcript(),
+        grade:      this.grade(),
+        phase:      phase as 'listening' | 'feedback',
+        startMs:    this.startMs,
+      };
+      localStorage.setItem(LiveInterviewPage.SESSION_KEY, JSON.stringify(data));
+    } catch { /* storage quota */ }
+  }
+
+  private clearSession(): void {
+    try { localStorage.removeItem(LiveInterviewPage.SESSION_KEY); } catch { /* */ }
+  }
+
+  private tryRestoreSession(): boolean {
+    try {
+      const raw = localStorage.getItem(LiveInterviewPage.SESSION_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw) as SavedSession;
+      if (!data.questions?.length) return false;
+
+      this.questions.set(data.questions);
+      this.index.set(data.index ?? 0);
+      this.results.set(data.results ?? []);
+      this.transcript.set(data.transcript ?? '');
+      this.grade.set(data.grade ?? null);
+      this.startMs = data.startMs ?? Date.now();
+      this.sessionRestored.set(true);
+      this.startTimer();
+
+      if (data.phase === 'feedback' && data.grade) {
+        this.phase.set('feedback');
+      } else {
+        this.openInput();
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ── helpers ──
   private shuffle<T>(arr: T[]): T[] {
     const a = [...arr];
@@ -487,8 +613,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   }
 
   private startTimer(): void {
-    this.startMs = Date.now();
-    this.elapsed.set('0:00');
     this.stopTimer();
     this.timerId = setInterval(() => {
       const s = Math.floor((Date.now() - this.startMs) / 1000);

@@ -34,4 +34,15 @@ export const DEFAULT_LIVE_SETTINGS: LiveSettings = {
 export interface LiveResult {
   question: QuestionView;
   grade: GradeResult;
+  transcript: string;
+}
+
+export interface SavedSession {
+  questions: QuestionView[];
+  index: number;
+  results: LiveResult[];
+  transcript: string;
+  grade: GradeResult | null;
+  phase: 'listening' | 'feedback';
+  startMs: number;
 }

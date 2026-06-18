@@ -24,7 +24,7 @@ export class VoiceService {
         if (match) utter.voice = match;
       }
       utter.onend = () => resolve();
-      utter.onerror = () => resolve(); // never block the flow on TTS error
+      utter.onerror = () => resolve();
       speechSynthesis.speak(utter);
     });
   }
@@ -41,11 +41,11 @@ export class VoiceService {
 
   /**
    * Opens the mic and resolves with the final accumulated transcript when:
-   *  - silence of `silenceMs` is detected (auto-stop), OR
-   *  - stopListening() is called externally (e.g. "Done Speaking" tap).
-   * `onText` receives the live interim+final text as the user speaks.
-   * `onError` is called if mic permission is denied — resolve('') is still called so the
-   * caller can fall back to textarea mode.
+   *  - stopListening() is called (Done Speaking tap), OR
+   *  - a fatal error occurs.
+   * Auto-restarts on silence so the mic stays open indefinitely.
+   * Interim text is included in the resolve so clicking Done never returns empty
+   * when the browser hasn't yet finalized the last utterance.
    */
   listen(
     onText: (t: string) => void,
@@ -58,6 +58,7 @@ export class VoiceService {
       this.manualStop = false;
 
       let finalText = '';
+      let interimText = '';  // tracks the latest unfinished utterance across all rec instances
       let errorShown = false;
 
       const start = () => {
@@ -71,21 +72,25 @@ export class VoiceService {
           let interim = '';
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const part = event.results[i][0].transcript;
-            if (event.results[i].isFinal) finalText += part + ' ';
-            else interim = part;
+            if (event.results[i].isFinal) {
+              finalText += part + ' ';
+              interim = '';
+            } else {
+              interim = part;
+            }
           }
+          interimText = interim;
           onText(finalText + interim);
         };
 
         rec.onend = () => {
           this.recognition = null;
           if (this.manualStop) {
-            // User tapped "Done Speaking" — resolve with what we have
-            resolve(finalText.trim());
+            // Combine finalized + any pending interim so Done Speaking never loses words
+            resolve((finalText + interimText).trim());
           } else {
-            // Mobile/browser stopped recognition on its own (silence timeout, etc.)
-            // Auto-restart to keep the mic open
-            try { start(); } catch { resolve(finalText.trim()); }
+            // Browser stopped on its own (silence timeout) — keep mic open
+            try { start(); } catch { resolve((finalText + interimText).trim()); }
           }
         };
 
@@ -96,23 +101,23 @@ export class VoiceService {
               errorShown = true;
               onError?.('Microphone access was denied. Allow mic in browser settings, or type your answer below.');
             }
-            resolve(finalText.trim());
+            resolve((finalText + interimText).trim());
           } else if (e.error === 'network') {
             if (!errorShown) {
               errorShown = true;
               onError?.('Speech recognition needs an internet connection. Type your answer below.');
             }
-            resolve(finalText.trim());
+            resolve((finalText + interimText).trim());
           } else if (e.error === 'aborted') {
-            // aborted fires when we call .stop() — onend handles the actual resolve
+            // fired when we call .stop() — onend handles the resolve
           } else if (e.error === 'no-speech') {
-            // no-speech on mobile is common; onend will fire and we auto-restart
+            // common on mobile; onend will fire and auto-restart
           } else {
             if (!errorShown) {
               errorShown = true;
               onError?.(`Mic error (${e.error}). Type your answer below.`);
             }
-            resolve(finalText.trim());
+            resolve((finalText + interimText).trim());
           }
         };
 
@@ -123,7 +128,6 @@ export class VoiceService {
     });
   }
 
-  /** Stops the current STT session — called by "Done Speaking" tap. */
   stopListening(): void {
     this.manualStop = true;
     this.recognition?.stop();
