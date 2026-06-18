@@ -107,7 +107,7 @@ export class VoiceService {
         };
 
         rec.onend = () => {
-          if (this.sessionId !== myId) { this.recognition = null; return; }
+          if (this.sessionId !== myId) return; // stale — do NOT null this.recognition (new session owns it)
           this.recognition = null;
           this.capturedText = (finalText + interimText).trim();
 
@@ -120,7 +120,7 @@ export class VoiceService {
         };
 
         rec.onerror = (e: any) => {
-          if (this.sessionId !== myId) { this.recognition = null; return; }
+          if (this.sessionId !== myId) return; // stale — do NOT null this.recognition (new session owns it)
           this.recognition = null;
 
           if (e.error === 'not-allowed') {
