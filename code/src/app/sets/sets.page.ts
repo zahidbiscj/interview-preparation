@@ -401,17 +401,27 @@ type Mode = 'add' | 'review';
       .layout { flex-direction: column; }
       .sets-col {
         width: 100%;
-        max-height: 40vh;
+        max-height: 28vh;
         border-right: none;
         border-bottom: 1px solid var(--border);
       }
-      .main-col { padding: 14px 14px 28px; }
+      .main-col { padding: 12px 12px 24px; }
 
-      .set-head { flex-direction: column; align-items: stretch; gap: 10px; }
-      .run-actions { flex-direction: column; }
-      .run-btn { width: 100%; }
-      .add-controls { flex-direction: column; }
-      .type-select { width: 100%; }
+      /* Keep set-head as a row so title+buttons don't eat vertical space */
+      .set-head { flex-wrap: wrap; gap: 8px; }
+      .set-head-info { flex: 1; min-width: 0; }
+      .run-actions { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+      .run-btn { flex: 1; min-width: 130px; font-size: 0.82em; padding: 8px 10px; }
+
+      /* Grid: search full-width, two selects side by side below it */
+      .add-controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+      .search-input { grid-column: 1 / -1; }
+      .type-select { width: 100%; min-width: 0; }
+
       .pick-row { grid-template-columns: auto 1fr; }
       .pick-meta { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; padding-left: 0; }
     }
