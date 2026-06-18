@@ -30,6 +30,20 @@ jobs:
         working-directory: code
         run: npm ci --legacy-peer-deps
 
+      - name: Inject OpenRouter key
+        working-directory: code
+        env:
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+          OPENROUTER_MODEL: 'meta-llama/llama-3.3-70b-instruct:free'
+        run: |
+          cat > src/environments/environment.prod.ts << EOF
+          export const environment = {
+            production: true,
+            openrouterKey: '${OPENROUTER_KEY}',
+            openrouterModel: '${OPENROUTER_MODEL}',
+          };
+          EOF
+
       - name: Build
         working-directory: code
         run: npx ng build --configuration=production --base-href=/interview-preparation/
