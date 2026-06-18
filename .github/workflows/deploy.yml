@@ -34,15 +34,10 @@ jobs:
         working-directory: code
         env:
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
-          OPENROUTER_MODEL: 'meta-llama/llama-3.3-70b-instruct:free'
         run: |
-          cat > src/environments/environment.prod.ts << EOF
-          export const environment = {
-            production: true,
-            openrouterKey: '${OPENROUTER_KEY}',
-            openrouterModel: '${OPENROUTER_MODEL}',
-          };
-          EOF
+          mkdir -p src/environments
+          printf 'export const environment = {\n  production: true,\n  openrouterKey: "%s",\n  openrouterModel: "meta-llama/llama-3.3-70b-instruct:free",\n};\n' \
+            "$OPENROUTER_KEY" > src/environments/environment.prod.ts
 
       - name: Build
         working-directory: code
