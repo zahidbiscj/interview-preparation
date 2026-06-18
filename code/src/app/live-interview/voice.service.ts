@@ -7,6 +7,7 @@ export class VoiceService {
     !!((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
 
   private recognition: any = null;
+  private manualStop = false;
 
   getVoices(): SpeechSynthesisVoice[] {
     return typeof speechSynthesis !== 'undefined' ? speechSynthesis.getVoices() : [];
@@ -54,47 +55,77 @@ export class VoiceService {
       if (!this.sttSupported) { resolve(''); return; }
 
       const SpeechRec = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-      const rec = new SpeechRec();
-      this.recognition = rec;
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-US';
+      this.manualStop = false;
 
       let finalText = '';
+      let errorShown = false;
 
-      rec.onresult = (event: any) => {
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const part = event.results[i][0].transcript;
-          if (event.results[i].isFinal) finalText += part + ' ';
-          else interim = part;
-        }
-        onText(finalText + interim);
+      const start = () => {
+        const rec = new SpeechRec();
+        this.recognition = rec;
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+
+        rec.onresult = (event: any) => {
+          let interim = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const part = event.results[i][0].transcript;
+            if (event.results[i].isFinal) finalText += part + ' ';
+            else interim = part;
+          }
+          onText(finalText + interim);
+        };
+
+        rec.onend = () => {
+          this.recognition = null;
+          if (this.manualStop) {
+            // User tapped "Done Speaking" — resolve with what we have
+            resolve(finalText.trim());
+          } else {
+            // Mobile/browser stopped recognition on its own (silence timeout, etc.)
+            // Auto-restart to keep the mic open
+            try { start(); } catch { resolve(finalText.trim()); }
+          }
+        };
+
+        rec.onerror = (e: any) => {
+          this.recognition = null;
+          if (e.error === 'not-allowed') {
+            if (!errorShown) {
+              errorShown = true;
+              onError?.('Microphone access was denied. Allow mic in browser settings, or type your answer below.');
+            }
+            resolve(finalText.trim());
+          } else if (e.error === 'network') {
+            if (!errorShown) {
+              errorShown = true;
+              onError?.('Speech recognition needs an internet connection. Type your answer below.');
+            }
+            resolve(finalText.trim());
+          } else if (e.error === 'aborted') {
+            // aborted fires when we call .stop() — onend handles the actual resolve
+          } else if (e.error === 'no-speech') {
+            // no-speech on mobile is common; onend will fire and we auto-restart
+          } else {
+            if (!errorShown) {
+              errorShown = true;
+              onError?.(`Mic error (${e.error}). Type your answer below.`);
+            }
+            resolve(finalText.trim());
+          }
+        };
+
+        rec.start();
       };
 
-      rec.onend = () => {
-        this.recognition = null;
-        resolve(finalText.trim());
-      };
-
-      rec.onerror = (e: any) => {
-        this.recognition = null;
-        if (e.error === 'not-allowed') {
-          onError?.('Microphone access was denied. Allow mic in browser settings, or type your answer below.');
-        } else if (e.error === 'network') {
-          onError?.('Speech recognition needs an internet connection (Chrome uses Google servers). Type your answer below.');
-        } else if (e.error !== 'no-speech') {
-          onError?.(`Mic error (${e.error}). Type your answer below.`);
-        }
-        resolve(finalText.trim());
-      };
-
-      rec.start();
+      start();
     });
   }
 
-  /** Stops the current STT session — triggers onend which resolves the listen() promise. */
+  /** Stops the current STT session — called by "Done Speaking" tap. */
   stopListening(): void {
+    this.manualStop = true;
     this.recognition?.stop();
   }
 }

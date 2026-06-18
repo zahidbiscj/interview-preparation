@@ -16,7 +16,7 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
       <!-- Header (always visible, click to expand) -->
       <div class="qcard-header" (click)="toggle()" role="button" [attr.aria-expanded]="state() !== 'collapsed'">
         <div class="qcard-meta">
-          @if (q().freq === 'high') { <span class="freq-badge">🔥</span> }
+          @if (q().bookmarked) { <span class="freq-badge">🔥</span> }
           @if (q().type) {
             <span class="badge badge-{{ q().type }}">{{ q().type }}</span>
           }
