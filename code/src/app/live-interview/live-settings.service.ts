@@ -19,7 +19,12 @@ export class LiveSettingsService {
   private load(): LiveSettings {
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
-      return raw ? { ...DEFAULT_LIVE_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_LIVE_SETTINGS };
+      if (!raw) return { ...DEFAULT_LIVE_SETTINGS };
+      const stored = JSON.parse(raw) as Partial<LiveSettings>;
+      // If no key was saved by the user, fall back to the environment-injected key
+      if (!stored.openrouterKey?.trim()) stored.openrouterKey = DEFAULT_LIVE_SETTINGS.openrouterKey;
+      if (!stored.model?.trim()) stored.model = DEFAULT_LIVE_SETTINGS.model;
+      return { ...DEFAULT_LIVE_SETTINGS, ...stored };
     } catch {
       return { ...DEFAULT_LIVE_SETTINGS };
     }

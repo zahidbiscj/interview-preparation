@@ -1,4 +1,5 @@
 import type { QuestionView } from '../question-bank/models/question-bank.models';
+import { environment } from '../../environments/environment';
 
 export interface GradeResult {
   covered: boolean[];        // parallel to question.answer.keyPoints
@@ -24,8 +25,8 @@ export interface LiveSettings {
 }
 
 export const DEFAULT_LIVE_SETTINGS: LiveSettings = {
-  openrouterKey: '',
-  model: 'xiaomi/mimo-v2-flash:free',
+  openrouterKey: environment.openrouterKey,
+  model: environment.openrouterModel,
   rate: 1.0,
   voiceURI: null,
 };
