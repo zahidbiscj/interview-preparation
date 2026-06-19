@@ -21,12 +21,12 @@
             "dml"
           ],
           "answer": {
-            "oneLiner": "DELETE removes rows one-by-one (logged, can use WHERE); TRUNCATE wipes all rows by deallocating pages (fast, resets identity); DROP removes the whole table object.",
+            "oneLiner": "DELETE removes rows one at a time and logs every row individually, which means you can filter with a WHERE clause and it fires triggers. TRUNCATE is much faster because it deallocates whole data pages instead of logging each row, but you cannot use a WHERE clause and it resets the identity seed. DROP goes further still — it removes the entire table object, including its structure, indexes, and constraints, not just the data.",
             "keyPoints": [
-              "DELETE: DML, per-row logging, fires triggers, supports WHERE",
-              "TRUNCATE: DDL, minimal logging, no WHERE, resets IDENTITY",
-              "DROP: removes table structure, data, indexes, constraints",
-              "Both DELETE and TRUNCATE roll back inside an explicit transaction"
+              "DELETE is a DML statement that logs every row deletion, fires triggers, and supports a WHERE clause to target specific rows.",
+              "TRUNCATE is a DDL statement that uses minimal logging by deallocating pages, cannot filter with WHERE, and resets the IDENTITY seed.",
+              "DROP removes the entire table structure along with all its data, indexes, and constraints — the table no longer exists afterward.",
+              "Both DELETE and TRUNCATE can be rolled back if they run inside an explicit transaction."
             ],
             "code": {
               "lang": "sql",
@@ -99,13 +99,13 @@
             "full outer join"
           ],
           "answer": {
-            "oneLiner": "INNER returns only matches; LEFT returns all left rows plus matches (NULLs otherwise); RIGHT is the mirror; FULL OUTER returns all rows from both sides.",
+            "oneLiner": "Think of two overlapping circles: an INNER JOIN gives you only the overlap — rows that match in both tables. A LEFT JOIN gives you the entire left circle, filling in NULLs where there is no match on the right. A FULL OUTER JOIN combines both circles, so you get all rows from both sides with NULLs wherever a match is missing.",
             "keyPoints": [
-              "INNER: only rows matching the ON condition in both tables",
-              "LEFT: all left rows, NULLs where no right match",
-              "RIGHT: all right rows, NULLs where no left match",
-              "FULL OUTER: all rows from both, NULLs where no match",
-              "LEFT + WHERE right.key IS NULL = anti-join"
+              "INNER JOIN returns only the rows where the ON condition matches in both tables — non-matching rows are excluded entirely.",
+              "LEFT JOIN returns every row from the left table and fills in NULLs for the right-side columns wherever there is no match.",
+              "RIGHT JOIN is the mirror of a LEFT JOIN — every row from the right table is kept, with NULLs for unmatched left columns.",
+              "FULL OUTER JOIN returns all rows from both tables, placing NULLs on whichever side has no matching row.",
+              "Adding WHERE right.key IS NULL after a LEFT JOIN creates an anti-join that returns only the rows with no match on the right."
             ],
             "code": {
               "lang": "sql",
@@ -178,13 +178,13 @@
             "statistics"
           ],
           "answer": {
-            "oneLiner": "Start with the execution plan: look for scans, thick arrows, and Key Lookups, then fix with proper indexes, SARGable predicates, and updated statistics. Always measure with SET STATISTICS IO before and after.",
+            "oneLiner": "The first thing I do is turn on SET STATISTICS IO so I have a baseline of logical reads — that tells me how much I/O the query is actually doing. Then I pull the actual execution plan and read it right to left, looking for thick arrows that indicate a large number of rows flowing through, table scans instead of seeks, Key Lookups where the index is not covering, and any implicit conversion warnings. Once I know the bottleneck I fix it — usually by adding a covering index, rewriting a non-SARGable predicate, or updating stale statistics — and then I measure again to confirm the improvement.",
             "keyPoints": [
-              "Baseline with SET STATISTICS IO/TIME ON (logical reads = I/O cost)",
-              "Read graphical plans right-to-left; thick arrows = many rows",
-              "Watch for Table Scan, Key Lookup, Sort, expensive Hash Match",
-              "Fix non-SARGable predicates, SELECT *, implicit conversions",
-              "Update stale statistics; missing-index hints are a hint, not gospel"
+              "Always establish a baseline using SET STATISTICS IO and SET STATISTICS TIME ON, because logical reads are the most reliable measure of I/O cost.",
+              "Read graphical execution plans from right to left, and treat the thickness of the arrows as a visual signal of how many rows are flowing between operators.",
+              "The most expensive signals to watch for are Table Scans, Key Lookups, Sort operators, and Hash Match joins on large inputs.",
+              "Non-SARGable predicates such as wrapping a column in a function, selecting all columns with SELECT star, and implicit type conversions all prevent the optimizer from doing an index seek.",
+              "Missing index hints in the plan are a useful starting point but not gospel — always validate them against the real workload before creating an index."
             ],
             "detail": "Key Lookup means a non-clustered index seek had to go back to the clustered index for extra columns; fix with a covering index (INCLUDE). Make predicates SARGable by keeping functions off indexed columns.",
             "code": {
@@ -258,12 +258,12 @@
             "subquery"
           ],
           "answer": {
-            "oneLiner": "A CTE is a named temporary result set defined with WITH that exists only for the next single statement; it improves readability and enables recursion for hierarchies.",
+            "oneLiner": "A CTE is a named temporary result set you define with the WITH keyword, and it exists only for the duration of the single statement that follows it — think of it like naming an intermediate calculation on a whiteboard that you erase when you are done. The main reasons to use one are readability, because the query reads top-down in logical steps, and recursion, which lets you walk parent-child hierarchies like an org chart without looping in application code. Unlike a temp table it is not a physical object, so the optimizer usually inlines it rather than materializing it.",
             "keyPoints": [
-              "Syntax: WITH Name AS (SELECT ...) then a SELECT/INSERT/UPDATE/DELETE",
-              "Scoped to one statement; not a physical temp table",
-              "Recursive CTEs: anchor UNION ALL recursive member, for hierarchies",
-              "Default recursion limit 100; override with OPTION (MAXRECURSION n)"
+              "The syntax starts with WITH followed by a name and the query in parentheses, then a single SELECT, INSERT, UPDATE, or DELETE that references it.",
+              "A CTE is scoped to one statement and is not a physical temp table — it lives only in the query plan.",
+              "Recursive CTEs have two parts joined by UNION ALL: an anchor member that seeds the recursion and a recursive member that joins back to the CTE itself, which makes them ideal for hierarchies.",
+              "The default recursion limit is 100 iterations and you can override it with OPTION MAXRECURSION followed by the number you want."
             ],
             "detail": "A non-recursive CTE is usually inlined by the optimizer, not materialized, so referencing it many times can re-execute it; use a #temp table if that's expensive.",
             "code": {
@@ -339,12 +339,12 @@
             "global temp"
           ],
           "answer": {
-            "oneLiner": "#temp is session-scoped in tempdb; ##temp is global across all sessions; @table is batch-scoped, has no real statistics, and is not undone by a transaction rollback.",
+            "oneLiner": "A local temp table prefixed with a single hash sign lives in tempdb and is private to your session, so it disappears when your connection closes or you drop it explicitly. A global temp table prefixed with two hash signs is also in tempdb but is visible to every session until the session that created it disconnects. A table variable declared with at sign is scoped only to the current batch or stored procedure and has no real statistics, which means the optimizer almost always guesses just one row regardless of how much data is actually in it.",
             "keyPoints": [
-              "#temp: tempdb, session-scoped, supports indexes/stats, rolls back",
-              "##temp: tempdb, visible to all sessions until creator disconnects",
-              "@table: batch/proc-scoped, no stats (optimizer assumes 1 row), rollback-immune",
-              "Small sets: table variable; larger sets: #temp (better stats)"
+              "A local temp table is session-scoped in tempdb, supports additional indexes and proper statistics, and participates in transaction rollbacks just like a regular table.",
+              "A global temp table is visible to all sessions and persists in tempdb until the creating session disconnects — use it carefully in production.",
+              "A table variable is scoped to the current batch or procedure, has no statistics so the optimizer assumes a single row, and its changes are not rolled back when the surrounding transaction is rolled back.",
+              "For small result sets a table variable is fine, but for larger intermediate sets a local temp table is the better choice because the optimizer can use real statistics to build a good plan."
             ],
             "detail": "Because table variables have no statistics, the optimizer estimates 1 row and can pick bad plans on large data. Their rollback immunity makes them handy for audit logging inside TRY/CATCH.",
             "code": {
@@ -420,12 +420,12 @@
             "instead of"
           ],
           "answer": {
-            "oneLiner": "A trigger is a special stored procedure that fires automatically on DML or DDL events, using the virtual INSERTED and DELETED tables to see the new and old row states.",
+            "oneLiner": "A trigger is a special stored procedure that SQL Server fires automatically whenever a DML event like an insert, update, or delete happens on a table — you do not call it yourself. Inside the trigger body you have access to two virtual tables called INSERTED and DELETED that hold the new and old row states respectively, which lets you capture exactly what changed. Triggers run inside the same transaction as the statement that fired them, so a ROLLBACK inside a trigger will undo the caller's work too.",
             "keyPoints": [
-              "AFTER (default): fires after the DML; you can still ROLLBACK",
-              "INSTEAD OF: replaces the DML; used to make views updatable",
-              "INSERTED = new rows, DELETED = old rows; both populated on UPDATE",
-              "Runs in the same transaction; always handle multi-row cases"
+              "An AFTER trigger, which is the default type, fires after the DML statement completes and you can still issue a ROLLBACK from within it to cancel the entire operation.",
+              "An INSTEAD OF trigger replaces the DML statement entirely rather than running after it, which is commonly used to make non-updatable views support updates.",
+              "INSERTED holds the new rows for inserts and updates, while DELETED holds the old rows for deletes and updates — on an UPDATE both tables are populated simultaneously.",
+              "Triggers always run in the same transaction as the triggering statement, and because INSERTED and DELETED are sets you must always write set-based logic to handle multi-row operations correctly."
             ],
             "detail": "A ROLLBACK inside a trigger aborts the whole calling transaction. Keep triggers minimal — they are invisible to app developers and hard to debug.",
             "code": {
@@ -498,13 +498,13 @@
             "performance"
           ],
           "answer": {
-            "oneLiner": "An index is a B-tree that speeds up lookups. A clustered index physically sorts the table by its key (one per table); a non-clustered index is a separate structure with the key plus a pointer back to the row (up to 999).",
+            "oneLiner": "An index is a B-tree data structure that lets SQL Server find rows quickly without reading every page in the table — think of it like the index at the back of a textbook. A clustered index is special because its leaf level actually is the table data, physically ordered by the key, so you can only have one per table. A non-clustered index is a separate structure that stores the key columns plus a pointer back to the actual row, and you can have up to 999 of them.",
             "keyPoints": [
-              "Table with no clustered index = heap (unordered)",
-              "Clustered leaf nodes ARE the data rows",
-              "Non-clustered leaf = key + row locator (clustered key or RID)",
-              "Key Lookup happens when extra columns are needed; fix with covering index",
-              "Indexes speed reads but slow writes"
+              "A table with no clustered index is called a heap, meaning the rows have no physical order and are located by a row identifier.",
+              "The leaf level of a clustered index holds the actual data rows in key order — the index and the table are the same physical structure.",
+              "The leaf level of a non-clustered index holds the index key plus a row locator, which is either the clustered key or a row identifier on a heap.",
+              "A Key Lookup occurs when a non-clustered index seek finds the key but needs additional columns that are not in the index — it then has to jump back to the clustered index for those columns, which adds extra I/O per row.",
+              "Indexes speed up reads but slow down writes because every insert, update, and delete must also maintain each index on the table."
             ],
             "code": {
               "lang": "sql",
@@ -579,12 +579,12 @@
             "salary"
           ],
           "answer": {
-            "oneLiner": "Use DENSE_RANK() ordered by salary descending in a CTE, then filter WHERE rank = N — it handles ties correctly.",
+            "oneLiner": "The cleanest solution is to use DENSE_RANK ordered by salary descending inside a CTE and then filter where the rank equals N, because DENSE_RANK handles ties correctly by giving the same rank to equal salaries without skipping numbers. Using ROW_NUMBER instead would be wrong when multiple employees share the same salary, because it would arbitrarily assign them different numbers and could exclude a valid result from the Nth position. Window functions are evaluated after the WHERE clause, so you always need to wrap them in a CTE or subquery before you can filter on the result.",
             "keyPoints": [
-              "DENSE_RANK is preferred: ties get the same rank, no gaps",
-              "ROW_NUMBER gives unique numbers — wrong when salaries tie",
-              "Window functions can't go in WHERE — wrap in a CTE/subquery",
-              "Alternative: correlated subquery with COUNT(DISTINCT) — slower"
+              "DENSE_RANK is the preferred function for this problem because ties receive the same rank and no rank numbers are skipped, so the Nth highest salary is always correct even when values repeat.",
+              "ROW_NUMBER assigns a unique sequential number to every row regardless of ties, which means it can return the wrong result when multiple employees share a salary.",
+              "Window functions are computed in the SELECT phase, after the WHERE clause is evaluated, so you cannot filter on a window function directly in WHERE — you must wrap it in a CTE or subquery first.",
+              "An alternative approach using a correlated subquery with COUNT DISTINCT works but is slower and harder to read than the window function approach."
             ],
             "code": {
               "lang": "sql",
@@ -657,12 +657,12 @@
             "filter"
           ],
           "answer": {
-            "oneLiner": "WHERE filters rows before aggregation; HAVING filters groups after aggregation; GROUP BY collapses rows sharing a key so aggregates can be applied.",
+            "oneLiner": "WHERE and HAVING both filter rows, but they operate at different points in query execution. WHERE runs before any grouping happens and filters individual rows, so you cannot use aggregate functions like SUM or COUNT inside it. HAVING runs after GROUP BY has collapsed the rows into groups, so it is the right place to filter based on aggregate results — for example, keeping only customers who placed more than five orders.",
             "keyPoints": [
-              "WHERE runs before GROUP BY — no aggregates allowed",
-              "HAVING runs after GROUP BY — aggregates allowed",
-              "Order: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY",
-              "Filter with WHERE first to cut rows before grouping"
+              "WHERE is evaluated before GROUP BY runs, which means aggregate functions are not allowed in a WHERE clause.",
+              "HAVING is evaluated after GROUP BY and is specifically designed to filter grouped results using aggregate functions.",
+              "The logical processing order is FROM, then WHERE, then GROUP BY, then HAVING, then SELECT, and finally ORDER BY — which is why a SELECT alias is not visible in a WHERE clause.",
+              "As a performance best practice, always filter rows in WHERE as early as possible so fewer rows flow into the GROUP BY operation."
             ],
             "code": {
               "lang": "sql",
@@ -735,12 +735,12 @@
             "partition by"
           ],
           "answer": {
-            "oneLiner": "Window functions compute across related rows without collapsing them. ROW_NUMBER is always unique (1,2,3), RANK skips after ties (1,1,3), DENSE_RANK never skips (1,1,2).",
+            "oneLiner": "Window functions let you compute values across a related set of rows while keeping every individual row in the result, unlike GROUP BY which collapses rows into summaries. The OVER clause defines the window — PARTITION BY resets the calculation for each group and ORDER BY determines the sort order within each partition. ROW_NUMBER always produces a unique sequential number with no ties, RANK gives tied rows the same number but then skips ahead leaving a gap, and DENSE_RANK also gives tied rows the same number but never skips so there are no gaps.",
             "keyPoints": [
-              "Unlike GROUP BY, rows are NOT collapsed",
-              "OVER defines the window: PARTITION BY resets per group, ORDER BY sorts within",
-              "ROW_NUMBER unique; RANK gaps after ties; DENSE_RANK no gaps",
-              "Also: LAG/LEAD, SUM/AVG OVER (running totals), NTILE"
+              "Unlike GROUP BY, window functions do not collapse rows — every detail row is preserved in the output alongside the computed window value.",
+              "The OVER clause is required and defines the window: PARTITION BY divides rows into independent groups and ORDER BY determines the ranking or frame order within each group.",
+              "ROW_NUMBER assigns a unique sequential integer to every row, RANK assigns the same number to ties but then skips numbers to account for the ties, and DENSE_RANK assigns the same number to ties without skipping any numbers afterward.",
+              "Other useful window functions include LAG and LEAD for accessing adjacent rows, SUM and AVG over a frame for running totals, and NTILE for dividing rows into equal-sized buckets."
             ],
             "detail": "Common use: de-dupe with ROW_NUMBER() OVER (PARTITION BY key ORDER BY date DESC) and keep rn = 1.",
             "code": {
@@ -814,12 +814,12 @@
             "performance"
           ],
           "answer": {
-            "oneLiner": "A covering index contains every column a query needs — key columns plus INCLUDE columns — so the query is answered entirely from the index without a Key Lookup to the base table.",
+            "oneLiner": "A covering index is a non-clustered index that contains every column a particular query needs, so the database engine can satisfy the entire query from the index alone without going back to the base table. You achieve this by putting the columns you search, filter, or sort on as key columns, and then adding any extra columns needed only in the SELECT list using the INCLUDE clause. When the index does not cover all needed columns, the optimizer performs a Key Lookup for each row — an extra round-trip to the clustered index that adds significant I/O on large result sets.",
             "keyPoints": [
-              "Key Lookup = extra I/O per row to fetch columns from the clustered index",
-              "INCLUDE adds non-key columns at the leaf level only",
-              "Key columns: seek/filter/sort; INCLUDE: coverage only",
-              "Trade-off: bigger index, slower writes on included columns"
+              "A Key Lookup is the extra I/O cost incurred per row when the non-clustered index has to jump back to the clustered index to fetch columns that are not in the index.",
+              "The INCLUDE clause adds columns at the leaf level of the index only, without including them in the B-tree sorting structure, which keeps the index smaller while still covering the query.",
+              "Put a column in the key position if the query seeks, range-scans, or sorts on it; put a column in INCLUDE if it is only needed in the SELECT list.",
+              "The trade-off is that covering indexes are larger and every write to the table must maintain those included columns in the index too."
             ],
             "detail": "Put a column in the key if you seek, range-scan, or sort on it; use INCLUDE if it's only needed in SELECT. Check sys.dm_db_missing_index_details for suggestions, but validate against the real workload.",
             "code": {
@@ -893,13 +893,13 @@
             "sargable"
           ],
           "answer": {
-            "oneLiner": "The optimizer scans when there's no suitable index, the predicate is non-SARGable, selectivity is low, or stats are stale; it seeks for high-selectivity SARGable predicates.",
+            "oneLiner": "The optimizer chooses between a scan and a seek based on cost, and several things can force it into a scan: there is no suitable index, the predicate is not SARGable so the B-tree cannot be navigated efficiently, the query matches so many rows that a scan is cheaper than thousands of Key Lookups, or the statistics are stale and the optimizer underestimates the row count. It picks a seek when the predicate is SARGable, a good index exists, and the selectivity is high enough that navigating the B-tree saves more work than it costs.",
             "keyPoints": [
-              "Seek: navigates the B-tree; good when few rows match",
-              "Scan: reads every row; chosen for low selectivity or no index",
-              "SARGable = optimizer can seek; functions on columns / leading % / implicit conversions break it",
-              "Optimizer uses statistics; stale stats cause bad estimates",
-              "Above ~1-3% of rows, a scan can beat seek + Key Lookup"
+              "An index seek navigates the B-tree directly to the matching rows and is efficient when only a small fraction of rows match the predicate.",
+              "A table or index scan reads every row in the table and is chosen when selectivity is low, no index exists, or the optimizer decides the seek plus Key Lookup cost exceeds the scan cost.",
+              "A predicate is SARGable when the optimizer can use it to navigate the index tree — wrapping a column in a function, using a leading wildcard like percent at the start, or causing an implicit type conversion all break SARGability.",
+              "The optimizer relies on statistics to estimate row counts, and stale statistics can cause it to choose the wrong plan by underestimating or overestimating how many rows will be returned.",
+              "Above roughly one to three percent of rows, the cost of an index seek plus a Key Lookup for each row can actually exceed a straight table scan, so the optimizer may prefer the scan."
             ],
             "detail": "Implicit type conversion (VARCHAR column vs NVARCHAR parameter) converts every row and forces a scan — it shows as a warning in the plan. Keep statistics updated.",
             "code": {
@@ -973,12 +973,12 @@
             "set operations"
           ],
           "answer": {
-            "oneLiner": "UNION removes duplicates via a sort/hash step; UNION ALL keeps everything and is faster because there's no dedup. Default to UNION ALL unless you need dedup.",
+            "oneLiner": "UNION combines the results of two queries and then removes duplicate rows, which requires an extra sort or hash operation that can be expensive on large result sets. UNION ALL simply stacks all the rows together without any deduplication, making it noticeably faster. In practice you should default to UNION ALL and only use UNION when you genuinely need duplicates removed.",
             "keyPoints": [
-              "Both need matching column count and compatible types",
-              "UNION = implicit DISTINCT (extra blocking step, slower)",
-              "UNION ALL keeps duplicates, no extra work",
-              "ORDER BY only once, at the very end"
+              "Both UNION and UNION ALL require that the queries on each side have the same number of columns with compatible data types.",
+              "UNION performs an implicit DISTINCT across the combined result, which adds a blocking sort or hash operation and makes it slower than UNION ALL.",
+              "UNION ALL keeps all rows including duplicates and does no extra work, so it is the faster choice whenever the two result sets are known to be disjoint or duplicates are acceptable.",
+              "An ORDER BY clause can only appear once at the very end of the entire UNION or UNION ALL statement, applying to the combined result."
             ],
             "code": {
               "lang": "sql",
@@ -1050,12 +1050,12 @@
             "security"
           ],
           "answer": {
-            "oneLiner": "Stored procedures are named, cached T-SQL objects with permission control and injection safety; parameterized inline SQL (sp_executesql) gets the same caching and safety, while string-concatenated SQL is vulnerable.",
+            "oneLiner": "Stored procedures are named database objects that get their execution plan compiled and cached on the first run, and they give you a clean security boundary because you can grant execute permission without giving direct table access. Parameterized inline SQL using sp_executesql gets exactly the same plan caching benefit and is equally safe against injection, because in both cases values are passed as parameters rather than concatenated into the query string. The real injection risk is not inline SQL in general but string concatenation, where user input is directly joined into the query text.",
             "keyPoints": [
-              "Stored procs: plan cached on first run, reused afterward",
-              "Parameterized inline SQL caches and is injection-safe too",
-              "GRANT EXECUTE without granting table access = security boundary",
-              "String-concatenated SQL is the real injection risk, not inline per se"
+              "Stored procedures compile and cache their execution plan on the first run and reuse that plan for subsequent calls, just like parameterized inline SQL does.",
+              "Parameterized inline SQL executed through sp_executesql is both plan-cached and safe from SQL injection, making it functionally equivalent to a stored procedure for those two concerns.",
+              "Stored procedures provide a useful security boundary by allowing you to grant EXECUTE permission on the procedure without giving the caller direct SELECT or UPDATE rights on the underlying tables.",
+              "String-concatenated SQL is the actual injection risk, regardless of whether it appears in a stored procedure or an ad-hoc statement — the danger is concatenation, not inline SQL itself."
             ],
             "detail": "Both stored procs and sp_executesql are subject to parameter sniffing — the plan is built from the first parameters seen. Mitigate with OPTION (RECOMPILE), OPTIMIZE FOR, or Query Store.",
             "code": {
@@ -1137,12 +1137,12 @@
             "transactions"
           ],
           "answer": {
-            "oneLiner": "ACID = Atomicity (all-or-nothing), Consistency (always valid state), Isolation (concurrent txns don't interfere), Durability (committed data survives crashes), backed by write-ahead logging and locking.",
+            "oneLiner": "ACID is the set of four guarantees that make database transactions reliable — Atomicity means a transaction either fully commits or fully rolls back with no partial results, Consistency means the database always moves from one valid state to another, Isolation means concurrent transactions do not interfere with each other, and Durability means that once a transaction commits the data survives even a system crash. SQL Server implements these through write-ahead logging, which hardens log records to disk before the commit returns, and through its locking and isolation level system.",
             "keyPoints": [
-              "Atomicity: all statements commit together or all roll back",
-              "Consistency: constraints/triggers keep the DB in a valid state",
-              "Isolation: controlled by isolation levels and locks",
-              "Durability: committed log is hardened to disk (Write-Ahead Logging)"
+              "Atomicity means all statements in a transaction succeed together or all are rolled back — there is no such thing as a partial commit.",
+              "Consistency means that after every transaction the database remains in a valid state, enforced by constraints, triggers, and the business logic written inside the transaction.",
+              "Isolation is controlled by isolation levels and locking, and it determines how much of a transaction's intermediate state is visible to other concurrently running transactions.",
+              "Durability is guaranteed by the write-ahead log, which ensures that the log record for every committed transaction is hardened to disk before the commit acknowledgment is returned to the caller."
             ],
             "detail": "SET XACT_ABORT ON makes any runtime error roll back the whole transaction, not just the failing statement — use it with TRY/CATCH in stored procedures.",
             "code": {
@@ -1217,13 +1217,13 @@
             "read committed"
           ],
           "answer": {
-            "oneLiner": "Five levels — Read Uncommitted, Read Committed (default), Repeatable Read, Serializable, Snapshot — trading concurrency against protection from dirty reads, non-repeatable reads, and phantoms.",
+            "oneLiner": "SQL Server offers five isolation levels that trade concurrency for protection against three classic problems: dirty reads, non-repeatable reads, and phantom reads. Read Uncommitted offers no protection at all, Read Committed is the default and prevents dirty reads, Repeatable Read additionally prevents non-repeatable reads, and both Serializable and Snapshot prevent all three including phantoms. For most OLTP applications the best practical choice is enabling Read Committed Snapshot Isolation at the database level, because it gives readers a consistent view of committed data without taking shared locks that would block writers.",
             "keyPoints": [
-              "Dirty read: reading uncommitted data (only at Read Uncommitted)",
-              "Non-repeatable read: same row re-read differs (fixed at Repeatable Read+)",
-              "Phantom: range re-query returns new rows (fixed at Serializable/Snapshot)",
-              "RCSI: readers see last committed version, no read locks — recommended for OLTP",
-              "Snapshot: whole txn sees a point-in-time view; detects write conflicts"
+              "A dirty read means reading uncommitted data from another transaction that might still be rolled back — this can only happen at the Read Uncommitted level.",
+              "A non-repeatable read means reading the same row twice within one transaction and getting different values because another transaction committed a change in between — this is prevented at Repeatable Read and above.",
+              "A phantom read means running the same range query twice and getting different rows because another transaction inserted or deleted rows that match the range — this is prevented at Serializable and Snapshot.",
+              "Read Committed Snapshot Isolation changes the default Read Committed behavior so that readers see the last committed row version instead of taking shared locks, eliminating reader-writer blocking without any application code changes.",
+              "Snapshot Isolation versions all reads at the start of the transaction so the entire transaction sees a consistent point-in-time view, and it detects write conflicts when two transactions try to update the same row."
             ],
             "detail": "RCSI (READ_COMMITTED_SNAPSHOT ON) makes readers not block writers without app changes. Snapshot Isolation versions at transaction start and throws a conflict error on concurrent updates.",
             "code": {
@@ -1297,13 +1297,13 @@
             "prevention"
           ],
           "answer": {
-            "oneLiner": "A deadlock is a circular wait where two transactions each hold a lock the other needs; SQL Server auto-kills the cheapest victim (error 1205). Prevent with consistent lock order, short transactions, and good indexes.",
+            "oneLiner": "A deadlock happens when two or more transactions are each waiting for a lock that the other is holding, creating a circular wait that nobody can break on their own. SQL Server's lock monitor detects this cycle automatically and kills the transaction with the least expensive rollback cost, which receives error number 1205. The best prevention strategies are always accessing tables in the same order across all transactions, keeping transactions as short as possible, and using good indexes so that locks cover the fewest rows necessary.",
             "keyPoints": [
-              "Lock monitor detects the cycle; victim gets error 1205",
-              "Always access tables in the same order across transactions",
-              "Keep transactions short — commit fast",
-              "Good indexes shrink lock scope; RCSI removes reader-writer deadlocks",
-              "App should catch 1205 and retry"
+              "SQL Server's lock monitor detects circular wait cycles automatically and chooses the cheapest transaction to kill as the deadlock victim, which receives error 1205.",
+              "The most effective prevention technique is always accessing shared tables in a consistent order across all transactions, because this prevents the circular wait from forming.",
+              "Keeping transactions short and committing as quickly as possible reduces the window during which locks are held and lowers the chance of overlap with competing transactions.",
+              "Good indexes reduce the number of rows that need to be locked during a scan, which shrinks the scope of potential conflicts, and enabling Read Committed Snapshot Isolation removes reader-writer deadlocks entirely.",
+              "Application code should catch error 1205 and retry the transaction with an appropriate backoff delay, since deadlocks are an expected condition in a concurrent system."
             ],
             "detail": "The system_health Extended Events session captures deadlock graphs by default; open the .xdl to see who held and waited on what. EF Core's EnableRetryOnFailure handles transient retries.",
             "code": {
@@ -1378,12 +1378,12 @@
             "database design"
           ],
           "answer": {
-            "oneLiner": "Normalization removes redundancy: 1NF = atomic values, 2NF = no partial dependency on a composite key, 3NF = no transitive dependency. Denormalize to speed up reads.",
+            "oneLiner": "Normalization is the process of structuring a relational database to reduce data redundancy and improve data integrity by organizing columns and tables so that each fact is stored in exactly one place. The three most common normal forms are 1NF, which requires atomic column values and no repeating groups; 2NF, which removes partial dependencies on composite keys; and 3NF, which removes transitive dependencies between non-key columns. Denormalization deliberately reverses some of this to improve read performance, which is why analytical data warehouses typically use wide, denormalized star schemas rather than fully normalized OLTP-style designs.",
             "keyPoints": [
-              "1NF: atomic columns, no repeating groups, has a PK",
-              "2NF: 1NF + every non-key column depends on the whole PK",
-              "3NF: 2NF + no non-key column depends on another non-key column",
-              "Denormalize for read-heavy reporting, warehouses (star schema)"
+              "First Normal Form requires that every column holds a single atomic value, there are no repeating groups of columns, and the table has a defined primary key.",
+              "Second Normal Form requires that the table is already in First Normal Form and that every non-key column depends on the entire primary key, not just a part of it — this only matters when the primary key is composite.",
+              "Third Normal Form requires that the table is already in Second Normal Form and that no non-key column depends on another non-key column, meaning all non-key columns must depend directly on the primary key.",
+              "Denormalization is intentional redundancy introduced to speed up read-heavy workloads, such as reporting databases and data warehouse star schemas, where eliminating joins matters more than avoiding data duplication."
             ],
             "detail": "Examples: 1NF fixes a comma-separated phone column; 2NF moves ProductName out of OrderItems; 3NF moves DepartmentName out of Employees into Departments.",
             "code": {
@@ -1457,12 +1457,12 @@
             "clustered"
           ],
           "answer": {
-            "oneLiner": "A PK uniquely identifies a row, is NOT NULL, and is clustered by default; a unique key also enforces uniqueness but allows one NULL and is non-clustered; a foreign key enforces that a child value exists in the parent.",
+            "oneLiner": "A primary key is the main identifier for a row — it must be unique, it cannot be NULL, and SQL Server creates a clustered index for it by default with a limit of one per table. A unique key also enforces uniqueness but it allows a single NULL value, can be created as a non-clustered index, and you can have multiple per table. A foreign key is a referential integrity constraint that enforces that every value in the child column either exists as a primary or unique key value in the parent table or is NULL.",
             "keyPoints": [
-              "PK: NOT NULL, one per table, clustered by default",
-              "UNIQUE: allows one NULL, many per table, non-clustered by default",
-              "FK: child value must exist in parent (or be NULL)",
-              "FK columns are NOT auto-indexed — index them yourself"
+              "A primary key column cannot be NULL, only one primary key is allowed per table, and it is backed by a clustered index by default.",
+              "A unique key allows one NULL value, you can have many unique keys per table, and the backing index is non-clustered by default.",
+              "A foreign key enforces referential integrity by requiring that the child column value either matches a value in the referenced parent column or is NULL.",
+              "SQL Server does not automatically create an index on a foreign key column in the child table — you need to add that index yourself to avoid full table scans when the parent row is deleted or to speed up joins."
             ],
             "detail": "Without an index on the child's FK column, deleting a parent row scans the whole child table to check dependents. FKs also support ON DELETE/UPDATE CASCADE, SET NULL, or RESTRICT.",
             "code": {
@@ -1536,12 +1536,12 @@
             "identity"
           ],
           "answer": {
-            "oneLiner": "A clustered index physically orders the rows by its key — the B-tree leaf IS the data — so range scans are fast, but random-key inserts cause page splits and fragmentation.",
+            "oneLiner": "A clustered index defines the physical order in which rows are stored on disk — the B-tree leaf level is not a separate structure pointing to the data, it literally is the data rows sorted by the key. This means range scans on the clustered key are fast because the rows are contiguous on disk, but inserts with random keys like GUIDs land in the middle of existing pages and cause page splits that fragment the data over time. Using an IDENTITY column as the clustered key avoids this because new rows always append to the last page.",
             "keyPoints": [
-              "Leaf level holds the actual data rows in key order",
-              "No clustered index = heap (unordered, RID locators)",
-              "All non-clustered indexes carry the clustered key as locator",
-              "Random keys (GUIDs) cause page splits; IDENTITY appends sequentially"
+              "The leaf level of a clustered index holds the actual data rows stored in key order — the index and the table storage are the same physical structure.",
+              "A table without a clustered index is called a heap, where rows have no defined order and non-clustered indexes locate them using a row identifier rather than the clustered key.",
+              "Every non-clustered index on the table carries the clustered key as its row locator, which means a wide clustered key inflates the size of every non-clustered index.",
+              "Inserting rows with random key values such as GUIDs causes page splits because new rows must be inserted in the middle of sorted pages, leading to fragmentation, whereas an IDENTITY value always appends to the end sequentially."
             ],
             "detail": "A wide clustered key bloats every non-clustered index. Fix fragmentation with REBUILD (>30%) or REORGANIZE (5-30%); both can update statistics.",
             "code": {
@@ -1616,12 +1616,12 @@
             "partitioning"
           ],
           "answer": {
-            "oneLiner": "Prefer surrogate keys (INT/BIGINT IDENTITY) for stability and simple joins; use natural keys only when truly unique and immutable. For scale, plan partitioning, archiving, and sharding upfront.",
+            "oneLiner": "A surrogate key is a system-generated identifier with no business meaning — typically an integer IDENTITY column — and it is almost always the better choice for a primary key because it is narrow, stable, and sequential, which is ideal for a clustered index. Natural keys like email addresses or product codes have real business meaning but they risk changing over time, being NULL, or turning out not to be truly unique, so the best practice is to use a surrogate primary key and enforce the natural key separately with a unique constraint. For tables that will grow to hundreds of millions of rows you need to think about scalability upfront through table partitioning by date, a consistent timestamp audit trail, and — for multi-tenant systems — sharding by tenant.",
             "keyPoints": [
-              "Surrogate: no business meaning, narrow, stable, sequential",
-              "Natural keys risk changing, being NULL, or not unique — enforce with a UNIQUE constraint instead",
-              "Partition large tables by date for partition elimination",
-              "Add CreatedAt/ModifiedAt from day one; shard by tenant for multi-tenant"
+              "Surrogate keys have no business meaning, are narrow in size, stable over the life of the row, and sequential when using IDENTITY, which makes them efficient as clustered index keys.",
+              "Natural keys carry real-world meaning but are risky as primary keys because they can change, may not always be unique, and sometimes allow NULL — the safer approach is to enforce them with a separate UNIQUE constraint and use a surrogate as the primary key.",
+              "Partitioning large tables by a date column allows the optimizer to skip entire partitions when queries have date range filters, and it makes archiving old data almost instant through partition switching.",
+              "Adding CreatedAt and ModifiedAt timestamp columns from the very first migration is much cheaper than retrofitting them later, and for multi-tenant architectures sharding by tenant with a tenant identifier on every table is the standard approach to scaling out."
             ],
             "detail": "Keep the clustered key narrow since every non-clustered index carries it. Partition switching lets you archive old partitions in milliseconds.",
             "code": {
@@ -1694,12 +1694,12 @@
             "non-clustered"
           ],
           "answer": {
-            "oneLiner": "A PK is NOT NULL and clustered by default (one per table); a unique key allows one NULL and is non-clustered by default (many per table).",
+            "oneLiner": "A primary key and a unique key both enforce that no two rows can have the same value, but they differ in two important ways. A primary key column is always NOT NULL and the constraint creates a clustered index by default, with only one allowed per table. A unique key permits a single NULL value in the column, creates a non-clustered index by default, and you can have many unique keys on the same table.",
             "keyPoints": [
-              "PK: NOT NULL, one per table, clustered by default",
-              "UNIQUE: one NULL allowed, many per table, non-clustered by default",
-              "Both can be composite",
-              "Unique index and unique constraint are functionally identical"
+              "A primary key enforces NOT NULL, only one is allowed per table, and it is backed by a clustered index by default.",
+              "A unique key allows a single NULL value in the column, multiple unique keys are allowed on the same table, and the backing index is non-clustered by default.",
+              "Both primary keys and unique keys can be defined on multiple columns, making them composite keys.",
+              "A unique index and a unique constraint are functionally identical in SQL Server — a unique constraint is simply implemented as a unique index under the hood."
             ],
             "code": {
               "lang": "sql",
@@ -1778,12 +1778,12 @@
             "performance"
           ],
           "answer": {
-            "oneLiner": "SQL Server builds and caches a plan based on the first parameter values it sees; if later calls have very different selectivity, that cached plan can be terrible for them.",
+            "oneLiner": "Parameter sniffing is when SQL Server compiles and caches a stored procedure's execution plan using the actual parameter values from the very first call, and then reuses that same plan for every subsequent call regardless of whether the new parameter values have very different selectivity. This is usually helpful because the plan is tailored to real data, but it becomes a problem when one customer has ten thousand orders and another has two, because the cached plan optimized for the large customer performs terribly for the small one and vice versa. The main fixes are using OPTION RECOMPILE to force a fresh plan on each execution, using OPTIMIZE FOR UNKNOWN to plan based on average statistics rather than a specific value, or using Query Store to force a known-good plan.",
             "keyPoints": [
-              "First execution's parameters shape the cached plan for everyone.",
-              "Fixes: `OPTION (RECOMPILE)` (fresh plan per call), `OPTIMIZE FOR (@p = value)`, or `OPTIMIZE FOR UNKNOWN`.",
-              "Assigning the parameter to a local variable disables sniffing (uses average estimate).",
-              "Broader fixes: Query Store plan forcing, or splitting into separate procedures."
+              "The execution plan is compiled and cached based on the parameter values present during the very first execution, and that same plan is reused for all subsequent calls.",
+              "Common fixes include OPTION RECOMPILE which generates a fresh plan per execution, OPTIMIZE FOR with a specific representative value, and OPTIMIZE FOR UNKNOWN which tells the optimizer to use average column statistics instead of the sniffed value.",
+              "Assigning the incoming parameter to a local variable before using it in the query disables parameter sniffing because the optimizer cannot see the local variable value at compile time and falls back to average statistics.",
+              "Broader solutions include using Query Store to identify and force a good plan, or splitting the procedure into multiple specialized procedures for different parameter ranges."
             ],
             "code": {
               "lang": "sql",
@@ -1855,12 +1855,12 @@
             "batch mode"
           ],
           "answer": {
-            "oneLiner": "A columnstore index stores data column-by-column with heavy compression, giving huge gains for analytical/aggregation queries over millions of rows, while rowstore stays better for OLTP point lookups.",
+            "oneLiner": "A columnstore index stores data column by column rather than row by row, which means all the values for a single column are stored together and can be compressed very efficiently because similar values sit next to each other. When an aggregation query like a SUM or GROUP BY runs, it only needs to read the few columns it cares about rather than every column of every row, and the SQL Server engine can process these in large batches of around nine hundred rows at a time instead of one row at a time, which makes analytical queries dramatically faster. For row-by-row OLTP operations like looking up a single order by ID, a traditional rowstore index is still the better choice.",
             "keyPoints": [
-              "Column-oriented + batch-mode execution = fast scans and aggregates.",
-              "High compression because similar values sit together per column.",
-              "Clustered columnstore for data-warehouse fact tables; nonclustered for HTAP on OLTP tables.",
-              "Poor for single-row seeks/frequent small updates — use rowstore there."
+              "Column-oriented storage combined with batch-mode execution — where the engine processes roughly 900 rows per operator call instead of one — makes columnstore indexes dramatically faster for large scans and aggregations.",
+              "Compression is much more effective than in rowstore because each column contains values of the same data type and similar magnitude, making run-length encoding and dictionary compression highly efficient.",
+              "A clustered columnstore index is ideal for analytical fact tables in a data warehouse, while a nonclustered columnstore index on an OLTP table enables hybrid transactional and analytical processing on live data.",
+              "Columnstore indexes perform poorly for single-row lookups and frequent small updates, so an OLTP table with those access patterns should stick with rowstore indexes."
             ],
             "code": {
               "lang": "sql",
@@ -1932,12 +1932,12 @@
             "updlock"
           ],
           "answer": {
-            "oneLiner": "Pessimistic locking takes a lock up front so others wait; optimistic locking takes no lock and instead checks at write time whether the row changed, retrying or failing on conflict.",
+            "oneLiner": "Pessimistic locking assumes conflicts are likely, so it acquires a lock on the data as soon as it is read and holds that lock until the transaction commits, forcing any other session that wants the same row to wait. Optimistic locking assumes conflicts are rare, so it reads data without taking any lock and only checks at write time whether the row has changed since it was read — typically by comparing a row version or timestamp column. If the check fails because someone else changed the row in the meantime, the operation returns a conflict and the caller can re-read and retry.",
             "keyPoints": [
-              "Pessimistic: hold locks (e.g. UPDLOCK/HOLDLOCK) — safe but blocks and risks deadlocks.",
-              "Optimistic: read freely, validate a version/rowversion on update.",
-              "Optimistic wins under low contention (better concurrency); pessimistic under high contention/critical sections.",
-              "Optimistic conflict = re-read and retry or return 409 to the user."
+              "Pessimistic locking holds locks such as UPDLOCK or HOLDLOCK from the moment the row is read until the transaction commits, which is safe but blocks other sessions and increases the risk of deadlocks.",
+              "Optimistic locking reads data freely without any lock and then validates a version column or rowversion value at the time of the update to detect whether another session changed the row in the interim.",
+              "Optimistic locking provides better concurrency under low contention because readers and writers do not block each other, while pessimistic locking is more appropriate for high-contention scenarios or critical sections where conflicts are frequent.",
+              "When an optimistic update detects a conflict because the row changed since it was read, the standard responses are to re-read the latest values and retry, or to return a 409 Conflict error to the caller."
             ],
             "code": {
               "lang": "sql",
@@ -2012,12 +2012,12 @@
             "isolation"
           ],
           "answer": {
-            "oneLiner": "RCSI changes the default READ COMMITTED behavior to use row versioning so readers see the last committed version instead of taking shared locks — readers no longer block writers and vice versa.",
+            "oneLiner": "Read Committed Snapshot Isolation, or RCSI, is a database-level setting that changes how the default Read Committed isolation level works — instead of taking shared locks that block writers, readers get a versioned copy of the last committed row from a version store maintained in tempdb. The practical effect is that readers and writers no longer block each other at all, which eliminates the most common source of blocking in busy OLTP systems without requiring any application code changes. It is different from NOLOCK because the data readers see is always fully committed and consistent, not potentially dirty or missing rows.",
             "keyPoints": [
-              "Database-level setting; row versions are kept in tempdb.",
-              "Readers get the last committed row, no shared (S) locks, no blocking.",
-              "Eliminates many reader-writer deadlocks without any app code change.",
-              "Cost: extra tempdb usage and a 14-byte version pointer per row."
+              "RCSI is enabled at the database level with an ALTER DATABASE command and changes the default Read Committed behavior so that all readers use row versioning instead of shared locks.",
+              "Readers see the last committed version of each row, take no shared locks, and therefore never block writers — and writers never block readers.",
+              "Enabling RCSI eliminates the majority of reader-writer deadlocks in a typical OLTP system without any changes to application queries or connection strings.",
+              "The cost of RCSI is increased tempdb usage because the version store lives there, plus a 14-byte version pointer that is added to every row in the database."
             ],
             "code": {
               "lang": "sql",

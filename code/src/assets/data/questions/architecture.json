@@ -21,12 +21,12 @@
             "layers"
           ],
           "answer": {
-            "oneLiner": "Concentric rings — Domain at the centre, then Application, then Infrastructure and Presentation — where all dependencies point inward and the domain knows nothing about the outside.",
+            "oneLiner": "Clean Architecture organises code into concentric rings, with the Domain at the centre and Infrastructure and Presentation on the outside. The key rule is that all dependencies point inward, meaning the domain knows nothing about databases, HTTP, or any external concern. Think of it like an onion where the core business rules are completely isolated and everything else plugs into them.",
             "keyPoints": [
-              "Domain (centre): entities, value objects, zero dependencies.",
-              "Application: use-cases and interfaces like IRepository.",
-              "Infrastructure/Presentation (outer): EF, HTTP, controllers.",
-              "Dependency Rule: source dependencies point inward only — via Dependency Inversion."
+              "The Domain layer sits at the centre and contains entities and value objects with zero external dependencies.",
+              "The Application layer holds use cases and defines interfaces like IRepository that the outer layers must implement.",
+              "The outer layers, including Infrastructure and Presentation, contain concrete implementations such as Entity Framework, HTTP controllers, and external service clients.",
+              "The Dependency Rule states that source code dependencies can only point inward, achieved by applying the Dependency Inversion Principle at each layer boundary."
             ],
             "detail": "Interfaces are defined in inner layers and implemented in outer ones, so you can swap DB, broker, or UI without touching domain code. Use-cases test in milliseconds against fakes.",
             "code": {
@@ -101,12 +101,12 @@
             "unit-testing"
           ],
           "answer": {
-            "oneLiner": "It wraps data access behind a collection-like interface so callers don't care where data comes from — but with EF Core it can be redundant since DbContext is already a unit-of-work plus repository.",
+            "oneLiner": "The Repository pattern wraps data access behind a collection-like interface so the rest of your application does not care whether data comes from SQL, a file, or an API. It is a well-established pattern for decoupling business logic from persistence, but when using Entity Framework Core it can feel redundant because DbContext already provides the same abstraction. The main decision is how much of EF you want to hide from your application layer.",
             "keyPoints": [
-              "Centralises query logic and enables testing against fakes.",
-              "Criticism: EF's DbSet is already a repository, DbContext a UoW.",
-              "Returning IQueryable leaks EF; returning IEnumerable forces in-memory filtering.",
-              "Prefer specific repos (IOrderRepository) over generic IRepository<T>."
+              "Centralising query logic in a repository makes it easier to test business code against fakes or in-memory implementations.",
+              "A common criticism is that Entity Framework's DbSet already acts as a repository and DbContext already acts as a Unit of Work, making an extra layer feel like duplication.",
+              "Returning IQueryable from a repository leaks Entity Framework concerns to callers, while returning IEnumerable forces all filtering to happen in memory rather than in the database.",
+              "Prefer specific, domain-named interfaces such as IOrderRepository over a generic IRepository of T, because they communicate intent and allow query methods that make sense for that aggregate."
             ],
             "detail": "A pragmatic middle ground is query/specification objects run directly against DbContext — testable without the leaky wrapper. It genuinely pays off with multiple data sources or strict Clean Architecture boundaries.",
             "code": {
@@ -180,12 +180,12 @@
             "dbcontext"
           ],
           "answer": {
-            "oneLiner": "Unit of Work tracks all changes during a business operation and commits them atomically — EF Core's DbContext is the canonical implementation.",
+            "oneLiner": "Unit of Work is a pattern that tracks all the changes you make during a single business operation and then commits them all at once in a single transaction. Entity Framework Core's DbContext is the canonical implementation of this pattern, grouping inserts, updates, and deletes and flushing them together when you call SaveChanges. It ensures that either everything succeeds or nothing is persisted.",
             "keyPoints": [
-              "Collects inserts/updates/deletes, then one SaveChanges in a single transaction.",
-              "DbContext is a UoW: ChangeTracker records, SaveChangesAsync commits.",
-              "Repositories in one request share the same scoped DbContext.",
-              "An explicit IUnitOfWork lets Application control commit timing without exposing EF."
+              "The Unit of Work collects all inserts, updates, and deletes made during a business operation and writes them to the database in a single transaction when SaveChanges is called.",
+              "Entity Framework Core's DbContext is a Unit of Work implementation: its ChangeTracker records modifications and SaveChangesAsync commits them atomically.",
+              "Multiple repositories within a single HTTP request typically share the same scoped DbContext, so they all participate in the same Unit of Work without extra coordination.",
+              "Defining an explicit IUnitOfWork interface lets the Application layer control when to commit without depending directly on Entity Framework, keeping the domain clean."
             ],
             "detail": "Commit once at the use-case boundary — multiple independent SaveChanges calls cause partial commits. Keep the UoW scoped tightly to avoid stale data and long-held connections.",
             "code": {
@@ -259,12 +259,12 @@
             "read-write-separation"
           ],
           "answer": {
-            "oneLiner": "CQRS separates writes (Commands) from reads (Queries) so each side can be optimised and scaled independently.",
+            "oneLiner": "CQRS stands for Command Query Responsibility Segregation and is the idea of splitting your application into two distinct sides: Commands that change state and Queries that read state. Because the two sides have very different needs, you can optimise, scale, and evolve them independently. For example, reads can hit a denormalised view or cache while writes go through full domain validation.",
             "keyPoints": [
-              "Commands mutate and return little; Queries return data, never mutate.",
-              "Reads can hit a denormalised model, cache, or replica — bypassing domain rules.",
-              "Writes go through full domain validation and aggregates.",
-              "MediatR dispatches commands/queries; event sourcing is optional and complex."
+              "Commands are operations that change state and typically return little to no data, while Queries return data and must never cause side effects.",
+              "The read side can query a denormalised model, a cache, or a database read replica, bypassing domain rules entirely for maximum performance.",
+              "The write side enforces full domain validation, invariants, and business rules before persisting any change.",
+              "MediatR is a popular library for dispatching command and query objects to their handlers in .NET; event sourcing is sometimes combined with CQRS but is an optional and significantly more complex addition."
             ],
             "detail": "Useful when reads dwarf writes or domain logic is complex. Skip it for simple CRUD — it just adds ceremony.",
             "code": {
@@ -339,12 +339,12 @@
             "architecture-decision"
           ],
           "answer": {
-            "oneLiner": "Monoliths are simpler to build and run; microservices give independent scaling and deployment but add distributed-system complexity — choose on team size, domain maturity, and operational capability.",
+            "oneLiner": "A monolith deploys as a single unit which makes it simpler to build, debug, and operate, whereas microservices split the system into independently deployable services that can scale and be released separately. The tradeoff is that microservices introduce significant distributed-systems complexity around networking, data consistency, and observability. The right choice depends on your team size, domain maturity, and operational capability.",
             "keyPoints": [
-              "Monolith: one deploy, easy debugging, ACID across the domain.",
-              "Microservices: independent deploy, fault isolation, targeted scaling.",
-              "Costs: network calls, eventual consistency, observability overhead.",
-              "Start with a modular monolith; extract services only with a proven reason."
+              "A monolith has a single deployment unit, is easy to debug with a single process, and supports ACID transactions across the whole domain.",
+              "Microservices allow independent deployment, fault isolation between services, and targeted scaling of only the parts that need it.",
+              "The costs of microservices include network latency between services, eventual consistency challenges, and the overhead of distributed tracing and observability.",
+              "A common best practice is to start with a well-structured modular monolith and only extract services when there is a proven, specific reason to do so."
             ],
             "detail": "It's really an operational-capability and domain-complexity question. If you can't run Kubernetes, tracing, and multi-service CI/CD, microservices hurt more than they help.",
             "redFlags": [
@@ -416,12 +416,12 @@
             "horizontal-scaling"
           ],
           "answer": {
-            "oneLiner": "Scale out behind a load balancer with stateless services, add retries with backoff and circuit breakers to stop cascades — in .NET, wire it with Polly or the standard resilience handler.",
+            "oneLiner": "Scaling out means running more instances of your service behind a load balancer rather than upgrading to a bigger machine, which requires each instance to be stateless. To handle failures gracefully at scale, you also need resilience patterns like retries with exponential backoff and circuit breakers, which in .NET you can configure using the Polly library or the built-in resilience handler in .NET 8.",
             "keyPoints": [
-              "Vertical = bigger box (ceiling); horizontal = more instances (needs stateless).",
-              "Stateless: session/cache in Redis, not in-process.",
-              "Retry with exponential backoff + jitter for transient failures.",
-              "Circuit breaker fails fast after N failures; always add timeouts."
+              "Vertical scaling means giving one machine more CPU or memory, which has a hard ceiling and still leaves a single point of failure, while horizontal scaling means running more instances.",
+              "For services to scale horizontally, they must be stateless, meaning session state and cache must live in a shared store like Redis rather than in the process itself.",
+              "Retries with exponential backoff and added jitter prevent transient failures from causing persistent overload by spacing out retry attempts.",
+              "A circuit breaker stops sending requests to a failing dependency after a threshold of failures and fails fast until the dependency recovers, while timeouts ensure no call can block indefinitely."
             ],
             "detail": "Circuit breaker states: Closed (normal), Open (fail fast), Half-Open (probe). Order matters: timeout wraps circuit breaker wraps retry. Bulkheads cap concurrent calls so a slow dependency can't exhaust shared resources.",
             "code": {
@@ -498,12 +498,12 @@
             "azure-apim"
           ],
           "answer": {
-            "oneLiner": "An API Gateway is the single entry point handling routing, auth, rate limiting, and SSL; services talk internally via sync HTTP/gRPC or async messaging depending on coupling.",
+            "oneLiner": "An API Gateway is a single front-door service that sits in front of all your microservices and handles cross-cutting concerns like routing, authentication, rate limiting, and SSL termination so individual services do not have to. Behind the gateway, services communicate with each other either synchronously over HTTP or gRPC when an immediate response is needed, or asynchronously through a message broker when decoupling is more important than immediacy.",
             "keyPoints": [
-              "Gateway: routing, JWT validation, rate limiting, SSL, aggregation.",
-              "Azure options: APIM, Application Gateway, or YARP in-process.",
-              "Sync (HTTP/gRPC) when caller needs an answer now; gRPC for internal calls.",
-              "Async (Service Bus/Kafka) to decouple services from each other's uptime."
+              "The API Gateway handles routing, JWT validation, rate limiting, SSL termination, and can aggregate responses from multiple services into one.",
+              "Azure options include API Management for full enterprise gateway features, Application Gateway for layer-7 load balancing, and YARP as a lightweight in-process reverse proxy.",
+              "Synchronous communication over HTTP or gRPC is appropriate when the caller genuinely needs an answer before it can continue, with gRPC preferred for internal service-to-service calls due to its efficiency.",
+              "Asynchronous messaging via Service Bus or Kafka decouples services from each other's availability, allowing work to be buffered and retried without tight temporal coupling."
             ],
             "detail": "A BFF is a gateway tailored per client type. Watch the chatty anti-pattern — synchronous A→B→C chains stack latency; prefer events for non-critical paths.",
             "redFlags": [
@@ -571,12 +571,12 @@
             "browser-security"
           ],
           "answer": {
-            "oneLiner": "CORS is a browser mechanism that blocks cross-origin requests unless the server allows them via response headers — ASP.NET Core configures this with built-in middleware.",
+            "oneLiner": "CORS, or Cross-Origin Resource Sharing, is a browser security mechanism that blocks JavaScript from making requests to a different origin than the page it came from, unless the server explicitly permits it via special response headers. It only applies in browsers and does not affect server-to-server calls. ASP.NET Core includes built-in middleware to configure which origins, methods, and headers are allowed.",
             "keyPoints": [
-              "Browsers enforce same-origin (scheme + domain + port) by default.",
-              "Server sends Access-Control-Allow-* headers to permit cross-origin calls.",
-              "Non-simple requests trigger a preflight OPTIONS request.",
-              "Configure with AddCors + UseCors; never wildcard with credentials."
+              "Browsers enforce the same-origin policy by default, meaning a request is blocked if the scheme, domain, or port differs from the page's origin.",
+              "The server signals permission by returning Access-Control-Allow headers in its response, telling the browser which origins and methods are acceptable.",
+              "Non-simple requests, such as those using custom headers or methods other than GET or POST, trigger a preflight OPTIONS request that the browser sends before the actual request.",
+              "In ASP.NET Core you configure CORS with AddCors and UseCors, and you should never allow wildcard origins when credentials such as cookies are included."
             ],
             "detail": "CORS only affects browser-to-server calls, not server-to-server. In event-driven setups, backend consumers use a broker so CORS never applies — only the BFF/gateway needs it.",
             "code": {
@@ -648,12 +648,12 @@
             "dependency-direction"
           ],
           "answer": {
-            "oneLiner": "N-Tier flows top-down (UI → Logic → Data) with higher layers depending on lower; Clean Architecture inverts it so the domain depends on nothing — pick based on size and testability needs.",
+            "oneLiner": "N-Tier and Clean Architecture are both layered approaches but with opposite dependency directions. In N-Tier, higher layers depend on lower layers, so the business layer directly references the data access layer. In Clean Architecture, the domain defines interfaces and nothing points outward, making the domain testable in complete isolation. Clean Architecture is more effort but pays off as complexity grows.",
             "keyPoints": [
-              "N-Tier: business layer references concrete data-access classes.",
-              "Clean: domain defines interfaces, infrastructure implements them.",
-              "N-Tier is simpler — fine for small CRUD apps.",
-              "Clean is testable in isolation but adds projects and ceremony."
+              "In N-Tier architecture, the business layer references concrete data-access classes directly, creating a hard dependency on the database technology.",
+              "In Clean Architecture, the domain defines interfaces such as IRepository and the Infrastructure layer provides implementations, so the domain never references any external library.",
+              "N-Tier is simpler to set up and perfectly adequate for small CRUD applications where testability of the domain in isolation is not a priority.",
+              "Clean Architecture makes domain logic testable in isolation but introduces more projects, interfaces, and structural ceremony that can feel like overhead on smaller projects."
             ],
             "detail": "The key difference is where interfaces live. Small app with one dev → N-Tier. Domain-rich, larger team, long horizon → Clean pays off. For brownfield, introduce interfaces gradually.",
             "redFlags": [
@@ -722,12 +722,12 @@
             "design-patterns"
           ],
           "answer": {
-            "oneLiner": "The Mediator routes messages through a central hub so senders and receivers don't know each other; MediatR dispatches Command/Query objects to handlers and adds pipeline behaviours for cross-cutting concerns.",
+            "oneLiner": "The Mediator pattern introduces a central hub that all components send messages through, so they never communicate with each other directly. In .NET, MediatR is the most common implementation, where you dispatch Command or Query objects and it routes them to the appropriate handler. Pipeline behaviours let you add cross-cutting concerns like validation or logging without touching any handler.",
             "keyPoints": [
-              "Decouples components — a controller sends a command, not a class call.",
-              "IMediator.Send routes to one IRequestHandler; DI discovers handlers.",
-              "Pipeline behaviours add validation, logging, caching composably.",
-              "Downsides: hides dependencies, and it's overkill for simple CRUD."
+              "Mediator decouples components so that a controller, for example, sends a command object to the mediator without knowing which class will handle it.",
+              "IMediator.Send routes a request to exactly one IRequestHandler, and dependency injection discovers and wires up the handlers automatically.",
+              "Pipeline behaviours wrap the handler execution and allow you to compose validation, logging, caching, and transaction management in a clean and reusable way.",
+              "The downsides are that the indirection makes it harder to trace what handles a given request, and the pattern is overkill for simple applications with only a few endpoints."
             ],
             "detail": "The main value beyond dispatch is IPipelineBehavior — validation, logging, transactions run before handlers without them knowing. For 3-5 endpoints, direct service injection is cleaner.",
             "code": {
@@ -802,12 +802,12 @@
             "domain-events"
           ],
           "answer": {
-            "oneLiner": "DDD structures software around the business domain using Bounded Contexts, Aggregates, Entities, Value Objects, and Domain Events, with a shared Ubiquitous Language.",
+            "oneLiner": "Domain-Driven Design, or DDD, is an approach to software design that centres the codebase on the business domain rather than on technical concerns. It introduces a shared vocabulary called Ubiquitous Language, clear model boundaries called Bounded Contexts, and building blocks like Aggregates, Entities, and Value Objects to represent domain concepts faithfully in code.",
             "keyPoints": [
-              "Ubiquitous Language: same terms in code, tests, and conversations.",
-              "Bounded Context: a boundary where one model is consistent.",
-              "Aggregate Root enforces invariants; all changes flow through it.",
-              "Entity has identity; Value Object is immutable and identity-less."
+              "Ubiquitous Language means the same terms are used in code, tests, documentation, and conversations with domain experts so there is no translation layer.",
+              "A Bounded Context is an explicit boundary within which a particular model is consistent and valid, often aligning with a microservice or a subdomain.",
+              "The Aggregate Root is the single entry point for a cluster of related objects and is responsible for enforcing all business invariants for that cluster.",
+              "Entities have a unique identity that persists even as their attributes change, while Value Objects are immutable and defined entirely by their values with no individual identity."
             ],
             "detail": "Aggregates reference others by ID, stay small, and raise domain events dispatched after SaveChanges. Each microservice is ideally one bounded context. Best for complex domains, not CRUD.",
             "code": {
@@ -882,12 +882,12 @@
             "eventual-consistency"
           ],
           "answer": {
-            "oneLiner": "A SAGA is a sequence of local transactions where each step triggers the next via events; if one fails, compensating transactions undo prior steps — eventual consistency without a distributed lock.",
+            "oneLiner": "A Saga is a pattern for managing distributed transactions across multiple services without using a distributed lock. Instead of trying to make all changes atomically, each service performs a local transaction and signals the next step via an event. If a step fails, previously completed steps are undone by running compensating transactions, achieving eventual consistency.",
             "keyPoints": [
-              "2PC locks resources across services — strong consistency but a distributed lock.",
-              "SAGA: each service does a local transaction and emits an event.",
-              "Compensating transactions undo earlier steps and must be idempotent.",
-              "Choreography (no coordinator) vs orchestration (central controller)."
+              "Two-phase commit locks resources across multiple services to achieve strong consistency, but this creates a distributed lock that degrades availability and is fragile.",
+              "In a Saga, each service performs its own local transaction and emits an event or message to trigger the next step in the sequence.",
+              "Compensating transactions reverse the effect of an earlier step when a later step fails, and they must be designed to be idempotent so they are safe to run more than once.",
+              "Choreography means each service reacts to events with no central coordinator, while orchestration uses a central coordinator that explicitly directs each step."
             ],
             "detail": "Orchestrated SAGAs map naturally to Azure Durable Functions. Idempotency is mandatory because retries replay messages. The system is temporarily inconsistent, so the UI must show 'processing'.",
             "redFlags": [
@@ -958,12 +958,12 @@
             "coupling"
           ],
           "answer": {
-            "oneLiner": "Use sync (HTTP/gRPC) when the caller needs an immediate result; use async messaging when work can be deferred or services should be decoupled from each other's availability.",
+            "oneLiner": "Synchronous communication means the caller waits for an immediate response, which is simple and traceable but couples the caller's availability to the called service. Asynchronous messaging puts a broker in between so the caller can continue without waiting, decoupling the two services in time. The right choice depends on whether the caller genuinely needs the answer before it can proceed.",
             "keyPoints": [
-              "Sync: simple and traceable but couples availability.",
-              "Async: broker buffers spikes and enables retry without the caller.",
-              "Sync hops stack latency; async defers it.",
-              "Always use DLQs for messages that repeatedly fail."
+              "Synchronous calls are simple to reason about and easy to trace, but they couple the availability of the caller to the availability of the downstream service.",
+              "Asynchronous messaging through a broker buffers requests during traffic spikes and allows the consumer to retry independently without the original caller being involved.",
+              "Every synchronous hop in a chain adds latency directly to the user's response time, whereas asynchronous work defers that latency to background processing.",
+              "Dead-letter queues should always be configured for asynchronous consumers so that messages that repeatedly fail are captured for inspection rather than silently lost."
             ],
             "detail": "Use async for events, notifications, and cross-context integration; sync for real-time queries and auth. Watch the dual-write problem — solve it with the Transactional Outbox or CDC.",
             "redFlags": [
@@ -1031,12 +1031,12 @@
             "idempotency-key"
           ],
           "answer": {
-            "oneLiner": "An operation is idempotent if running it many times gives the same result as running it once — essential when retries and at-least-once delivery are the norm.",
+            "oneLiner": "An operation is idempotent if calling it multiple times produces exactly the same result as calling it once. This property is essential in distributed systems because networks are unreliable and retries are inevitable, so you need to ensure that a duplicated request does not cause a duplicated side effect like charging a customer twice.",
             "keyPoints": [
-              "GET/PUT/DELETE are idempotent by spec; POST is not.",
-              "Idempotency key: client sends a UUID; API returns the stored result on replay.",
-              "Store keys in Redis with TTL or a dedicated table.",
-              "Consumers check a processed message ID before doing work."
+              "HTTP GET, PUT, and DELETE are defined as idempotent by specification, while POST is not and requires explicit design to be made idempotent.",
+              "An idempotency key is a unique identifier the client generates per logical operation and sends with the request so the server can detect and short-circuit duplicates.",
+              "Idempotency keys and their associated results are typically stored in Redis with a time-to-live, or in a dedicated database table, so the server can look them up on retry.",
+              "Message consumers should check a processed message identifier before performing any work to avoid processing the same message twice when a broker delivers it more than once."
             ],
             "detail": "A POST that times out and retries can double-charge unless an idempotency key dedupes it. Use Redis SET ... NX atomically to handle simultaneous duplicate requests.",
             "code": {
@@ -1116,12 +1116,12 @@
             "stakeholders"
           ],
           "answer": {
-            "oneLiner": "Treat it as trade-off analysis: nail the quality attributes and constraints, pick the simplest architecture that meets them, and capture the decision in an ADR.",
+            "oneLiner": "Designing an architecture is fundamentally an exercise in trade-off analysis. You start by identifying the quality attributes the system must satisfy, understand the constraints you are working within, and then choose the simplest design that meets those requirements. Every significant decision should be recorded in an Architecture Decision Record so the reasoning is preserved for the team.",
             "keyPoints": [
-              "Gather quality attributes first — read/write heavy, latency, availability.",
-              "Know your constraints: team skill, budget, infra, compliance.",
-              "Start simple — usually a modular monolith.",
-              "Document each decision as an ADR and revisit periodically."
+              "Begin by gathering quality attributes such as whether the system is read-heavy or write-heavy, what the latency requirements are, and what level of availability is needed.",
+              "Understand your constraints up front, including team skills, budget, infrastructure availability, and any compliance or regulatory requirements.",
+              "Default to the simplest viable architecture, which is usually a well-structured modular monolith, and add complexity only when there is a clear justification.",
+              "Document each significant architectural decision as an Architecture Decision Record capturing the context, the options considered, and the reasoning, and revisit those records periodically as the system evolves."
             ],
             "detail": "Sketch 2-3 candidate architectures, stress-test them against the NFRs, and present the trade-offs honestly — don't hide the cost of microservices. YAGNI applies to architecture too.",
             "redFlags": [
@@ -1189,12 +1189,12 @@
             "leadership"
           ],
           "answer": {
-            "oneLiner": "Use STAR with technical depth — set the context, state your specific role, spend most of the answer on your reasoning and options, then quantify the result.",
+            "oneLiner": "When describing a past architectural decision in an interview, use the STAR format but make sure the bulk of your answer covers your reasoning process, the options you considered, and why you made the choice you did. Interviewers care more about how you think than about what you chose. Always close by quantifying the outcome and reflecting on what you would do differently.",
             "keyPoints": [
-              "Situation: system, scale, team, business pressure — briefly.",
-              "Task: your specific responsibility.",
-              "Action (the bulk): options considered, what you chose and why.",
-              "Result: quantify, and note what you'd do differently."
+              "Start with a brief Situation that describes the system, its scale, the team, and the business pressure driving the decision.",
+              "State your specific Task and responsibility so the interviewer understands your individual contribution rather than the team's.",
+              "Spend most of your time on the Action, walking through the options you evaluated, what you chose, and the reasoning behind the choice.",
+              "Close with a Result that quantifies the impact of the decision, and note honestly what you would do differently with hindsight."
             ],
             "detail": "Worked example: an Azure Functions pipeline silently dropped ~0.3% of orders. Diagnosed via App Insights and correlation IDs that the Service Bus lock expired before processing finished; chose lock renewal as the immediate fix and scheduled the async refactor. Result: zero lost orders next peak.",
             "redFlags": [
@@ -1264,12 +1264,12 @@
             "metrics"
           ],
           "answer": {
-            "oneLiner": "Baseline measurement → bottleneck found by profiling (not guessing) → solution with trade-offs explained → measured improvement.",
+            "oneLiner": "Performance problems should always be measured before being solved, not guessed at. The right approach is to establish a baseline, use profiling tools to identify the actual bottleneck, apply a targeted fix, and then measure again to confirm the improvement. Jumping to solutions without measurement usually optimises the wrong thing.",
             "keyPoints": [
-              "Start with a baseline — p50/p95/p99, throughput, CPU.",
-              "Find the bottleneck with tools: App Insights, dotTrace, Query Store.",
-              "Common .NET wins: N+1, missing indexes, sync blocking, over-loading.",
-              "Quantify: 'p95 from 1.8s to 220ms', 'DB CPU 80% to 30%'."
+              "Start by capturing a baseline using latency percentiles such as p50, p95, and p99, along with throughput and CPU utilisation, so you know what you are improving.",
+              "Find the actual bottleneck using tools such as Application Insights for distributed traces, dotTrace for CPU profiling, and Query Store for slow SQL queries.",
+              "Common .NET performance wins include fixing N+1 query problems, adding missing database indexes, converting synchronous blocking calls to asynchronous, and avoiding loading more data than needed.",
+              "Always quantify the result with concrete numbers, for example reducing p95 latency from 1.8 seconds to 220 milliseconds or dropping database CPU usage from 80 percent to 30 percent."
             ],
             "detail": "Worked example: listing API at ~2s p95. Found an N+1, a missing composite index, and over-eager entity loading; fixed with Include, the index, and a DTO projection — p95 dropped to ~190ms. Acknowledge cache staleness as a trade-off.",
             "redFlags": [
@@ -1338,12 +1338,12 @@
             "sre"
           ],
           "answer": {
-            "oneLiner": "Four phases: detect via monitoring, mitigate to restore service first, root-cause it, then prevent recurrence with a blameless post-mortem.",
+            "oneLiner": "Handling a production incident well means moving through four phases in order: detect the problem through monitoring before customers report it, mitigate by restoring service as quickly as possible, find the root cause through evidence rather than guesswork, and prevent recurrence with code fixes, better tests, and a blameless post-mortem.",
             "keyPoints": [
-              "Detect: alerts before customers — error rate, p95, dependency failures.",
-              "Mitigate first: roll back a suspect deploy before deep debugging.",
-              "Root cause: 5 Whys and a timeline from logs/traces, no blame.",
-              "Prevent: code fix plus tests, alerts, and runbook updates."
+              "Detection should come from proactive alerts on error rates, latency percentiles, and dependency failures rather than from customer complaints.",
+              "Mitigate first by rolling back a suspect deployment or rerouting traffic before investing time in deep debugging, because restoring service is more urgent than understanding the cause.",
+              "Root cause analysis uses techniques like the Five Whys and a timeline reconstructed from logs and distributed traces, with a focus on contributing factors rather than individual blame.",
+              "Prevention means shipping a code fix, adding tests to cover the scenario, improving alerting thresholds, and updating runbooks so the team can respond faster next time."
             ],
             "detail": "Example: SQL DTU at 100% after a 01:40 deploy introduced an unindexed query; roll back restores service in minutes, then add the index, a CI query-perf test, and a 70% DTU alert. Keep stakeholders updated every 10-15 minutes via one channel.",
             "redFlags": [
@@ -1413,12 +1413,12 @@
             "production-issue"
           ],
           "answer": {
-            "oneLiner": "Isolate the layer with data: check recent deployments, read traces to see where time goes, then drill into SQL plans, app code, or external dependencies.",
+            "oneLiner": "When a service that was previously healthy slows down, the goal is to isolate which layer the problem lives in by working from the outside in. You start by checking whether anything changed recently in deployments or infrastructure, then use distributed tracing to find the slow span, and finally drill into the specific subsystem responsible.",
             "keyPoints": [
-              "Check deployment and infra history first.",
-              "Use a distributed trace to find the slow span.",
-              "SQL slow? Query Store, missing indexes, parameter sniffing, blocking.",
-              "App slow? Sync blocking, thread-pool starvation, GC pressure."
+              "Check deployment history and infrastructure change logs first, because the most common cause of a regression is something that changed recently.",
+              "Use a distributed trace to identify exactly which span is slow, which immediately tells you whether the problem is in your application code, the database, or an external dependency.",
+              "If the database is the bottleneck, investigate using Query Store for slow queries, check for missing indexes, look for parameter sniffing issues, and check for blocking queries.",
+              "If the application itself is slow, look for synchronous blocking calls on async code, thread-pool starvation from too many concurrent operations, or excessive garbage collection pressure."
             ],
             "detail": "Confirm scope (one endpoint or all, intermittent or constant), correlate with changes, then expand a slow trace. A single 2.8s SQL span points to a query; many small calls point to an N+1. Also check if a dataset crossed a tipping point.",
             "code": {
@@ -1494,12 +1494,12 @@
             "azure"
           ],
           "answer": {
-            "oneLiner": "An async, channel-agnostic pipeline: producers publish notification-intent events; a notification service applies user preferences and routes to channel handlers with retry, dedup, and audit.",
+            "oneLiner": "A robust notification system is built as an asynchronous pipeline where the business logic publishes an event expressing what happened rather than directly instructing a channel to send a message. A dedicated notification service then reads that event, applies the user's preferences, selects the right channel, and delivers the message with retry, deduplication, and a full audit trail.",
             "keyPoints": [
-              "Producers emit domain events, not 'send email' commands.",
-              "Service Bus topic with per-channel subscriptions (email/SMS/push).",
-              "Notification service: preferences, templates, rate limiting, dedup.",
-              "Retry with backoff, DLQ on failure, and audit every attempt."
+              "Producers should emit domain events describing what happened, such as OrderShipped, rather than commands like SendEmail, so notification logic stays out of business code.",
+              "A Service Bus topic with a separate subscription per channel, such as email, SMS, and push, allows each channel handler to operate and scale independently.",
+              "The notification service is responsible for applying user preferences, rendering templates, enforcing rate limits per user, and deduplicating messages to avoid sending duplicates.",
+              "Each delivery attempt should be retried with backoff, failed messages should land in a dead-letter queue for inspection, and every attempt should be written to an audit log."
             ],
             "detail": "Abstract providers (ACS, SendGrid, Twilio, FCM) behind INotificationChannel so they're swappable. Use MessageId as the idempotency key, and scale out with competing consumers.",
             "redFlags": [
@@ -1571,12 +1571,12 @@
             "performance"
           ],
           "answer": {
-            "oneLiner": "Pick the layer by freshness, access pattern, and sharing needs — in-process for single-instance hot data, Redis for distributed, CDN for static — and define invalidation before adding any cache.",
+            "oneLiner": "Caching is most effective when you choose the right layer for each type of data based on how fresh it needs to be, how it is accessed, and whether it needs to be shared across instances. You should define an invalidation strategy before adding any cache because a cache without a clear invalidation plan becomes a source of stale data bugs.",
             "keyPoints": [
-              "Layers: CDN → response cache → IMemoryCache → Redis → DB.",
-              "Cache-Aside is the default: miss → load → store → return.",
-              "TTL is simplest; event-driven invalidation is precise but complex.",
-              "Guard against stampede with a lock or stale-while-revalidate."
+              "Caching layers from outermost to innermost are: CDN for public static responses, response caching for full HTTP responses, IMemoryCache for single-instance hot data, Redis for distributed shared data, and finally the database.",
+              "The Cache-Aside pattern is the most common default: on a cache miss the application loads from the database, writes the result to the cache, and returns it.",
+              "Time-to-live based expiry is the simplest invalidation strategy; event-driven invalidation that clears the cache on a data change is more precise but adds complexity.",
+              "Cache stampedes, where many requests simultaneously miss and all hit the database at once, can be prevented with a lock around the miss-and-load path or by serving a slightly stale value while refreshing in the background."
             ],
             "detail": "Use Redis for per-user data across instances, IMemoryCache for single-instance aggregates. Don't cache always-fresh data (financial totals) — optimise the query instead. Never cache user data under a shared key.",
             "code": {
@@ -1653,12 +1653,12 @@
             "production"
           ],
           "answer": {
-            "oneLiner": "Confirm the trend, capture a dump in production, find the largest object graphs and their retention path with a heap profiler, then fix the root cause.",
+            "oneLiner": "A true memory leak in a .NET application is confirmed when the process's working set grows steadily over time without recovering after garbage collection. You diagnose it by capturing a memory dump in production and analysing it with a heap profiler to find which object types are accumulating and what is holding references to them.",
             "keyPoints": [
-              "Real leak = working set grows over hours with no GC recovery.",
-              "dotnet-counters to watch gc-heap-size and time-in-gc.",
-              "dotnet-dump collect, then analyze with dumpheap and gcroot.",
-              "Common causes: static collections, unsubscribed events, undisposed IDisposables."
+              "A genuine leak is distinguished from normal heap growth by the fact that the garbage collector cannot reclaim the memory even under pressure, and the working set keeps climbing over hours.",
+              "Use dotnet-counters to watch gc-heap-size and time-in-gc live in production to confirm the trend before taking a disruptive dump.",
+              "Take a memory dump with dotnet-dump collect, then analyse it with the dumpheap command to find the most numerous object types and gcroot to trace what is keeping them alive.",
+              "Common causes of memory leaks in .NET include static collections that accumulate entries, event handler subscriptions that are never removed, and IDisposable objects that are never disposed."
             ],
             "detail": "gcroot shows what's keeping objects alive — often a static dictionary with no eviction. Fixes: IMemoryCache with limits, unsubscribe in Dispose, use IHttpClientFactory, fix Singleton-capturing-Scoped. Validate by watching memory plateau over 24h.",
             "code": {
@@ -1734,12 +1734,12 @@
             "azure"
           ],
           "answer": {
-            "oneLiner": "Scale in cheapest-first layers: cache (response/Redis/CDN), then a DB read replica, then horizontal API scaling — each multiplies capacity without expensive vertical scaling.",
+            "oneLiner": "Scaling a high-traffic system is most cost-effective when you add capacity in the cheapest layers first. Caching eliminates redundant computation, a database read replica offloads query traffic, and then horizontal API scaling adds more instances. Each layer multiplies your capacity before you resort to more expensive options like vertical scaling.",
             "keyPoints": [
-              "Profile first — the top 20% of endpoints drive most traffic.",
-              "CDN/response caching for public responses; Redis for per-user data.",
-              "DB read replica to offload SELECT traffic.",
-              "Stateless API + autoscale; CQRS read models for complex views."
+              "Start by profiling to identify the top twenty percent of endpoints that drive most of the traffic, because optimising those gives the greatest return.",
+              "CDN and response caching serve public, cacheable responses without touching the application, and Redis caches per-user or per-session data that is expensive to compute.",
+              "A database read replica offloads SELECT queries to a secondary server, removing the most common bottleneck without requiring application architecture changes.",
+              "Making API instances stateless and enabling autoscaling allows the system to grow horizontally under load; CQRS read models can additionally serve complex views from pre-computed data."
             ],
             "detail": "Escalation ladder: CDN → IMemoryCache → Redis → read replica → horizontal scaling → pre-materialised read model. Remember replicas have lag, so reads after writes can be stale.",
             "code": {
@@ -1821,12 +1821,12 @@
             "bounded-context"
           ],
           "answer": {
-            "oneLiner": "Entities have identity and a lifecycle; value objects are immutable and compared by value; an aggregate is a cluster of those with one root that guards invariants; a bounded context is the boundary where a model and its language stay consistent.",
+            "oneLiner": "These are the core building blocks of Domain-Driven Design. An Entity is an object with a unique identity that persists over time, a Value Object is immutable and compared entirely by its values, and an Aggregate is a cluster of those objects with a single Root that controls all access and enforces business rules. A Bounded Context is the explicit boundary within which a particular model and its language remain consistent.",
             "keyPoints": [
-              "Entity — identity persists even as attributes change (e.g. Order)",
-              "Value object — immutable, equality by value (e.g. Money, Address)",
-              "Aggregate root — single entry point that enforces invariants; reference others by ID",
-              "Bounded context — one consistent model per boundary, often one per microservice"
+              "An Entity has an identity that persists even as its attributes change over time, for example an Order that remains the same order even after its status is updated.",
+              "A Value Object is immutable and two Value Objects are equal if all their values are equal, for example Money or Address have no meaningful individual identity.",
+              "The Aggregate Root is the single entry point for modifying a cluster of related objects and enforces all invariants for that cluster; other aggregates reference it only by identifier.",
+              "A Bounded Context is a boundary within which one consistent model applies, and it often aligns with a single microservice or subdomain."
             ],
             "redFlags": [
               "Treating every table as an aggregate",
@@ -1894,12 +1894,12 @@
             "cqrs"
           ],
           "answer": {
-            "oneLiner": "CRUD stores only the current state and overwrites it; event sourcing stores an append-only log of every state change and rebuilds current state by replaying events, giving a full audit history at the cost of complexity.",
+            "oneLiner": "Traditional CRUD stores only the current state of a record and overwrites it on every update, which is simple but loses all history. Event Sourcing instead stores an immutable, append-only log of every change that ever happened, and reconstructs the current state by replaying those events. This gives you a complete audit trail and enables powerful capabilities like time-travel queries, but it comes with significant complexity.",
             "keyPoints": [
-              "CRUD — simple, current state only, history is lost on update",
-              "Event sourcing — append-only events are the source of truth",
-              "Benefits: full audit, time-travel, natural fit with CQRS read models",
-              "Costs: schema/versioning of events, replay cost, steep learning curve"
+              "CRUD is simple and familiar, but every update permanently overwrites the previous state so historical information is lost unless you build separate audit logging.",
+              "In Event Sourcing the events themselves are the source of truth, and the current state is derived by replaying the event log from the beginning or from a snapshot.",
+              "The benefits include a full audit history, the ability to reconstruct state at any point in time, and a natural fit with CQRS read models that project events into query-optimised views.",
+              "The costs include the challenge of versioning and migrating event schemas as the domain evolves, the cost of replaying large event streams, and a steep learning curve for teams new to the pattern."
             ],
             "redFlags": [
               "Using event sourcing for simple CRUD",
@@ -1966,12 +1966,12 @@
             "redis"
           ],
           "answer": {
-            "oneLiner": "Cache-aside has the app load and populate the cache on a miss; write-through writes to cache and DB together (consistent, slower writes); write-behind writes to cache and flushes to the DB asynchronously (fast, risk of loss). Redis is the common distributed store for all three.",
+            "oneLiner": "These are three strategies for keeping a cache in sync with a database. Cache-Aside, the most common default, has the application load data on a miss and populate the cache itself. Write-Through writes to the cache and the database together to keep them consistent. Write-Behind writes to the cache immediately and flushes to the database later, which is fast but risks data loss. Redis is the most common distributed cache for all three strategies.",
             "keyPoints": [
-              "Cache-aside — app manages it; lazy-loaded; most common default",
-              "Write-through — write cache+DB synchronously; strong consistency, slower",
-              "Write-behind — write cache now, persist later; fast but can lose data on crash",
-              "Redis serves as the distributed cache across instances for any of these"
+              "Cache-Aside means the application manages the cache manually: on a miss it reads from the database, stores the result in the cache, and returns it; the cache is lazily populated.",
+              "Write-Through writes to both the cache and the database synchronously on every write, which keeps them consistent but at the cost of slower write operations.",
+              "Write-Behind writes to the cache immediately and defers the database write to an asynchronous background process, which makes writes very fast but can lose data if the cache crashes before flushing.",
+              "Redis is the standard choice for a distributed cache across multiple application instances, and it supports all three of these strategies."
             ],
             "redFlags": [
               "Thinking write-behind is safe without durability handling",
@@ -2037,12 +2037,12 @@
             "modularity"
           ],
           "answer": {
-            "oneLiner": "A modular monolith is a single deployable with strongly enforced internal module boundaries — it gives you the maintainability of microservices without the distributed-systems and deployment overhead.",
+            "oneLiner": "A modular monolith is a single deployable application that is internally structured with strongly enforced boundaries between modules, like microservices but without the network overhead or operational complexity. It is often the right starting architecture because it gives you the maintainability benefits of clear separation while keeping deployment and debugging simple.",
             "keyPoints": [
-              "Traditional monolith — one deploy, but often tangled (big ball of mud)",
-              "Modular monolith — one deploy, but clean module boundaries + in-process calls",
-              "Microservices — independent deploy/scale, but network + ops complexity",
-              "Modular monolith is the recommended starting point; extract services later"
+              "A traditional monolith is a single deployable but often has no internal structure, leading to tangled dependencies where every part of the code can reference every other part.",
+              "A modular monolith is also a single deployable but enforces clean boundaries between modules so each module has its own public interface and modules communicate through well-defined contracts.",
+              "Microservices are independently deployable and scalable services, but they introduce significant network latency, distributed data consistency challenges, and operational overhead.",
+              "Starting with a modular monolith is the widely recommended approach because module boundaries can later be extracted into separate services when there is a clear, justified need."
             ],
             "redFlags": [
               "Equating modular monolith with a plain monolith",
@@ -2109,12 +2109,12 @@
             "saas"
           ],
           "answer": {
-            "oneLiner": "On a spectrum of isolation vs cost: database-per-tenant gives strongest isolation but high cost; schema-per-tenant is a middle ground; a shared schema with a TenantId column is cheapest and most scalable but needs strict query filtering.",
+            "oneLiner": "Multi-tenancy strategies sit on a spectrum from strongest isolation to lowest cost. Database-per-tenant gives the best isolation but is the most expensive and hardest to scale to thousands of tenants. Schema-per-tenant is a middle ground. A shared schema with a TenantId column on every table is the cheapest and most scalable approach, but it requires strict query filtering to prevent one tenant from seeing another's data.",
             "keyPoints": [
-              "DB-per-tenant — best isolation/compliance, costly, harder to scale to thousands",
-              "Schema-per-tenant — moderate isolation, moderate operational cost",
-              "Shared schema (TenantId) — cheapest and densest, but risk of data leakage",
-              "Shared schema needs enforced tenant filters (e.g. EF global query filters)"
+              "Database-per-tenant provides the strongest data isolation and is easiest to meet compliance requirements, but the cost and operational complexity make it impractical at high tenant counts.",
+              "Schema-per-tenant provides moderate isolation within a shared database server and a moderate operational cost, sitting between the two extremes.",
+              "A shared schema where every table has a TenantId column is the cheapest and densest approach, but it carries the highest risk of data leakage if tenant filtering is ever missed.",
+              "Shared schema requires a reliable mechanism to enforce tenant filters on every query, for example using Entity Framework Core global query filters so the application layer cannot accidentally omit the filter."
             ],
             "redFlags": [
               "Forgetting tenant filtering on shared-schema queries",
@@ -2179,12 +2179,12 @@
             "public-api"
           ],
           "answer": {
-            "oneLiner": "Make only additive, non-breaking changes where possible (new optional fields/endpoints), version the API when you must break, and deprecate gracefully with notice and a migration window before removal.",
+            "oneLiner": "When evolving an API that has existing consumers, the safest approach is to make only additive changes such as new optional fields or new endpoints, because these are backward-compatible. When a genuinely breaking change is unavoidable, you introduce versioning. Deprecation should always come with advance notice and a migration window so consumers have time to adapt before the old version is removed.",
             "keyPoints": [
-              "Additive changes are safe; removing/renaming/retyping fields breaks clients",
-              "Tolerant reader: clients should ignore unknown fields",
-              "Version (v1/v2) only for genuine breaking changes",
-              "Deprecate with headers/docs and a sunset timeline, never remove abruptly"
+              "Additive changes such as adding new optional fields or new endpoints are safe because existing consumers simply ignore what they do not know about.",
+              "Consumers should be written as tolerant readers that ignore unknown fields, which gives the API provider more freedom to evolve without breaking clients.",
+              "API versioning, typically through a version segment in the URL like v1 or v2, should only be introduced when a genuinely breaking change such as removing or renaming a field is unavoidable.",
+              "Deprecation should be communicated through response headers and documentation along with a clear sunset date, and old versions should never be removed abruptly without a migration window."
             ],
             "redFlags": [
               "Renaming/removing fields in place",
@@ -2250,12 +2250,12 @@
             "fault-tolerance"
           ],
           "answer": {
-            "oneLiner": "Like watertight compartments in a ship, the bulkhead pattern isolates resources (thread pools, connection pools) per dependency so a single slow or failing dependency can't exhaust shared resources and sink the whole app.",
+            "oneLiner": "The Bulkhead pattern takes its name from the watertight compartments in a ship's hull: if one compartment floods, the others remain intact. In software, it means isolating resources such as thread pools and connection pools per downstream dependency so that a single slow or failing dependency can only consume its own allocated resources and cannot starve the rest of the application.",
             "keyPoints": [
-              "Partition resources per dependency instead of one shared pool",
-              "A slow downstream consumes only its own quota, not everything",
-              "Complements circuit breaker and timeout in a resilience strategy",
-              "In .NET, configurable via Polly's bulkhead/concurrency limiter"
+              "Instead of sharing one resource pool across all downstream dependencies, you partition separate pools per dependency so failures are contained.",
+              "When a slow downstream service starts consuming all threads in its dedicated pool, other dependencies are unaffected because they each have their own quota.",
+              "Bulkhead complements circuit breaker and timeout in a full resilience strategy: timeout stops waiting, circuit breaker stops trying, and bulkhead limits concurrent attempts.",
+              "In .NET, bulkhead behavior can be configured using Polly's bulkhead policy or the concurrency limiter in the standard resilience pipeline."
             ],
             "redFlags": [
               "Confusing it with circuit breaker",
@@ -2321,12 +2321,12 @@
             "scalability"
           ],
           "answer": {
-            "oneLiner": "Vertical scaling adds power to one machine (simple, but a hard ceiling and a single point of failure); horizontal scaling adds more instances behind a load balancer, which scales further but forces you to design stateless services.",
+            "oneLiner": "Vertical scaling means upgrading to a more powerful machine with more CPU, memory, or storage. It is simple because it requires no code changes, but it has a hard ceiling and leaves a single point of failure. Horizontal scaling means adding more instances behind a load balancer, which can scale much further, but it requires your services to be stateless so any instance can handle any request.",
             "keyPoints": [
-              "Vertical — bigger box, no code changes, but limited and risky (SPOF)",
-              "Horizontal — more instances, near-limitless, but needs statelessness",
-              "Move session/cache out of process (Redis), avoid in-memory request state",
-              "Horizontal also enables rolling deploys and fault isolation"
+              "Vertical scaling, putting the application on a bigger machine, requires no code changes and is simple, but it reaches a hard limit and the machine itself is still a single point of failure.",
+              "Horizontal scaling adds more instances behind a load balancer, is effectively limitless in theory, but requires the application to be stateless so requests can be routed to any instance.",
+              "Statelessness means moving session data, user state, and caches out of the application process and into a shared external store like Redis so no instance holds data another instance needs.",
+              "Horizontal scaling also enables rolling deployments with no downtime and provides fault isolation so a single failing instance does not take down the entire service."
             ],
             "redFlags": [
               "Holding session/state in-process while scaling out",
@@ -2393,12 +2393,12 @@
             "feature-flags"
           ],
           "answer": {
-            "oneLiner": "Deploy a new version alongside the old and shift traffic gradually or instantly with a fallback: rolling replaces instances batch by batch, blue-green swaps two full environments, canary sends a small % first, and feature flags decouple release from deploy.",
+            "oneLiner": "Modern deployment strategies give you ways to release new versions with controlled risk and fast rollback. Rolling deployments replace instances gradually, blue-green keeps two full environments ready for an instant switch, canary releases send a small percentage of real traffic to the new version first, and feature flags let you ship code without activating it so you can turn features on and off independently of deployment.",
             "keyPoints": [
-              "Rolling — replace instances in batches; cheap, slower rollback",
-              "Blue-green — two environments, instant switch and instant rollback",
-              "Canary — route a small % to the new version, watch metrics, then ramp",
-              "Feature flags — ship code dark, turn features on independently of deploy"
+              "A rolling deployment replaces instances in batches so the application stays available throughout, but rollback is slower because you have to re-deploy the previous version.",
+              "Blue-green deployment maintains two identical environments and switches traffic from the old to the new instantly, enabling equally instant rollback by switching back.",
+              "A canary release routes a small percentage of production traffic to the new version, monitors key metrics, and only ramps up further if the new version looks healthy.",
+              "Feature flags decouple releasing code from activating features, so you can ship code to all instances in production but keep a feature dark until you are ready to enable it."
             ],
             "detail": "All of these require backward-compatible changes — especially DB migrations must work with both old and new code running at once (expand/contract pattern).",
             "redFlags": [
@@ -2472,12 +2472,12 @@
             "lazy"
           ],
           "answer": {
-            "oneLiner": "Singleton guarantees exactly one instance with a global access point; in modern .NET you almost always express it as a DI singleton registration rather than a hand-rolled static.",
+            "oneLiner": "The Singleton pattern ensures a class has exactly one instance throughout the application's lifetime and provides a global access point to it. It is useful for things like configuration, connection pools, or shared caches where having multiple instances would cause bugs or waste resources. In modern .NET you almost never hand-roll a Singleton with static fields; instead you register it with the dependency injection container as a singleton lifetime.",
             "keyPoints": [
-              "Intent: one shared instance for the whole app lifetime (config, cache, connection pool).",
-              "Thread-safe options: static readonly field, or Lazy<T> with LazyThreadSafetyMode.",
-              "Trade-off: it's a global — hidden coupling and hard to unit-test if accessed statically.",
-              "Prefer services.AddSingleton<T>() so it's injected, mockable, and lifetime-managed."
+              "The intent is to guarantee one shared instance for the entire application lifetime, which is appropriate for things like configuration readers, connection pools, or in-memory caches.",
+              "Thread-safe implementation options include a static readonly field initialised at declaration time, or a Lazy of T with thread-safe mode to defer initialisation until first use.",
+              "The trade-off of a hand-rolled static Singleton is that it becomes hidden global state, making it hard to unit test and creating implicit coupling between classes.",
+              "The preferred approach in modern .NET is to register the type with the dependency injection container using services.AddSingleton so it is injected through constructors, can be mocked in tests, and has its lifetime managed by the container."
             ],
             "detail": "A classic Singleton hides its dependency and makes tests share mutable state. Registering a normal class as AddSingleton gives you the single-instance guarantee while keeping it injectable and replaceable in tests. Singletons must be thread-safe because every request shares them.",
             "code": {
@@ -2551,12 +2551,12 @@
             "object-creation"
           ],
           "answer": {
-            "oneLiner": "Factory Method defers creation of one product to a subclass/method; Abstract Factory creates whole families of related products through one interface so they stay consistent.",
+            "oneLiner": "The Factory Method pattern provides a method or subclass that decides which concrete object to create, hiding the construction details from the caller. The Abstract Factory pattern extends this idea to creating entire families of related objects through a single interface, ensuring that all the objects in a family are compatible with each other. Both patterns centralise and encapsulate the decision of which concrete type to instantiate.",
             "keyPoints": [
-              "Factory Method: one creator method returns one product, chosen by input/subtype.",
-              "Abstract Factory: a factory interface produces a set of related objects (a family).",
-              "Use a factory to hide construction and centralise the 'which concrete type' decision.",
-              "Trade-off: extra abstraction layers; overkill if there's only ever one product type."
+              "Factory Method provides a single creator method that returns one product type, where the choice of concrete product is determined by input or by subclassing.",
+              "Abstract Factory defines an interface that produces a set of related objects, such as all UI components for a theme, ensuring the objects from one factory are always compatible.",
+              "The main benefit of both patterns is hiding the construction logic and centralising the decision about which concrete type to use so that callers depend only on abstractions.",
+              "The trade-off is added abstraction layers and more classes, which can be overkill when there is only ever going to be one product type."
             ],
             "detail": "Factory Method answers 'create the right one product'; Abstract Factory answers 'create a matched set'. In .NET you'll often just use a delegate (Func<T>) or DI with a keyed/named resolver instead of class hierarchies.",
             "code": {
@@ -2630,12 +2630,12 @@
             "immutability"
           ],
           "answer": {
-            "oneLiner": "Builder constructs a complex object step by step through a fluent API, separating how it's assembled from its final representation — ideal when there are many optional parameters.",
+            "oneLiner": "The Builder pattern constructs a complex object step by step through a fluent, readable API, separating the assembly process from the final object's representation. It is most valuable when an object has many optional parameters, because it avoids the problem of constructors with long parameter lists where it is impossible to tell which argument is which at the call site.",
             "keyPoints": [
-              "Intent: avoid telescoping constructors and unreadable long parameter lists.",
-              "Real use: HttpRequestBuilder, WebApplicationBuilder, test data builders, EF model config.",
-              "Often returns an immutable object via a final Build() call.",
-              "Trade-off: more code than a constructor or object initializer; only worth it for genuinely complex assembly."
+              "The intent is to avoid constructors with many parameters, sometimes called telescoping constructors, which make call sites hard to read and maintain.",
+              "Real-world examples include HttpRequestBuilder for building HTTP requests, WebApplicationBuilder in ASP.NET Core, test data builders for creating test fixtures, and Entity Framework's model configuration API.",
+              "Builders typically return an immutable or fully configured object via a final Build method call that validates and seals the object.",
+              "The trade-off is more boilerplate code than a simple constructor or object initialiser, so it is only worth the investment for objects that are genuinely complex to assemble."
             ],
             "detail": "C# object initializers and records with init properties cover many cases, so a full Builder is justified when construction has steps, validation, or optional combinations. .NET itself uses it heavily (WebApplication.CreateBuilder).",
             "code": {
@@ -2709,12 +2709,12 @@
             "records"
           ],
           "answer": {
-            "oneLiner": "Prototype creates new objects by copying an existing instance rather than constructing from scratch — useful when construction is expensive or the configured 'template' is the cheapest source of truth.",
+            "oneLiner": "The Prototype pattern creates new objects by copying an existing configured instance rather than constructing a new one from scratch. This is useful when the initial configuration or construction of an object is expensive or complex, and you can get a valid starting point more cheaply by cloning a known good template.",
             "keyPoints": [
-              "Intent: clone a pre-configured instance instead of rebuilding it.",
-              "Real use: duplicating a complex config/document template, or expensive-to-build objects.",
-              "Beware shallow vs deep copy — reference members are shared unless deep-cloned.",
-              "C# offers records with 'with' expressions for cheap non-destructive copies."
+              "The intent is to clone a pre-configured instance rather than rebuilding one from scratch, saving time or complexity when construction is expensive.",
+              "Real-world uses include duplicating complex configuration objects or document templates where most settings are shared and only a few differ between instances.",
+              "A critical concern is the difference between shallow copy and deep copy: a shallow copy shares any reference-type members with the original, so modifying them in the clone also affects the original.",
+              "In modern C#, records with the with expression syntax provide a clean, compiler-supported way to create non-destructive copies where only specified properties differ from the original."
             ],
             "detail": "MemberwiseClone gives a shallow copy. Records' 'with' expression creates a copy with selected changes (still shallow for reference members). For deep copies, clone nested objects explicitly or serialize/deserialize.",
             "code": {
@@ -2788,12 +2788,12 @@
             "wrapper"
           ],
           "answer": {
-            "oneLiner": "Adapter converts one interface into another the client expects, letting incompatible classes work together — the go-to pattern for wrapping a third-party or legacy API behind your own abstraction.",
+            "oneLiner": "The Adapter pattern converts one interface into another that the client expects, allowing classes with incompatible interfaces to work together. It is the go-to solution for wrapping a third-party library or legacy system behind your own abstraction so the rest of your code is not coupled to external APIs.",
             "keyPoints": [
-              "Intent: make an existing class fit an interface the caller wants.",
-              "Real use: wrapping a vendor SDK (Stripe, SendGrid) behind your IPaymentGateway.",
-              "Keeps third-party types out of your domain — swap vendors by writing a new adapter.",
-              "Trade-off: an extra layer; pure passthrough adapters can feel like boilerplate."
+              "The intent is to make an existing class fit an interface that the caller already expects without modifying either the caller or the existing class.",
+              "A typical real-world use is wrapping a vendor SDK such as Stripe or SendGrid behind your own IPaymentGateway or IEmailSender interface.",
+              "Adapters keep third-party types confined to a single class, which means you can swap vendors by writing a new adapter without touching any business logic.",
+              "The trade-off is an extra indirection layer, and pure passthrough adapters where every method is a one-line delegation can feel like unnecessary boilerplate."
             ],
             "detail": "In Clean Architecture, the adapter lives in Infrastructure and implements an Application-layer interface, so the SDK's types never leak inward. This is also how you write seams for testing around hard-to-mock SDKs.",
             "code": {
@@ -2869,12 +2869,12 @@
             "api-design"
           ],
           "answer": {
-            "oneLiner": "Facade provides a single simplified entry point over a complicated subsystem, hiding its moving parts so clients call one easy method instead of orchestrating many classes.",
+            "oneLiner": "The Facade pattern provides a single simplified interface over a complex subsystem, hiding its internal moving parts so that clients only need to interact with one easy entry point. It does not change what the subsystem can do, it just provides a more convenient and higher-level way to use it.",
             "keyPoints": [
-              "Intent: reduce coupling between clients and a complex set of classes.",
-              "Real use: an OrderService that hides inventory, payment, shipping, and notification steps.",
-              "Doesn't change the subsystem's interfaces — just offers a higher-level one.",
-              "Trade-off: can become a god object if it accumulates logic instead of just delegating."
+              "The intent is to reduce the coupling between clients and a complex set of classes by providing one unified entry point.",
+              "A common real-world example is an OrderService that hides the coordination of inventory checks, payment processing, shipping scheduling, and notification sending behind a single PlaceOrder method.",
+              "The Facade does not change the interfaces of the underlying classes; it simply provides a higher-level interface that delegates to them.",
+              "The risk is that the Facade becomes a god object that accumulates business logic itself instead of simply delegating, which should be avoided by keeping it thin."
             ],
             "detail": "A Facade orchestrates and delegates; it shouldn't hold business rules itself. Application-layer use-case handlers often act as facades over domain services and infrastructure.",
             "code": {
@@ -2950,12 +2950,12 @@
             "open-closed"
           ],
           "answer": {
-            "oneLiner": "Decorator wraps an object in another object with the same interface to add behaviour at runtime — composing features instead of exploding subclasses.",
+            "oneLiner": "The Decorator pattern wraps an object with another object that implements the same interface, transparently adding new behaviour before or after delegating to the original. It lets you compose features at runtime rather than baking them into subclasses, avoiding a combinatorial explosion of subclass variants for every combination of features.",
             "keyPoints": [
-              "Intent: add responsibilities (logging, caching, retry) without modifying the original.",
-              "Both decorator and target share the same interface, so wrapping is transparent.",
-              "Beats inheritance: you stack features dynamically and avoid class explosion.",
-              "Trade-off: many small wrappers and longer stack traces; order of wrapping matters."
+              "The intent is to add responsibilities such as logging, caching, or retry logic to an object without modifying its source code.",
+              "Both the decorator and the original target implement the same interface, which makes the wrapping transparent to any code that holds a reference to the interface.",
+              "This approach beats inheritance because you can stack multiple decorators in any combination dynamically at runtime without creating a separate subclass for each combination.",
+              "The trade-off is that many small wrapper classes can make code harder to navigate, stack traces become longer, and the order in which decorators are applied matters and can be subtle."
             ],
             "detail": "Cross-cutting concerns are the classic use: wrap a service in a caching decorator, then a logging decorator, then a retry decorator. .NET DI supports this via Scrutor's .Decorate<T>() or manual registration.",
             "code": {
@@ -3030,12 +3030,12 @@
             "interception"
           ],
           "answer": {
-            "oneLiner": "Proxy provides a stand-in with the same interface as the real object to control access to it — adding lazy loading, access control, caching, or remote calls transparently.",
+            "oneLiner": "The Proxy pattern provides a stand-in object that shares the same interface as the real object and controls access to it. The proxy can add behaviour like lazy loading, access control, caching, or network transparency without the caller knowing it is not talking directly to the real object.",
             "keyPoints": [
-              "Intent: control access to an object via a surrogate sharing its interface.",
-              "Types: virtual (lazy init), protection (auth), remote (network), caching.",
-              "Real use: EF Core lazy-loading proxies, gRPC/HTTP client proxies, Castle DynamicProxy.",
-              "Trade-off: hidden indirection and surprising costs (a property access triggers a DB hit)."
+              "The intent is to provide a surrogate that controls access to a real object, adding behaviour around that access transparently.",
+              "Common proxy types include virtual proxies for lazy initialisation, protection proxies for access control, remote proxies that hide network calls, and caching proxies.",
+              "Real-world examples include Entity Framework Core lazy-loading proxies, auto-generated gRPC and HTTP client proxies, and Castle DynamicProxy used by some DI containers for interception.",
+              "The trade-off is hidden indirection that can produce surprising costs, for example a property access on a lazy-loading proxy transparently triggering a database query."
             ],
             "detail": "Decorator adds behaviour; Proxy controls access (often deciding whether/when to call the real object at all). EF Core's lazy-loading proxies are the canonical .NET example — and a classic N+1 source.",
             "code": {
@@ -3111,12 +3111,12 @@
             "switch-replacement"
           ],
           "answer": {
-            "oneLiner": "Strategy defines a family of interchangeable algorithms behind a common interface and lets you select one at runtime — the canonical way to replace a growing if/switch on a type.",
+            "oneLiner": "The Strategy pattern defines a family of algorithms or business rules, each in its own class behind a common interface, and selects which one to use at runtime. It is the canonical replacement for a growing if-else chain or switch statement that branches on a type or category, because adding a new option means adding a new class rather than editing existing logic.",
             "keyPoints": [
-              "Intent: encapsulate each algorithm/variant in its own class behind one interface.",
-              "Real use: payment providers, pricing/discount rules, shipping cost calculators, export formats.",
-              "Open/Closed: add a new strategy by adding a class, not editing a switch.",
-              "Trade-off: more classes; for two trivial branches a switch may be clearer."
+              "The intent is to encapsulate each variant of an algorithm or business rule in its own class that implements a shared interface, making each interchangeable.",
+              "Real-world uses include selecting between payment providers, applying different pricing or discount rules, calculating shipping costs, or exporting data in different formats.",
+              "The pattern supports the Open-Closed Principle: you add new strategies by adding new classes without editing any existing switch statement or condition.",
+              "The trade-off is more classes in the codebase, and for very simple cases with only two trivial branches a plain conditional may be clearer and less over-engineered."
             ],
             "detail": "In .NET you register strategies in DI and resolve by key (keyed services in .NET 8) or via a dictionary/Func map. This kills the 'switch that everyone edits' and isolates each variant for testing.",
             "code": {
@@ -3192,12 +3192,12 @@
             "reactive"
           ],
           "answer": {
-            "oneLiner": "Observer lets a subject notify many subscribers automatically when its state changes; in C# it's built in via events/delegates and, for streams, via IObservable<T>/Rx.",
+            "oneLiner": "The Observer pattern lets a subject notify an open-ended list of subscribers whenever its state changes, without the subject needing to know anything about the specific subscribers. In C#, events and delegates are a first-class language-level implementation of Observer, and for asynchronous push streams the IObservable and IObserver interfaces from the Reactive Extensions library provide a more powerful version.",
             "keyPoints": [
-              "Intent: one-to-many notification without the subject knowing concrete subscribers.",
-              "C# events are the language-level Observer; subscribers += handlers.",
-              "IObservable<T>/IObserver<T> (Rx) handle async push streams with completion/error.",
-              "Trade-off: lapsed-listener memory leaks if you forget to unsubscribe; ordering is non-deterministic."
+              "The intent is to establish a one-to-many notification relationship where the subject broadcasts state changes without being coupled to concrete subscriber types.",
+              "C# events are the built-in Observer implementation; subscribers attach by using the plus-equals operator to add a handler and detach with minus-equals.",
+              "IObservable of T and IObserver of T from Reactive Extensions handle asynchronous push streams and support completion and error signals in addition to regular notifications.",
+              "The trade-off is the lapsed-listener problem: if subscribers forget to unsubscribe, the subject holds a reference to them and prevents garbage collection, causing a memory leak."
             ],
             "detail": "For in-process domain notifications, MediatR INotification is a clean Observer (one event, many handlers). C# events are great for UI/component decoupling; Rx shines for event streams (debounce, throttle, merge).",
             "code": {
@@ -3273,12 +3273,12 @@
             "cqrs"
           ],
           "answer": {
-            "oneLiner": "Mediator centralises communication so components talk through a hub instead of referencing each other; MediatR is the de facto .NET implementation, routing request objects to handlers.",
+            "oneLiner": "The Mediator pattern reduces coupling between components by having them communicate through a central hub rather than directly with each other. This turns a tangled many-to-many communication web into a cleaner many-to-one structure. MediatR is the standard .NET implementation, routing strongly-typed request objects to their registered handlers.",
             "keyPoints": [
-              "Intent: reduce many-to-many coupling to many-to-one through a mediator.",
-              "MediatR: IMediator.Send routes a request to its single IRequestHandler.",
-              "Pipeline behaviours add validation/logging/transactions around handlers.",
-              "Trade-off: indirection hides who handles what; overkill for a few endpoints."
+              "The intent is to reduce many-to-many coupling between components by routing all communication through a single mediator object.",
+              "In MediatR, calling IMediator.Send with a request object routes it to the single registered IRequestHandler for that request type.",
+              "Pipeline behaviours wrap the handler execution and allow validation, logging, transaction management, and other cross-cutting concerns to be applied consistently around every request.",
+              "The trade-off is that the indirection hides the relationship between a request and its handler, making the flow harder to follow, and the pattern adds unnecessary complexity in simple applications."
             ],
             "detail": "This is the same Mediator covered in the architecture patterns set, viewed as a GoF pattern: the controller sends a command object and never knows the handler. Its real power in .NET is the IPipelineBehavior chain (itself Decorator).",
             "code": {
@@ -3356,12 +3356,12 @@
             "queueing"
           ],
           "answer": {
-            "oneLiner": "Command encapsulates a request as an object, letting you parameterise, queue, log, and undo operations — decoupling the invoker from the receiver that performs the work.",
+            "oneLiner": "The Command pattern encapsulates a request as a first-class object, bundling the action and all its data together. This decouples the code that initiates an operation from the code that executes it and enables powerful capabilities like queuing, logging, and undo because commands are objects that can be stored, passed around, and replayed.",
             "keyPoints": [
-              "Intent: turn an action plus its data into a first-class object.",
-              "Enables queueing, retrying, logging, and undo/redo of operations.",
-              "Real use: MediatR commands, background job payloads, ICommand in WPF/MVVM.",
-              "Trade-off: a class per action; trivial actions don't need the ceremony."
+              "The intent is to turn an action and its associated data into a first-class object so the operation can be stored, passed, queued, and inspected.",
+              "Encapsulating operations as objects enables queuing for background processing, retry logic, audit logging, and undo-redo functionality.",
+              "Real-world uses include MediatR command objects for CQRS, background job payloads in libraries like Hangfire, and the ICommand interface in WPF and MVVM-based frameworks.",
+              "The trade-off is a proliferation of small classes with one class per action, which adds ceremony and is not justified for simple fire-and-forget operations."
             ],
             "detail": "Because the request is an object, you can store it (audit/outbox), put it on a queue (background processing), or keep a history (undo). MediatR commands and Hangfire/Azure job payloads are everyday examples.",
             "code": {
@@ -3437,12 +3437,12 @@
             "strategy"
           ],
           "answer": {
-            "oneLiner": "Template Method defines the skeleton of an algorithm in a base class and lets subclasses override specific steps without changing the overall structure.",
+            "oneLiner": "The Template Method pattern defines the overall skeleton of an algorithm in a base class and lets subclasses fill in specific steps by overriding designated methods, without being able to change the overall structure. It is a way of enforcing a fixed process while allowing controlled variation in the details.",
             "keyPoints": [
-              "Intent: fix the algorithm's outline, vary the individual steps via overrides.",
-              "Real use: import/ETL pipelines, request handlers with fixed phases, test fixtures.",
-              "Uses inheritance (override hook methods); Strategy uses composition (inject behaviour).",
-              "Trade-off: inheritance is rigid — favour Strategy when you need runtime swapping."
+              "The intent is to fix the overall structure of an algorithm in one place while allowing individual steps to be overridden by subclasses.",
+              "Real-world uses include import and ETL pipelines where the phases are fixed but the transformation logic varies, request handlers with defined phases, and shared test fixture setup.",
+              "Template Method uses inheritance to vary behaviour by overriding hook methods, whereas Strategy uses composition by injecting a behaviour object from outside.",
+              "The trade-off is that inheritance is a rigid coupling: if you need to swap behaviour at runtime or compose multiple variations, the Strategy pattern is more flexible."
             ],
             "detail": "Template Method is compile-time variation through inheritance; Strategy is runtime variation through composition. Many teams now prefer Strategy/DI, but Template Method is clean when the steps are tightly bound to a fixed sequence.",
             "code": {
@@ -3517,12 +3517,12 @@
             "aspnet-core"
           ],
           "answer": {
-            "oneLiner": "Chain of Responsibility passes a request along a chain of handlers, each deciding to process it and/or pass it to the next — decoupling sender from the eventual handler.",
+            "oneLiner": "The Chain of Responsibility pattern passes a request along a sequence of handlers where each handler decides independently whether to process the request, transform it, or pass it to the next handler in the chain. This decouples the sender from knowing which handler will ultimately process the request.",
             "keyPoints": [
-              "Intent: let multiple handlers get a shot at a request without the sender knowing which handles it.",
-              "Each handler either handles, transforms, or forwards to the next.",
-              "Real use: ASP.NET Core middleware pipeline, MediatR behaviours, validation chains, approval workflows.",
-              "Trade-off: a request can fall through unhandled; ordering is significant."
+              "The intent is to give multiple handlers a chance to process a request without the sender needing to know which handler will ultimately handle it.",
+              "Each handler in the chain can handle the request and stop the chain, transform the request and pass it on, or simply forward it unchanged to the next handler.",
+              "Real-world uses include ASP.NET Core middleware pipeline, MediatR pipeline behaviours, validation chains, and approval workflow systems.",
+              "The trade-off is that a request can pass through the entire chain without being handled by anyone, and the order in which handlers are registered matters significantly."
             ],
             "detail": "ASP.NET Core middleware is the textbook example: each component does work, then calls next() or short-circuits. The same shape appears in MediatR pipeline behaviours and DelegatingHandler chains for HttpClient.",
             "code": {
@@ -3597,12 +3597,12 @@
             "enterprise"
           ],
           "answer": {
-            "oneLiner": "Dependency Injection is a pattern for supplying a class's dependencies from outside rather than newing them up inside — the practical realisation of the Dependency Inversion Principle.",
+            "oneLiner": "Dependency Injection is a pattern where a class receives its dependencies from an external source rather than creating them internally. This makes the class depend on abstractions rather than concrete implementations and is the practical application of the Dependency Inversion Principle. A dependency injection container automates the wiring so you declare what you need and the container provides it.",
             "keyPoints": [
-              "Intent: invert control of construction so classes depend on abstractions, passed in.",
-              "Constructor injection is the default; the container just automates wiring.",
-              "Lifetimes: Transient (per resolve), Scoped (per request), Singleton (per app).",
-              "Trade-off: indirection and a learning curve; captive dependencies bite (Scoped into Singleton)."
+              "The intent is to invert control of construction: instead of a class newing up its own dependencies, those dependencies are passed in, making the class depend on interfaces rather than concrete types.",
+              "Constructor injection is the recommended default approach because it makes dependencies explicit and visible; the container simply automates the wiring by matching registered types.",
+              "Service lifetimes control how long an instance lives: Transient creates a new instance every time it is resolved, Scoped creates one per HTTP request, and Singleton creates one for the application's entire lifetime.",
+              "The main pitfall is captive dependencies, where a Singleton holds a reference to a Scoped service, which causes the Scoped service to outlive the scope it was intended for and can lead to incorrect behaviour."
             ],
             "detail": "DI is a pattern even without a container — you can hand-wire constructors. The built-in Microsoft.Extensions.DependencyInjection container just resolves the graph. Getting lifetimes right is the main real-world gotcha.",
             "code": {
@@ -3678,12 +3678,12 @@
             "validation"
           ],
           "answer": {
-            "oneLiner": "The Options pattern binds configuration sections to strongly-typed classes injected via IOptions<T>, giving type safety, validation, and clean separation from how config is loaded.",
+            "oneLiner": "The Options pattern in ASP.NET Core binds configuration sections from appsettings.json or environment variables to strongly-typed classes that are injected through the constructor. This gives you type safety and the ability to validate configuration at startup rather than discovering a missing key at runtime when it is actually used.",
             "keyPoints": [
-              "Intent: turn loosely-typed config into validated, strongly-typed objects.",
-              "IOptions<T> (singleton snapshot), IOptionsSnapshot<T> (per-request reload), IOptionsMonitor<T> (live change notifications).",
-              "Supports DataAnnotations validation and ValidateOnStart for fail-fast config.",
-              "Trade-off: more setup than reading a key; chosen interface affects reload behaviour."
+              "The intent is to convert loosely-typed configuration key-value pairs into validated, strongly-typed objects that are easy to consume and refactor.",
+              "IOptions of T provides a singleton snapshot of configuration read once at startup, IOptionsSnapshot of T reloads per request, and IOptionsMonitor of T provides live change notifications for long-running processes.",
+              "The Options pattern supports DataAnnotations-based validation on the settings class and the ValidateOnStart option causes the application to fail immediately at startup if configuration is invalid.",
+              "The trade-off is more setup than reading a configuration key directly with a string, and choosing the wrong interface between IOptions, IOptionsSnapshot, and IOptionsMonitor will affect whether your service sees live configuration changes."
             ],
             "detail": "It follows Interface Segregation and DIP — consumers depend on a small typed options object, not the whole IConfiguration. Use IOptionsSnapshot to pick up changes per request, IOptionsMonitor for background services.",
             "code": {
@@ -3765,12 +3765,12 @@
             "ef-core"
           ],
           "answer": {
-            "oneLiner": "It's a lost-update race; add a concurrency token (RowVersion) so the second SaveChanges fails with a concurrency exception instead of silently overwriting.",
+            "oneLiner": "This is a classic lost-update race condition where two concurrent users read the same data, both see availability, and both write a decrement, with the second write silently overwriting the first. The solution is to add a concurrency token like a RowVersion column so that the second update sees no matching row and fails with a concurrency exception rather than corrupting data.",
             "keyPoints": [
-              "Both reads see 1 seat left, both decrement - the second write clobbers the first (lost update).",
-              "Add a RowVersion/concurrency token; EF Core includes it in the WHERE clause on UPDATE.",
-              "First commit wins; the loser matches 0 rows and throws DbUpdateConcurrencyException - catch, reload, retry or reject.",
-              "Alternatives: a pessimistic lock (SELECT ... FOR UPDATE) or an atomic conditional UPDATE."
+              "Both requests read the same seat count simultaneously, both decrement locally, and the second write overwrites the first result, meaning a seat that was already taken is sold again.",
+              "Adding a RowVersion or concurrency token column causes Entity Framework Core to include that value in the WHERE clause of every UPDATE, so it only succeeds if the row has not changed since it was read.",
+              "The first writer commits successfully, but the second writer's UPDATE matches zero rows because the RowVersion has changed, causing Entity Framework to throw a DbUpdateConcurrencyException which you catch and handle.",
+              "Alternative approaches include a pessimistic lock using a SELECT FOR UPDATE query to block concurrent reads, or an atomic conditional UPDATE that decrements only when the current value is still greater than zero."
             ],
             "detail": "EF Core reads the row and keeps the original snapshot. On SaveChanges it issues UPDATE ... WHERE Id=@id AND RowVersion=@original. Whoever commits first bumps the version, so the loser's WHERE matches nothing, EF sees 0 affected rows and raises a concurrency exception - then you reload the current state and decide whether to retry or tell the user it's sold out.",
             "redFlags": [
@@ -3843,12 +3843,12 @@
             "at-least-once"
           ],
           "answer": {
-            "oneLiner": "Make the write idempotent with a client-supplied idempotency key the server stores, so a retry returns the original result instead of charging again.",
+            "oneLiner": "When a network request times out, the client cannot know whether the server processed it or not, so it retries, and without protection that can result in charging a customer twice. The solution is idempotency: the client supplies a unique key per logical operation and the server uses it to detect and short-circuit duplicate requests, returning the original result instead of processing again.",
             "keyPoints": [
-              "Networks give at-least-once delivery, so retries are inevitable - writes must be idempotent.",
-              "The client sends a unique Idempotency-Key header per logical operation.",
-              "The server stores key + result; a repeat key replays the saved response and skips processing.",
-              "Persist the key in the same transaction as the charge so they commit atomically."
+              "Networks guarantee at-least-once delivery in the sense that a timeout does not mean the request failed, so retries are inevitable and writes must be designed to be safe when duplicated.",
+              "The client generates a unique idempotency key, such as a UUID, for each logical operation and sends it as a header or field with every attempt of that operation.",
+              "The server stores the key along with the result; when the same key arrives again it returns the stored result immediately without re-executing the charge or any other side effect.",
+              "The key and the result must be persisted in the same database transaction as the charge itself so they are always in sync and there is no window where one exists without the other."
             ],
             "detail": "On the first request you insert the idempotency key behind a unique constraint and process the charge in one transaction. A retry hits the duplicate key, so you skip the charge and replay the stored response. The key is owned by the client (stable across retries), scoped per operation, and expires via TTL.",
             "redFlags": [
@@ -3916,12 +3916,12 @@
             "distributed"
           ],
           "answer": {
-            "oneLiner": "Keep the counter in a shared fast store like Redis, keyed per API key, using a token-bucket or sliding-window algorithm enforced at the gateway.",
+            "oneLiner": "Rate limiting needs to be enforced across all instances of your API, so per-server counters do not work because a client can simply spread requests across servers to bypass the limit. The solution is a central atomic counter in a fast shared store like Redis, keyed per API client and time window, enforced at the API gateway before requests reach downstream services.",
             "keyPoints": [
-              "Per-server counters don't work - a client spread across N servers gets N times the limit.",
-              "Use a central atomic counter in Redis keyed by api-key + window.",
-              "Token bucket smooths bursts; sliding window gives accurate per-window counts.",
-              "Enforce at the gateway before work hits downstream services; return 429 + Retry-After."
+              "Per-server counters fail because a client hitting multiple instances effectively gets the limit multiplied by the number of instances, defeating the purpose of rate limiting.",
+              "Use a central atomic counter in Redis keyed by the API key combined with the current time window so all instances share the same count.",
+              "The token bucket algorithm smooths out traffic bursts by allowing short-term burst headroom, while the sliding window algorithm provides more accurate per-window counts.",
+              "Rate limiting should be enforced at the API gateway level so that requests exceeding the limit are rejected with a 429 Too Many Requests response and a Retry-After header before any downstream work is done."
             ],
             "detail": "Use an atomic Redis operation - INCR with EXPIRE, or a Lua script for a token bucket - so two concurrent requests can't both pass the limit. A sliding-window counter is a good accuracy/cost balance. On a Redis outage you choose fail-open (protect availability) or fail-closed (protect the backend) deliberately.",
             "redFlags": [
@@ -3989,12 +3989,12 @@
             "microservices"
           ],
           "answer": {
-            "oneLiner": "Use a Saga - a sequence of local transactions with compensating actions that undo earlier steps when a later one fails, accepting eventual consistency.",
+            "oneLiner": "When a business operation spans multiple microservices, there is no single distributed transaction that can guarantee atomicity across all of them reliably. The Saga pattern solves this by breaking the operation into a sequence of local transactions where each step can be undone by a compensating transaction if a later step fails, achieving eventual consistency.",
             "keyPoints": [
-              "There's no distributed ACID across services; two-phase commit is fragile and blocks.",
-              "A Saga is a local transaction per service plus a compensating action to roll it back.",
-              "Choreography (events) suits simple flows; orchestration (a coordinator) suits complex ones.",
-              "The end state is eventually consistent - make every step and compensation idempotent."
+              "There is no reliable distributed ACID transaction across independent microservices, and two-phase commit is fragile under failure conditions and blocks resources across services.",
+              "A Saga consists of one local transaction per service, each of which can succeed or fail independently, plus a compensating action that reverses that step's effect if needed.",
+              "Choreography suits simpler flows where each service reacts to events from the previous step; orchestration suits complex flows where a central coordinator explicitly directs each participant.",
+              "Every step and every compensating transaction must be designed to be idempotent because the Saga coordinator may need to retry them, and the overall outcome is eventually consistent rather than immediately consistent."
             ],
             "detail": "If payment succeeds but shipping fails, you run compensations in reverse - refund, release inventory. Orchestration centralizes the workflow in one service that issues commands and reacts to replies; choreography has services react to each other's events. Steps and compensations must be idempotent because messages can repeat.",
             "redFlags": [
@@ -4063,12 +4063,12 @@
             "cdc"
           ],
           "answer": {
-            "oneLiner": "It's the dual-write problem; use the Transactional Outbox - write the event to an outbox table in the same DB transaction, then a relay publishes it.",
+            "oneLiner": "When saving a database record and publishing an event to a message broker in the same operation, you cannot do both atomically because they are two separate systems. The Transactional Outbox pattern solves this by writing the event to an outbox table in the same database transaction as the business data, and having a separate relay process publish it to the broker after the transaction commits.",
             "keyPoints": [
-              "Writing to the DB and the broker separately can't be atomic - either can fail after the other.",
-              "Outbox: insert the event into an outbox table inside the order's transaction.",
-              "A background relay or CDC reads the outbox and publishes to the broker, marking rows sent.",
-              "Delivery is at-least-once, so consumers must de-dupe."
+              "Writing to the database and to the message broker are two separate operations and either can fail after the other succeeds, leaving the system in an inconsistent state.",
+              "The Outbox pattern inserts the event into an outbox table in the same database transaction as the order or other business entity, making the two writes atomic together.",
+              "A background relay process or a change data capture mechanism reads committed outbox rows and publishes them to the broker, then marks the rows as sent.",
+              "Because the relay may publish a message more than once before marking it sent, consumers must be designed to deduplicate and handle receiving the same message multiple times."
             ],
             "detail": "Because the order row and the outbox row commit together, you never lose an event. A poller or change-data-capture process ships outbox rows to the broker and retries until acknowledged. Since the relay can re-publish after a crash, delivery is at-least-once and consumers must be idempotent.",
             "redFlags": [
@@ -4137,12 +4137,12 @@
             "idempotency"
           ],
           "answer": {
-            "oneLiner": "Coordinate with a distributed lock or lease - one instance acquires it and runs the job; the others see it's held and skip.",
+            "oneLiner": "When multiple instances of a service each have their own scheduler, a scheduled job will fire once per instance rather than once total. The solution is to use a distributed lock or lease in a shared store so that whichever instance acquires the lock runs the job while all others see it is held and skip that execution.",
             "keyPoints": [
-              "Each instance has its own scheduler, so without coordination the job fires N times.",
-              "Use a shared lock/lease: a row with a unique constraint, or a Redis lock with a TTL.",
-              "The lock must auto-expire so a crashed holder doesn't block the job forever.",
-              "Make the job idempotent anyway as a safety net."
+              "Without coordination, every application instance runs its own scheduler independently, causing the job to execute once per instance simultaneously.",
+              "Use a shared lock or lease such as a database row with a unique constraint or a Redis lock with a time-to-live so only one instance can hold the right to run the job at a time.",
+              "The lock must have an automatic expiry time so that if the instance holding it crashes or hangs, another instance can acquire it after the expiry and the job is not blocked permanently.",
+              "The job itself should also be designed to be idempotent as a safety net, so that even if it runs more than once due to a race at lock expiry, the result is still correct."
             ],
             "detail": "A simple version is an atomic acquire - INSERT a lock row, or SET NX with an expiry in Redis; whoever wins runs, the others back off. The TTL stops a dead holder from deadlocking the job, and for long jobs you renew the lease. Don't rely on the lock alone - keep the work idempotent.",
             "redFlags": [
@@ -4210,12 +4210,12 @@
             "read-heavy"
           ],
           "answer": {
-            "oneLiner": "Map a short code to the long URL in a key-value store; generate codes by base62-encoding a unique id, and serve cache-backed redirects.",
+            "oneLiner": "A URL shortener's core data model is a simple mapping from a short code to a long URL, and because reads vastly outnumber writes, the architecture is optimised primarily for fast lookups with heavy caching. Short codes are typically generated by base-62-encoding a unique numeric identifier, and responses use HTTP redirects to send the browser to the original URL.",
             "keyPoints": [
-              "The core is a code -> long-URL lookup, and reads vastly outnumber writes.",
-              "Generate codes by base62-encoding a unique counter/id, or hash + a collision check.",
-              "Cache hot codes (Redis/CDN) and return a 301/302 redirect.",
-              "Scale reads with caching and replicas; partition by code if needed."
+              "The core data access pattern is a key-value lookup from short code to long URL, and the read-to-write ratio is extremely high so the system is optimised for reads.",
+              "Short codes are generated by base-62 encoding a unique counter or auto-incrementing identifier, or alternatively by hashing the long URL and checking for collisions.",
+              "Hot short codes should be cached aggressively in Redis or at the CDN layer, and the redirect should use a 301 permanent redirect for caching or a 302 temporary redirect if click analytics are needed.",
+              "At very high scale, reads can be served from read replicas or a CDN, and the key-value store can be partitioned by code if a single node cannot handle the lookup throughput."
             ],
             "detail": "A 7-character base62 code gives about 3.5 trillion combinations. Encoding a unique auto-increment id avoids collisions entirely, whereas hashing needs a uniqueness check. Redirects are the hot path, so cache aggressively and keep the store a simple key-value lookup; push click analytics off the redirect path onto a queue.",
             "redFlags": [

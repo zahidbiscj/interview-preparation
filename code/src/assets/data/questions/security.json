@@ -19,12 +19,14 @@
             "checklist"
           ],
           "answer": {
-            "oneLiner": "Layer it: authenticate and authorize every endpoint, force HTTPS/HSTS, validate all input, lock down CORS, rate-limit, and add security headers.",
+            "oneLiner": "Securing a public API is about layering defenses so that if one control fails, another catches the attacker. You start at the identity layer — every endpoint must authenticate and authorize the caller, defaulting to deny — then you force HTTPS with HSTS, validate and encode all input and output, lock CORS to a strict whitelist, and add rate limiting plus security response headers. Finally, you put a WAF in front as a catch-all for known attack patterns, and you make sure database accounts and secrets follow least privilege so the blast radius of any breach is contained.",
             "keyPoints": [
-              "AuthN + AuthZ on every endpoint (deny by default)",
-              "HTTPS + HSTS, input validation, output encoding",
-              "CORS whitelist, rate limiting / throttling, WAF in front",
-              "Versioning + least-privilege DB and secrets"
+              "Authenticate and authorize every endpoint and deny by default, so a forgotten attribute fails closed rather than leaving an open endpoint.",
+              "Force HTTPS everywhere and add HSTS so browsers never attempt a plaintext connection to your API.",
+              "Validate all input server-side and encode all output — client-side validation is UX only, never a security control.",
+              "Lock CORS to a whitelist of specific origins rather than using a wildcard, and add rate limiting at both the gateway and app layers.",
+              "Add security response headers such as Content-Security-Policy and X-Content-Type-Options to harden browser behavior.",
+              "Apply least privilege to database accounts and secrets, and put a WAF in front as defense-in-depth against known attack patterns."
             ],
             "redFlags": [
               "Relying only on HTTPS",
@@ -89,12 +91,12 @@
             "config"
           ],
           "answer": {
-            "oneLiner": "CORS is a browser mechanism that controls which origins may call your API via response headers; configure it with a strict origin whitelist, never a wildcard with credentials.",
+            "oneLiner": "CORS is a browser-enforced mechanism that controls which external origins are allowed to call your API — it works by the browser checking response headers before allowing a cross-origin request to complete. By default browsers block cross-origin calls, and CORS is what you use to relax that restriction in a controlled way. In ASP.NET Core you configure it by registering a named policy that whitelists only the specific origins, methods, and headers your frontend needs, and you never combine a wildcard origin with credentials because that would let any website on the internet send your users' cookies to your API.",
             "keyPoints": [
-              "Browser-enforced, not server security — it relaxes same-origin policy",
-              "Use `AddCors` + `UseCors` with a named policy",
-              "Whitelist specific origins/methods/headers",
-              "Never combine `AllowAnyOrigin()` with `AllowCredentials()`"
+              "CORS is enforced by the browser, not the server — a non-browser client like Postman or curl ignores it entirely, so it is not a substitute for server-side authorization.",
+              "It relaxes the browser's same-origin policy, which by default blocks a page on one domain from making requests to a different domain.",
+              "In ASP.NET Core you use AddCors and UseCors with a named policy, and you whitelist only the specific origins, methods, and headers your app needs.",
+              "Never combine AllowAnyOrigin with AllowCredentials — ASP.NET Core actually throws an exception for this combination because it would allow any website to make authenticated requests using the user's cookies."
             ],
             "code": {
               "lang": "csharp",
@@ -163,12 +165,13 @@
             "injection"
           ],
           "answer": {
-            "oneLiner": "XSS is injecting malicious script into a page so it runs in another user's browser; prevent it with context-aware output encoding and a Content-Security-Policy.",
+            "oneLiner": "Cross-site scripting, or XSS, happens when an attacker manages to get malicious JavaScript to run inside another user's browser in the context of your website — for example, if a comment field stores a script tag that executes when other users view the page, the attacker can steal their session cookies or impersonate them. The core defense is context-aware output encoding, which means you encode user-supplied text differently depending on where it appears in the page — in HTML, in an attribute, in JavaScript, or in a URL — so the browser always treats it as data rather than executable code. You layer on a Content-Security-Policy header to restrict which script sources the browser is allowed to run, and you mark session cookies as HttpOnly so that even if XSS slips through, injected scripts cannot read them.",
             "keyPoints": [
-              "Stored, reflected, and DOM-based variants",
-              "Encode output for its context (HTML/attr/JS/URL)",
-              "Razor auto-encodes; avoid `Html.Raw` on untrusted data",
-              "Add CSP and use HttpOnly cookies to limit impact"
+              "There are three main variants: stored XSS where the payload is saved in the database and served to all users, reflected XSS where it comes back in the response from a URL parameter, and DOM-based XSS where the payload never reaches the server but gets injected into the page entirely in the browser.",
+              "The correct fix is context-aware output encoding — HTML-encode when writing into HTML, attribute-encode for HTML attributes, JavaScript-encode for script contexts — because simply blocking script tags misses dozens of other injection vectors.",
+              "Razor in ASP.NET Core encodes output by default, which is why you should avoid Html.Raw on any untrusted data since it bypasses that protection entirely.",
+              "A Content-Security-Policy header restricts which script sources the browser will load, so even if encoding is missed somewhere, injected or inline scripts are blocked.",
+              "Mark session cookies as HttpOnly so that even a successful XSS attack cannot read the cookie and hijack the session."
             ],
             "redFlags": [
               "Blacklisting `<script>` only",
@@ -232,12 +235,13 @@
             "cookies"
           ],
           "answer": {
-            "oneLiner": "CSRF tricks a logged-in user's browser into sending an unwanted authenticated request; prevent it with antiforgery tokens and SameSite cookies.",
+            "oneLiner": "Cross-site request forgery tricks a logged-in user's browser into sending a request to your site that the user never intended — for example, a malicious page might embed an image tag whose URL is your bank's transfer endpoint, and the browser silently attaches the user's session cookie when loading it. The attack works because browsers automatically include cookies on any matching request, regardless of which page triggered it. You prevent it by including an antiforgery token — a secret value the malicious page cannot read — in every state-changing request, and by setting your cookies with SameSite=Lax or Strict so the browser refuses to send them on cross-site requests in the first place.",
             "keyPoints": [
-              "Only affects cookie/credential-based auth (browser auto-sends)",
-              "Use antiforgery tokens (`[ValidateAntiForgeryToken]`)",
-              "Set cookies `SameSite=Lax/Strict` + `Secure`",
-              "Token-in-header APIs (Bearer) are largely immune"
+              "CSRF only affects authentication mechanisms where the browser automatically attaches credentials, which means session cookies — APIs that use a Bearer token in the Authorization header are largely immune because the browser does not add that header automatically on cross-site requests.",
+              "The antiforgery token defense works by embedding a secret value in the page that the server issued — a cross-site attacker cannot read it due to the same-origin policy, so they cannot forge a valid request.",
+              "In ASP.NET Core you protect state-changing actions with the ValidateAntiForgeryToken attribute, which automatically validates the token on POST, PUT, and DELETE requests.",
+              "Setting cookies with SameSite=Lax prevents the browser from sending them on cross-site requests at all, which is the most modern and effective defense and works alongside antiforgery tokens.",
+              "HTTPS does not prevent CSRF — it only encrypts the traffic in transit, but the attack relies on the browser sending the cookie, not on anyone reading the wire."
             ],
             "redFlags": [
               "Thinking HTTPS stops CSRF",
@@ -301,12 +305,13 @@
             "ef"
           ],
           "answer": {
-            "oneLiner": "Never concatenate user input into queries — use parameterized queries or an ORM that parameterizes, plus least-privilege DB accounts.",
+            "oneLiner": "SQL injection happens when an attacker puts SQL code into a form field or URL parameter and your app blindly includes that text in a database query — for example, entering a value like ' OR '1'='1 into a login box can bypass authentication entirely if the query is built by string concatenation. The fix is to use parameterized queries or prepared statements, which tell the database driver to always treat user input as data rather than part of the SQL command itself. Entity Framework's LINQ queries are parameterized by default, which is one reason using an ORM correctly is safer than writing raw SQL strings.",
             "keyPoints": [
-              "Parameterized commands / EF LINQ are parameterized",
-              "Use `FromSqlInterpolated` not string concat in EF",
-              "Least-privilege DB user, no `sa`/`db_owner`",
-              "Validate input and put a WAF in front as defense-in-depth"
+              "Never build SQL strings by concatenating user input directly — even something as simple as a search box becomes an injection point if the input is not parameterized.",
+              "Parameterized commands and Entity Framework LINQ queries send the user input separately from the SQL command, so the database engine cannot interpret it as code.",
+              "In Entity Framework, FromSqlInterpolated is safe because it parameterizes the C# interpolation automatically, but FromSqlRaw with a concatenated string is just as dangerous as raw ADO.NET string building.",
+              "Use a least-privilege database account for the application — if the account cannot drop tables or access other schemas, a successful injection does far less damage.",
+              "Input validation and a WAF are useful as defense-in-depth but they are not substitutes for parameterization, which is the actual fix."
             ],
             "code": {
               "lang": "csharp",
@@ -376,12 +381,13 @@
             "dto"
           ],
           "answer": {
-            "oneLiner": "Over-posting is when a client binds extra fields (like `IsAdmin`) you never intended to accept; prevent it by binding to purpose-built DTOs instead of entities.",
+            "oneLiner": "Over-posting, also called mass assignment, is a vulnerability where a client sends extra fields in a request body that your app was never intended to accept, and the model binder quietly applies them to your object — the classic example is a user posting IsAdmin=true to a profile-update endpoint that binds directly to the user entity, accidentally granting themselves administrator access. The fix is to bind incoming requests to a purpose-built data transfer object that only contains the fields you actually want to accept, and then map that DTO to your entity explicitly on the server side. This approach is inherently safe because any field not on the DTO is simply ignored, regardless of what the client sends.",
             "keyPoints": [
-              "Happens when model binding maps to your domain entity directly",
-              "Use input DTOs/view models with only allowed fields",
-              "Or restrict with `[Bind]` / `[BindNever]`",
-              "Map DTO to entity explicitly server-side"
+              "The vulnerability happens when your controller action binds the request body directly to a domain entity or database model that contains fields the client should never be able to set, such as roles, admin flags, or audit fields.",
+              "The correct fix is to use an input DTO that only declares the fields you want to accept — anything the client sends that is not on the DTO is automatically ignored by the model binder.",
+              "You then map the DTO to the entity explicitly on the server side, copying only the intended fields, which keeps control in your hands.",
+              "Using the Bind attribute on an entity to restrict which fields are bound is fragile — if someone adds a privileged property to the entity later, it silently becomes bindable, whereas a DTO is safe by construction.",
+              "The BindNever attribute can mark individual properties on an entity to exclude them from binding, but a DTO is the preferred approach for any endpoint that handles sensitive data."
             ],
             "code": {
               "lang": "csharp",
@@ -450,12 +456,14 @@
             "hsts"
           ],
           "answer": {
-            "oneLiner": "A small set of response headers harden the browser: CSP, X-Content-Type-Options, X-Frame-Options, HSTS, Referrer-Policy, and Permissions-Policy.",
+            "oneLiner": "Security response headers are instructions your server sends to the browser telling it how to behave when rendering your pages, and a small set of them collectively close off a wide range of client-side attacks. The most important ones are Content-Security-Policy to restrict which scripts and resources the browser will load, X-Content-Type-Options to prevent the browser from guessing at content types and accidentally executing a file as a script, X-Frame-Options to stop your pages being embedded in an attacker's iframe for clickjacking, and Strict-Transport-Security to tell browsers to always use HTTPS for your domain. You should also set Referrer-Policy to control how much URL information leaks to third parties, and Permissions-Policy to disable browser features your app does not use.",
             "keyPoints": [
-              "`Content-Security-Policy` — restricts script/resource sources (XSS)",
-              "`X-Content-Type-Options: nosniff` — stops MIME sniffing",
-              "`X-Frame-Options: DENY` — anti-clickjacking; `Strict-Transport-Security` — force HTTPS",
-              "`Referrer-Policy` + `Permissions-Policy` — limit leakage / browser features"
+              "Content-Security-Policy is the most powerful header — it tells the browser which domains are allowed to supply scripts, styles, images, and other resources, which is the best mitigation against XSS after encoding. It requires careful tuning to avoid breaking your app.",
+              "X-Content-Type-Options set to nosniff stops the browser from second-guessing the Content-Type you declared — without it, a browser might execute a text file as a script if it looks like JavaScript.",
+              "X-Frame-Options set to DENY prevents your page from being embedded in any iframe, closing off clickjacking attacks. The modern equivalent is the frame-ancestors directive in your Content-Security-Policy.",
+              "Strict-Transport-Security tells the browser to always use HTTPS for your domain for a specified period, eliminating the first unencrypted request. Be careful not to enable it in local development, because it gets cached and will prevent HTTP access even on localhost.",
+              "Referrer-Policy controls how much of your URL the browser includes in the Referer header on outgoing requests, which can leak sensitive path information to third parties.",
+              "Permissions-Policy lets you disable browser features your app does not need, such as the camera, microphone, or geolocation, reducing the surface area if XSS does occur."
             ],
             "code": {
               "lang": "csharp",
@@ -524,12 +532,13 @@
             "iframe"
           ],
           "answer": {
-            "oneLiner": "Clickjacking tricks a user into clicking on your site loaded invisibly inside an attacker's iframe; block it by refusing to be framed.",
+            "oneLiner": "Clickjacking is an attack where an attacker loads your website invisibly inside an iframe on their own malicious page, then overlays it with fake UI so that when a user thinks they are clicking something innocent, they are actually clicking a button on your site — for example, confirming a bank transfer or changing their password. The fix is straightforward: tell the browser your page is not allowed to be embedded in any iframe, which you do with the X-Frame-Options response header set to DENY, or with the frame-ancestors directive in your Content-Security-Policy. You should set both for the widest browser support.",
             "keyPoints": [
-              "Attacker overlays/hides your page in an iframe",
-              "Defend with `X-Frame-Options: DENY` or `SAMEORIGIN`",
-              "Modern equivalent: CSP `frame-ancestors 'none'`",
-              "Use both for broad browser coverage"
+              "The attack works by loading your site in a transparent or hidden iframe over an attacker-controlled page, so the user's clicks land on your page without them realizing it.",
+              "Setting X-Frame-Options to DENY prevents any origin from embedding your page in an iframe. Using SAMEORIGIN instead allows your own domain to embed it, which is useful if your own app legitimately uses iframes.",
+              "The Content-Security-Policy frame-ancestors directive is the modern equivalent and is more flexible — you can specify exactly which origins are allowed to frame your content, and it overrides X-Frame-Options in browsers that support it.",
+              "You should set both headers for the broadest browser compatibility, since older browsers may not support the CSP directive.",
+              "JavaScript-based frame-busting scripts are not a reliable defense because they can be bypassed by the attacker sandboxing the iframe — rely on the headers."
             ],
             "redFlags": [
               "No framing protection on sensitive pages"
@@ -592,12 +601,13 @@
             "gateway"
           ],
           "answer": {
-            "oneLiner": "A Web Application Firewall inspects HTTP traffic at the edge and blocks common attack patterns (SQLi, XSS, bots); it's defense-in-depth, not a replacement for secure code.",
+            "oneLiner": "A Web Application Firewall sits in front of your application at the network edge and inspects incoming HTTP traffic, blocking requests that match known attack patterns like SQL injection payloads, XSS strings, and malicious bot signatures before they even reach your app. It is an important layer of defense-in-depth — think of it as a filter that catches known-bad traffic and buys you time against zero-day exploits — but it is not a replacement for fixing vulnerabilities in your own code. A WAF cannot stop business-logic abuse where an attacker sends perfectly valid requests that exploit a flaw in how your application behaves.",
             "keyPoints": [
-              "Sits in front (Azure Front Door / App Gateway, Cloudflare)",
-              "Rule-based: OWASP CRS, rate limits, geo/IP filters",
-              "Buys time against zero-days and known patterns",
-              "Complements, never replaces, app-level fixes"
+              "A WAF operates at the HTTP layer at the network edge, typically via a service like Azure Front Door, Azure Application Gateway, or Cloudflare, and blocks requests that match known attack signatures before they reach your application servers.",
+              "It uses rule sets such as the OWASP Core Rule Set to identify common attack patterns including SQL injection, cross-site scripting, and known vulnerability probes, and it can enforce rate limits and geo or IP-based filters.",
+              "A WAF is defense-in-depth — it reduces attack surface and provides an early warning layer, but it does not replace secure coding practices because an attacker who crafts a payload the rules do not recognize will still get through.",
+              "It cannot protect against business-logic vulnerabilities because those involve valid-looking requests that your application processes incorrectly — for example, a coupon-drain attack using a legitimate checkout endpoint.",
+              "A WAF left in detection-only mode logs attacks but does not block them — you need to enable prevention mode for it to actually protect your application."
             ],
             "redFlags": [
               "Treating a WAF as full protection",
@@ -661,12 +671,13 @@
             "api"
           ],
           "answer": {
-            "oneLiner": "Validate every input on the server with an allow-list mindset; client validation is only UX, never a security control.",
+            "oneLiner": "Every piece of data entering your API must be validated on the server, regardless of what any client-side form did first — a determined attacker will bypass your frontend entirely and call your endpoint directly. The correct mindset is an allow-list approach: define exactly what values, formats, and ranges you expect, and reject anything that does not match rather than trying to enumerate all the bad inputs. In ASP.NET Core, the ApiController attribute gives you automatic model validation out of the box, and you can add more expressive rules with data annotations or a library like FluentValidation.",
             "keyPoints": [
-              "`[ApiController]` auto-validates `ModelState`",
-              "Use data annotations or FluentValidation",
-              "Allow-list expected formats/ranges, reject the rest",
-              "Validate even for authenticated/internal callers"
+              "Client-side validation is a user experience feature, not a security control — anyone can send a raw HTTP request directly to your API and bypass any JavaScript validation entirely.",
+              "Use an allow-list mindset: define what good input looks like and reject anything else, rather than trying to block specific bad characters or patterns which attackers can work around.",
+              "The ApiController attribute in ASP.NET Core automatically checks the model state and returns a 400 Bad Request response before your action method even runs if the model is invalid.",
+              "You can add validation rules with data annotations such as Required, MaxLength, and Range on your DTO properties, or use FluentValidation for more complex rules.",
+              "You should validate input even from authenticated internal services — authentication proves identity, not that the payload is well-formed, and internal services can be compromised or have bugs."
             ],
             "redFlags": [
               "Trusting the client",
@@ -730,12 +741,14 @@
             "overview"
           ],
           "answer": {
-            "oneLiner": "It's OWASP's list of the most critical web app risks, currently led by Broken Access Control, Cryptographic Failures, and Injection.",
+            "oneLiner": "The OWASP Top 10 is a regularly updated list of the most critical web application security risks, ordered by how commonly they appear in real-world applications and how severe the impact is. The current list is led by Broken Access Control, meaning users reaching data or performing actions they should not be allowed to — this overtook injection because access control failures are now the most widespread finding. Other prominent entries include Cryptographic Failures where sensitive data is not properly encrypted, Injection including SQL and command injection, Security Misconfiguration, and newer entries like Server-Side Request Forgery which is particularly common in cloud-hosted applications. It is a prioritization and awareness tool, not a complete security checklist.",
             "keyPoints": [
-              "Broken Access Control (#1), Crypto Failures, Injection",
-              "Insecure Design, Security Misconfiguration",
-              "Vulnerable Components, Auth Failures, SSRF",
-              "It's awareness/prioritization, not a checklist of everything"
+              "Broken Access Control is the current number one risk, covering things like insecure direct object references where a user can access another user's data by changing an ID in the URL, or missing authorization checks on admin endpoints.",
+              "Cryptographic Failures covers cases where sensitive data such as passwords or personal information is transmitted or stored without adequate encryption, or where weak or outdated algorithms are used.",
+              "Injection covers SQL injection, command injection, and similar attacks where untrusted data is included in a query or command that gets executed.",
+              "Security Misconfiguration is one of the most common findings — things like default credentials left in place, unnecessary features enabled, or error messages that reveal too much internal detail.",
+              "Server-Side Request Forgery is where your application fetches a URL that an attacker controls, which can expose internal services, cloud metadata endpoints, or other internal infrastructure that should not be reachable from the outside.",
+              "The Top 10 is a prioritization tool based on real-world data — it helps teams focus on the most impactful risks first, but it does not cover every possible vulnerability."
             ],
             "redFlags": [
               "Naming only injection/XSS and nothing about access control"
@@ -805,12 +818,13 @@
             "basics"
           ],
           "answer": {
-            "oneLiner": "Authentication proves who you are; authorization decides what you're allowed to do.",
+            "oneLiner": "Authentication is the process of proving who you are — logging in with a password or presenting a valid token — while authorization is the separate decision of what you are allowed to do once your identity is known. They are distinct steps that always happen in that order: you cannot make an access decision without first knowing who is asking. In ASP.NET Core this is reflected in the middleware pipeline where UseAuthentication must come before UseAuthorization.",
             "keyPoints": [
-              "AuthN = identity (login, tokens)",
-              "AuthZ = permissions (roles, policies, claims)",
-              "AuthN always happens first",
-              "ASP.NET: `UseAuthentication()` before `UseAuthorization()`"
+              "Authentication answers the question 'who are you?' and is typically handled through credentials like a username and password, a token, or a certificate.",
+              "Authorization answers the question 'are you allowed to do this?' and evaluates the authenticated identity against roles, claims, or policies.",
+              "Authentication always happens before authorization because you need to establish identity before you can make any access decision.",
+              "In ASP.NET Core, UseAuthentication must be called before UseAuthorization in the middleware pipeline — reversing them means the user principal is not populated when authorization runs.",
+              "A valid token that is rejected by an authorization check returns a 403 Forbidden response, while a missing or invalid token returns a 401 Unauthorized — these two HTTP status codes represent failures at different stages."
             ],
             "redFlags": [
               "Using the terms interchangeably"
@@ -873,12 +887,13 @@
             "tokens"
           ],
           "answer": {
-            "oneLiner": "OAuth 2.0 is an authorization framework that issues access tokens for API access; OpenID Connect is an identity layer on top that adds an ID token to authenticate the user.",
+            "oneLiner": "OAuth 2.0 is an authorization framework designed to let a user grant a third-party application limited access to their resources — it answers 'can this app call this API on the user's behalf?' and issues an access token for that purpose. OpenID Connect is a thin identity layer built on top of OAuth 2.0 that adds the concept of who the user actually is, issuing an ID token that contains claims like the user's name and email address so the application can sign them in. The key distinction is that OAuth alone is about authorization and API access, while OpenID Connect adds authentication and is what you should use whenever you need to log a user into your application.",
             "keyPoints": [
-              "OAuth → access token (authorization / 'can call API')",
-              "OIDC → ID token (authentication / 'who the user is')",
-              "ID token is a JWT with user claims (`sub`, `email`)",
-              "Use OIDC when you need to log a user in, OAuth for delegated API access"
+              "OAuth 2.0 is an authorization framework, not an authentication protocol — it grants access tokens that allow an application to call APIs on a user's behalf, but those tokens do not necessarily tell you who the user is.",
+              "OpenID Connect adds an identity layer on top of OAuth 2.0 by issuing an ID token, which is a JSON Web Token containing verified claims about the user such as their subject identifier, email, and name.",
+              "The ID token is what you use to sign a user into your application, while the access token is what you present to an API to prove you are authorized to call it.",
+              "A common mistake is using an access token to identify the user — access tokens are opaque or may lack user claims and are intended for API authorization, not as a user identity source.",
+              "Use OpenID Connect whenever you need to authenticate a user and know who they are. Use OAuth 2.0 alone for machine-to-machine scenarios where no human identity is involved."
             ],
             "redFlags": [
               "Using an access token to identify the user",
@@ -943,12 +958,13 @@
             "mobile"
           ],
           "answer": {
-            "oneLiner": "PKCE is the Authorization Code flow plus a one-time code verifier/challenge, so public clients that can't keep a secret can still exchange codes securely.",
+            "oneLiner": "PKCE, which stands for Proof Key for Code Exchange, is an extension to the OAuth 2.0 Authorization Code flow that solves the problem of public clients — applications like single-page apps and mobile apps that cannot safely store a client secret because their code is visible to anyone. The way it works is that the client generates a random secret called a code verifier before starting the login flow, hashes it to produce a code challenge, and sends the hash to the authorization server upfront. When the authorization code comes back and the client exchanges it for tokens, it must prove it knows the original verifier — so even if someone intercepts the authorization code, they cannot use it without that verifier.",
             "keyPoints": [
-              "Client sends a hashed `code_challenge`, later proves it with `code_verifier`",
-              "Stops authorization-code interception/replay",
-              "Required for public clients (SPA, mobile, native)",
-              "No client secret needed — replaces the old implicit flow"
+              "The problem PKCE solves is that public clients like SPAs and native apps cannot keep a client secret — anything embedded in a JavaScript bundle or a mobile app binary can be extracted by an attacker.",
+              "PKCE replaces the client secret with a per-request proof: the client generates a random code verifier, hashes it to produce a code challenge, and sends only the hash to the authorization server at the start of the flow.",
+              "When the client later presents the authorization code to exchange it for tokens, it must also present the original code verifier — the server hashes it and checks it matches the challenge it stored, proving the client is the same one that started the flow.",
+              "This means an intercepted authorization code is useless to an attacker because they do not have the code verifier that the legitimate client generated in memory.",
+              "PKCE replaces the older implicit flow, which returned tokens directly in the URL fragment with no proof of possession and was deprecated because those tokens could be intercepted from browser history, referrer headers, or logging."
             ],
             "redFlags": [
               "Still using implicit flow for SPAs",
@@ -1012,12 +1028,13 @@
             "validation"
           ],
           "answer": {
-            "oneLiner": "A JWT has three base64url parts — header, payload (claims), and signature; you validate the signature, issuer, audience, and expiry before trusting it.",
+            "oneLiner": "A JSON Web Token consists of three base64url-encoded sections separated by dots: a header that declares the signing algorithm, a payload that contains the claims such as the user's identity and when the token expires, and a signature that the issuer computed over the first two sections. The payload is only encoded, not encrypted, so anyone can read it — you should never put sensitive data like passwords or internal IDs in it. When you receive a JWT you must validate the signature against the issuer's public keys, confirm the issuer and audience match what you expect, and check that the token has not expired before trusting any of its claims.",
             "keyPoints": [
-              "Header (alg) . Payload (claims) . Signature",
-              "Payload is encoded, not encrypted — never put secrets in it",
-              "Validate signature, `iss`, `aud`, `exp`, `nbf`",
-              "Verify against the IdP's signing keys (JWKS)"
+              "A JWT has three dot-separated parts: the header specifying the algorithm, the payload containing the claims, and the cryptographic signature over the first two parts.",
+              "The payload is base64url-encoded, which means it is trivially decodable by anyone — do not put secrets, passwords, or sensitive business data in the JWT claims.",
+              "When validating a JWT you must check the signature against the identity provider's published public signing keys, which are available at a well-known JWKS endpoint.",
+              "You must also validate the issuer claim to confirm the token came from the expected identity provider, the audience claim to confirm it was issued for your specific API, and the expiry and not-before timestamps.",
+              "Never accept a token with the algorithm set to none — this is a well-known attack where an attacker strips the signature and sets the algorithm to none, then presents forged claims with no cryptographic proof."
             ],
             "code": {
               "lang": "csharp",
@@ -1086,12 +1103,13 @@
             "sessions"
           ],
           "answer": {
-            "oneLiner": "Cookies suit server-rendered apps and are CSRF-prone but XSS-safer when HttpOnly; JWTs suit APIs/SPAs/mobile and cross-domain calls but need careful storage.",
+            "oneLiner": "Cookie-based authentication works well for traditional server-rendered web applications because the browser handles the cookie automatically, and marking it HttpOnly prevents JavaScript from reading it which reduces XSS risk — but it introduces CSRF exposure because the browser sends the cookie on every matching request including cross-site ones. JWTs sent in the Authorization header work better for APIs, single-page apps, and mobile clients because they work seamlessly across domains and the browser does not automatically attach them to cross-site requests, making them immune to CSRF. The main downside of JWTs is that they are hard to revoke before they expire, which is why the common pattern is a short-lived access token combined with a long-lived refresh token stored in an HttpOnly cookie.",
             "keyPoints": [
-              "Cookies: stateful-ish, auto-sent, HttpOnly, needs CSRF protection",
-              "JWT: stateless, sent in Authorization header, good cross-domain",
-              "JWT downside: hard to revoke; cookie downside: CSRF",
-              "Hybrid: short-lived JWT + refresh token in HttpOnly cookie"
+              "Cookie authentication is ideal for traditional web apps — the browser attaches the cookie automatically on every request, it can be marked HttpOnly to prevent JavaScript from reading it, but it requires CSRF protection because browsers send cookies on cross-site requests too.",
+              "JWT authentication is better for APIs, SPAs, and mobile apps where you need to call multiple domains or services, because the token is sent explicitly in the Authorization header and the browser does not auto-attach it cross-site.",
+              "The main downside of JWTs is revocation difficulty — once issued, a JWT remains valid until it expires, so there is no built-in way to invalidate it immediately if a user logs out or a token is compromised.",
+              "Storing a JWT in localStorage is convenient but exposes it to any JavaScript running on the page, including injected scripts — an HttpOnly cookie or in-memory storage with a secure refresh mechanism is safer.",
+              "The hybrid pattern combines the strengths of both: a short-lived JWT access token for API calls, plus a long-lived refresh token stored in an HttpOnly cookie, rotated on each use so that a stolen refresh token can be detected."
             ],
             "redFlags": [
               "Storing JWTs in localStorage without considering XSS",
@@ -1157,12 +1175,13 @@
             "tokens"
           ],
           "answer": {
-            "oneLiner": "A refresh token is a long-lived credential exchanged for new short-lived access tokens; store it securely server-side or in an HttpOnly cookie and rotate it on every use.",
+            "oneLiner": "A refresh token is a long-lived credential that the client uses to obtain new short-lived access tokens without asking the user to log in again — this lets you keep access tokens very short-lived, typically just minutes, which limits the damage if one leaks. Because the refresh token itself is long-lived and powerful, it must be stored very carefully: for web apps it belongs in an HttpOnly and Secure cookie so JavaScript cannot read it, and on mobile it goes in platform-provided secure storage. To detect theft, you rotate the refresh token on every use and implement reuse detection — if an already-used refresh token is presented again, you know it was stolen and you revoke the entire token family for that user.",
             "keyPoints": [
-              "Lets access tokens stay short-lived (minutes)",
-              "Rotate on each use; detect reuse → revoke the family",
-              "Store HttpOnly+Secure cookie (web) or secure storage (mobile)",
-              "Never put refresh tokens in localStorage"
+              "Refresh tokens exist so that access tokens can be kept very short-lived — typically a few minutes — because the shorter the access token lifetime, the smaller the window if it is stolen.",
+              "On every use, the refresh token should be rotated: the server issues a new refresh token and immediately invalidates the old one. This limits how long a stolen refresh token remains usable.",
+              "Reuse detection is the mechanism for catching stolen tokens: if a client presents a refresh token that has already been used and replaced, the server knows that either the legitimate client or an attacker replayed it, and the safe response is to revoke the entire token family and force the user to log in again.",
+              "For web applications, store the refresh token in an HttpOnly and Secure cookie — this prevents JavaScript from ever reading it, so XSS attacks cannot steal it.",
+              "Never store a refresh token in localStorage or sessionStorage — these are accessible to any JavaScript on the page, making them vulnerable to XSS."
             ],
             "redFlags": [
               "Refresh token in localStorage",
@@ -1228,12 +1247,13 @@
             "authorization"
           ],
           "answer": {
-            "oneLiner": "RBAC checks roles, claims-based checks specific user claims, and policy-based wraps both (plus custom logic) in named, reusable rules — policy-based is the most flexible.",
+            "oneLiner": "Role-based access control is the simplest model — you decorate an endpoint with the roles that are allowed to call it, and the framework checks whether the user has one of those roles. Claims-based authorization is more granular — instead of a broad role you check for a specific claim value like a department or subscription tier. Policy-based authorization is the most flexible and is what ASP.NET Core recommends as the default: you define named, reusable rules that can combine role checks, claim checks, and arbitrarily complex custom logic, then reference those policy names on your endpoints — this keeps authorization logic centralized and avoids scattering hardcoded role strings across the codebase.",
             "keyPoints": [
-              "RBAC: `[Authorize(Roles=\"Admin\")]` — coarse-grained",
-              "Claims: assert a specific claim value (e.g. department)",
-              "Policy: named rules, combine claims + custom `IAuthorizationRequirement`",
-              "Prefer policies for anything beyond simple roles"
+              "Role-based access control, or RBAC, assigns users to roles and checks whether the user holds a required role on the endpoint. It is simple but coarse-grained — a user is either in the Admin role or they are not, with no room for nuance.",
+              "Claims-based authorization checks whether the user's identity token contains a specific claim with a specific value, which allows finer-grained decisions such as allowing only users with a department claim of HR to access payroll endpoints.",
+              "Policy-based authorization wraps both of these into named, centrally-defined rules using the AddAuthorization registration in Program.cs, so the authorization logic lives in one place rather than being repeated as role strings on every attribute.",
+              "You can write a custom IAuthorizationRequirement and handler for logic that cannot be expressed with roles or claims alone — for example, allowing only the manager of the same department as the resource being accessed.",
+              "Prefer policies over raw role checks in general — if the role logic ever needs to change, you update it in one place in the policy definition rather than finding every Authorize attribute across the application."
             ],
             "code": {
               "lang": "csharp",
@@ -1302,12 +1322,13 @@
             "managed-identity"
           ],
           "answer": {
-            "oneLiner": "Entra ID (Azure AD) is Microsoft's cloud identity provider for users and apps; Managed Identity gives an Azure resource its own Entra identity so it can call services with no stored credentials.",
+            "oneLiner": "Entra ID, which Microsoft previously called Azure Active Directory, is Microsoft's cloud identity platform — it handles user sign-in via standard protocols like OpenID Connect and OAuth 2.0, issues tokens, manages groups and roles, and supports enterprise federation. Managed Identity is a related feature that gives an Azure resource such as an App Service or a virtual machine its own identity in Entra ID, so the resource can authenticate to other Azure services like Key Vault or SQL without any stored credentials — the platform issues and rotates the token automatically, completely removing the need to manage a secret. This combination means you can run your application in Azure with no passwords or connection string secrets in your code or configuration files.",
             "keyPoints": [
-              "Entra ID = IdP for OAuth/OIDC sign-in and tokens",
-              "Managed Identity = passwordless identity for app/VM/service",
-              "Platform rotates the credential — no secrets in code",
-              "Use it to access Key Vault, SQL, Storage securely"
+              "Entra ID is Microsoft's cloud identity provider that handles user and application authentication using OpenID Connect and OAuth 2.0, issuing ID tokens and access tokens for your applications.",
+              "Managed Identity gives an Azure resource its own identity in Entra ID without requiring you to create or manage any credentials — you simply assign the identity to the resource and then grant it the permissions it needs.",
+              "The platform automatically issues and rotates the authentication token for a Managed Identity, so there is no password, connection string, or service principal secret that could be accidentally committed to source control or exposed in a breach.",
+              "System-assigned Managed Identity is tied to the lifecycle of a single Azure resource and is deleted when that resource is deleted. User-assigned Managed Identity is a standalone resource that can be shared across multiple Azure services and has an independent lifecycle.",
+              "You use Managed Identity together with Azure RBAC to grant the identity only the specific permissions it needs — for example, read access to a specific Key Vault secret rather than access to the whole subscription."
             ],
             "redFlags": [
               "Storing service principal secrets when MI is available"
@@ -1371,12 +1392,13 @@
             "authn"
           ],
           "answer": {
-            "oneLiner": "ASP.NET Core Identity is the built-in membership system for managing users, passwords, roles, and sign-in, typically backed by EF Core.",
+            "oneLiner": "ASP.NET Core Identity is the built-in membership system that comes with the framework for managing users, passwords, roles, and authentication for applications that handle their own local accounts. It provides all the plumbing you would otherwise have to build yourself: secure password hashing using a salted adaptive algorithm, account lockout after failed attempts, two-factor authentication, email confirmation, and external login providers like Google or Microsoft. It is backed by Entity Framework Core by default, so it creates its own schema in your database to store users, roles, and claims. You would typically use it for first-party local account management, and switch to an external identity provider like Entra ID when you need single sign-on across multiple apps or enterprise federation.",
             "keyPoints": [
-              "Handles registration, login, password hashing, lockout",
-              "Stores users/roles/claims (EF Core by default)",
-              "Supports 2FA, external logins, email confirmation",
-              "Good for first-party local accounts; use an IdP for SSO/B2C"
+              "ASP.NET Core Identity handles registration, login, and password management out of the box, using a salted adaptive hash such as PBKDF2 for password storage so you do not have to implement password security yourself.",
+              "It supports account lockout after configurable failed login attempts, two-factor authentication, and email confirmation for new accounts.",
+              "It integrates with external login providers via OAuth 2.0, so users can sign in with Google, Microsoft, or other providers while their local account in your app links to that external identity.",
+              "The default storage is Entity Framework Core, which creates a set of tables for users, roles, claims, and tokens in your database.",
+              "When you need single sign-on across multiple applications, enterprise federation, or a large-scale consumer identity solution, an external identity provider like Entra ID is a better choice than managing local accounts with Identity."
             ],
             "redFlags": [
               "Rolling your own user/password store unnecessarily"
@@ -1440,12 +1462,13 @@
             "tokens"
           ],
           "answer": {
-            "oneLiner": "Since JWTs are self-contained you can't truly invalidate one; you mitigate with short lifetimes plus a server-side denylist or token-version check.",
+            "oneLiner": "You cannot truly invalidate a stateless JWT once it is issued — it is self-contained and valid until the expiry time you embedded in it. The practical strategies are to keep access tokens very short-lived so the valid window is small, combined with one of two approaches for forced revocation: a server-side denylist keyed on the token's unique identifier that you check on every request, or a per-user security stamp or token version number embedded in the token that you increment when you want to invalidate all that user's tokens. The denylist gives immediate revocation but reintroduces server state, while the security stamp approach is lighter but still requires a database lookup per request.",
             "keyPoints": [
-              "Keep access tokens short-lived; revoke at the refresh step",
-              "Maintain a denylist/jti cache for forced logout",
-              "Bump a per-user 'token version'/security stamp to invalidate all",
-              "Rotate signing keys for a global kill-switch"
+              "JWTs are self-contained and cryptographically signed, so once issued they are valid until they expire — there is no built-in revocation mechanism.",
+              "The primary mitigation is to keep access tokens short-lived, typically five to fifteen minutes, so that even a stolen token becomes useless quickly.",
+              "For forced immediate revocation, such as when a user logs out or changes their password, you can maintain a server-side denylist of token identifiers that have been invalidated before their expiry, and check it on every request.",
+              "An alternative to a denylist is embedding a per-user token version or security stamp in the token claims. When you increment the stamp, all previously issued tokens fail validation because their embedded stamp no longer matches the current value.",
+              "Rotating the signing key is a global kill-switch that immediately invalidates every token in circulation, but it affects all users simultaneously so it is only appropriate for emergency scenarios."
             ],
             "redFlags": [
               "Claiming you can instantly revoke a stateless JWT",
@@ -1517,12 +1540,13 @@
             "asymmetric"
           ],
           "answer": {
-            "oneLiner": "Symmetric uses one shared key (fast, for bulk data); asymmetric uses a public/private key pair (slower, for key exchange and signatures).",
+            "oneLiner": "Symmetric encryption uses a single shared key to both encrypt and decrypt data — it is fast and efficient, which makes it suitable for encrypting large amounts of data like files or database contents. Asymmetric encryption uses a mathematically linked key pair where data encrypted with the public key can only be decrypted with the private key — it is slower and impractical for bulk data, but it solves the key distribution problem because the public key can be shared openly. In practice you use both together: TLS, for example, uses asymmetric cryptography to securely agree on a shared session key, then switches to symmetric encryption for the actual data transfer because it is much faster.",
             "keyPoints": [
-              "Symmetric: AES — fast, bulk data at rest/in transit",
-              "Asymmetric: RSA/ECC — key exchange, signing, certs",
-              "TLS uses both: asymmetric to agree a symmetric session key",
-              "Symmetric pain point is securely sharing the key"
+              "Symmetric encryption uses one key that both encrypts and decrypts. AES is the standard algorithm. It is fast and suitable for encrypting bulk data such as files, database columns, and disk volumes.",
+              "The main weakness of symmetric encryption is key distribution — both parties need to share the same secret key, and doing so securely over a network is difficult without another layer of cryptography.",
+              "Asymmetric encryption uses a key pair. The public key can be shared freely. Data encrypted with the public key can only be decrypted by the corresponding private key. RSA and ECC are common asymmetric algorithms.",
+              "Asymmetric encryption is used for key exchange, digital signatures, and TLS certificate authentication rather than bulk data because it is computationally much slower than symmetric encryption.",
+              "TLS combines both: it uses asymmetric cryptography during the handshake phase to authenticate the server and securely agree on a symmetric session key, then uses that symmetric key for the rest of the connection because it is far more efficient."
             ],
             "redFlags": [
               "Saying asymmetric replaces symmetric for bulk data"
@@ -1585,12 +1609,13 @@
             "basics"
           ],
           "answer": {
-            "oneLiner": "Encryption is reversible with a key; hashing is a one-way fingerprint with no way back.",
+            "oneLiner": "Encryption is a two-way process where you use a key to transform data into ciphertext and can later reverse it back to plaintext using that key — it is for protecting data that you need to read again. Hashing is a one-way process that transforms input data into a fixed-length fingerprint, and it is designed to be irreversible — there is no key and no way to get the original input back from the hash. You use hashing for things like storing passwords, because you never need to recover the actual password — you just hash what the user types at login and compare it to the stored hash. A third thing people sometimes confuse with these is encoding such as base64, which is just a way of representing data in a different format and provides no security at all.",
             "keyPoints": [
-              "Encryption: two-way, needs a key (confidentiality)",
-              "Hashing: one-way, fixed length (integrity, passwords)",
-              "Hashing isn't encryption and shouldn't be reversible",
-              "Encoding (base64) is neither — not security"
+              "Encryption is reversible and requires a key. You use it when you need to store or transmit data confidentially and retrieve the original value later, such as encrypting a connection string or sensitive field in a database.",
+              "Hashing is a one-way function that produces a fixed-length output. Given a hash you cannot work backwards to the original input, which makes it appropriate for storing passwords and verifying data integrity.",
+              "When storing passwords, you store the hash and compare hashes at login — the server never needs to know the actual password, only whether the hash of what the user typed matches what was stored.",
+              "Encoding, such as base64, is not a security measure at all — it is just a transformation of data into a different representation, and anyone can reverse it without any secret.",
+              "A common mistake is referring to hashing as encryption or treating base64 as a security mechanism — an interviewer will pick up on this immediately."
             ],
             "redFlags": [
               "Calling hashing 'encryption you can't undo' loosely",
@@ -1656,12 +1681,13 @@
             "bcrypt"
           ],
           "answer": {
-            "oneLiner": "Never store them in plaintext or with a fast hash — use a slow, salted, adaptive algorithm like bcrypt, PBKDF2, or Argon2.",
+            "oneLiner": "Passwords must never be stored in plaintext and must not be hashed with a general-purpose fast algorithm like MD5 or SHA-256 — those are designed to be quick, which means an attacker can try billions of guesses per second against a stolen hash file. Instead you use a slow, adaptive algorithm like bcrypt, PBKDF2, or Argon2 that is specifically designed for password hashing and has a configurable work factor you can increase over time as hardware gets faster. Each password also gets its own unique random salt before hashing, which means that two users with the same password will produce completely different hashes, defeating precomputed rainbow table attacks. In ASP.NET Core applications that use Identity, this is all handled for you automatically.",
             "keyPoints": [
-              "Unique random salt per password (stored with the hash)",
-              "Use bcrypt / PBKDF2 / Argon2, not MD5/SHA-256 alone",
-              "Slow + adaptive work factor resists brute force",
-              "ASP.NET Core Identity does this for you"
+              "Never store passwords in plaintext — if your database is compromised, every user's password is immediately exposed and every other site where they reused it becomes vulnerable too.",
+              "General-purpose hashing algorithms like MD5, SHA-1, and SHA-256 are designed to be fast, which makes them unsuitable for passwords because an attacker with a GPU can compute billions of hashes per second when cracking a stolen database.",
+              "Use a slow, adaptive password hashing algorithm such as bcrypt, PBKDF2, or Argon2. These algorithms have a configurable work factor that you can tune upwards as hardware improves, keeping brute-force attacks impractically slow.",
+              "Every password gets a unique random salt — a random value generated at registration time that is included in the hash computation and stored alongside the hash. This ensures that identical passwords produce different hashes, making precomputed dictionary attacks impossible.",
+              "ASP.NET Core Identity handles all of this correctly out of the box using PBKDF2, so if you are using the framework's membership system you do not need to implement any of this yourself."
             ],
             "redFlags": [
               "Plaintext or unsalted hashes",
@@ -1726,12 +1752,13 @@
             "config"
           ],
           "answer": {
-            "oneLiner": "Keep secrets out of source control — use Azure Key Vault (accessed via Managed Identity) in production and user-secrets locally, injecting them at runtime.",
+            "oneLiner": "The golden rule is that secrets must never go into source control — no connection strings, API keys, or passwords in appsettings.json or anywhere else in the repository. In a production Azure environment you store secrets in Azure Key Vault and your application reads them at startup using its Managed Identity, so there is no stored credential of any kind in the app's configuration. For local development you use dotnet user-secrets, which stores values in a file outside the project directory where they cannot be accidentally committed. In CI and CD pipelines you use the platform's built-in secret variables which are masked in logs and injected as environment variables at runtime.",
             "keyPoints": [
-              "Never commit secrets; no secrets in appsettings or repo",
-              "Prod: Key Vault + Managed Identity (no stored creds)",
-              "Local dev: `dotnet user-secrets`",
-              "CI/CD: secret variables / secure store, masked in logs"
+              "Never commit secrets to source control — not in appsettings.json, not in commented-out code, not in any tracked file. Even if the repository is private, git history persists and access can change.",
+              "In production on Azure, use Azure Key Vault to store secrets and grant the application's Managed Identity read access to the specific secrets it needs. The app reads them at startup with no stored credentials.",
+              "The DefaultAzureCredential class in the Azure SDK automatically uses the Managed Identity when running in Azure and falls back to developer credentials on a local machine, so the same code works in both environments without any conditional logic.",
+              "For local development, use dotnet user-secrets to store secrets in a file in your user profile directory, which is outside the project folder and cannot be accidentally staged and committed.",
+              "In CI and CD pipelines, use the platform's secret variable mechanism — in Azure DevOps or GitHub Actions, secrets are stored encrypted and injected as environment variables at runtime, and the runner automatically masks them in log output."
             ],
             "code": {
               "lang": "csharp",
@@ -1802,12 +1829,13 @@
             "tls"
           ],
           "answer": {
-            "oneLiner": "In transit means encrypting data moving over the network (TLS/HTTPS); at rest means encrypting stored data (disk/DB/blob).",
+            "oneLiner": "Data in transit is data moving across a network, and you protect it with TLS and HTTPS so that anyone intercepting the network traffic sees only encrypted ciphertext. Data at rest is data stored on disk, in a database, or in blob storage, and you protect it with encryption at the storage layer so that anyone who physically steals the disk or a backup file cannot read the data. These are two completely separate threats and two separate controls — using HTTPS does not protect your database backups if someone steals them from a server room, and encrypting your database files on disk does nothing to protect data that is being exfiltrated via SQL injection through a legitimate query.",
             "keyPoints": [
-              "In transit: TLS 1.2+/HTTPS, mTLS internally",
-              "At rest: TDE, disk/storage encryption, column encryption",
-              "You need both — they cover different threats",
-              "Manage keys via KMS/Key Vault"
+              "Data in transit protection means using TLS 1.2 or higher for all network communications so that traffic cannot be read or tampered with by someone intercepting it on the network.",
+              "Data at rest protection covers encrypting stored data using mechanisms like Transparent Data Encryption for SQL Server databases, disk-level encryption for virtual machine disks, and storage service encryption for Azure Blob Storage.",
+              "You need both controls because they protect against different attack vectors — an attacker sniffing network traffic needs in-transit protection, while an attacker who steals a backup disk needs at-rest encryption.",
+              "At-rest encryption is transparent to application-level attacks — a SQL injection attack still reaches the database through legitimate query channels and sees decrypted data, so it does not substitute for preventing injection.",
+              "Encryption keys for both in-transit and at-rest scenarios should be managed in a dedicated key management service such as Azure Key Vault rather than stored alongside the data they protect."
             ],
             "redFlags": [
               "Assuming HTTPS covers stored data too"
@@ -1871,12 +1899,13 @@
             "saas"
           ],
           "answer": {
-            "oneLiner": "Pick an isolation model on a cost-vs-isolation spectrum — separate database per tenant, separate schema, or a shared schema with a tenant discriminator.",
+            "oneLiner": "Multi-tenant data isolation is about choosing the right point on the spectrum between cost-efficiency and isolation strength. The strongest approach is to give each tenant their own separate database, which means a breach of one tenant's data cannot affect others, but it is the most expensive to provision and manage at scale. At the other end you put all tenants in a single shared schema and distinguish their records with a tenant identifier column, which is the cheapest and most scalable approach but requires you to be rigorous about filtering every query. A critical mistake in the shared-schema model is relying on developers to manually add the tenant filter to every query — instead you enforce it centrally using an Entity Framework global query filter so it is applied automatically and cannot be forgotten.",
             "keyPoints": [
-              "DB-per-tenant: strongest isolation, costlier to scale",
-              "Schema-per-tenant: middle ground",
-              "Shared schema + TenantId: cheapest, must filter every query",
-              "Enforce the tenant filter centrally (EF global query filter) — never per-query trust"
+              "The three main isolation models are database-per-tenant, schema-per-tenant within a shared server, and a fully shared schema with a tenant identifier column — each represents a different point on the tradeoff between isolation strength and operational cost.",
+              "Database-per-tenant provides the strongest isolation because each tenant's data is completely separate, making cross-tenant leaks structurally impossible, but managing hundreds or thousands of separate databases is expensive and operationally complex.",
+              "Shared-schema with a tenant identifier is the most cost-efficient model but requires that every single query correctly filters by the current tenant — a single missing filter clause is a data breach.",
+              "Never rely on individual developers to remember to add the tenant filter to every query. Use Entity Framework Core global query filters to enforce the filter automatically at the DbContext level so it applies to every query on that entity.",
+              "The current tenant identifier must always be resolved server-side from the authenticated user's claims or the verified hostname — never trust a tenant ID that the client sends in the request body, because a malicious user could change it to access another tenant's data."
             ],
             "code": {
               "lang": "csharp",
@@ -1945,12 +1974,13 @@
             "privacy"
           ],
           "answer": {
-            "oneLiner": "Collect the minimum personal data, secure it, and honor rights like access and erasure; GDPR requires a lawful basis and breach notification.",
+            "oneLiner": "Personally identifiable information is any data that can identify a specific individual — names, email addresses, location data, and so on — and handling it responsibly means collecting only what you genuinely need, using it only for the purpose you stated, securing it appropriately, and being able to delete or anonymize it on request. GDPR, the General Data Protection Regulation, is the European Union's legal framework that formalizes these obligations: you must have a lawful basis for processing personal data such as consent or a legitimate interest, you must respect users' rights to access and erase their data, and if you suffer a data breach that involves personal data you must notify the relevant supervisory authority within approximately 72 hours of becoming aware of it.",
             "keyPoints": [
-              "Data minimization + purpose limitation",
-              "Encrypt PII, restrict access, log who reads it",
-              "Support right to access / erasure (delete or anonymize)",
-              "Lawful basis (e.g. consent) + ~72h breach notification"
+              "Data minimization means collecting only the personal data you actually need for a specific stated purpose — storing additional fields just because they might be useful later is not a lawful practice under GDPR.",
+              "You must have a lawful basis for processing personal data. Common bases include explicit user consent, contractual necessity where processing is needed to fulfill a contract with the user, and legitimate interest where the processing is necessary for a genuine business reason that does not override the user's rights.",
+              "Users have the right to access their data, meaning you must be able to provide a copy of all personal data you hold about them. They also have the right to erasure, meaning you must be able to delete or fully anonymize their data on request.",
+              "Pseudonymization means replacing personal identifiers with a key so the data cannot directly identify someone, but it can still be re-linked using that key — pseudonymized data is still personal data under GDPR. Anonymization removes all identifying information permanently and takes the data out of GDPR scope entirely.",
+              "A personal data breach that is likely to risk individual rights must be reported to the relevant supervisory authority within roughly 72 hours of you becoming aware of it — this requires having breach detection and incident response procedures in place."
             ],
             "redFlags": [
               "Storing PII 'just in case'",
@@ -2014,12 +2044,13 @@
             "hardening"
           ],
           "answer": {
-            "oneLiner": "Give every user, service, and process only the minimum access it needs to do its job — nothing more.",
+            "oneLiner": "The principle of least privilege means that every user, service, and process should have access to only the minimum resources and permissions it needs to do its specific job — nothing more. The practical reason this matters is blast radius: if a component is compromised, the attacker inherits that component's access, so a narrowly-scoped account or token limits how much damage they can do. Applied consistently across database accounts, cloud service permissions, token scopes, and user roles, least privilege turns a single compromised service into a contained incident rather than a full system breach.",
             "keyPoints": [
-              "App DB account: only needed CRUD, not db_owner",
-              "Scope tokens/roles narrowly; deny by default",
-              "Managed Identity with tight RBAC over broad keys",
-              "Review and revoke unused access regularly"
+              "The core idea is deny by default, grant explicitly — start with no access and add only the specific permissions needed, rather than starting with broad access and trying to remove what is not needed.",
+              "For database accounts, the application should connect with a dedicated account that has only the create, read, update, and delete permissions it actually needs on the specific tables it uses — not db_owner or system administrator privileges.",
+              "For Azure services, use Managed Identity with a specific RBAC role assignment scoped to the exact resource the application needs, rather than a broad connection string with subscription-level access.",
+              "For API tokens and OAuth scopes, request only the scopes needed for the specific operation — do not request write access if the operation is read-only.",
+              "Access should be reviewed and revoked regularly — unused permissions accumulate over time, and old service accounts or API keys with broad access become security liabilities."
             ],
             "redFlags": [
               "Running everything as admin/sa for convenience"
@@ -2083,12 +2114,13 @@
             "rotation"
           ],
           "answer": {
-            "oneLiner": "Treat it as compromised: rotate the secret immediately, then remove it from history and add scanning to prevent recurrence.",
+            "oneLiner": "The moment you find a secret committed to a repository, you treat it as already compromised and rotate or revoke it immediately — this is the first and most important step, done before anything else, because you have no way of knowing whether someone has already read it. Deleting the file is not sufficient because the secret is still visible in the git commit history and in any clone or fork of the repository. Once you have rotated the credential and moved it to a proper secrets store, you purge it from the git history, and then you add secret scanning and pre-commit hooks to prevent it from happening again.",
             "keyPoints": [
-              "Rotate/revoke the secret first — assume it's leaked",
-              "Move it to Key Vault / secret store",
-              "Purge from git history (and notify if it was pushed)",
-              "Add secret scanning + pre-commit hooks"
+              "The first action is always to rotate or revoke the exposed secret immediately, assuming it has already been seen — even in a private repository, because access can change, forks may exist, and history persists indefinitely.",
+              "Deleting the file that contained the secret does not remove it from the git history — anyone with access to the repository can check out or view older commits and still see the secret.",
+              "To remove a secret from git history you need to rewrite the history using tools like git filter-repo or BFG Repo Cleaner and then force-push the cleaned history. You should also notify any contributors who may have clones with the old history.",
+              "After rotating and cleaning, move the secret to a proper secrets store such as Azure Key Vault, and update the application to read it from there rather than from configuration files.",
+              "Add secret scanning to your repository — GitHub and Azure DevOps both offer built-in secret scanning that alerts you when known credential patterns appear in commits — and add pre-commit hooks locally to catch them before they are pushed."
             ],
             "redFlags": [
               "Just deleting the file without rotating",

@@ -15,12 +15,12 @@
           "freq": "high",
           "tags": ["git", "remote", "fetch", "pull"],
           "answer": {
-            "oneLiner": "`git fetch` just downloads remote changes; `git pull` fetches AND merges (or rebases) them into your current branch.",
+            "oneLiner": "git fetch downloads the latest changes from the remote into your local tracking references — like origin/main — but it never touches your actual working branch, so it is completely safe to run anytime. git pull does the same download and then immediately merges those changes into your current branch, which can cause conflicts if you are not ready. Think of fetch as 'let me see what changed' and pull as 'download and integrate it now'.",
             "keyPoints": [
-              "`fetch` updates remote-tracking refs (e.g. `origin/main`), leaves your branch alone",
-              "`pull` = `fetch` + `merge` (or `rebase` with `--rebase`)",
-              "Prefer fetch + inspect on shared branches to avoid surprise conflicts",
-              "`pull --rebase` keeps history linear"
+              "git fetch updates your remote-tracking references such as origin/main so you can see what the remote has, but it leaves your local branch exactly as it was.",
+              "git pull is essentially fetch followed by a merge — it downloads the changes and integrates them into your current branch in one step.",
+              "On shared long-lived branches it is safer to fetch first, inspect the incoming commits with git log HEAD..origin/main, and then decide whether to merge or rebase.",
+              "Running git pull with the --rebase flag replays your local commits on top of the fetched changes rather than creating a merge commit, which keeps the history clean and linear."
             ],
             "code": {
               "lang": "bash",
@@ -55,12 +55,12 @@
           "freq": "high",
           "tags": ["git", "merge", "rebase", "history", "branching"],
           "answer": {
-            "oneLiner": "Merge preserves history with a merge commit; rebase rewrites commits into a linear history. Merge shared branches, rebase local cleanup.",
+            "oneLiner": "git merge combines two branches by creating a new merge commit that ties their histories together — the original commits are preserved exactly. git rebase takes your commits and replays them on top of another branch, rewriting their SHA hashes to produce a clean, straight-line history. A good rule of thumb is to rebase your own local feature branch before opening a pull request, then use merge to actually land it into the shared branch.",
             "keyPoints": [
-              "Merge creates a merge commit tying both branch tips together",
-              "Rebase replays your commits on top of the target, rewriting SHAs",
-              "Golden rule: never rebase commits already pushed to a shared branch",
-              "Rebase = clean linear history; merge = safer for shared branches"
+              "Merging creates a merge commit that shows where two lines of history came together, which makes it easy to see at a glance when a feature branch was integrated.",
+              "Rebasing rewrites each of your commits with a new SHA so they sit directly on top of the target branch — the result looks like the work was done sequentially all along.",
+              "The golden rule of rebasing is never to rebase commits that you have already pushed to a shared branch, because rewriting those SHAs breaks everyone else who has pulled them.",
+              "A common team workflow is to rebase a local feature branch to keep it up to date and clean, then merge it into main — often with the --no-ff flag to always record the merge event."
             ],
             "detail": "Rebase rewrites commit SHAs, so it breaks collaborators if used on published history. Typical flow: rebase your local branch before a PR, then merge (often `--no-ff`) to land it.",
             "code": {
@@ -96,12 +96,12 @@
           "freq": "high",
           "tags": ["git", "merge", "conflicts", "resolution"],
           "answer": {
-            "oneLiner": "Git marks conflicts with `<<<<<<<`, `=======`, `>>>>>>>`; you edit the file to the correct state, remove the markers, stage it, then continue the merge.",
+            "oneLiner": "A merge conflict happens when two branches changed the same lines of code in different ways and Git cannot decide which version to keep. Git marks the conflicting sections in the file with angle-bracket markers — your version, a separator, and the incoming version. You manually edit the file to the correct final state, remove those markers, stage the file, and then tell Git to continue the merge.",
             "keyPoints": [
-              "Conflict = same lines changed differently on both branches",
-              "Markers: `<<<<<<< HEAD` (yours), `=======`, `>>>>>>> branch` (theirs)",
-              "Edit to final state, `git add`, then `git merge --continue`",
-              "Abort anytime with `git merge --abort` / `git rebase --abort`"
+              "When a conflict occurs, Git marks the file with conflict markers: the section between the less-than signs and the equals signs is your current branch's version, and the section between the equals signs and greater-than signs is the incoming version.",
+              "You resolve the conflict by editing the file to its correct final state — this might mean keeping one side, the other, or combining both — then deleting all the marker lines.",
+              "After editing, you stage the resolved file with git add and then run git merge --continue or git rebase --continue to complete the operation.",
+              "You can abort the entire operation at any point with git merge --abort or git rebase --abort to return to the state before you started. Merging from the target branch frequently keeps conflicts small and manageable."
             ],
             "detail": "Use `git status` to find conflicted files and a merge tool (VS Code, `git mergetool`) for a 3-way view. Merge from the target branch often to keep conflicts small.",
             "code": {
@@ -137,12 +137,12 @@
           "freq": "high",
           "tags": ["git", "branching", "git-flow", "trunk-based", "github-flow", "strategy"],
           "answer": {
-            "oneLiner": "Git Flow uses long-lived develop/release/hotfix branches for scheduled releases; GitHub Flow is single-branch with PRs for frequent deploys; Trunk-Based merges tiny branches to main with feature flags for continuous delivery.",
+            "oneLiner": "Git Flow uses several long-lived branches — main, develop, release, and hotfix — and is well suited to products with scheduled versioned releases, like desktop or mobile apps. GitHub Flow simplifies this to a single main branch with short-lived feature branches and pull requests, which works well for teams deploying frequently. Trunk-Based Development is even more disciplined: developers merge very small, short-lived branches directly to main multiple times a day, using feature flags to hide work in progress, and it is the pattern associated with the highest-performing DevOps teams.",
             "keyPoints": [
-              "Git Flow: main + develop + feature/release/hotfix — good for versioned, scheduled releases",
-              "GitHub Flow: branch off main, PR, merge, deploy — simple, great for SaaS",
-              "Trunk-Based: short-lived branches to main, feature flags hide WIP — DORA favourite",
-              "For cloud .NET/Angular: GitHub Flow or TBD is the pragmatic pick"
+              "Git Flow maintains separate long-lived branches for development, releases, and hotfixes, which provides structure for teams that ship on a fixed schedule and need to maintain multiple released versions simultaneously.",
+              "GitHub Flow uses a single main branch where everything is always deployable — developers branch off, open a pull request, get a review, and merge. It is simple and works well for SaaS products that deploy continuously.",
+              "Trunk-Based Development keeps branches extremely short-lived, often less than a day, and relies on feature flags to hide incomplete features so the main branch is always in a shippable state — this is the preferred model according to the DORA research.",
+              "For a modern cloud-hosted .NET or Angular application that deploys frequently, either GitHub Flow or Trunk-Based Development is the pragmatic choice because Git Flow's extra branches add merge overhead without proportional benefit."
             ],
             "detail": "Git Flow suits app-store cycles and formal QA gates but adds merge debt. GitHub Flow needs strong automated tests since main is always deployable. TBD enables true CI and minimal integration risk but requires feature flags and good coverage.",
             "code": {
@@ -178,12 +178,12 @@
           "freq": "high",
           "tags": ["git", "reset", "revert", "undo", "history"],
           "answer": {
-            "oneLiner": "`reset` moves the branch pointer back (rewrites history — local only); `revert` creates a new commit that undoes a previous one (safe on shared branches).",
+            "oneLiner": "git reset moves your branch pointer backward in history, effectively un-making commits — it rewrites history, so it is only safe on commits you have not yet pushed to a shared branch. git revert takes a different approach: it leaves history intact and instead creates a brand-new commit that applies the reverse of a previous commit. When you need to undo something that is already on a shared branch, revert is the right choice because it does not disrupt anyone else's history.",
             "keyPoints": [
-              "`--soft`: moves HEAD back, keeps changes staged",
-              "`--mixed` (default): moves HEAD back, unstages but keeps changes",
-              "`--hard`: moves HEAD back, discards changes — destructive (recover via reflog)",
-              "`revert`: new inverse commit, safe to push to shared branches"
+              "git reset --soft moves the branch pointer back but keeps all the changed files staged and ready to commit again — useful when you want to rewrap your last commit with a better message or structure.",
+              "git reset --mixed, which is the default, moves the pointer back and unstages the changes but keeps them in your working directory so you can review and re-stage them selectively.",
+              "git reset --hard moves the pointer back and discards all the changes entirely — it is destructive, but if you realize you need those commits back, git reflog can help you find the old SHA for roughly 30 days.",
+              "git revert creates a new commit that undoes the effect of a specific previous commit without touching any history, which makes it completely safe to push to a shared branch that others are working on."
             ],
             "detail": "Use reset for local unpushed commits, revert for anything already pushed. After an accidental hard reset, `git reflog` finds the lost SHA (kept ~30 days).",
             "code": {
@@ -219,12 +219,12 @@
           "freq": "medium",
           "tags": ["git", "merge", "fast-forward", "history"],
           "answer": {
-            "oneLiner": "When the target branch hasn't diverged, Git just slides its pointer forward to the feature tip instead of creating a merge commit.",
+            "oneLiner": "A fast-forward merge happens when the branch you are merging into has not moved forward since you branched off of it, meaning your branch is simply ahead on the same line of history. In that case, Git does not need to create a merge commit — it just slides the target branch's pointer forward to your latest commit. The result is a perfectly linear history as if you had always been working on one branch.",
             "keyPoints": [
-              "Happens when main got no new commits since you branched",
-              "No merge commit is created — history stays linear",
-              "`--no-ff` forces a merge commit anyway",
-              "`--ff-only` fails if a fast-forward isn't possible"
+              "A fast-forward merge is only possible when the target branch has received no new commits since the feature branch was created — there is no divergence, so no merge commit is needed.",
+              "The advantage is a clean, linear history with no extra merge commits; the disadvantage is that you lose a clear record of when the feature branch was integrated.",
+              "Using the --no-ff flag forces Git to always create a merge commit even when a fast-forward would be possible, which many teams prefer on main or develop branches so the history shows when each feature landed.",
+              "The --ff-only flag does the opposite — it tells Git to only proceed if the merge can be a fast-forward, and to fail otherwise; this is useful in CI to enforce that branches are rebased before being merged."
             ],
             "detail": "Teams use `--no-ff` on main/develop to keep an explicit record of when each feature merged, which makes `git log --merges` useful for auditing.",
             "code": {
@@ -259,12 +259,12 @@
           "freq": "medium",
           "tags": ["git", "stash", "workflow"],
           "answer": {
-            "oneLiner": "`git stash` temporarily shelves uncommitted changes so you can switch context, then `git stash pop` restores them later.",
+            "oneLiner": "git stash is a way to temporarily save your uncommitted work — both staged and unstaged changes — and revert your working directory to a clean state, without losing what you were doing. It is like putting your work in a drawer so you can switch to something else, then pulling it back out later with git stash pop. This is really handy when someone asks you to review their branch or fix an urgent bug while you are in the middle of something else.",
             "keyPoints": [
-              "Saves staged + unstaged changes, reverts working dir to last commit",
-              "Great for quickly switching branches mid-WIP",
-              "`pop` restores and removes; `apply` restores but keeps it",
-              "Untracked files excluded by default — add `-u` to include them"
+              "Running git stash saves all your staged and unstaged changes onto a stack and restores the working directory to match the last commit, so you can freely switch branches without committing half-finished work.",
+              "git stash pop brings back the most recently stashed changes and removes the entry from the stack; git stash apply does the same but leaves the entry in the stack in case you want to apply it to another branch as well.",
+              "By default git stash does not include brand-new untracked files that Git has never seen before — you need to add the -u flag to include those.",
+              "You can name a stash with the -m flag to give it a descriptive label, which is helpful if you accumulate multiple stashes and need to tell them apart."
             ],
             "detail": "It's a stack: each stash pushes on, each pop removes from top. Name stashes with `-m` when you accumulate several. Stashes survive branch switches.",
             "code": {
@@ -299,12 +299,12 @@
           "freq": "medium",
           "tags": ["git", "cherry-pick", "selective-merge"],
           "answer": {
-            "oneLiner": "`git cherry-pick <sha>` applies the changes from one specific commit onto your current branch without merging the whole source branch.",
+            "oneLiner": "git cherry-pick lets you take a single specific commit from one branch and apply its changes onto a different branch, without bringing across the rest of the source branch's history. It creates a new commit with the same changes but a brand-new hash. The most common real-world use case is backporting a critical bug fix to a release branch when the full feature it belongs to is not yet ready to ship.",
             "keyPoints": [
-              "Good for grabbing one fix from a branch before the full feature is ready",
-              "Creates a new commit with the same diff but a different SHA",
-              "Conflicts arise if the commit depends on other missing commits",
-              "Common use: backport a fix to a release branch"
+              "Cherry-picking applies the diff from one specific commit onto your current branch, creating a new commit with the same code change but a different SHA — the two commits are not linked in Git's eyes.",
+              "The classic use case is backporting a bug fix: your fix lives on a feature branch, but you need it in the release branch right now before the full feature is ready to merge.",
+              "If the commit you are cherry-picking depends on other commits that are not present in the target branch, you will likely get merge conflicts because the context Git expected is missing.",
+              "Avoid cherry-picking the same commit into many branches repeatedly because it creates duplicate-looking commits with different hashes, which complicates future merges and makes history harder to read."
             ],
             "detail": "Overusing it creates duplicate commits and diverging history — if you're picking many commits, do a proper merge or rebase instead.",
             "code": {
@@ -339,12 +339,12 @@
           "freq": "medium",
           "tags": ["git", "squash", "rebase", "history", "pull-request"],
           "answer": {
-            "oneLiner": "Squashing combines several commits into one for a clean history — via `git rebase -i` or the 'Squash and merge' PR button.",
+            "oneLiner": "Squashing means combining multiple commits into a single one, usually to turn a series of messy work-in-progress commits into one clean, meaningful commit before merging a pull request. You can do it manually with an interactive rebase, or most code review platforms like GitHub and Azure DevOps have a 'Squash and merge' button that does it automatically. The result is a tidy main branch history where each commit represents a complete feature or fix rather than a trail of 'fix typo' or 'WIP' messages.",
             "keyPoints": [
-              "Turns noisy WIP commits into one meaningful commit",
-              "`rebase -i HEAD~N`: change `pick` to `squash` on commits to fold in",
-              "GitHub/Azure 'Squash and merge' does it automatically per PR",
-              "Downside: loses fine-grained per-commit history"
+              "Interactive rebase with git rebase -i HEAD~N opens an editor where you mark which commits to fold into the one above them by changing the word 'pick' to 'squash' — Git then combines them and lets you write a unified commit message.",
+              "GitHub and Azure DevOps both offer a Squash and merge option on pull requests that automatically collapses all the PR's commits into one before landing it on main, without you having to do anything manually.",
+              "The alternative command git merge --squash stages all the changes from the source branch as a single uncommitted change, which you then commit yourself — it does not automatically create the commit for you.",
+              "The trade-off is that squashing discards the fine-grained per-commit history, which can make it harder to pinpoint exactly which change introduced a bug when using git bisect or reviewing an audit log."
             ],
             "detail": "Squash small features for a clean changelog on main; keep granular history for large multi-developer features where individual commits matter for auditing.",
             "code": {
@@ -379,12 +379,12 @@
           "freq": "medium",
           "tags": ["git", "HEAD", "detached-head", "pointers"],
           "answer": {
-            "oneLiner": "HEAD points to your current commit, normally via a branch name; detached HEAD means it points directly at a commit SHA instead of a branch.",
+            "oneLiner": "HEAD is Git's way of tracking where you currently are in the repository — it is a pointer that normally points to a branch name, which in turn points to the latest commit on that branch. When you check out a specific commit SHA or a tag directly instead of a branch, HEAD points straight at that commit rather than going through a branch, which is called detached HEAD state. The danger is that any new commits you make in this state are not attached to any branch and will eventually be garbage-collected by Git if you navigate away without saving them to a branch.",
             "keyPoints": [
-              "Normally `.git/HEAD` holds `ref: refs/heads/main`",
-              "Detached HEAD happens on `git checkout <sha>` or a tag",
-              "Commits made detached are orphaned and can be garbage collected",
-              "Rescue them with `git checkout -b new-branch`"
+              "In normal use, HEAD points to a branch reference such as refs/heads/main, and that branch reference points to the latest commit — so HEAD is effectively two hops away from the actual commit.",
+              "Detached HEAD occurs when you check out a specific commit hash, a tag, or any reference that is not a branch name — HEAD now points directly at a commit with no branch in between.",
+              "Any commits you make while in detached HEAD state are unreachable from any branch name, meaning Git's garbage collector can delete them. To preserve that work you need to create a new branch pointing at those commits with git checkout -b new-branch.",
+              "If you realize you left useful commits behind in detached HEAD state, git reflog will show you the SHA of those commits for roughly 30 days, letting you recover them by creating a branch from that SHA."
             ],
             "detail": "HEAD is a pointer to a pointer — it usually tracks a branch, which tracks a commit. Detaching breaks that indirection, so new work isn't reachable from any branch until you create one.",
             "code": {
@@ -419,12 +419,12 @@
           "freq": "high",
           "tags": ["git", "revert", "undo", "remote", "shared-branch"],
           "answer": {
-            "oneLiner": "Use `git revert <sha>` to add an inverse commit and push it — never `reset` + force push on a shared branch, since that rewrites everyone's history.",
+            "oneLiner": "The safe way to undo a pushed commit on a shared branch is git revert, which creates a new commit that applies the exact opposite of the bad commit — your history is preserved and everyone else's copies stay consistent. Force-pushing after a reset should be avoided on shared branches because it rewrites history that other developers have already pulled, causing their local branches to diverge and creating difficult conflicts for the whole team.",
             "keyPoints": [
-              "`revert` is safe: new commit undoes the bad one, history preserved",
-              "Force push after reset is highly disruptive — almost never do it",
-              "For a merge commit: `git revert -m 1 <merge-sha>`",
-              "If forced (e.g. leaked secrets): use `--force-with-lease`, rotate secrets immediately"
+              "git revert creates a new reverse commit that cancels out the original one — because it adds a commit rather than removing one, everyone else on the team can simply pull the fix without any conflict.",
+              "A regular force push after git reset is highly disruptive on a shared branch because it rewrites history that other team members have already pulled down, forcing them to manually re-sync their local copies.",
+              "Reverting a merge commit requires an extra flag: git revert -m 1 followed by the merge commit's SHA, where the 1 tells Git to revert relative to the first parent, which is typically the main branch.",
+              "In the rare case where you absolutely must rewrite history — for example, if credentials were accidentally committed — use git push --force-with-lease instead of a plain force push, because it will refuse to overwrite the remote if someone else has pushed since your last fetch, giving you an extra safety check."
             ],
             "detail": "If you must scrub secrets from history, reset locally, force-push with `--force-with-lease`, have everyone re-sync, and rotate the secrets (assume compromised). `--force-with-lease` fails if someone pushed since your last fetch.",
             "code": {
@@ -467,12 +467,12 @@
           "freq": "high",
           "tags": ["ci-cd", "pipeline", "automation", "devops"],
           "answer": {
-            "oneLiner": "CI auto-builds and tests every change; Continuous Delivery keeps the artifact always release-ready (deploy is manual); Continuous Deployment ships every passing build to prod automatically.",
+            "oneLiner": "Continuous Integration is the practice of automatically building and running tests every time a developer pushes code, so that integration bugs are caught early rather than piling up. Continuous Delivery means the pipeline keeps the application in a state where it could be deployed to production at any time, but a human still decides when to actually pull the trigger. Continuous Deployment goes one step further and removes that human gate entirely — every commit that passes all the automated checks is automatically deployed to production.",
             "keyPoints": [
-              "CI: merge often, each push triggers build + tests, catching bugs early",
-              "Continuous Delivery: artifact always deployable, prod needs manual approval",
-              "Continuous Deployment: no gate — every green build goes to prod",
-              "Stages: Source → Build → Test → Scan → Package → Deploy → Verify"
+              "Continuous Integration means developers merge their changes frequently — often multiple times a day — and every push automatically triggers a build and a full test run so that broken integrations are caught immediately.",
+              "Continuous Delivery means the same automated pipeline produces a deployable artifact that is ready for production, but getting it to production still requires a deliberate human decision, often with an approval step.",
+              "Continuous Deployment removes the manual approval step entirely so that every build that passes tests is automatically released to production — this requires a very high degree of confidence in the automated test suite.",
+              "A typical pipeline flows through these stages in order: source control triggers the build, the code is compiled, unit and integration tests run, a security scan checks for vulnerabilities, the output is packaged into an artifact, the artifact is deployed to an environment, and then automated smoke or health checks verify the deployment succeeded."
             ],
             "detail": "The same immutable artifact (Docker image, package) is promoted through environments unchanged. Continuous Deployment requires strong tests, feature flags, and fast rollback.",
             "code": {
@@ -508,12 +508,12 @@
           "freq": "medium",
           "tags": ["ci-cd", "artifact", "immutable", "environments"],
           "answer": {
-            "oneLiner": "An artifact is the compiled, versioned output of a build (Docker image, zip, package); promoting the same one guarantees what you tested is exactly what runs in prod.",
+            "oneLiner": "A build artifact is the compiled, versioned output produced by your CI pipeline — for example a Docker image, a published .NET application folder, a NuGet package, or a JAR file. The key principle is that you build it once and then promote that exact same artifact through dev, staging, and production rather than rebuilding at each stage. This guarantees that the code you tested in staging is byte-for-byte identical to what runs in production, because rebuilding can introduce subtle differences in dependency versions or compilation flags.",
             "keyPoints": [
-              "Examples: Docker image, published .NET zip, NuGet/npm package, JAR",
-              "Should be immutable and versioned (git SHA or semver tag)",
-              "Rebuilding per environment risks subtle dependency/timing differences",
-              "Env config injected at deploy time, never baked into the artifact"
+              "An artifact is immutable once built — it should be tagged with a unique identifier such as the git commit SHA or a semantic version number so you can precisely trace which code is running in any environment and roll back to an exact previous version.",
+              "Promoting the same artifact across environments rather than rebuilding per environment is known as the build-once, deploy-many principle, and it eliminates an entire class of bugs where something worked in staging because a different library version was resolved at build time.",
+              "Environment-specific configuration such as connection strings, API keys, and feature flag settings should never be baked into the artifact itself — instead they should be injected at deploy time through environment variables or a secrets manager like Azure Key Vault.",
+              "Artifacts are stored in a registry — a Docker image registry like Azure Container Registry, a package feed like GitHub Packages or NuGet.org, or a file store — so that any environment can pull the exact version it needs and you have an auditable history of what was deployed when."
             ],
             "detail": "This is the 'build once, deploy many' principle from 12-factor. Store artifacts in a registry (ACR, GitHub Packages, Artifactory) so 'it works in staging' actually means something.",
             "code": {
@@ -549,12 +549,12 @@
           "freq": "high",
           "tags": ["ci-cd", "deployment", "blue-green", "canary", "zero-downtime"],
           "answer": {
-            "oneLiner": "Blue-green switches all traffic instantly between two identical environments; canary gradually rolls the new version to a subset of users while monitoring.",
+            "oneLiner": "Blue-green deployment runs two complete, identical production environments side by side and switches all user traffic from the old version to the new one in a single atomic flip — the old environment stays live so rollback is instant if something goes wrong. Canary deployment takes a more gradual approach: the new version is deployed and receives only a small fraction of real traffic first, and if the metrics look healthy you progressively route more traffic to it until the rollout is complete. Blue-green is faster to roll out but consumes double the infrastructure during the transition, while canary limits your blast radius but requires smart traffic routing and careful monitoring.",
             "keyPoints": [
-              "Blue-green: two prod environments, flip the load balancer atomically",
-              "Blue-green rollback is instant; costs double infra during transition",
-              "Canary: send a small % of traffic to the new version, ramp up if healthy",
-              "Canary limits blast radius but needs smart routing + monitoring"
+              "In a blue-green deployment you maintain two separate production environments and use a load balancer or DNS to switch which one receives all traffic — the swap is instant and rollback is equally instant by switching back.",
+              "The main cost of blue-green is that you need to run two full production environments simultaneously during the cutover, which roughly doubles your infrastructure costs for that window.",
+              "In a canary deployment the new version is deployed alongside the old one and initially receives a small percentage of traffic — say five or ten percent — and that percentage is gradually increased as you monitor error rates, latency, and business metrics to confirm the new version is healthy.",
+              "Both strategies require that your database schema and API contracts are backward-compatible at the point of the switch, because both versions of the application will be hitting the same database simultaneously during the transition."
             ],
             "detail": "Both run two versions at once, so APIs and DB schemas must stay backward-compatible. Azure: deployment slots = blue-green; AKS + Istio/Nginx weighting = canary.",
             "code": {
@@ -590,12 +590,12 @@
           "freq": "high",
           "tags": ["ci-cd", "secrets", "security", "environment-variables", "key-vault"],
           "answer": {
-            "oneLiner": "Store secrets in a dedicated manager (GitHub Secrets, Azure Key Vault, AWS Secrets Manager) and inject them as env vars at runtime — never hardcode them in source.",
+            "oneLiner": "The core rule is that secrets never live in source code — not even in private repos. CI platforms like GitHub Actions and Azure DevOps have encrypted secret stores where you save build-time tokens such as registry credentials, and those values are masked in any log output. For production, connection strings and API keys should live in a dedicated secrets manager like Azure Key Vault, and the application reads them at runtime using a Managed Identity so there are no credentials stored anywhere in the pipeline at all.",
             "keyPoints": [
-              "Never commit secrets; use .gitignore + scanners like gitleaks",
-              "CI platforms have encrypted secret stores, masked in logs",
-              "Prod: use a vault accessed via Managed Identity / OIDC (no stored creds)",
-              "Rotate regularly; least privilege per environment"
+              "Never commit secrets to source control — use a .gitignore to exclude env files and add a secrets scanner like gitleaks to your CI pipeline to catch any accidental inclusion before it reaches the remote.",
+              "CI platform secret stores — GitHub Secrets, Azure DevOps variable groups — encrypt secrets at rest and automatically mask them in pipeline logs so they cannot be read from the build output even if a step prints environment variables.",
+              "For production workloads, use a proper secrets manager like Azure Key Vault accessed via Managed Identity so there is no long-lived credential to store, rotate, or leak — the application gets a short-lived token from the platform identity system.",
+              "OIDC federation, also called workload identity, is the modern alternative to storing service principal secrets in CI — GitHub Actions exchanges a short-lived JWT token for cloud access, meaning there is no static credential in GitHub Secrets that could be stolen."
             ],
             "detail": "Layers: no secrets in code → CI platform secrets for build-time tokens → runtime vault for prod connection strings/keys. If one leaks, rotate immediately and scrub history with git filter-repo.",
             "code": {
@@ -631,12 +631,12 @@
           "freq": "high",
           "tags": ["ci-cd", "github-actions", "dotnet", "angular", "azure", "pipeline-design"],
           "answer": {
-            "oneLiner": "Run parallel jobs to build/test .NET and Angular, publish artifacts, auto-deploy to Azure staging on merge, and promote to prod via a release trigger with environment approval gates.",
+            "oneLiner": "I would structure it as two parallel build jobs — one for the .NET backend and one for the Angular frontend — so they both build and test at the same time rather than sequentially. Each job produces an artifact that is passed downstream. On a merge to main, a deployment job automatically deploys both artifacts to a staging environment in Azure, and then a separate production job waits for a manual approval via a GitHub Environment before promoting the same artifacts to production. Authentication to Azure uses OIDC so there are no stored credentials in the pipeline.",
             "keyPoints": [
-              "Separate parallel jobs for backend and frontend, fail fast",
-              "Backend: restore → build → test → publish → artifact/image",
-              "Frontend: npm ci → ng build --prod → upload dist",
-              "GitHub Environments gate prod (reviewers, wait timer); OIDC for Azure auth"
+              "Running the backend and frontend as separate parallel jobs significantly reduces total pipeline time — the .NET restore, build, test, and publish steps run at the same time as the Angular npm install, build, and bundle steps.",
+              "The backend job runs dotnet restore, dotnet build, dotnet test, and dotnet publish and then uploads the published output as an artifact; the frontend job runs npm ci and ng build with the production configuration and uploads the dist folder.",
+              "GitHub Environments give you a proper approval gate for production — you configure required reviewers on the production environment, and the deploy-to-production job cannot run until someone clicks approve, while dev and staging deploy automatically.",
+              "Database migrations with Entity Framework Core should run as a separate step before the application is deployed — using the expand-and-contract pattern to keep the schema backward-compatible so that the old application version can still run against the migrated database during the brief window of the rollout."
             ],
             "detail": "Promote the same artifact from staging to prod (slots for zero-downtime). Run EF migrations as a separate backward-compatible step before deploy. Rollback via slot swap or re-deploying the previous artifact.",
             "code": {
@@ -673,12 +673,12 @@
           "freq": "medium",
           "tags": ["ci-cd", "environments", "promotion", "staging", "production"],
           "answer": {
-            "oneLiner": "Advance the same immutable artifact through increasingly production-like environments, with automated and manual gates validating quality before it reaches users.",
+            "oneLiner": "An environment promotion strategy means you take the same versioned, immutable artifact and advance it through a sequence of increasingly production-like environments, with automated and manual quality gates between each stage. Development gets every commit automatically. Staging gets every merge to main automatically and runs full integration and end-to-end tests. Production requires a deliberate human approval after staging is green. The key insight is that you are promoting the artifact, not rebuilding from source, so the code that passed your tests in staging is byte-for-byte what runs in production.",
             "keyPoints": [
-              "dev (auto on commit) → staging (auto on merge) → prod (manual approval)",
-              "Same artifact promoted, never rebuilt between environments",
-              "Keep each environment as production-like as possible",
-              "Env config injected at deploy time, not baked in"
+              "Each environment in the chain should be as similar to production as possible in terms of infrastructure, data shape, and configuration — if staging uses a differently sized database or different network rules, the tests it runs are not actually predicting production behavior.",
+              "The same immutable artifact is promoted through each environment rather than rebuilt at each stage; only the environment-specific configuration such as connection strings and feature flag values changes.",
+              "Automated gates between environments — unit tests, integration tests, security scans, and smoke tests — run without human intervention, while the final gate before production requires a manual approval from a team member.",
+              "Keeping the previous artifact available at each stage means you can roll back quickly to the last known-good version using a slot swap or a re-deploy command, without waiting for a new build."
             ],
             "detail": "Staging mirrors prod and runs integration/E2E/UAT as the final gate. Keep the previous artifact for rollback (slot swap or `kubectl rollout undo`).",
             "code": {
@@ -714,12 +714,12 @@
           "freq": "high",
           "tags": ["ci-cd", "rollback", "incident-response", "deployment", "production"],
           "answer": {
-            "oneLiner": "Return to the last known-good state in minutes — slot swap, re-deploy the previous artifact, or `kubectl rollout undo` — plus a plan for DB changes that can't simply be reversed.",
+            "oneLiner": "The goal is to restore the last known-good state as fast as possible — ideally in minutes — without waiting for a new build. For Azure App Service that means swapping deployment slots back; for Kubernetes that means running kubectl rollout undo; for any platform it means re-deploying the previous versioned artifact that you kept in your registry. The hard part is not the application rollback but the database — if a schema migration was part of the deployment, you need a plan for that too, which is why I always use the expand-and-contract migration pattern so the previous code version can still run against the migrated schema.",
             "keyPoints": [
-              "App rollback: re-deploy previous versioned artifact",
-              "Azure: swap slots back; Kubernetes: `kubectl rollout undo`",
-              "DB is the hard part: use expand/contract for backward compatibility",
-              "Feature flags = instant software rollback, no redeploy"
+              "Application rollback is straightforward when you keep previous versioned artifacts: redeploy the previous Docker image or published package, or use a platform feature like Azure deployment slot swap or Kubernetes rollout undo to switch back in seconds.",
+              "Database rollback is the difficult part — a destructive schema migration such as dropping a column cannot simply be reversed, which is why the expand-and-contract pattern exists: you add new columns and keep old ones in the same release, then remove the old ones in a later release after the code no longer references them.",
+              "Feature flags provide the fastest form of rollback for a misbehaving feature because you can flip the flag off in a configuration store and the feature is immediately disabled for all users without requiring any deployment or restart.",
+              "A rollback plan only counts if you have actually rehearsed it in staging — the time to discover that your slot swap takes fifteen minutes or that your rollback script has a bug is not during a production incident."
             ],
             "detail": "Backward-incompatible schema changes can't auto-roll-back; expand/contract adds the column first and drops the old one a release later. Rehearse rollbacks in staging and track rollback time as a KPI.",
             "code": {

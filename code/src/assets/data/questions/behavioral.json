@@ -20,12 +20,12 @@
             "communication"
           ],
           "answer": {
-            "oneLiner": "Title and domain, then what you build, how, and the impact — keep it under 2 minutes and end on why you're here.",
+            "oneLiner": "Think of this as a 90-second elevator pitch with four stops: your title and domain, the system you own and its real-world impact, your personal contribution (not the team's), and a bridge to why you're sitting in this interview. Interviewers are checking whether you can communicate clearly under slight pressure and whether your experience is genuinely relevant to the role they're filling.",
             "keyPoints": [
-              "Title, company context, and domain in one sentence",
-              "The system you own: what it does, who uses it, scale",
-              "Name your stack: .NET 8, Service Bus, Cosmos DB, Angular",
-              "Your contribution vs. the team's, then a 'why this role' hook"
+              "Open with your title and the domain in a single sentence so the interviewer immediately knows where you sit — for example, 'I'm a senior engineer on an event-driven integrations platform in the fintech space.'",
+              "Describe the system you own: what it does, who relies on it, and a sense of its scale — something like '40k messages a day at 99.95% uptime' turns an abstract description into something concrete.",
+              "Name your stack naturally but don't list every library you've ever touched — stick to the choices that shaped the system, like .NET 8, Service Bus, Cosmos DB, and Angular.",
+              "Finish with a personal contribution hook and then bridge to why you're here — make it clear you're moving toward something, not just escaping your current job."
             ],
             "detail": "Arc: Role → daily work → impact → bridge. E.g. 'Senior engineer on the integrations platform — event-driven .NET 8 services connecting our ERP to logistics/payment partners. I own the integration layer end-to-end. It handles ~40k messages/day at 99.95% uptime. I'm looking for that same ownership at larger scale, which is why I'm here.' Rehearse to land in 90 seconds.",
             "redFlags": [
@@ -93,12 +93,12 @@
             "azure"
           ],
           "answer": {
-            "oneLiner": "Describe it outside-in — entry points, core processing, data stores, cross-cutting concerns — then the key decisions behind each.",
+            "oneLiner": "Walk from the outside in — start at the boundary where requests or events enter, move through the core processing logic, cover the data stores, and then address the cross-cutting concerns like observability and resilience. Interviewers want to see that you understand not just what your system does, but why each piece is shaped the way it is.",
             "keyPoints": [
-              "Start at the boundary: HTTP, events, or schedules?",
-              "Major components and how they talk (sync vs. async)",
-              "Data stores and why each fits its use case",
-              "Cross-cutting: auth, observability, resilience, plus trade-offs"
+              "Start at the entry points — whether that's HTTP, events from a message bus, or scheduled jobs — because this orients the interviewer before you go deeper.",
+              "Explain how the major components talk to each other, distinguishing between synchronous HTTP calls (where the caller genuinely needs an immediate answer) and asynchronous messaging (for decoupling and durability).",
+              "Cover your data stores and say why each one fits its use case — for example, SQL for transactional data, Cosmos for archive, Redis for fast config lookups.",
+              "Address cross-cutting concerns — auth, observability, resilience policies — and be ready to talk about the trade-offs behind the shape you chose."
             ],
             "detail": "Worked example: three entry points (REST API, Service Bus subscription, Functions timer); Clean Architecture with EF Core + Cosmos + Azure SDK in infrastructure; MediatR pipelines for message flow; SQL for transactional data, Cosmos for archive, Redis for config lookups; App Insights + Polly for observability and resilience. Trade-off: three compute types means more to monitor but independent scaling. Offer to go deeper on any layer.",
             "redFlags": [
@@ -166,12 +166,12 @@
             "testability"
           ],
           "answer": {
-            "oneLiner": "State the problem it solved for us, the concrete benefits I saw, and honestly name the cost.",
+            "oneLiner": "Never answer this with 'because it's best practice' — that's the fastest way to fail this question. Instead, name the specific problem Clean Architecture solved for your team, describe the concrete benefits you actually saw, and then honestly acknowledge the cost it introduced. Interviewers are testing whether you make deliberate decisions or just cargo-cult patterns.",
             "keyPoints": [
-              "Problem first: EF calls in controllers made testing impossible",
-              "Dependency rule: domain/application have zero infra dependencies",
-              "Benefits: testability, swappable infra, clear onboarding",
-              "Trade-off: more projects/boilerplate, heavy for plain CRUD"
+              "Lead with the problem it solved, not the pattern itself — for example, infrastructure code mixed into controllers made unit testing nearly impossible, which is a concrete pain point that justifies the switch.",
+              "Explain the core dependency rule in plain terms: domain and application layers have zero references to infrastructure, which means you can test your business logic without spinning up a database.",
+              "Give a real benefit you observed — like test coverage jumping from 5% to 78%, or swapping an HTTP client library without touching a single use case.",
+              "Name the genuine cost too: more projects, more boilerplate, and a learning curve for new team members — and explain when you would choose a lighter approach instead."
             ],
             "detail": "We enforced the dependency rule with architecture tests in CI. Result: application-logic coverage went from ~5% to 78%, and we swapped HTTP clients (RestSharp to Refit) without touching a use case. I'd pick a lighter structure for pure CRUD — Clean Architecture earns its complexity only when domain logic is genuinely complex and longevity matters.",
             "redFlags": [
@@ -238,12 +238,12 @@
             "ownership"
           ],
           "answer": {
-            "oneLiner": "Pick a high-stakes decision, give two credible options, your criteria, and the measurable outcome — plus what you'd change.",
+            "oneLiner": "Pick a decision that genuinely mattered — where the wrong call would have had real consequences — and structure your answer around the two real alternatives you weighed, the criteria you used to choose, the outcome with numbers, and what you'd do differently now. Interviewers are probing for engineering judgment, not just execution ability.",
             "keyPoints": [
-              "Context: the problem and why it mattered",
-              "Two real alternatives you genuinely weighed",
-              "Your criteria: latency, cost, ops burden, team skill",
-              "Outcome with numbers, then a reflection"
+              "Set the context first: what problem forced this decision, and why did it matter to the business or system reliability — this makes the rest of your answer land with weight.",
+              "Present two genuine alternatives you actually considered, not a strawman option versus your brilliant idea — interviewers can tell when you've reverse-engineered a story to make yourself look right.",
+              "Walk through your decision criteria explicitly: things like latency targets, operational burden, team skill, cost, and how reversible the choice was if you turned out to be wrong.",
+              "Close with the measured outcome and a reflection — what would you change if you did it again? This shows maturity and intellectual honesty, not weakness."
             ],
             "detail": "Example: a logistics partner sent ~5k webhooks/min. Option A (process synchronously) hit P99 900ms under load test. Option B (accept-and-queue, return 202, worker processes) won. Result: 202 in <20ms regardless of downstream health, 8M webhooks first month, zero loss. I'd invest in an idempotency key earlier — we retrofitted dedup via Redis.",
             "redFlags": [
@@ -311,12 +311,12 @@
             "ownership"
           ],
           "answer": {
-            "oneLiner": "Pick a genuinely complex problem, walk the diagnosis systematically, and show you found the root cause, not just symptoms.",
+            "oneLiner": "Pick a problem that was genuinely hard to diagnose — not just hard to implement — and walk through your investigation systematically, showing how you separated symptoms from root cause. Interviewers want to see that you stay structured under pressure and that you find and fix the underlying issue rather than papering over it.",
             "keyPoints": [
-              "Business impact first — why it mattered",
-              "Diagnosis: observations, hypotheses, how you tested them",
-              "Separate immediate mitigation from root-cause fix",
-              "Quantify the result and what you changed to prevent recurrence"
+              "Open with the business impact so the interviewer understands the stakes — a problem that only annoyed you isn't the right story; something that stalled a critical feed or caused customer impact is.",
+              "Walk through your diagnostic process step by step: what you observed in the metrics, what hypotheses you formed, and how you tested each one until you isolated the root cause.",
+              "Distinguish between the immediate mitigation (stopping the bleeding quickly) and the root cause fix — doing both shows operational maturity.",
+              "End with what you changed to prevent recurrence, such as new alerts, policy changes, or runbook additions — this shows you closed the loop, not just patched the moment."
             ],
             "detail": "Example: Service Bus consumer fell from 30s to 45min processing. Metrics showed messages slow, not failing — one type spent 40s in a partner API. Root cause: partner added rate limiting; our Polly policy silently retried 429s, saturating consumer threads. Fix: treat 429 as circuit-breaker not retry, add back-off with jitter, per-partner throttle, and a 429 alert. Result: P99 back under 4s, no rate-limit hit in 6 months.",
             "redFlags": [
@@ -385,12 +385,12 @@
             "sql"
           ],
           "answer": {
-            "oneLiner": "Lead with the baseline and the pain, then profile, root cause, the specific change, and the after metric.",
+            "oneLiner": "Structure this as: here was the baseline and the pain it caused, here is how I profiled to find the actual bottleneck, here is the specific change I made, and here is the before-and-after metric. The profiling step is what separates a senior engineer's answer from a junior's — never jump straight to the fix.",
             "keyPoints": [
-              "Baseline metric before the change (latency/throughput/cost)",
-              "How you profiled the bottleneck — don't skip this",
-              "The specific change: index, cache, async, batching",
-              "After metric and business impact"
+              "Start with the baseline metric and why it was a problem — not 'it felt slow' but something concrete like 'P99 latency was 11 seconds and users were abandoning the page.'",
+              "Describe how you found the bottleneck through actual profiling tools, whether that's SQL Query Store, Application Insights, dotnet-trace, or a load test — this step proves you diagnose before you optimize.",
+              "Name the specific change or set of changes you made: adding a composite index, pushing filtering from in-memory to the database query, introducing a cache layer, or switching to batched async calls.",
+              "Close with the measurable after metric, ideally in percentage terms and with a business translation — something like '97% reduction in P99 latency and roughly 350 pounds a month saved on compute.'"
             ],
             "detail": "Example: a report endpoint took 8–12s. Query Store showed a 2.1M-row scan (missing composite index), a mid-pipeline ToList() doing in-memory filtering, and no caching despite 15-min data refresh. Fixes: composite index, push filtering to IQueryable, IMemoryCache with 10-min expiry. Result: P99 11s to 280ms (97%), ~40% less DTU, ~£350/month saved. Avoided a premature Cosmos rewrite — documented it as the 10x-scale path.",
             "redFlags": [
@@ -458,12 +458,12 @@
             "post-mortem"
           ],
           "answer": {
-            "oneLiner": "Calm, structured: detect → triage → communicate → mitigate → root cause → fix → prevent — and own every phase, not just the fix.",
+            "oneLiner": "Talk through a structured, calm process that covers all seven phases: detect, triage, communicate, mitigate, find root cause, fix, and prevent. Interviewers want to see that you own the whole lifecycle — not just the technical fix — and that you keep stakeholders informed rather than going silent while you debug.",
             "keyPoints": [
-              "Detect: alerts on error rate, latency, dead-letter depth",
-              "Triage: severity and business impact in first 5 minutes",
-              "Communicate: who, how often, what format; mitigate before root cause",
-              "Root cause after stable; blameless post-mortem with owned actions"
+              "Detection should be proactive, not 'a user complained' — explain what alerts you have in place, such as error rate spikes, latency thresholds, or dead-letter queue depth, that fire before customers notice.",
+              "Triage first: before you touch anything, assess severity and business impact within the first five minutes so you know whether to wake people up or handle it yourself.",
+              "Mitigate before you root-cause — your job is to stop the bleeding fast via rollback, scale-out, or a feature flag, and only then investigate why it happened.",
+              "Run a blameless post-mortem within 48 hours with a written timeline, a clear root cause statement, and action items that each have a named owner and a due date — the goal is system improvement, not blame."
             ],
             "detail": "Mitigate first — stop the bleeding via rollback, scale-out, or feature flag (deployment slots give 30s rollbacks). Then trace with a correlation ID. Post-mortem within 48h: timeline, root cause, action items with owners. Example: a config change pointed Cosmos at the wrong key; rolled back in 8 min, then renamed keys, added a post-deploy connectivity smoke test, and a review-checklist item.",
             "redFlags": [
@@ -530,12 +530,12 @@
             "influence"
           ],
           "answer": {
-            "oneLiner": "Engage with data and empathy, advocate clearly, and commit fully once a decision is made — even if it wasn't yours.",
+            "oneLiner": "Use the STAR method here, but the heart of this question is really about whether you can advocate for your position with data and empathy, and then commit fully to the team's decision even when it doesn't go your way. Interviewers are checking for professional maturity — they want someone who can push back constructively, not someone who either rolls over or digs in stubbornly.",
             "keyPoints": [
-              "A technical disagreement, not a personality clash",
-              "Your position, the reasoning, and how you presented it (data/RFC)",
-              "Show you genuinely understood the other side",
-              "Outcome and what you learned — commit even if you 'lost'"
+              "Choose a technical disagreement, not a personality conflict — the interviewer wants to hear about competing ideas and how you navigated them, not a story about a difficult colleague.",
+              "Describe your position and how you presented it — ideally with data, a written RFC, or a concrete trade-off comparison rather than just repeating your opinion more loudly.",
+              "Show that you genuinely engaged with the other person's reasoning and found what was valid in it — steelmanning their position before arguing yours is a sign of engineering confidence, not weakness.",
+              "Tell them the outcome and what you took away from it — if you didn't get your way, show that you committed fully anyway, because 'disagree and commit' is a senior engineering skill."
             ],
             "detail": "Example: lead wanted all partner config in appsettings; I argued runtime config belonged in a DB. I wrote a one-page RFC of both trade-offs, acknowledged his valid audit-trail point, and showed 12 partners onboarding meant 12+ deploys per cycle. We agreed a hybrid: low-churn config in appsettings, dynamic per-partner config in a DB table. Lesson: frame it as 'here are trade-offs', not 'you're wrong'.",
             "redFlags": [
@@ -602,12 +602,12 @@
             "honesty"
           ],
           "answer": {
-            "oneLiner": "Show conscious trade-offs under constraint and that you actually paid the debt back.",
+            "oneLiner": "This question is a honesty and ownership test — the worst answer is claiming you always ship perfect code. Pick a real example where a genuine constraint forced a conscious compromise, show that you flagged it transparently at the time rather than hiding it, and prove you actually paid the debt back rather than just saying you would. Interviewers are looking for self-awareness and follow-through.",
             "keyPoints": [
-              "Be honest — a trivial example signals defensiveness",
-              "The constraint that forced the compromise",
-              "You flagged and documented the trade-off at the time",
-              "What it cost, and how you actually paid it back"
+              "Pick a real, meaningful compromise — not a typo in a comment — because a trivial example signals that you're being defensive rather than honest.",
+              "Explain the constraint that forced the trade-off: a hard deadline, a missing dependency, a scope decision made above you — context matters so it doesn't look like simple carelessness.",
+              "Show that you made the compromise consciously and transparently: you filed a ticket, documented the risk in the code, and told your team — a hidden corner-cut is far worse than an acknowledged one.",
+              "Prove that you followed through by describing what it cost when the compromise showed its limits, and then what you specifically did to pay back the debt — 'we'll fix it later' only counts if later actually happened."
             ],
             "detail": "Example: three days to go-live, no time to add Redis, so I built SQL-based webhook dedup. Under peak load (~5k inserts/min) it caused lock contention and intermittent 5xx. I'd filed a HIGH tech-debt ticket and documented it in code. Next sprint I migrated to a Redis SET with TTL — contention gone. Lesson: 'fix it after launch' only works if treated as a committed plan, plus load-test the hot path first.",
             "redFlags": [
@@ -674,12 +674,12 @@
             "stakeholder management"
           ],
           "answer": {
-            "oneLiner": "Manage deadlines with ruthless scope triage and transparent communication — not silent overwork or invisible corner-cutting.",
+            "oneLiner": "The answer they want is not 'I work harder' — it's that you manage deadlines through ruthless scope triage and transparent communication. Show that you distinguish between quality you can defer and quality you can never compromise, and that you surface risk early so stakeholders can make informed choices rather than being surprised at the finish line.",
             "keyPoints": [
-              "Triage scope: minimum viable vs. nice-to-have",
-              "Flag risk early — surprises are worse than warnings",
-              "Make quality trade-offs explicit and documented",
-              "Protect non-negotiable gates: critical-path tests, security, data integrity"
+              "When facing a tight deadline, triage scope immediately: separate what absolutely must ship for the thing to work from what would be nice to have — the first group is your must-have, everything else is negotiable.",
+              "Flag risk to stakeholders early and clearly — framing it as 'here's what, here's the impact, here are your options' gives them the information to make a real decision rather than forcing a last-minute scramble.",
+              "Make quality trade-offs explicit and documented: log skipped work as a tech-debt ticket with a severity rating so it has a real chance of getting scheduled, rather than disappearing into the backlog.",
+              "Identify the quality gates you will never drop under pressure, specifically tests and safeguards on paths that are irreversible — data deletion, financial writes, and security controls cannot be untested just because the deadline moved."
             ],
             "detail": "Example: a GDPR erasure endpoint added 3 weeks before a full release. I split it into must-have (deletion cascade + audit log) and nice-to-have (portal UI), shipped the API on time and the UI next sprint. Protected the cascade with full unit + integration tests since data loss is unrecoverable; logged skipped OpenAPI docs as tech debt. I pitch pressure to stakeholders as 'what, so what, options'.",
             "redFlags": [
@@ -746,12 +746,12 @@
             "technology"
           ],
           "answer": {
-            "oneLiner": "Show a concrete, repeatable learning system — not passive reading — and tie recent learning to applied work.",
+            "oneLiner": "This question is looking for a concrete, repeatable system — not a vague claim that you read blogs. The strongest answers name something specific you learned recently, explain how you applied it in real work, and show that you also have a filter for deciding when new technology is not worth adopting. Interviewers want to hire engineers who grow deliberately, not ones who chase every shiny new thing.",
             "keyPoints": [
-              "A specific system, not 'I read blogs'",
-              "A concrete recent thing: a .NET feature, Azure service, pattern",
-              "How you applied it in real work",
-              "A filter: not every new thing is worth adopting"
+              "Describe a genuine learning system rather than passive consumption — for example, protecting a few hours each week and picking one topic to go deep on each quarter is far more credible than 'I follow the .NET blog.'",
+              "Name something specific and recent that you actually learned, whether that's a new language feature, an Azure service, a design pattern, or a library — vague answers like 'I stay current with trends' tell the interviewer nothing.",
+              "Explain how you applied it to real work, because learning something in isolation does not prove you can use it — the application is what makes the skill real and what makes the story memorable.",
+              "Show that you have a deliberate filter: you evaluated something, decided it was not worth adopting right now, and explain why — this proves you make thoughtful decisions rather than chasing novelty."
             ],
             "detail": "Example: I protect ~3–4 hrs/week and go deep on one topic per quarter. Recently learned .NET 8 Keyed Services — refactored our partner handler registry to [FromKeyedServices], removing ~80 lines of factory boilerplate. I evaluated System.Text.Json source generators the same quarter but skipped them — our serialisation didn't justify the complexity.",
             "redFlags": [
@@ -818,12 +818,12 @@
             "structure"
           ],
           "answer": {
-            "oneLiner": "Be specific about size, structure, your ownership level, and cross-functional work — they're checking whether your experience maps to theirs.",
+            "oneLiner": "Be specific and concrete here — the interviewer is mapping your experience to their team to see if you'll slot in well and operate at the right level. Describe the size and composition of your team, your actual working model, the decisions you make independently versus the ones you escalate, and how you interact with people outside the squad.",
             "keyPoints": [
-              "Size, composition, and working model (Scrum/Kanban)",
-              "Your role: IC, tech lead, or both?",
-              "Cross-functional: product, design, infra, other squads",
-              "What you decide independently vs. escalate"
+              "Give the team's size and composition in one sentence — for example, 'a cross-functional squad of six: three backend engineers, one frontend, a QA, and a PM, running two-week Scrum' — so the interviewer can immediately visualise the context.",
+              "Be clear about your own role within that structure: are you a pure individual contributor, an informal tech lead, or something in between? If you wear both hats, say so explicitly.",
+              "Describe your cross-functional working relationships — product, design, other squads, a platform team, an architect — because this shows the interviewer the breadth of your collaboration.",
+              "Articulate the boundary of your decision-making authority: what you decide independently versus what you loop in others for, because this is where interviewers learn whether you operate at the right level of seniority."
             ],
             "detail": "Example: cross-functional squad of 6 (3 BE, 1 FE, QA, PM), 2-week Scrum, infra owned by the squad with platform-team support. As senior BE I act as informal tech lead — RFCs, most reviews, infra/architecture calls, business-hours incident point. I decide library choices and conventions independently; I involve my architect for new Azure services or significant architecture changes.",
             "redFlags": [
@@ -891,12 +891,12 @@
             "team development"
           ],
           "answer": {
-            "oneLiner": "Show deliberate investment in someone's growth and a clear approach — not just that you 'helped'.",
+            "oneLiner": "This question is checking whether you invest in people deliberately or just help reactively when asked. The best answers describe a specific engineer, a specific growth area, a structured approach you took, and a concrete outcome that shows they actually improved — not just that they appreciated the help. Interviewers also want to hear what you learned from the experience.",
             "keyPoints": [
-              "Their starting point and the specific growth area",
-              "Your approach: structured 1:1s, paired reviews",
-              "A concrete thing you coached them through",
-              "The outcome, and what you learned too"
+              "Start with where your mentee was starting from and what the specific growth area was — not 'they were junior' but something concrete like 'they came from a PHP background and were writing async code that introduced subtle race conditions.'",
+              "Describe your approach with enough specificity to show it was deliberate: weekly one-on-ones on a single concept, synchronous PR reviews where you ask questions rather than hand over answers, or specific reading you pointed them toward.",
+              "Give a concrete example of something you coached them through — a specific pattern, a PR you worked through together, a design decision they wrestled with — so the interviewer can see the substance of the mentoring.",
+              "Share the outcome in terms of growing independence: the real signal that mentoring worked is when they start catching the issue in others' code before you do, not just when they say thank you."
             ],
             "detail": "Example: a PHP-background engineer new to async/await. Weekly 30-min 1:1s on one concept at a time, synchronous PR reviews where I asked questions instead of giving answers, and pointed reading (Cleary's Concurrency in C#). Within 6 weeks he caught async anti-patterns in others' PRs; by month 3 he designed an async flow solo. Teaching it made me audit my own ConfigureAwait usage.",
             "redFlags": [
@@ -964,12 +964,12 @@
             "ownership"
           ],
           "answer": {
-            "oneLiner": "Pick a real, significant mistake, own it cleanly, and show a concrete behaviour change that stuck.",
+            "oneLiner": "Pick something real with real consequences — interviewers asking this question can spot a rehearsed non-answer immediately, and a trivial mistake actually hurts you more than a significant one handled well. The three things that make this answer strong are: you own it completely without deflecting, you describe a concrete behaviour change you made as a result, and you deliver all of this in a calm, matter-of-fact tone that shows you've processed it.",
             "keyPoints": [
-              "A real mistake with real consequences",
-              "Own it — don't deflect to team or requirements",
-              "The impact: who was affected and how",
-              "The concrete behaviour change, in a calm tone"
+              "Choose a mistake that had real consequences — something that broke a build, caused customer impact, or required an incident response — because anything smaller signals you're being evasive.",
+              "Own it cleanly and without deflection: 'it was my call,' 'I approved it,' 'I missed this' — the moment you start blaming the requirements, the timeline, or your team, the interviewer stops believing you.",
+              "Describe the impact clearly and honestly: who was affected, what broke, how long it took to recover — this shows you understand the downstream effects of your decisions, not just the technical side.",
+              "Close with the concrete behaviour change you made, not a vague lesson like 'I learned to be more careful' — something you actually do differently now, like a checklist, a process gate, or a deprecation cycle, tells them the learning was real."
             ],
             "detail": "Example: approved dropping a 'unused' nullable column after a code search found no references — but an SSRS report outside the codebase used it, and a monthly finance report broke. Restored from backup by midnight. Root cause: I only searched application code. Changes: a destructive-migration checklist (also grep INFORMATION_SCHEMA), a 2-sprint deprecation cycle, and a staging schema-diff review gate. No unintended breaking schema change in two years since.",
             "redFlags": [
@@ -1036,12 +1036,12 @@
             "culture fit"
           ],
           "answer": {
-            "oneLiner": "Be honest and forward-looking — frame it around what you're moving toward, tied to this specific role, not what you're escaping.",
+            "oneLiner": "Frame this as what you are moving toward, not what you are escaping — interviewers are listening for professional maturity and genuine motivation, not frustration venting. Stay positive about your current employer, give a real reason rooted in growth, and tie it to something specific about this company so it doesn't sound like a stock answer you rehearsed for every interview you went to.",
             "keyPoints": [
-              "Stay positive about your current employer",
-              "A genuine reason about growth, not frustration",
-              "Connect it to something specific about this company",
-              "Prep for 'what would make you stay?'"
+              "Stay genuinely positive about your current employer — even if it's complicated, the interviewer does not need to hear the full story, and negativity raises a red flag about how you'll talk about them one day.",
+              "Give a forward-looking reason tied to growth: something like wanting larger scale, a more formal tech leadership path, or a growing team that needs what you can offer — these are reasons that make you a motivated candidate, not a disgruntled one.",
+              "Connect your reason to something specific and real about this company or role: a particular technology investment, a growth trajectory, a team structure they mentioned — this tells the interviewer you did your research and that this isn't just any job.",
+              "Prepare a calm, honest answer to 'what would make you stay?' — being ready for this question shows you thought this through, and giving a forward-looking answer rather than airing grievances shows maturity."
             ],
             "detail": "Example: 'Proud of the platform I built, but it's in maintenance mode and my team shrank from 6 to 3 as investment shifted. I want a system at larger scale, more formal tech leadership, and a growing team — which maps to your investment in distributed systems and internal promotion track.' If made redundant: state it was a restructure, not performance, with strong reviews. Tone: calm, confident; avoid 'my manager is terrible' or 'I'm underpaid'.",
             "redFlags": [
