@@ -93,13 +93,24 @@ export class VoiceService {
         rec.interimResults = true;
         rec.lang = 'en-US';
 
+        // Per-session high-water mark so Chrome can't double-append the same
+        // final result if onresult fires more than once for it. Resets to -1
+        // on each restart so index 0 from the new session is always accepted.
+        let lastFinalIdx = -1;
+
         rec.onresult = (event: any) => {
           if (this.sessionId !== myId) return;
           let interim = '';
           for (let i = event.resultIndex; i < event.results.length; i++) {
-            const part = event.results[i][0].transcript;
-            if (event.results[i].isFinal) { finalText += part + ' '; interim = ''; }
-            else interim = part;
+            if (event.results[i].isFinal) {
+              if (i > lastFinalIdx) {
+                finalText += event.results[i][0].transcript + ' ';
+                lastFinalIdx = i;
+              }
+              interim = '';
+            } else {
+              interim = event.results[i][0].transcript;
+            }
           }
           interimText = interim;
           this.capturedText = (finalText + interimText).trim();
