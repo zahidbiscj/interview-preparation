@@ -15,11 +15,12 @@
           "freq": "high",
           "tags": ["strings", "two-pointer", "in-place"],
           "answer": {
-            "oneLiner": "Convert to a char array and swap from both ends toward the middle with two pointers. O(n) time, O(n) space (strings are immutable in C#).",
+            "oneLiner": "The approach is to convert the string to a character array and use two pointers starting at opposite ends, swapping characters and moving inward until they meet in the middle. This works because each swap correctly repositions two characters at once, so we only need to touch half the array. It runs in O(n) time and O(n) space because C# strings are immutable and we need the intermediate array.",
             "keyPoints": [
-              "Two pointers: `left` at start, `right` at end.",
-              "Swap, then move both inward until they cross.",
-              "Strings are immutable, so work on a `char[]`."
+              "Because strings are immutable in C#, you first copy the characters into a char array so you can swap in place.",
+              "Place one pointer called left at index zero and another called right at the last index.",
+              "On each iteration swap the characters at left and right, then move left forward and right backward.",
+              "Stop when the two pointers meet or cross, at which point every character has been repositioned."
             ],
             "code": {
               "lang": "csharp",
@@ -49,12 +50,12 @@
           "freq": "medium",
           "tags": ["arrays", "hashmap", "counting", "majority"],
           "answer": {
-            "oneLiner": "Count every value with a hash map, then return all keys whose count is at least ⌊n/3⌋. O(n) time, O(n) space. Note the Boyer-Moore two-candidate trick does NOT apply here — that only works for strictly more than n/3 (≤2 winners); 'at least' can yield 3 or more answers.",
+            "oneLiner": "The straightforward approach is to count every value with a hash map in one pass and then return all entries whose count meets or exceeds the floor of n divided by 3. This is O(n) time and O(n) space. The Boyer-Moore majority vote trick does not apply here because that algorithm is designed for elements appearing strictly more than n divided by 3 times, which guarantees at most two winners, whereas the inclusive threshold in this problem can produce three or more qualifying values.",
             "keyPoints": [
-              "Threshold is floor(n/3) and the test is >= (inclusive), so ties at the boundary qualify.",
-              "Up to 3 values can hit exactly n/3 (3 × n/3 = n), so a fixed 2-candidate scheme is wrong.",
-              "Hash-map count is O(n) time / O(n) space and handles any number of winners.",
-              "Sort the result only if a deterministic order is required."
+              "The threshold is the floor of n divided by 3 and the comparison is greater than or equal to, so a value that appears exactly that many times does qualify.",
+              "Up to three distinct values can each appear exactly n divided by 3 times and together account for the whole array, which means a fixed two-candidate voting scheme will miss valid answers.",
+              "A hash map that maps each element to its count handles any number of winners correctly in O(n) time and O(n) space.",
+              "If the caller requires a deterministic ordering of the output, sort the result list before returning it."
             ],
             "code": {
               "lang": "csharp",
@@ -84,11 +85,12 @@
           "freq": "high",
           "tags": ["arrays", "dictionary", "hashing", "frequency"],
           "answer": {
-            "oneLiner": "Iterate once and accumulate counts in a Dictionary<T,int>. O(n) time, O(k) space where k is the number of distinct values.",
+            "oneLiner": "You iterate through the array exactly once and for each element either insert it into a Dictionary with a count of one or increment its existing count, giving you a complete frequency table at the end. This runs in O(n) time and O(k) space where k is the number of distinct values, because each element causes at most one lookup and one write.",
             "keyPoints": [
-              "Dictionary key = element, value = running count.",
-              "`TryGetValue` or the `dict[x] = dict.GetValueOrDefault(x) + 1` idiom.",
-              "Average O(1) per lookup/insert."
+              "The Dictionary maps each unique element to the number of times it has appeared so far.",
+              "You can use GetValueOrDefault to safely read a count that might not exist yet and then write back the incremented value in one line.",
+              "Each individual lookup and insert is O(1) on average due to hashing, so the full pass stays linear.",
+              "After the loop the Dictionary contains every distinct value paired with its exact frequency."
             ],
             "code": {
               "lang": "csharp",
@@ -118,11 +120,12 @@
           "freq": "high",
           "tags": ["arrays", "hashset", "duplicates"],
           "answer": {
-            "oneLiner": "Walk the array using a HashSet of seen values; if Add returns false, it's a duplicate. O(n) time, O(n) space.",
+            "oneLiner": "Walk the array once with a HashSet that tracks every value you have seen so far; if adding an element returns false then that element has appeared before and is a duplicate. Using a second HashSet for the results ensures each duplicate value is reported only once even if it appears three or more times. The whole algorithm is O(n) time and O(n) space.",
             "keyPoints": [
-              "`HashSet.Add` returns false when the value already exists.",
-              "Use a second set for results to avoid reporting a value twice.",
-              "One pass, average O(1) per operation."
+              "HashSet.Add returns false when the value is already present, which is a clean way to detect repetition without extra lookups.",
+              "Keep a separate results set so that a value appearing three or more times is only added to the output once.",
+              "The algorithm completes in a single pass through the array, and each add or membership check is O(1) on average.",
+              "At the end convert the results set to whatever collection type the caller expects."
             ],
             "code": {
               "lang": "csharp",
@@ -152,12 +155,12 @@
           "freq": "high",
           "tags": ["arrays", "single-pass", "max"],
           "answer": {
-            "oneLiner": "Track the largest and second-largest as you scan once; update both correctly on each element. O(n) time, O(1) space.",
+            "oneLiner": "You maintain two variables, one for the largest value seen so far and one for the second largest, updating both carefully as you scan the array from left to right in a single pass. This works because every element only needs to be compared against those two variables, so the problem reduces to bookkeeping rather than sorting. It runs in O(n) time and uses O(1) extra space.",
             "keyPoints": [
-              "Initialize both to long.MinValue (handles int.MinValue inputs).",
-              "If x > first: second = first; first = x.",
-              "Else if x > second and x != first: second = x.",
-              "Guard against arrays with fewer than 2 distinct values."
+              "Initialize both the largest and second largest variables to long.MinValue so that even arrays containing int.MinValue are handled correctly.",
+              "When you encounter a value greater than the current largest, demote the current largest to second largest and promote the new value to largest.",
+              "When a value is not greater than the largest but is greater than the current second largest and is not equal to the largest, update only the second largest.",
+              "After the loop check whether the second largest is still long.MinValue, which signals that the array had fewer than two distinct values and no valid answer exists."
             ],
             "code": {
               "lang": "csharp",
@@ -187,11 +190,12 @@
           "freq": "high",
           "tags": ["arrays", "two-pointer", "merge", "sorting"],
           "answer": {
-            "oneLiner": "Two pointers, one per array; repeatedly take the smaller front element into the result, then drain the remainder. O(m+n) time, O(m+n) space.",
+            "oneLiner": "Place one pointer at the start of each sorted array and repeatedly pick whichever front element is smaller, copying it into a result array and advancing that pointer forward. Once one array is exhausted you copy the remaining elements of the other directly, since they are already sorted. This runs in O(m plus n) time and O(m plus n) space and is exactly the merge step at the heart of merge sort.",
             "keyPoints": [
-              "This is the merge step of merge sort.",
-              "Compare a[i] vs b[j], copy the smaller, advance that pointer.",
-              "After the loop, copy whatever is left in either array."
+              "This is the same merge subroutine used internally by merge sort, so understanding it well gives insight into that algorithm too.",
+              "On each step compare the element at the current position in the first array against the element at the current position in the second array and copy the smaller one into the output.",
+              "Advance only the pointer belonging to the array you just copied from, leaving the other pointer in place.",
+              "When one array runs out of elements, append all remaining elements from the other array without any further comparisons because they are already in order."
             ],
             "code": {
               "lang": "csharp",
@@ -221,11 +225,12 @@
           "freq": "medium",
           "tags": ["strings", "split", "dictionary", "frequency"],
           "answer": {
-            "oneLiner": "Split on whitespace, reverse the word array (or iterate back to front) to rebuild the sentence, and tally counts in a Dictionary. O(n) time, O(w) space.",
+            "oneLiner": "Split the input on whitespace to get individual words, reverse the order of those words to form the new sentence, and simultaneously tally how many times each word appears using a Dictionary. Everything happens in linear time relative to the number of characters and the space used is proportional to the number of distinct words.",
             "keyPoints": [
-              "`Split` with RemoveEmptyEntries to ignore extra spaces.",
-              "Reverse the array, then String.Join to rebuild.",
-              "Count case-insensitively if required (use a case-insensitive comparer)."
+              "Use Split with the RemoveEmptyEntries option so that multiple consecutive spaces do not produce empty tokens in the word array.",
+              "Reverse the word array in place or iterate from the last index down to zero, then join the words back into a string with a single space separator.",
+              "Increment the count in a Dictionary for each word to build the frequency table in the same pass or a second pass over the word array.",
+              "If the comparison should be case-insensitive, pass a case-insensitive string comparer when constructing the Dictionary so that words differing only in capitalisation are treated as identical."
             ],
             "code": {
               "lang": "csharp",
@@ -262,11 +267,11 @@
           "freq": "high",
           "tags": ["math", "iteration", "fibonacci", "dp"],
           "answer": {
-            "oneLiner": "Keep the last two values and roll forward in a loop, no recursion. O(n) time, O(1) space (O(n) if you store the whole series).",
+            "oneLiner": "The iterative approach keeps track of just the previous two numbers and adds them together in a loop to produce the next one, which is why it only needs constant extra memory regardless of how many numbers you generate. You avoid the massive redundant recalculation that kills naive recursion, bringing the time cost down to a single linear pass. If you store the full series the space cost grows with n, but the computation itself stays O(n) time.",
             "keyPoints": [
-              "Iterative avoids the exponential blowup of naive recursion.",
-              "Track `a` and `b`, update `(a, b) = (b, a + b)`.",
-              "Use `long` to delay overflow."
+              "Iterative solution avoids the exponential blowup of naive recursion, which recalculates the same subproblems over and over.",
+              "You only need to track two variables at a time, updating them each iteration so the new value becomes the next starting point.",
+              "Use a long integer type rather than int to push back the point at which the values overflow for large inputs."
             ],
             "code": {
               "lang": "csharp",
@@ -296,11 +301,11 @@
           "freq": "high",
           "tags": ["math", "primes", "sieve", "eratosthenes"],
           "answer": {
-            "oneLiner": "Use the Sieve of Eratosthenes: mark multiples of each prime as composite starting from p*p. O(n log log n) time, O(n) space.",
+            "oneLiner": "The Sieve of Eratosthenes works by assuming every number is prime to start, then systematically crossing off multiples of each prime it finds, which eliminates composites far more efficiently than testing each number individually. Starting the crossing-off at p squared rather than 2p is the key optimization because every smaller multiple was already eliminated by an earlier prime. This gives you all primes up to n in O(n log log n) time using a boolean array of size n.",
             "keyPoints": [
-              "Boolean array; index = number, false = still prime.",
-              "Start crossing out at p*p (smaller multiples already crossed).",
-              "Only loop p up to sqrt(n)."
+              "You maintain a boolean array where each index represents a number and the value indicates whether it is still considered prime.",
+              "For each prime p you find, you start crossing out its multiples from p squared onward because any smaller multiple already has a smaller prime factor and was crossed out earlier.",
+              "You only need to iterate p up to the square root of n, because any composite number larger than that must have a factor smaller than or equal to the square root."
             ],
             "code": {
               "lang": "csharp",
@@ -330,11 +335,11 @@
           "freq": "medium",
           "tags": ["math", "factorial", "counting"],
           "answer": {
-            "oneLiner": "Trailing zeros come from factors of 10 = 2*5, and 5s are scarcer than 2s, so just count factors of 5: n/5 + n/25 + n/125 + ... O(log n) time, O(1) space.",
+            "oneLiner": "Every trailing zero in a factorial comes from multiplying a 2 and a 5 together to make 10, and since factors of 2 always outnumber factors of 5 in any factorial, counting the fives is all you need. You count how many times 5 divides into the numbers from 1 to n by summing the integer divisions n divided by 5, then n divided by 25, and so on, because multiples of 25 contribute an extra factor of 5 beyond what the first pass catches. The whole calculation runs in O(log n) time and uses no extra space.",
             "keyPoints": [
-              "Never compute n! itself (overflows fast).",
-              "Each multiple of 5 contributes one 5; multiples of 25 contribute an extra, etc.",
-              "Sum floor(n / 5^k) until the term is 0."
+              "You should never try to compute the factorial itself because it overflows even 64-bit integers extremely quickly for moderate values of n.",
+              "Each multiple of 5 in the range contributes one factor of 5, and each multiple of 25 contributes an additional factor on top of that, which is why you need to account for higher powers separately.",
+              "You keep summing the floor of n divided by successive powers of 5 until the term reaches zero, and that total is the number of trailing zeros."
             ],
             "code": {
               "lang": "csharp",
@@ -364,12 +369,12 @@
           "freq": "medium",
           "tags": ["linked-list", "sorting", "merge-sort"],
           "answer": {
-            "oneLiner": "Merge sort: it's O(n log n), doesn't need random access, and merges by relinking nodes, so it works on lists with O(1) extra space (bottom-up) unlike quicksort which relies on indexing.",
+            "oneLiner": "Merge sort is the natural fit for linked lists because it only ever needs to walk nodes sequentially and relink pointers, never jumping to an arbitrary index the way quicksort or heapsort do. It guarantees O(n log n) in all cases with no worst-case degradation, and a bottom-up iterative version avoids even the recursion stack, keeping auxiliary space at O(1). The merge step is also stable, preserving the relative order of equal elements.",
             "keyPoints": [
-              "Quicksort/heapsort need O(1) random access -> bad for lists.",
-              "Merge sort only walks nodes sequentially and splices pointers.",
-              "Stable and a guaranteed O(n log n) (no worst-case degradation like quicksort).",
-              "Bottom-up merge sort avoids recursion stack -> O(1) auxiliary space."
+              "Quicksort and heapsort both rely on fast random access by index, which linked lists cannot provide in constant time, making those algorithms a poor match.",
+              "Merge sort only needs to traverse nodes in order and update next and previous pointers during the merge step, which is exactly what linked lists do efficiently.",
+              "Merge sort is stable, meaning elements with equal keys stay in their original relative order, which is a useful guarantee that quicksort does not provide.",
+              "A bottom-up iterative merge sort eliminates the recursion call stack entirely, so auxiliary space stays at O(1) rather than O(log n)."
             ],
             "code": {
               "lang": "csharp",
@@ -399,12 +404,12 @@
           "freq": "medium",
           "tags": ["linked-list", "data-structures", "design"],
           "answer": {
-            "oneLiner": "Singly = one forward pointer; doubly = prev+next (O(1) bidirectional move/delete); circular = tail links back to head. For browser back/forward navigation use a doubly linked list (move both directions in O(1)); for round-robin tab cycling a circular list fits.",
+            "oneLiner": "A singly linked list carries only a forward pointer so it is memory-efficient but forces you to scan from the beginning to find a previous node. A doubly linked list adds a backward pointer, making it possible to move in either direction and delete a node in O(1) given a reference to it. A circular list connects the tail back to the head, which is ideal for cycling endlessly through items, while browser back and forward navigation fits a doubly linked list because you need to move naturally in both directions.",
             "keyPoints": [
-              "Singly: less memory, forward traversal only, O(n) to find prev.",
-              "Doubly: prev+next pointers, O(1) insert/delete given a node, both directions.",
-              "Circular: last node points to first -> natural cycling / round-robin.",
-              "Back/forward history = doubly linked (or two stacks); endless tab cycling = circular."
+              "A singly linked list uses less memory per node and supports forward traversal only, but finding the previous node costs O(n) because you must scan from the head.",
+              "A doubly linked list stores both a next and a previous pointer, enabling O(1) insertion and deletion at any position you already hold a reference to, and traversal in both directions.",
+              "A circular linked list has its last node point back to the first, which makes it a natural fit for round-robin scheduling or any scenario where you want to loop through items endlessly.",
+              "Browser back and forward navigation is best modeled with a doubly linked list or two stacks, while an endless tab cycling feature maps naturally onto a circular list."
             ],
             "code": {
               "lang": "csharp",
@@ -434,12 +439,12 @@
           "freq": "medium",
           "tags": ["collections", "tuple", "list", "concepts"],
           "answer": {
-            "oneLiner": "A Tuple is a fixed-size, heterogeneous group of values (different types, accessed by position/name); a List<T> is a resizable, homogeneous sequence (one type, indexable, growable). Use a tuple to return multiple values; use a list for collections you iterate or grow.",
+            "oneLiner": "A Tuple groups a fixed number of values that can each be a different type, accessed by position or name, and is designed for cases like returning multiple values from a method without defining a whole class. A List of T is a dynamically resizable collection where every element shares the same type, built for iteration, searching, and growing over time. The key mental model is that a tuple is a record of related but heterogeneous pieces, while a list is a sequence of uniform items.",
             "keyPoints": [
-              "Tuple: fixed length, mixed types, great for returning multiple values.",
-              "List<T>: dynamic length, single element type, index + iterate.",
-              "ValueTuple `(int, string)` is a value type with named members; List<T> is a reference type.",
-              "Tuples are not meant to be iterated; lists are."
+              "A Tuple has a fixed length determined at creation time and can hold values of mixed types, making it well suited for bundling a small number of related return values together.",
+              "A List of T has a dynamic length that grows or shrinks as you add or remove items, and every element in the list must be the same type.",
+              "The modern ValueTuple syntax using parentheses is a value type that supports named members and lives on the stack, whereas List of T is a reference type allocated on the heap.",
+              "Tuples are not designed to be iterated over in a loop the way lists are, and iterating a tuple requires reflection or deconstruction rather than a simple foreach."
             ],
             "code": {
               "lang": "csharp",
@@ -469,12 +474,12 @@
           "freq": "high",
           "tags": ["memory", "stack", "heap", "gc"],
           "answer": {
-            "oneLiner": "The stack is a fast, LIFO region for method call frames, local value types, and references, automatically reclaimed when a method returns; the heap is a larger region for reference-type objects, managed by the garbage collector. Value types live on the stack (or inline), reference types live on the heap.",
+            "oneLiner": "The stack is a small, fast, per-thread region of memory that automatically grows and shrinks as methods are called and returned, holding local variables, parameters, and the return address for each frame. The heap is a much larger shared region where objects created with new live, and the garbage collector periodically reclaims memory from objects that are no longer reachable. Value types typically live on the stack or inline inside other objects, while reference type instances always live on the heap.",
             "keyPoints": [
-              "Stack: per-thread, LIFO, very fast, holds locals/parameters/return addresses; freed on return.",
-              "Heap: shared, holds objects (class instances, arrays); cleaned by the GC.",
-              "A reference-type variable sits on the stack but points to heap data.",
-              "Boxing moves a value type onto the heap (allocation cost)."
+              "The stack operates in last-in first-out order and is extremely fast because allocation and deallocation are just pointer adjustments, with memory freed automatically when a method returns.",
+              "The heap is shared across threads and holds all class instances and arrays, with the garbage collector responsible for detecting and freeing objects that nothing references anymore.",
+              "A variable that holds a reference type sits on the stack and stores the address pointing to the actual object data, which lives on the heap.",
+              "Boxing wraps a value type inside an object on the heap so it can be treated as a reference type, and this incurs a heap allocation and a copy, which adds overhead if done frequently."
             ],
             "code": {
               "lang": "csharp",
@@ -511,11 +516,11 @@
           "freq": "high",
           "tags": ["sql", "ranking", "dense-rank", "salary"],
           "answer": {
-            "oneLiner": "Rank distinct salaries with DENSE_RANK() descending and pick rank 2; this handles ties cleanly and returns NULL when there's no second salary.",
+            "oneLiner": "My approach is to rank all distinct salaries using DENSE_RANK in descending order and then filter for rank 2. I use DENSE_RANK rather than RANK because it assigns the same rank to ties without leaving gaps, so if two employees share the top salary they both get rank 1 and the next distinct value correctly gets rank 2. If there is no second distinct salary the query returns NULL, which is the right behavior.",
             "keyPoints": [
-              "DENSE_RANK gives equal salaries the same rank (no gaps).",
-              "Filter the ranked result to rank = 2.",
-              "Subquery approach (MAX where salary < overall MAX) also works."
+              "DENSE_RANK assigns the same rank to equal salaries and does not skip numbers, so ties are handled cleanly.",
+              "After ranking, filter the result set to rows where the rank equals 2 to isolate the second highest salary.",
+              "A subquery approach using MAX where salary is less than the overall MAX also works but is harder to generalize to N-th highest."
             ],
             "code": {
               "lang": "sql",
@@ -545,11 +550,12 @@
           "freq": "high",
           "tags": ["sql", "ranking", "dense-rank", "nth"],
           "answer": {
-            "oneLiner": "Use DENSE_RANK() OVER (ORDER BY Salary DESC) and filter rnk = N; wrap in a function so N is a parameter. O(n log n) due to the sort.",
+            "oneLiner": "I apply the same DENSE_RANK pattern as the second-highest solution but parameterize the rank filter with N, which I typically wrap in a stored function so callers can pass any N. The sort that drives DENSE_RANK runs in O(n log n) time. If the table has fewer than N distinct salary values the query returns NULL gracefully.",
             "keyPoints": [
-              "Same DENSE_RANK pattern, parameterized by N.",
-              "OFFSET/FETCH also works but doesn't dedupe ties.",
-              "Return NULL gracefully when fewer than N distinct salaries exist."
+              "The pattern is identical to finding the second highest salary except the rank filter uses a parameter N instead of the hard-coded value 2.",
+              "Wrapping the query in a function lets you call it with any N without rewriting the SQL each time.",
+              "OFFSET/FETCH is a simpler alternative but it does not deduplicate ties, so it can return a different answer than DENSE_RANK when salaries repeat.",
+              "Always handle the case where fewer than N distinct salaries exist by ensuring the query returns NULL rather than an error."
             ],
             "code": {
               "lang": "sql",
@@ -579,11 +585,12 @@
           "freq": "medium",
           "tags": ["sql", "correlated-subquery", "subquery"],
           "answer": {
-            "oneLiner": "A correlated subquery references a column from the outer query, so it is logically re-evaluated per outer row; here we find employees earning more than their own department's average.",
+            "oneLiner": "A correlated subquery is one where the inner query references a column from the outer query, which means it is logically re-executed for every row the outer query visits. The classic example is finding employees who earn more than the average salary of their own department, where the inner query calculates the average for whichever department the current outer row belongs to. It is a clean way to express per-group comparisons, though it can be rewritten as a join or window function for better performance on large tables.",
             "keyPoints": [
-              "Inner query depends on the outer row (the correlation, e.g. e.DeptId).",
-              "Plain (non-correlated) subqueries run once, independently.",
-              "Often rewritable as a JOIN / window function for performance."
+              "The inner query references a column from the outer query, such as the employee's department ID, which creates the correlation.",
+              "Because of that dependency the inner query is logically re-evaluated once per outer row, unlike a plain subquery that runs only once.",
+              "A non-correlated subquery has no reference to the outer query and can be evaluated independently before the outer query runs.",
+              "Correlated subqueries are often rewritable as a JOIN with a grouped subquery or as a window function, which the optimizer can execute more efficiently."
             ],
             "code": {
               "lang": "sql",
@@ -613,11 +620,11 @@
           "freq": "high",
           "tags": ["sql", "self-join", "joins"],
           "answer": {
-            "oneLiner": "Join the Employee table to itself with two aliases, matching employee.ManagerId to manager.Id; use a LEFT JOIN so the top boss (NULL manager) is still listed.",
+            "oneLiner": "I join the Employee table to itself using two aliases, one representing the employee and one representing the manager, matching each employee's ManagerId to the manager's Id. Using a LEFT JOIN rather than an INNER JOIN ensures that the top-level executive, who has no manager and therefore a NULL ManagerId, still appears in the result set.",
             "keyPoints": [
-              "Two aliases of the same table: e (employee) and m (manager).",
-              "Join condition: e.ManagerId = m.Id.",
-              "LEFT JOIN keeps employees with no manager (CEO)."
+              "Two aliases of the same table are used: one alias for the employee row and another alias for the manager row.",
+              "The join condition matches the employee's ManagerId column to the manager alias's Id column.",
+              "A LEFT JOIN is used so that employees with a NULL ManagerId, such as the CEO, are still included in the output rather than being filtered out."
             ],
             "code": {
               "lang": "sql",
@@ -647,10 +654,11 @@
           "freq": "high",
           "tags": ["sql", "duplicates", "group-by", "having"],
           "answer": {
-            "oneLiner": "Group by the columns that define a duplicate and keep groups whose count exceeds one.",
+            "oneLiner": "I group by the combination of columns that together define a unique record and then use HAVING to keep only the groups where the count is greater than one, which means more than one row shares those values. This directly identifies every set of duplicates along with how many times each appears.",
             "keyPoints": [
-              "GROUP BY the candidate-key columns, then HAVING COUNT(*) > 1.",
-              "Return COUNT(*) too if you want how many times each repeats."
+              "GROUP BY the columns that together should uniquely identify a record, which are the candidate key columns for the duplicate check.",
+              "HAVING COUNT(*) greater than 1 filters to only those groups where the same combination of values appears more than once.",
+              "Including COUNT(*) in the SELECT list tells you exactly how many times each duplicate value set appears in the table."
             ],
             "code": {
               "lang": "sql",
@@ -677,10 +685,10 @@
           "freq": "high",
           "tags": ["sql", "left-join", "anti-join", "null"],
           "answer": {
-            "oneLiner": "LEFT JOIN to Department and keep rows where the joined department is NULL — the classic anti-join.",
+            "oneLiner": "I LEFT JOIN the Employee table to the Department table so that every employee is kept in the result regardless of whether a matching department exists. Then I filter to rows where the department column is NULL, which identifies employees that had no match on the join and therefore have no assigned department. This pattern is known as an anti-join.",
             "keyPoints": [
-              "LEFT JOIN preserves every employee even with no match.",
-              "WHERE d.department_id IS NULL keeps only the unmatched ones."
+              "A LEFT JOIN preserves every row from the left table, which is the Employee table, even when there is no matching row in the Department table.",
+              "After the join, filtering where the department ID from the right table is NULL isolates the employees who had no department match."
             ],
             "code": {
               "lang": "sql",
@@ -707,10 +715,10 @@
           "freq": "high",
           "tags": ["sql", "aggregate", "group-by", "revenue"],
           "answer": {
-            "oneLiner": "Sum quantity × price grouped by product.",
+            "oneLiner": "I multiply quantity by unit price to get revenue per row and then SUM those values grouped by product to get the total revenue each product has generated. It is a straightforward aggregation that the database can execute in a single pass through the sales data.",
             "keyPoints": [
-              "Revenue per row is quantity * price.",
-              "SUM(...) GROUP BY product_id totals it per product."
+              "Revenue for each individual row is calculated by multiplying the quantity sold by the price.",
+              "Wrapping that expression in SUM and grouping by product ID accumulates the total revenue per product across all its sales rows."
             ],
             "code": {
               "lang": "sql",
@@ -737,10 +745,10 @@
           "freq": "high",
           "tags": ["sql", "top-n", "order-by", "limit"],
           "answer": {
-            "oneLiner": "Order by salary descending and take the first three; use TOP (SQL Server) or LIMIT (MySQL/Postgres).",
+            "oneLiner": "I order the employee rows by salary in descending order and then limit the result to the first three rows using TOP in SQL Server or LIMIT in MySQL and PostgreSQL. When there are ties at the boundary I can add WITH TIES to include all employees who share the third-place salary rather than arbitrarily cutting some off.",
             "keyPoints": [
-              "TOP 3 / LIMIT 3 after ORDER BY salary DESC.",
-              "For ties at the boundary, TOP 3 WITH TIES or DENSE_RANK keeps equal salaries."
+              "ORDER BY salary descending followed by TOP 3 in SQL Server or LIMIT 3 in MySQL and PostgreSQL retrieves the three highest-paid employees.",
+              "When multiple employees share the same salary at the boundary, TOP 3 WITH TIES in SQL Server or a DENSE_RANK filter ensures all tied employees at that salary level are included."
             ],
             "code": {
               "lang": "sql",
@@ -767,11 +775,11 @@
           "freq": "medium",
           "tags": ["sql", "not-in", "anti-join", "join"],
           "answer": {
-            "oneLiner": "Take customers who appear in Orders but are absent from Returns (set difference).",
+            "oneLiner": "I join the Customers table to the Orders table to isolate customers who have actually made a purchase, and then I exclude anyone who also appears in the Returns table. Using NOT EXISTS or NOT IN for that exclusion gives me the set of buyers who have never returned anything.",
             "keyPoints": [
-              "JOIN Customers to Orders to keep buyers.",
-              "Exclude anyone present in Returns via NOT IN / NOT EXISTS.",
-              "DISTINCT since a customer can have many orders."
+              "Joining Customers to Orders first restricts the result to customers who have placed at least one order.",
+              "Excluding customers who appear in the Returns table using NOT IN or NOT EXISTS identifies the ones who purchased but never returned anything.",
+              "DISTINCT is needed because a single customer can have multiple orders, which would otherwise produce duplicate customer rows in the result."
             ],
             "code": {
               "lang": "sql",
@@ -798,10 +806,10 @@
           "freq": "high",
           "tags": ["sql", "group-by", "count"],
           "answer": {
-            "oneLiner": "Group by customer and COUNT the orders.",
+            "oneLiner": "I group the orders by customer ID and use COUNT to tally how many orders each customer has placed. If I also need to show customers who have placed zero orders I LEFT JOIN from the Customers table first so those customers are not excluded by the aggregation.",
             "keyPoints": [
-              "COUNT(*) per customer_id group.",
-              "LEFT JOIN from a Customers table if you must show zero-order customers."
+              "COUNT(*) with GROUP BY customer ID counts the number of order rows belonging to each customer.",
+              "If the requirement includes showing customers with zero orders, start with a LEFT JOIN from a Customers table into Orders so unmatched customers still appear in the result with a count of zero."
             ],
             "code": {
               "lang": "sql",
@@ -828,10 +836,10 @@
           "freq": "medium",
           "tags": ["sql", "date", "filter", "sargable"],
           "answer": {
-            "oneLiner": "Filter by year; a range predicate on hire_date stays index-friendly (sargable), unlike wrapping the column in YEAR().",
+            "oneLiner": "I filter on hire_date using a range predicate that checks whether the date falls on or after January 1 2023 and before January 1 2024. This approach is index-friendly, or sargable, because the column appears alone on one side of the comparison. Wrapping the column in a YEAR() function would prevent the database from using an index on that column.",
             "keyPoints": [
-              "YEAR(hire_date) = 2023 is simplest to read.",
-              "hire_date >= '2023-01-01' AND < '2024-01-01' lets an index be used."
+              "Using YEAR(hire_date) = 2023 is readable and intuitive but prevents the database from using an index on the hire_date column.",
+              "A range predicate checking that hire_date is greater than or equal to 2023-01-01 and strictly less than 2024-01-01 is sargable and allows index usage."
             ],
             "code": {
               "lang": "sql",
@@ -858,10 +866,10 @@
           "freq": "high",
           "tags": ["sql", "average", "group-by"],
           "answer": {
-            "oneLiner": "Group by customer and AVG the order amount.",
+            "oneLiner": "I group the orders by customer ID and apply AVG to the order amount, which gives the mean order value for each customer. It is worth noting that AVG ignores NULL values, so if any order amounts are NULL and should be treated as zero I would wrap them in COALESCE before averaging.",
             "keyPoints": [
-              "AVG(total_amount) per customer_id.",
-              "AVG ignores NULL amounts; use COALESCE if NULL should count as 0."
+              "AVG of the total amount column grouped by customer ID calculates the mean order value per customer.",
+              "AVG automatically ignores NULL values, so use COALESCE to convert NULLs to zero first if a NULL amount should be counted as a zero-value order."
             ],
             "code": {
               "lang": "sql",
@@ -888,10 +896,10 @@
           "freq": "high",
           "tags": ["sql", "group-by", "max", "latest-row"],
           "answer": {
-            "oneLiner": "For just the date, GROUP BY customer and MAX(order_date); for the whole latest row, use ROW_NUMBER per customer.",
+            "oneLiner": "If I only need the most recent date I group by customer and take MAX of order_date, which is simple and efficient. If I need the full row for the latest order I use ROW_NUMBER partitioned by customer and ordered by order_date descending, then filter to row number 1, which gives me exactly one complete row per customer.",
             "keyPoints": [
-              "MAX(order_date) per customer gives the latest date.",
-              "To return the full latest order, ROW_NUMBER() OVER (PARTITION BY customer ORDER BY order_date DESC) = 1."
+              "MAX of order_date grouped by customer ID is the simplest way to find the most recent order date for each customer.",
+              "To return the complete latest order row, use ROW_NUMBER partitioned by customer ID and ordered by order_date descending, then filter to rows where the row number equals 1."
             ],
             "code": {
               "lang": "sql",
@@ -918,10 +926,10 @@
           "freq": "medium",
           "tags": ["sql", "left-join", "anti-join", "null"],
           "answer": {
-            "oneLiner": "LEFT JOIN Products to Sales and keep products with no matching sale (NULL on the Sales side).",
+            "oneLiner": "I LEFT JOIN the Products table to the Sales table so that every product is present in the result even if it has never appeared in a sale. Then I filter to rows where the Sales side of the join is NULL, which means no matching sale was found for that product.",
             "keyPoints": [
-              "LEFT JOIN from Products preserves unsold ones.",
-              "WHERE s.product_id IS NULL filters to never-sold."
+              "A LEFT JOIN starting from the Products table preserves every product row regardless of whether a matching sale exists.",
+              "Filtering where the product ID from the Sales table is NULL after the join isolates products that have never been sold."
             ],
             "code": {
               "lang": "sql",
@@ -948,11 +956,11 @@
           "freq": "medium",
           "tags": ["sql", "top-n", "group-by", "order-by"],
           "answer": {
-            "oneLiner": "Aggregate quantity per product, order descending, and take the top one (WITH TIES if you want all leaders).",
+            "oneLiner": "I sum the quantity sold grouped by product, order the results by total quantity descending, and take the top row to find the product that sold the most units. If I want to surface all products tied for the top position I use WITH TIES in SQL Server or apply a DENSE_RANK filter.",
             "keyPoints": [
-              "SUM(quantity) GROUP BY product_id.",
-              "ORDER BY total DESC, then TOP 1 / LIMIT 1.",
-              "TOP 1 WITH TIES surfaces multiple equal leaders."
+              "SUM of quantity grouped by product ID gives the total units sold per product.",
+              "Ordering by the total descending and taking the first row with TOP 1 or LIMIT 1 identifies the highest-selling product.",
+              "TOP 1 WITH TIES in SQL Server or a DENSE_RANK filter ensures that all products sharing the maximum quantity are included rather than just one arbitrary winner."
             ],
             "code": {
               "lang": "sql",
@@ -979,10 +987,10 @@
           "freq": "medium",
           "tags": ["sql", "group-by", "aggregate"],
           "answer": {
-            "oneLiner": "Group by region and compute SUM(amount) and COUNT(*) in one pass.",
+            "oneLiner": "I group by region and compute both SUM of the order amount and COUNT of orders in a single aggregation pass. This gives total revenue and order volume together without requiring two separate queries.",
             "keyPoints": [
-              "Both metrics come from a single GROUP BY region.",
-              "SUM for revenue, COUNT(*) for order volume."
+              "Both metrics, total revenue and order count, are produced by a single GROUP BY region clause, so the table is scanned only once.",
+              "SUM of the amount column provides total revenue per region, and COUNT(*) provides the number of orders in each region."
             ],
             "code": {
               "lang": "sql",
@@ -1009,10 +1017,10 @@
           "freq": "medium",
           "tags": ["sql", "having", "subquery", "count"],
           "answer": {
-            "oneLiner": "Find customers with more than 5 orders in a grouped subquery, then count those customers.",
+            "oneLiner": "I first group orders by customer and use HAVING to keep only those with more than five orders, which produces a derived set of high-frequency customers. I then wrap that in an outer COUNT to tally how many customers met that threshold.",
             "keyPoints": [
-              "Inner: GROUP BY customer HAVING COUNT(*) > 5.",
-              "Outer: COUNT(*) over that result set."
+              "The inner query groups by customer ID and applies HAVING COUNT(*) greater than 5 to identify customers who placed more than five orders.",
+              "The outer query counts the rows returned by that inner result, giving the total number of customers who exceeded the threshold."
             ],
             "code": {
               "lang": "sql",
@@ -1039,10 +1047,10 @@
           "freq": "medium",
           "tags": ["sql", "subquery", "average", "filter"],
           "answer": {
-            "oneLiner": "Compare each order's amount to a scalar subquery returning the global average.",
+            "oneLiner": "I compare each order's amount against a scalar subquery that calculates the global average order value. Because the subquery returns a single value the database evaluates it once and then applies the comparison to every row, making this an efficient approach for filtering above-average orders.",
             "keyPoints": [
-              "The subquery (SELECT AVG(total_amount) FROM Orders) runs once.",
-              "WHERE total_amount > that average keeps above-average orders."
+              "The subquery selecting AVG of total amount from the Orders table runs once and returns a single scalar value representing the global average.",
+              "The WHERE clause compares each order's total amount to that scalar, keeping only orders whose amount exceeds the average."
             ],
             "code": {
               "lang": "sql",
@@ -1069,10 +1077,12 @@
           "freq": "low",
           "tags": ["sql", "date", "weekday"],
           "answer": {
-            "oneLiner": "Filter on the weekday name of hire_date being Saturday or Sunday (DATENAME in T-SQL).",
+            "oneLiner": "To find employees hired on weekends, I use DATENAME to extract the day name from the hire_date and check whether it equals Saturday or Sunday. I prefer DATENAME over DATEPART with a numeric weekday value because DATENAME returns a string like Saturday or Sunday that is unambiguous across database servers, whereas DATEPART returns a locale-sensitive number where what counts as day 1 can vary depending on the DATEFIRST setting.",
             "keyPoints": [
-              "DATENAME(WEEKDAY, hire_date) IN ('Saturday','Sunday') in SQL Server.",
-              "DATEPART(WEEKDAY,...) is locale-dependent on what day is 1; DATENAME avoids that ambiguity."
+              "DATENAME of WEEKDAY returns the full day name as a string, like Monday or Saturday, which makes the filter self-documenting and avoids locale confusion.",
+              "Using DATEPART with a numeric value like 1 or 7 to mean Sunday or Saturday is fragile because the SET DATEFIRST setting controls what number each day gets, so the same query can return different results on different servers.",
+              "This predicate wraps the column in a function, which means it is not sargable — the database cannot use a standard index on hire_date and will do a full scan instead.",
+              "On MySQL you would use DAYOFWEEK returning 1 for Sunday and 7 for Saturday, or WEEKDAY returning 5 for Saturday and 6 for Sunday; on PostgreSQL you would use EXTRACT with DOW where 0 is Sunday and 6 is Saturday."
             ],
             "code": {
               "lang": "sql",
@@ -1099,10 +1109,12 @@
           "freq": "medium",
           "tags": ["sql", "between", "filter"],
           "answer": {
-            "oneLiner": "Use BETWEEN, remembering it is inclusive of both bounds.",
+            "oneLiner": "The simplest way to filter a numeric range in SQL is the BETWEEN operator, and the important thing to remember is that it is inclusive on both ends, meaning a salary of exactly 50000 or exactly 100000 would be included in the result. If the interviewer wanted exclusive bounds, I would switch to explicit greater-than and less-than comparisons instead.",
             "keyPoints": [
-              "BETWEEN 50000 AND 100000 includes both endpoints.",
-              "Equivalent to salary >= 50000 AND salary <= 100000."
+              "BETWEEN 50000 AND 100000 includes both endpoints, so an employee earning exactly 50000 or exactly 100000 qualifies.",
+              "The expression is equivalent to writing salary greater than or equal to 50000 AND salary less than or equal to 100000.",
+              "For exclusive bounds you would write salary greater than 50000 AND salary less than 100000, dropping the equals signs.",
+              "When using BETWEEN with date values, be careful at the upper boundary: if the column stores a datetime with a time component, rows from late on the last day may be missed if you only specify a date."
             ],
             "code": {
               "lang": "sql",
@@ -1129,10 +1141,12 @@
           "freq": "medium",
           "tags": ["sql", "group-by", "date-format", "aggregate"],
           "answer": {
-            "oneLiner": "Bucket by year-month and aggregate revenue and order count per bucket.",
+            "oneLiner": "The key here is grouping by year and month together so that the same month in different years does not get merged. I use FORMAT with a yyyy-MM pattern in SQL Server to produce a sortable year-month string, then compute SUM of the amount and COUNT of the order IDs within each group. Ordering by the formatted month string works correctly because the yyyy-MM format sorts lexicographically in the right chronological order.",
             "keyPoints": [
-              "FORMAT(date,'yyyy-MM') keeps year and month together.",
-              "SUM(amount) and COUNT(order_id) per bucket; GROUP BY the same expression."
+              "If you group by MONTH alone you collapse all Januaries across all years into a single bucket, which is almost never what the interviewer wants when asking for monthly trends.",
+              "FORMAT with the pattern yyyy-MM produces a string like 2023-01 that sorts correctly as text, so an ORDER BY on that column gives chronological order without needing extra date arithmetic.",
+              "SUM of the amount gives total revenue and COUNT of the order ID gives the number of orders, and both aggregate over the same grouping in a single pass through the data.",
+              "On MySQL you would use DATE_FORMAT with percent-Y dash percent-m, and on PostgreSQL you would use TO_CHAR with YYYY-MM."
             ],
             "code": {
               "lang": "sql",
@@ -1159,10 +1173,12 @@
           "freq": "high",
           "tags": ["sql", "window", "rank", "partition"],
           "answer": {
-            "oneLiner": "Use RANK() OVER (PARTITION BY department_id ORDER BY salary DESC) to rank within each department independently.",
+            "oneLiner": "To rank employees by salary within each department independently, I use a window function called RANK with a PARTITION BY clause on the department ID. The PARTITION BY resets the ranking counter every time the department changes, so the top earner in each department gets rank 1 regardless of how employees in other departments are paid. The ORDER BY inside the window defines the direction of ranking, so ORDER BY salary descending means the highest salary gets rank 1.",
             "keyPoints": [
-              "PARTITION BY restarts the ranking per department.",
-              "RANK leaves gaps after ties; DENSE_RANK doesn't; ROW_NUMBER forces uniqueness."
+              "The PARTITION BY clause is what makes the ranking restart for each department; without it you would get a single global ranking across all employees.",
+              "RANK assigns the same rank number to employees who share a salary, and then skips the next number, so if two people tie for rank 2 the next person gets rank 4.",
+              "DENSE_RANK is similar to RANK but does not skip numbers after a tie, so a tie at rank 2 means the next distinct salary is rank 3 rather than rank 4.",
+              "ROW_NUMBER assigns a unique sequential number to every row with no ties allowed, which is useful when you need exactly one row per rank position."
             ],
             "code": {
               "lang": "sql",
@@ -1189,10 +1205,12 @@
           "freq": "medium",
           "tags": ["sql", "group-by", "having", "count-distinct"],
           "answer": {
-            "oneLiner": "Restrict to 2023, then keep customers whose count of distinct months equals 12.",
+            "oneLiner": "The approach is to filter orders to the year 2023, group by customer, and then use HAVING with COUNT of distinct months to keep only customers who have an order in all twelve months. The key insight is that you need COUNT of DISTINCT months rather than COUNT of orders, because a customer who places multiple orders in January but nothing in October would have a high order count but would not qualify.",
             "keyPoints": [
-              "Filter YEAR(order_date) = 2023.",
-              "HAVING COUNT(DISTINCT month) = 12 enforces all twelve months."
+              "Filtering with YEAR of order_date equal to 2023 first narrows the data to the relevant year before grouping.",
+              "COUNT of DISTINCT months within each customer's orders tells you how many unique months they were active, which is different from how many total orders they placed.",
+              "HAVING COUNT of distinct months equal to 12 keeps only customers who placed at least one order in every calendar month of the year.",
+              "Formatting the order date to a year-month string before counting DISTINCT ensures that months from different years would not collapse together, which is a useful habit even when you have already filtered to one year."
             ],
             "code": {
               "lang": "sql",
@@ -1219,10 +1237,12 @@
           "freq": "medium",
           "tags": ["sql", "window", "moving-average", "frame"],
           "answer": {
-            "oneLiner": "Average over a window frame of the current row plus the two preceding rows ordered by date.",
+            "oneLiner": "A moving average is computed using a window function with an explicit frame that includes a fixed number of preceding rows. For a 3-day moving average I use AVG of total amount with an OVER clause ordered by order date and a ROWS BETWEEN 2 PRECEDING AND CURRENT ROW frame, which averages the current day and the two days immediately before it. The ROWS keyword counts physical rows in the result, which is what you want here.",
             "keyPoints": [
-              "AVG(...) OVER (ORDER BY order_date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW).",
-              "ROWS frames by row position; RANGE would frame by value and merge same-date rows."
+              "The frame clause ROWS BETWEEN 2 PRECEDING AND CURRENT ROW tells the database to include the current row and exactly two rows before it in the calculation, giving a window of three rows.",
+              "Using ROWS rather than RANGE is important when multiple rows share the same order date, because RANGE groups all rows with the same order value together and would include or exclude entire days at once rather than exactly three rows.",
+              "The first two rows in the result will have smaller averages based on fewer data points since there are not yet two preceding rows available, so if the interviewer wants a full 7-day window they should filter out early rows.",
+              "If multiple orders exist on the same date and you want a true calendar-day moving average, aggregate to one row per day first before applying the window function."
             ],
             "code": {
               "lang": "sql",
@@ -1249,10 +1269,12 @@
           "freq": "medium",
           "tags": ["sql", "min-max", "group-by"],
           "answer": {
-            "oneLiner": "Group by customer and take MIN and MAX of order_date.",
+            "oneLiner": "This is a straightforward aggregation where you group orders by customer ID and take MIN of order date for the first order and MAX of order date for the last order. Both values come from a single pass through the data in one grouped query, which is efficient. If you also need the order amount or other columns from those specific rows, you would need a different approach using window functions because MIN and MAX only return the date value, not the full row.",
             "keyPoints": [
-              "MIN(order_date) = first, MAX(order_date) = last.",
-              "Both come from one grouped scan."
+              "MIN of order_date within each customer group returns the earliest date that customer placed an order.",
+              "MAX of order_date within the same group returns the most recent order date for that customer.",
+              "Because both MIN and MAX share the same GROUP BY, the database scans the data once and computes both aggregates together.",
+              "If you need the order amount or order ID from the first or last order row specifically, you cannot use MIN and MAX for that because they only return the date; you would need ROW_NUMBER or FIRST_VALUE window functions to fetch the full row instead."
             ],
             "code": {
               "lang": "sql",
@@ -1279,11 +1301,12 @@
           "freq": "medium",
           "tags": ["sql", "cte", "cross-join", "percentage"],
           "answer": {
-            "oneLiner": "Compute total revenue once in a CTE, CROSS JOIN it to each product's revenue, and divide (using 100.0 to force decimal math).",
+            "oneLiner": "To compute each product's share of total revenue, I calculate the overall total revenue once in a CTE and then cross join it into the per-product aggregation so I can divide each product's revenue by the grand total. I multiply by 100.0 rather than 100 to force the database to treat the division as floating point arithmetic, because dividing two integer columns would give an integer result and truncate the decimal portion.",
             "keyPoints": [
-              "CTE holds the single grand total.",
-              "CROSS JOIN attaches that total to every product group.",
-              "Multiply by 100.0 so integer division doesn't truncate."
+              "A CTE that computes SUM of quantity times price across all products gives you the grand total revenue as a single scalar value.",
+              "CROSS JOIN attaches that single grand total to every row in the per-product aggregation, which is exactly what you want since you are dividing each product's revenue by the same denominator.",
+              "Multiplying by 100.0 rather than 100 promotes the expression to floating point arithmetic so the percentage retains its decimal places instead of being truncated to a whole number.",
+              "An alternative to the CROSS JOIN approach is to use a window function with SUM over an empty OVER clause, which computes the total across all rows without needing a separate CTE."
             ],
             "code": {
               "lang": "sql",
@@ -1310,11 +1333,12 @@
           "freq": "medium",
           "tags": ["sql", "window", "lag", "consecutive"],
           "answer": {
-            "oneLiner": "Use LAG to bring each customer's previous order date alongside the current and keep rows exactly one day apart.",
+            "oneLiner": "To find customers who purchased on two consecutive days, I use the LAG window function to bring each customer's previous order date into the same row as the current order, and then I filter to rows where the day difference between those two dates is exactly one. I partition the window by customer so that each customer's orders are compared only against their own history rather than across different customers.",
             "keyPoints": [
-              "LAG(order_date) OVER (PARTITION BY customer ORDER BY order_date) is the prior date.",
-              "DATEDIFF(DAY, prev, current) = 1 marks consecutive days.",
-              "DISTINCT collapses customers with several such pairs."
+              "LAG of order_date partitioned by customer ID and ordered by date returns the date of the previous order for that same customer.",
+              "DATEDIFF between the previous date and the current date equal to 1 identifies pairs of consecutive-day orders.",
+              "Adding DISTINCT at the outer level collapses customers who have multiple qualifying pairs of consecutive-day purchases so each qualifying customer appears only once.",
+              "If multiple orders can exist on the same calendar day, you should deduplicate orders to one row per customer per day before applying the LAG, otherwise the difference might be zero and consecutive days could be missed."
             ],
             "code": {
               "lang": "sql",
@@ -1341,10 +1365,12 @@
           "freq": "medium",
           "tags": ["sql", "having", "date-math"],
           "answer": {
-            "oneLiner": "Group by customer and keep those whose most recent order is older than 6 months ago.",
+            "oneLiner": "To identify churned customers I group orders by customer and compute the most recent order date using MAX, then compare that date to a cutoff that is six months before the current date. Customers whose last order falls before that cutoff have not ordered in at least six months and are considered churned. I use HAVING rather than WHERE because I am filtering on an aggregate value, specifically the MAX of the order date, which does not exist until after the grouping step.",
             "keyPoints": [
-              "MAX(order_date) per customer is their last activity.",
-              "Compare to DATEADD(MONTH, -6, GETDATE()) for the cutoff."
+              "MAX of order_date per customer gives you the date of that customer's most recent order, which is what you want to compare against the churn cutoff.",
+              "DATEADD with a negative six months applied to GETDATE generates the cutoff date dynamically, so the query stays current without needing a hard-coded date.",
+              "HAVING is required here because WHERE filters individual rows before aggregation, but the condition you want to apply is on MAX of order_date, which is a result of aggregation.",
+              "Customers who never ordered at all will not appear in the Orders table, so this query only identifies formerly active customers who have gone quiet; you would need a LEFT JOIN from a Customers table to also catch people who signed up but never ordered."
             ],
             "code": {
               "lang": "sql",
@@ -1371,10 +1397,12 @@
           "freq": "medium",
           "tags": ["sql", "window", "running-total"],
           "answer": {
-            "oneLiner": "A running SUM ordered by date — the default window frame (unbounded preceding to current row) is exactly a cumulative total.",
+            "oneLiner": "A cumulative or running total is computed with a SUM window function that uses the default frame, which is everything from the beginning of the partition up to and including the current row. When you write SUM of total_amount with an OVER clause ordered by order date and no explicit frame, the database applies RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, which accumulates the total from the first row up to each successive row. This gives you a running revenue figure that grows with each row as you move forward in time.",
             "keyPoints": [
-              "SUM(total_amount) OVER (ORDER BY order_date).",
-              "Aggregate to daily totals first if there are several rows per day."
+              "A window SUM with ORDER BY and no ROWS or RANGE clause uses the default frame of RANGE UNBOUNDED PRECEDING TO CURRENT ROW, which is exactly the cumulative total behavior you want.",
+              "The word running total and cumulative total mean the same thing here: each row shows the sum of all amounts from the first row up to and including that row.",
+              "If multiple orders share the same date, the RANGE default groups all same-date rows together and assigns them all the same cumulative total, which may or may not be what the interviewer intends.",
+              "To produce one clean cumulative figure per calendar day, aggregate to daily totals first in a CTE and then apply the running SUM to the daily-total data."
             ],
             "code": {
               "lang": "sql",
@@ -1401,10 +1429,12 @@
           "freq": "medium",
           "tags": ["sql", "group-by", "average", "order-by"],
           "answer": {
-            "oneLiner": "Average salary per department and order descending; add TOP/LIMIT if you only want the leaders.",
+            "oneLiner": "The query is a simple aggregation: group employees by department and compute the average salary within each group, then order the results by that average descending so the highest-paying departments come first. If you only want the top few departments you add a TOP clause in SQL Server or LIMIT in MySQL or PostgreSQL to truncate the output.",
             "keyPoints": [
-              "AVG(salary) GROUP BY department_id.",
-              "ORDER BY the average DESC for ranking."
+              "GROUP BY department_id with AVG of salary computes the mean salary for every employee in each department.",
+              "Ordering by the average salary descending surfaces the departments with the highest average pay at the top of the result.",
+              "If you want to also display the department name, join to a Department table on department ID and include the name column in both the SELECT list and the GROUP BY clause.",
+              "To restrict to departments whose average exceeds the company-wide average, add a HAVING clause that compares the department average against a scalar subquery computing the global AVG of salary."
             ],
             "code": {
               "lang": "sql",
@@ -1431,10 +1461,12 @@
           "freq": "medium",
           "tags": ["sql", "cte", "subquery", "average"],
           "answer": {
-            "oneLiner": "Compute per-customer order counts in a CTE, then keep customers whose count beats the average of those counts.",
+            "oneLiner": "The challenge here is that we want to compare each customer's order count to the average order count across all customers, but the average must be computed over per-customer totals rather than over individual order rows. I solve this with a CTE that first counts orders per customer, then the outer query selects only those customers whose count exceeds the average of counts from the CTE.",
             "keyPoints": [
-              "CTE: COUNT(*) per customer.",
-              "Compare each to (SELECT AVG(order_count) FROM the CTE)."
+              "The CTE computes a COUNT of orders for each customer using GROUP BY customer ID, giving you one row per customer with their total order count.",
+              "The outer query filters the CTE results by comparing each customer's order count to a subquery that computes AVG of the order counts across all customers in the CTE.",
+              "It is important to take the average over the per-customer counts from the CTE rather than over the raw Orders table rows, because the latter would give you the average number of rows per customer ID, which in practice is the same thing but is easier to reason about correctly when framed as an average over totals.",
+              "Some database engines truncate the average of integers to a whole number, so if you need precision you should cast the count to a decimal before averaging."
             ],
             "code": {
               "lang": "sql",
@@ -1461,11 +1493,12 @@
           "freq": "medium",
           "tags": ["sql", "cte", "join", "first-order"],
           "answer": {
-            "oneLiner": "Find each customer's first order date in a CTE, join back to Orders on that date, and sum those first orders' amounts.",
+            "oneLiner": "To calculate revenue from first-time orders I find each customer's earliest order date in a CTE using MIN of order date grouped by customer, and then join that back to the Orders table on both the customer ID and the order date to retrieve the actual order rows from that first day. Summing the amounts on those joined rows gives the total revenue generated from new customers' first purchases.",
             "keyPoints": [
-              "CTE: MIN(order_date) per customer = first order.",
-              "Join Orders to the CTE on customer and that first date.",
-              "SUM(total_amount) over the matched first orders."
+              "The CTE uses MIN of order_date grouped by customer_id to determine when each customer placed their very first order.",
+              "Joining the CTE back to the Orders table on both customer_id and the first order date retrieves the actual order rows from each customer's first day, which could be more than one row if a customer placed multiple orders on their first day.",
+              "Summing total_amount on the joined result gives the total revenue attributable to first-time orders.",
+              "If you want only the single earliest order per customer rather than all orders placed on the first day, you would use ROW_NUMBER partitioned by customer ordered by order date and keep only the row numbered 1."
             ],
             "code": {
               "lang": "sql",
@@ -1492,10 +1525,12 @@
           "freq": "medium",
           "tags": ["sql", "group-by", "percentage", "subquery"],
           "answer": {
-            "oneLiner": "Per-department count divided by the company-wide count, scaled with 100.0 to keep decimals.",
+            "oneLiner": "To compute the percentage of employees in each department, I count employees grouped by department and divide each count by the total employee count from a scalar subquery. Multiplying by 100.0 rather than 100 ensures the division produces a decimal result rather than an integer because integer division would truncate the fraction to zero.",
             "keyPoints": [
-              "COUNT(*) per department.",
-              "Divide by (SELECT COUNT(*) FROM Employee), multiplied by 100.0."
+              "COUNT of all rows grouped by department_id gives the number of employees in each department.",
+              "The denominator is a scalar subquery that computes the total count of all employees in the company, and because it is non-correlated it is evaluated once and reused for every department row.",
+              "Multiplying by 100.0 before dividing promotes the expression to floating point arithmetic, which preserves the fractional part of the percentage.",
+              "An alternative approach uses a window function: COUNT of all rows in the SELECT, divided by SUM of COUNT over an empty OVER clause, which computes the total without a separate subquery."
             ],
             "code": {
               "lang": "sql",
@@ -1522,10 +1557,12 @@
           "freq": "medium",
           "tags": ["sql", "group-by", "min-max"],
           "answer": {
-            "oneLiner": "Per department, the spread is MAX(salary) minus MIN(salary).",
+            "oneLiner": "The salary spread within a department is simply the difference between the highest and lowest salary in that department, computed by subtracting MIN of salary from MAX of salary in a GROUP BY query. This is one of those cases where the answer is almost deceptively simple, but it is worth mentioning that a department with only one employee would have a spread of zero since MIN and MAX would be the same value.",
             "keyPoints": [
-              "MAX - MIN per group is the salary range.",
-              "Single GROUP BY department_id."
+              "MAX of salary minus MIN of salary grouped by department gives the range or spread of salaries within each department.",
+              "A department with a single employee has MIN and MAX equal to each other, so the difference is zero, which is the correct answer in that case.",
+              "Ordering the result by salary difference descending lets you quickly identify which departments have the widest pay gap.",
+              "If the interviewer asks which specific employees earn the max and min, you would need to use window functions to compare each row's salary to the MAX and MIN over their partition rather than using a simple aggregation."
             ],
             "code": {
               "lang": "sql",
@@ -1552,11 +1589,12 @@
           "freq": "low",
           "tags": ["sql", "window", "running-total", "pareto"],
           "answer": {
-            "oneLiner": "Rank products by revenue, compute a running total of revenue, and keep those whose running total is within 80% of the grand total. The running-total filter must live outside WHERE (window functions aren't allowed there).",
+            "oneLiner": "The Pareto or 80-20 analysis works by ranking products from highest revenue to lowest, computing a running total of revenue, and identifying the products whose cumulative contribution covers the first 80 percent of total revenue. I do this in two CTEs: the first computes per-product revenue, the second computes a running SUM ordered by revenue descending alongside the grand total using a window function. Then an outer query filters to rows where the running total is at or below 80 percent of the grand total.",
             "keyPoints": [
-              "Per-product revenue in a CTE.",
-              "Running SUM ordered by revenue DESC, plus the grand total via SUM() OVER ().",
-              "Filter running_total <= 0.8 * total in an outer query."
+              "The first CTE aggregates quantity times price per product to get each product's total revenue.",
+              "The second CTE computes two window functions on those product revenues: a running SUM ordered by revenue descending to accumulate from the highest contributor downward, and a global SUM over an empty window to get the grand total.",
+              "The outer query filters where the running total is less than or equal to 80 percent of the grand total, which captures all products whose combined revenue makes up the top 80 percent.",
+              "Window functions like SUM OVER cannot appear directly in a WHERE clause because the WHERE is evaluated before the window calculations, which is why the filter must go in an outer query that wraps the windowed result."
             ],
             "code": {
               "lang": "sql",
@@ -1583,10 +1621,12 @@
           "freq": "medium",
           "tags": ["sql", "window", "lag", "datediff"],
           "answer": {
-            "oneLiner": "Use LAG to pair each order with the previous one, then average the day gaps per customer (ignoring the first order's NULL gap).",
+            "oneLiner": "To find the average number of days between consecutive purchases per customer, I use LAG to bring the previous order date alongside each order, compute the day difference using DATEDIFF, and then average those gaps per customer. The first order for each customer has no previous order, so LAG returns NULL for that row, and I filter those NULL rows out before averaging so the first order does not distort the result.",
             "keyPoints": [
-              "LAG(order_date) per customer ordered by date.",
-              "AVG(DATEDIFF(DAY, prev, current)) where prev is not NULL."
+              "LAG of order_date partitioned by customer ID and ordered by date gives each row access to the date of that customer's previous order.",
+              "DATEDIFF between the previous date and the current order date gives the number of days that passed between consecutive purchases.",
+              "Filtering out rows where the previous date is NULL removes the first order for each customer, since the first order has no predecessor and would otherwise contribute a NULL gap to the average.",
+              "Customers who placed only a single order will have only a NULL gap and will be excluded entirely from the result, which is correct since an average gap requires at least two orders."
             ],
             "code": {
               "lang": "sql",
@@ -1613,11 +1653,12 @@
           "freq": "high",
           "tags": ["sql", "window", "row-number", "latest-row"],
           "answer": {
-            "oneLiner": "Number each customer's orders by date descending and keep row number 1 — this returns the whole latest row, amount included.",
+            "oneLiner": "To retrieve the full details of each customer's last purchase, including the order amount, I use ROW_NUMBER partitioned by customer ID and ordered by order date descending, then filter to rows where the row number equals 1. This is more powerful than a simple GROUP BY with MAX of order date because it carries the entire row from the latest order, including the order ID and amount, rather than just the date.",
             "keyPoints": [
-              "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC).",
-              "Filter rn = 1 to keep the most recent order.",
-              "Unlike MAX(date), this carries the order_id and amount."
+              "ROW_NUMBER assigns a unique sequential number to each order within a customer's partition, ordered from newest to oldest.",
+              "Filtering to rows where the row number equals 1 keeps exactly the most recent order for each customer.",
+              "Unlike MAX of order_date with GROUP BY, the window approach retrieves the full row including all columns from that latest order, which is necessary when you need more than just the date.",
+              "If two orders share exactly the same latest date, adding a secondary sort criterion inside the ORDER BY of the window function, such as order_id descending, makes the result deterministic by picking one row consistently."
             ],
             "code": {
               "lang": "sql",
@@ -1644,11 +1685,12 @@
           "freq": "medium",
           "tags": ["sql", "window", "lag", "yoy"],
           "answer": {
-            "oneLiner": "Aggregate revenue per year, then subtract the previous year's revenue via LAG ordered by year.",
+            "oneLiner": "Year-over-year revenue growth is computed by first aggregating total revenue per year, then using LAG to place the previous year's revenue alongside each year's revenue in the same row, and finally subtracting to get the difference. The first year in the data has no prior year, so LAG returns NULL for that row and the growth column will be NULL, which is the correct and expected behavior.",
             "keyPoints": [
-              "Yearly revenue in a derived table.",
-              "LAG(revenue) OVER (ORDER BY year) is the prior year.",
-              "Current minus previous is the YoY change."
+              "A derived table or CTE groups orders by YEAR of order date and sums the amounts to get one revenue figure per year.",
+              "LAG of the revenue column ordered by year brings the previous year's revenue into the current row so the subtraction can happen in a single expression.",
+              "The year-over-year change is current revenue minus the previous year's revenue; a positive value means growth and a negative value means decline.",
+              "To express growth as a percentage, divide the difference by the previous year's revenue and multiply by 100, but add a guard against dividing by zero or NULL when the previous year has no data."
             ],
             "code": {
               "lang": "sql",
@@ -1675,11 +1717,12 @@
           "freq": "low",
           "tags": ["sql", "window", "ntile", "percentile"],
           "answer": {
-            "oneLiner": "Bucket each customer's orders into deciles by amount with NTILE(10) and keep the top decile (decile 10 ≈ above the 90th percentile).",
+            "oneLiner": "To find orders above each customer's 90th percentile, I use NTILE to divide each customer's orders into ten equal buckets ranked by amount, with the highest amounts in bucket 10, and then I keep only bucket 10. NTILE is an approximation of the percentile because it splits by row count, so a customer with only a few orders will have unevenly sized buckets. If you need the exact 90th percentile cutoff, you would use PERCENTILE_CONT instead.",
             "keyPoints": [
-              "NTILE(10) OVER (PARTITION BY customer_id ORDER BY total_amount).",
-              "Decile 10 is the top 10% of that customer's orders.",
-              "NTILE is an approximation; PERCENTILE_CONT(0.9) is exact."
+              "NTILE of 10 partitioned by customer ID and ordered by total amount ascending divides each customer's orders into ten roughly equal groups, with the top 10 percent of orders landing in bucket 10.",
+              "Filtering to decile 10 returns the orders in the top tenth of each customer's spending distribution, which approximates orders above the 90th percentile.",
+              "NTILE is an approximation because it splits rows evenly by count; for a customer with only three orders, bucket 10 gets just one row, and the boundaries between buckets may not correspond to true percentile values.",
+              "The exact alternative is PERCENTILE_CONT of 0.9 WITHIN GROUP ordered by total amount, computed as a window function over the customer partition, which interpolates the true 90th percentile value and lets you compare each order directly against it."
             ],
             "code": {
               "lang": "sql",
@@ -1706,10 +1749,12 @@
           "freq": "medium",
           "tags": ["sql", "window", "lag", "datediff", "max"],
           "answer": {
-            "oneLiner": "LAG the previous order date per customer, take the day difference, and MAX it per customer.",
+            "oneLiner": "To find the longest gap between orders for each customer, I use LAG to get each order's previous date, compute the day difference with DATEDIFF, and then aggregate with MAX per customer to find the largest of those gaps. Rows where the previous date is NULL represent each customer's first order and are filtered out before taking the MAX.",
             "keyPoints": [
-              "LAG(order_date) per customer ordered by date.",
-              "MAX(DATEDIFF(DAY, prev, current)) over the non-NULL gaps."
+              "LAG of order_date partitioned by customer and ordered chronologically gives each row the date of the previous order for that customer.",
+              "DATEDIFF between the previous date and the current date gives the number of days that elapsed between two consecutive purchases.",
+              "Filtering out rows where the previous date is NULL removes each customer's first order, which has no predecessor and therefore no meaningful gap.",
+              "MAX of the day differences per customer collapses all the individual gaps into a single longest gap value for each customer."
             ],
             "code": {
               "lang": "sql",
@@ -1736,11 +1781,12 @@
           "freq": "low",
           "tags": ["sql", "percentile", "cte", "window"],
           "answer": {
-            "oneLiner": "Total revenue per customer, then compare each to the 10th-percentile cutoff computed with PERCENTILE_CONT (a window function in SQL Server, so it needs OVER ()).",
+            "oneLiner": "To find customers in the bottom 10 percent by total revenue, I first sum their order amounts per customer in a CTE, and then compute the 10th percentile cutoff value using PERCENTILE_CONT. In SQL Server, PERCENTILE_CONT is a window function that requires an OVER clause and returns the interpolated value on every row, so I take a single DISTINCT value from it to use as a scalar threshold and then filter customers whose total is below that threshold.",
             "keyPoints": [
-              "CTE: SUM(total_amount) per customer.",
-              "PERCENTILE_CONT(0.1) WITHIN GROUP (ORDER BY total_revenue) OVER () gives the cutoff.",
-              "Keep customers below that cutoff."
+              "The CTE uses SUM of total amount grouped by customer ID to compute each customer's lifetime revenue.",
+              "PERCENTILE_CONT of 0.1 WITHIN GROUP ordered by total revenue OVER an empty window computes the 10th percentile cutoff as an interpolated value, meaning it calculates a value that would fall at the 10th percentile point even if that exact value does not exist in the data.",
+              "In SQL Server, PERCENTILE_CONT is a window function rather than an aggregate, so it returns the same cutoff value on every row of the result and you need to take DISTINCT to get a single scalar.",
+              "PERCENTILE_DISC is similar to PERCENTILE_CONT but instead of interpolating it returns the actual existing data value closest to the target percentile, so the two functions can give different answers when data is sparse."
             ],
             "code": {
               "lang": "sql",
@@ -1774,13 +1820,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "where", "filter"],
           "answer": {
-            "oneLiner": "Filter rows where both flag columns equal 'Y'.",
+            "oneLiner": "This is the simplest kind of SQL filter: two equality conditions joined by AND so that only rows satisfying both conditions are returned. I select the product_id and filter where low_fats equals Y and recyclable equals Y, and because product_id is the primary key I do not need DISTINCT.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT product_id\nFROM Products\nWHERE low_fats = 'Y' AND recyclable = 'Y';",
               "note": "Basic WHERE with AND"
             },
-            "keyPoints": ["Two equality predicates joined by AND."],
+            "keyPoints": ["The AND operator means both conditions must be true simultaneously for a row to qualify, so a product that is recyclable but not low fat would be excluded.", "Because product_id is the primary key, each row is already unique and adding DISTINCT would have no effect.", "If the question asked for products that are either low fat or recyclable, I would use OR instead, but the word both in the problem description requires AND."],
             "dialogue": [
               { "role": "interviewer", "text": "Find product ids that are both low fat and recyclable." },
               { "role": "me", "text": "I'd SELECT product_id and filter WHERE low_fats = 'Y' AND recyclable = 'Y'." },
@@ -1804,13 +1850,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "null", "where"],
           "answer": {
-            "oneLiner": "Keep rows where referee_id is not 2, explicitly including NULLs since NULL <> 2 is unknown, not true.",
+            "oneLiner": "The tricky part of this question is handling NULL values in the referee_id column. A plain not-equal comparison like referee_id not equal to 2 in SQL returns UNKNOWN rather than TRUE when referee_id is NULL, so those rows are silently excluded from the result. To include customers with no referee at all, I add an explicit OR IS NULL check.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT name\nFROM Customer\nWHERE referee_id <> 2 OR referee_id IS NULL;",
               "note": "NULL-aware filtering: <> never matches NULL"
             },
-            "keyPoints": ["NULL <> 2 evaluates to UNKNOWN, so add OR referee_id IS NULL."],
+            "keyPoints": ["In SQL, any comparison involving NULL evaluates to UNKNOWN rather than TRUE or FALSE, which means NULL not equal to 2 is not considered true and the row is filtered out.", "Adding OR referee_id IS NULL to the WHERE clause explicitly includes customers who have no referee, which is the correct interpretation of not being referred by customer 2.", "An alternative is to use COALESCE to substitute a safe placeholder value for NULL before comparing, such as COALESCE of referee_id and 0 not equal to 2, which achieves the same result in a single predicate."],
             "dialogue": [
               { "role": "interviewer", "text": "Report customers not referred by customer id 2. Note referee_id can be NULL." },
               { "role": "me", "text": "I'd filter WHERE referee_id <> 2, but that alone drops NULLs, so I add OR referee_id IS NULL." },
@@ -1834,13 +1880,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "where", "or"],
           "answer": {
-            "oneLiner": "Select the three columns where either size threshold is met.",
+            "oneLiner": "A country is big if it meets either of two criteria: large area or large population. Since either condition alone qualifies the country, I use OR to connect the two predicates in the WHERE clause. I select only the three columns the question asks for: name, population, and area.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT name, population, area\nFROM World\nWHERE area >= 3000000 OR population >= 25000000;",
               "note": "OR condition on two thresholds"
             },
-            "keyPoints": ["Either condition qualifies, so use OR."],
+            "keyPoints": ["OR means a row qualifies if at least one of the conditions is true, so a country with a huge population but a small area would still be selected.", "Using AND instead of OR would require a country to be both large in area and large in population, which would be too restrictive and exclude valid results.", "An OR filter on two different columns usually cannot take advantage of a single composite index, so the database may perform a table scan or use an index-merge strategy on large tables."],
             "dialogue": [
               { "role": "interviewer", "text": "Find big countries where area >= 3000000 OR population >= 25000000." },
               { "role": "me", "text": "I'd SELECT name, population, area and filter WHERE area >= 3000000 OR population >= 25000000." },
@@ -1864,13 +1910,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "distinct", "self-view"],
           "answer": {
-            "oneLiner": "Keep rows where author_id = viewer_id, take DISTINCT ids, order ascending.",
+            "oneLiner": "An author viewing their own article means the author_id and viewer_id columns in the same row are equal. I filter to those rows, select DISTINCT author_id to avoid listing the same author multiple times if they viewed several of their own articles, and order the result ascending as required.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT DISTINCT author_id AS id\nFROM Views\nWHERE author_id = viewer_id\nORDER BY id;",
               "note": "DISTINCT + equality predicate"
             },
-            "keyPoints": ["author_id = viewer_id means self-view.", "DISTINCT removes duplicate authors."],
+            "keyPoints": ["The condition author_id equal to viewer_id identifies rows where the person who wrote the article is also the person who viewed it, which is what self-view means.", "DISTINCT is necessary because an author might self-view several articles or view the same article multiple times, which would produce duplicate author IDs without the deduplication.", "Ordering by the aliased id column ascending satisfies the output ordering requirement, and the alias is referenced directly in the ORDER BY clause."],
             "dialogue": [
               { "role": "interviewer", "text": "Find authors who viewed at least one of their own articles, distinct ids ascending." },
               { "role": "me", "text": "I'd filter WHERE author_id = viewer_id, then SELECT DISTINCT author_id and ORDER BY it ascending." },
@@ -1894,13 +1940,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "string-length", "char-length"],
           "answer": {
-            "oneLiner": "Filter by CHAR_LENGTH(content) > 15.",
+            "oneLiner": "I filter tweets where the character length of the content column is strictly greater than 15, which identifies the invalid ones. I use CHAR_LENGTH rather than LENGTH because LENGTH counts bytes in MySQL, and a multibyte character like an emoji would inflate the byte count beyond the actual number of characters, producing incorrect results.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT tweet_id\nFROM Tweets\nWHERE CHAR_LENGTH(content) > 15;",
               "note": "CHAR_LENGTH counts characters (not bytes like LENGTH)"
             },
-            "keyPoints": ["Prefer CHAR_LENGTH over LENGTH for multibyte safety."],
+            "keyPoints": ["CHAR_LENGTH counts the number of characters in a string regardless of how many bytes each character takes, making it safe for multibyte encodings like UTF-8.", "LENGTH in MySQL counts the number of bytes, so a two-byte character would count as 2 rather than 1 and could incorrectly classify a tweet as invalid.", "The threshold is strictly greater than 15, so a tweet with exactly 15 characters is still valid and should not appear in the results.", "The SQL Server equivalent is LEN, which counts characters rather than bytes."],
             "dialogue": [
               { "role": "interviewer", "text": "Find invalid tweets where content has strictly more than 15 characters." },
               { "role": "me", "text": "I'd SELECT tweet_id and filter WHERE CHAR_LENGTH(content) > 15." },
@@ -1924,13 +1970,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "left-join"],
           "answer": {
-            "oneLiner": "LEFT JOIN from Employees to EmployeeUNI on id so unmatched employees still appear with NULL unique_id.",
+            "oneLiner": "I use a LEFT JOIN starting from the Employees table so that every employee is preserved in the result, even those who have no entry in the EmployeeUNI table. For employees without a unique ID, the join produces NULL for the unique_id column, which is exactly the output required.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT eu.unique_id, e.name\nFROM Employees e\nLEFT JOIN EmployeeUNI eu ON e.id = eu.id;",
               "note": "LEFT JOIN preserves rows without a match"
             },
-            "keyPoints": ["LEFT JOIN keeps all employees; missing unique_id becomes NULL."],
+            "keyPoints": ["A LEFT JOIN keeps all rows from the left table, Employees in this case, regardless of whether a matching row exists in the right table EmployeeUNI.", "When no match exists in EmployeeUNI for a given employee, the joined columns from that table are filled with NULL, which naturally produces the required NULL output for employees without a unique ID.", "Using an INNER JOIN instead would silently drop employees who have no unique ID entry, which would be wrong."],
             "dialogue": [
               { "role": "interviewer", "text": "Show each user's unique_id, NULL if they have none." },
               { "role": "me", "text": "I'd LEFT JOIN Employees to EmployeeUNI on id so every employee is preserved even without a match." },
@@ -1954,13 +2000,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "inner-join"],
           "answer": {
-            "oneLiner": "Inner join Sales to Product on product_id and project the requested columns.",
+            "oneLiner": "This is a basic inner join that enriches each sales row with the product name from the Product table. Every sales row references a product via the product_id foreign key, and because that key is guaranteed to exist in the Product table, an inner join is appropriate here and will not drop any rows.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT p.product_name, s.year, s.price\nFROM Sales s\nJOIN Product p ON s.product_id = p.product_id;",
               "note": "Simple INNER JOIN on FK"
             },
-            "keyPoints": ["Join on product_id to enrich sales with the name."],
+            "keyPoints": ["Joining Sales to Product on product_id pulls the product name into each sales row so it can be included in the output.", "An INNER JOIN is safe here because every sale has a valid product_id that exists in the Product table, so no rows are lost.", "Because product_id is the primary key of Product, each sales row matches exactly one product row and the join does not multiply rows."],
             "dialogue": [
               { "role": "interviewer", "text": "Report product_name, year, and price for each Sales row." },
               { "role": "me", "text": "I'd INNER JOIN Sales to Product on product_id and project the three requested columns." },
@@ -1984,13 +2030,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "left-join", "group-by", "anti-join"],
           "answer": {
-            "oneLiner": "LEFT JOIN visits to transactions and keep only visits with no matching transaction (transaction_id IS NULL), then count per customer.",
+            "oneLiner": "I LEFT JOIN the Visits table to the Transactions table on visit_id, which keeps every visit including ones with no transactions. Rows where transaction_id is NULL after the join are visits where the customer browsed but did not buy anything, and counting those per customer gives the answer.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT v.customer_id, COUNT(*) AS count_no_trans\nFROM Visits v\nLEFT JOIN Transactions t ON v.visit_id = t.visit_id\nWHERE t.transaction_id IS NULL\nGROUP BY v.customer_id;",
               "note": "LEFT JOIN + IS NULL = anti-join"
             },
-            "keyPoints": ["transaction_id IS NULL isolates visits with no transaction.", "GROUP BY customer to count them."],
+            "keyPoints": ["A LEFT JOIN from Visits to Transactions on visit_id preserves every visit row regardless of whether a transaction exists for that visit.", "After the join, rows where the transaction_id column from Transactions is NULL represent visits with no transactions, which is the classic anti-join pattern.", "GROUP BY customer_id with COUNT of all such NULL-transaction rows gives the number of transaction-free visits per customer."],
             "dialogue": [
               { "role": "interviewer", "text": "For each customer, count visits where they made no transaction." },
               { "role": "me", "text": "I'd LEFT JOIN Visits to Transactions on visit_id, then keep only rows where transaction_id IS NULL." },
@@ -2014,13 +2060,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "self-join", "datediff"],
           "answer": {
-            "oneLiner": "Self-join Weather to itself where the dates are exactly one day apart and today's temperature exceeds yesterday's.",
+            "oneLiner": "I self-join the Weather table to itself using two aliases and connect them where the day difference is exactly 1, meaning one row represents today and the other represents yesterday. Then I filter to pairs where today's temperature is higher than yesterday's to find the warming days.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT w1.id\nFROM Weather w1\nJOIN Weather w2\n  ON DATEDIFF(w1.recordDate, w2.recordDate) = 1\nWHERE w1.temperature > w2.temperature;",
               "note": "Self-join on consecutive days via DATEDIFF"
             },
-            "keyPoints": ["DATEDIFF(today, yesterday) = 1 ties consecutive days.", "Compare temperatures across the two aliases."],
+            "keyPoints": ["A self-join connects a table to itself using two aliases, letting you compare rows that belong to different dates within the same table.", "Using DATEDIFF to test that the date difference equals exactly 1 is more reliable than subtracting ID values, because dates can have gaps and IDs are not guaranteed to be consecutive.", "The temperature comparison in the WHERE clause ensures only days that are genuinely warmer than the previous day appear in the result.", "An alternative is to use LAG of temperature over the window ordered by date and compare the current row's temperature to the prior row's temperature, which avoids the self-join entirely."],
             "dialogue": [
               { "role": "interviewer", "text": "Find ids of days warmer than the previous day." },
               { "role": "me", "text": "I'd self-join Weather to itself where DATEDIFF(w1.date, w2.date) = 1 and w1.temperature > w2.temperature." },
@@ -2044,13 +2090,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "self-join", "aggregate", "round"],
           "answer": {
-            "oneLiner": "Join start rows to end rows on machine_id + process_id and average (end - start) per machine.",
+            "oneLiner": "To compute each machine's average process time, I self-join the Activity table on machine_id and process_id, pairing start rows with their corresponding end rows for the same process. I compute the time difference by subtracting the start timestamp from the end timestamp, average those differences per machine, and round to three decimal places.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT a.machine_id,\n       ROUND(AVG(b.timestamp - a.timestamp), 3) AS processing_time\nFROM Activity a\nJOIN Activity b\n  ON a.machine_id = b.machine_id\n AND a.process_id = b.process_id\n AND a.activity_type = 'start'\n AND b.activity_type = 'end'\nGROUP BY a.machine_id;",
               "note": "Self-join pairing start/end, then AVG + ROUND"
             },
-            "keyPoints": ["Pair each start with its matching end per process.", "AVG over all processes; ROUND to 3."],
+            "keyPoints": ["The self-join connects each start activity row to the matching end activity row for the same machine and process, using the activity_type column to distinguish start from end.", "Specifying that alias a must have activity_type equal to start and alias b must have activity_type equal to end ensures the subtraction always goes in the right direction, giving a positive duration.", "AVG over those differences per machine_id computes the mean processing time across all processes on that machine.", "An alternative without the self-join is conditional aggregation: compute the average of end timestamps minus the average of start timestamps per machine, which works when each process has exactly one start and one end."],
             "dialogue": [
               { "role": "interviewer", "text": "Compute each machine's average process time from start/end activity rows." },
               { "role": "me", "text": "I'd self-join Activity to itself on machine_id and process_id, pairing the 'start' row with the 'end' row, then average (end - start)." },
@@ -2074,13 +2120,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "left-join", "null"],
           "answer": {
-            "oneLiner": "LEFT JOIN to keep bonus-less employees, then filter bonus < 1000 OR bonus IS NULL.",
+            "oneLiner": "Employees with no bonus have no row in the Bonus table, so I need a LEFT JOIN to keep them in the result. After the join, employees with no bonus have NULL for the bonus column, and NULL is less than 1000 evaluates to UNKNOWN in SQL, so I must explicitly include an OR IS NULL check to make sure no-bonus employees are not accidentally filtered out.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT e.name, b.bonus\nFROM Employee e\nLEFT JOIN Bonus b ON e.empId = b.empId\nWHERE b.bonus < 1000 OR b.bonus IS NULL;",
               "note": "LEFT JOIN; IS NULL captures employees with no bonus"
             },
-            "keyPoints": ["Employees with no bonus have NULL, which must be included explicitly."],
+            "keyPoints": ["A LEFT JOIN from Employee to Bonus on empId keeps all employees in the result, including those who have no bonus entry at all.", "For employees with no bonus row, the bonus column after the LEFT JOIN contains NULL, and NULL compared to any number returns UNKNOWN rather than TRUE.", "Adding OR bonus IS NULL to the filter explicitly includes employees with no bonus, because the NULL comparison alone would exclude them.", "An alternative is to use COALESCE to replace NULL with zero before comparing, writing COALESCE of bonus and zero less than 1000, which is a single cleaner predicate."],
             "dialogue": [
               { "role": "interviewer", "text": "Report name and bonus for employees with bonus under 1000, including those with no bonus." },
               { "role": "me", "text": "I'd LEFT JOIN Employee to Bonus on empId, then filter WHERE b.bonus < 1000 OR b.bonus IS NULL." },
@@ -2104,13 +2150,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "cross-join", "left-join", "group-by"],
           "answer": {
-            "oneLiner": "CROSS JOIN students with subjects to get every pair, LEFT JOIN examinations, then COUNT the exam rows per pair.",
+            "oneLiner": "The challenge here is that we need to show a count of zero for combinations where a student never took an exam in a subject. To achieve that, I CROSS JOIN Students with Subjects to generate every possible student-subject pair, then LEFT JOIN that result to the Examinations table to attach actual exam records. COUNT of a column from the Examinations side returns zero for pairs with no matching rows.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT s.student_id, s.student_name, sub.subject_name,\n       COUNT(e.subject_name) AS attended_exams\nFROM Students s\nCROSS JOIN Subjects sub\nLEFT JOIN Examinations e\n  ON e.student_id = s.student_id\n AND e.subject_name = sub.subject_name\nGROUP BY s.student_id, s.student_name, sub.subject_name\nORDER BY s.student_id, sub.subject_name;",
               "note": "CROSS JOIN builds all pairs; COUNT(col) ignores NULLs"
             },
-            "keyPoints": ["CROSS JOIN generates every student-subject combination.", "COUNT(e.subject_name) gives 0 for untaken subjects."],
+            "keyPoints": ["A CROSS JOIN between Students and Subjects produces every possible combination of a student and a subject, which is necessary so that pairs with zero exams still appear in the result.", "LEFT JOIN to Examinations attaches exam rows where they exist while preserving all student-subject pairs that have no matching exam.", "COUNT of a specific column from the Examinations table, rather than COUNT of all rows, counts only non-NULL values and therefore returns zero for student-subject pairs that had no exams after the LEFT JOIN.", "GROUP BY student_id, student_name, and subject_name collapses all exam rows for each pair into a single count."],
             "dialogue": [
               { "role": "interviewer", "text": "For every student and every subject, count exams taken, even zero." },
               { "role": "me", "text": "I'd CROSS JOIN Students with Subjects to get all pairs, LEFT JOIN Examinations, then COUNT per pair." },
@@ -2134,13 +2180,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "group-by", "having", "self-join"],
           "answer": {
-            "oneLiner": "Group employees by managerId, keep groups with 5+ members, then join back to get the manager's name.",
+            "oneLiner": "To find managers with at least five direct reports, I group the Employee table by manager_id and use HAVING to keep only those manager IDs with a count of five or more. Then I look up those manager IDs in the Employee table to retrieve their names, since the employee who is a manager also has a row in the same table with their name.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT name\nFROM Employee\nWHERE id IN (\n    SELECT managerId\n    FROM Employee\n    GROUP BY managerId\n    HAVING COUNT(*) >= 5\n);",
               "note": "GROUP BY ... HAVING COUNT(*) >= 5, then map id back to name"
             },
-            "keyPoints": ["HAVING filters aggregated counts.", "Subquery returns manager ids; outer query resolves names."],
+            "keyPoints": ["Grouping by manager_id and counting the rows in each group gives you the number of direct reports for each manager.", "HAVING is required instead of WHERE because you are filtering on an aggregated count, which does not exist until after the grouping step.", "The manager IDs that pass the HAVING filter are then used to look up names in the Employee table using a WHERE IN subquery or a self-join, since each manager is also an employee with their own row.", "Managers with zero direct reports do not appear in this query because they have no subordinate rows that reference their ID as manager_id."],
             "dialogue": [
               { "role": "interviewer", "text": "Find managers with at least five direct reports; return their names." },
               { "role": "me", "text": "I'd GROUP BY managerId and keep groups with COUNT(*) >= 5 via HAVING, then map those ids back to names." },
@@ -2164,13 +2210,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "left-join", "avg", "ifnull"],
           "answer": {
-            "oneLiner": "LEFT JOIN signups to confirmations; AVG of (action='confirmed') gives the rate, wrapped in IFNULL/ROUND for users with no requests.",
+            "oneLiner": "I LEFT JOIN the Signups table to the Confirmations table so that users who never sent a confirmation request still appear with a null confirmation record. Then I compute the confirmation rate by averaging the boolean expression that checks whether each action is confirmed, which gives the fraction of confirmed messages, and I wrap that in IFNULL to return zero for users who have no rows in the Confirmations table at all.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT s.user_id,\n       ROUND(IFNULL(AVG(c.action = 'confirmed'), 0), 2) AS confirmation_rate\nFROM Signups s\nLEFT JOIN Confirmations c ON s.user_id = c.user_id\nGROUP BY s.user_id;",
               "note": "AVG of a boolean = fraction true; IFNULL handles no-request users"
             },
-            "keyPoints": ["(c.action = 'confirmed') yields 1/0; AVG = confirmation fraction.", "IFNULL(..., 0) covers users with no confirmations."],
+            "keyPoints": ["A LEFT JOIN from Signups to Confirmations keeps every user in the result, even those who never requested a confirmation.", "In MySQL, a boolean expression like action equal to confirmed evaluates to 1 when true and 0 when false, so averaging those values across all confirmation rows for a user gives the fraction that were confirmed.", "For users with no confirmation rows at all, the AVG returns NULL because it is averaging over an empty set, and IFNULL converts that to zero as required by the problem.", "ROUND to two decimal places is applied as the final step to format the confirmation rate correctly."],
             "dialogue": [
               { "role": "interviewer", "text": "Compute each user's confirmation rate = confirmed / total requests, 0 if none." },
               { "role": "me", "text": "I'd LEFT JOIN Signups to Confirmations and take AVG(c.action = 'confirmed'), which averages 1s and 0s into the fraction." },
@@ -2194,13 +2240,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "where", "modulo", "order-by"],
           "answer": {
-            "oneLiner": "Filter id % 2 = 1 and description <> 'boring', then ORDER BY rating DESC.",
+            "oneLiner": "I filter to movies with an odd id using the modulo operator and exclude those whose description is exactly the word boring. Then I order the qualifying movies by rating descending so the highest-rated ones appear first.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT *\nFROM Cinema\nWHERE id % 2 = 1 AND description <> 'boring'\nORDER BY rating DESC;",
               "note": "Modulo for odd ids; ORDER BY DESC"
             },
-            "keyPoints": ["id % 2 = 1 selects odd ids."],
+            "keyPoints": ["The modulo operator id percent 2 equal to 1 selects rows where the id is odd because odd numbers leave a remainder of 1 when divided by 2.", "The description not equal to boring condition uses a case-sensitive or case-insensitive comparison depending on the database collation, but for this problem the data is straightforward.", "ORDER BY rating descending sorts the results from the highest rating to the lowest, which is what the problem requires."],
             "dialogue": [
               { "role": "interviewer", "text": "Report movies with an odd id and description not 'boring', ordered by rating descending." },
               { "role": "me", "text": "I'd filter WHERE id % 2 = 1 AND description <> 'boring', then ORDER BY rating DESC." },
@@ -2224,13 +2270,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "left-join", "weighted-average", "ifnull"],
           "answer": {
-            "oneLiner": "LEFT JOIN prices to units sold where the purchase date falls inside the price window, then take the weighted average, defaulting to 0.",
+            "oneLiner": "The average selling price is a weighted average where each period's price is weighted by the number of units sold during that period. I join the Prices table to UnitsSold using a date range condition so that each unit's sale is matched to whichever price window was active on its purchase date, then compute SUM of price times units divided by SUM of units per product.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT p.product_id,\n       IFNULL(ROUND(SUM(p.price * u.units) / SUM(u.units), 2), 0) AS average_price\nFROM Prices p\nLEFT JOIN UnitsSold u\n  ON p.product_id = u.product_id\n AND u.purchase_date BETWEEN p.start_date AND p.end_date\nGROUP BY p.product_id;",
               "note": "Date-range join + weighted average; IFNULL for no-sales (division by NULL)"
             },
-            "keyPoints": ["Join on purchase_date BETWEEN start and end.", "Weighted avg = SUM(price*units)/SUM(units); IFNULL gives 0."],
+            "keyPoints": ["The join condition includes BETWEEN start_date AND end_date so that a unit sold on a given date is matched only to the price that was valid on that date, not to all historical prices.", "The weighted average formula is SUM of price multiplied by units divided by SUM of units, which weights each price by how many units were sold at that price.", "For products with no sales, the division produces NULL because SUM of units is NULL over an empty set, and IFNULL replaces that with zero as required.", "Using a LEFT JOIN from Prices to UnitsSold means that price windows with no matching sales are still preserved and contribute to the result correctly."],
             "dialogue": [
               { "role": "interviewer", "text": "Compute each product's average selling price = SUM(price*units)/SUM(units), 0 if no sales." },
               { "role": "me", "text": "I'd LEFT JOIN Prices to UnitsSold where purchase_date falls BETWEEN start_date and end_date, then take the weighted average." },
@@ -2254,13 +2300,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "join", "avg", "group-by"],
           "answer": {
-            "oneLiner": "Join Project to Employee on employee_id and AVG(experience_years) per project_id.",
+            "oneLiner": "I join the Project table to the Employee table on employee_id so I can access each employee's experience years, then group by project_id and take the average experience years across all employees on each project. Wrapping the average in ROUND to two decimal places formats the output as the problem requires.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT p.project_id,\n       ROUND(AVG(e.experience_years), 2) AS average_years\nFROM Project p\nJOIN Employee e ON p.employee_id = e.employee_id\nGROUP BY p.project_id;",
               "note": "JOIN + AVG + ROUND grouped by project"
             },
-            "keyPoints": ["Group by project_id, average the joined experience values."],
+            "keyPoints": ["Joining Project to Employee on employee_id enriches each project-employee assignment row with the employee's experience_years value.", "GROUP BY project_id collapses all employee rows for each project into a single aggregate row.", "AVG of experience_years computes the mean number of years of experience across all employees assigned to each project.", "An INNER JOIN is appropriate here because every project-employee row should have a corresponding employee record."],
             "dialogue": [
               { "role": "interviewer", "text": "For each project, report the average experience years of its employees." },
               { "role": "me", "text": "I'd JOIN Project to Employee on employee_id, GROUP BY project_id, and AVG(experience_years)." },
@@ -2284,13 +2330,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "group-by", "subquery", "percentage"],
           "answer": {
-            "oneLiner": "Count distinct registrants per contest, divide by the total user count (a scalar subquery), and order as required.",
+            "oneLiner": "To compute the percentage of all users who registered for each contest, I group the Register table by contest_id, count the distinct users who registered, and divide by the total user count from a scalar subquery. The scalar subquery retrieves the total number of users from the Users table once and that value is reused for every contest in the result.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT contest_id,\n       ROUND(COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM Users), 2) AS percentage\nFROM Register\nGROUP BY contest_id\nORDER BY percentage DESC, contest_id ASC;",
               "note": "Scalar subquery for the denominator (total users)"
             },
-            "keyPoints": ["Denominator is the full user count via a scalar subquery.", "Multiply before dividing to keep precision."],
+            "keyPoints": ["COUNT of DISTINCT user_id per contest gives the number of unique users who registered for that contest, accounting for any potential duplicate entries.", "Dividing by a scalar subquery that counts all rows in the Users table gives the fraction of all users who registered, and multiplying by 100.0 converts it to a percentage.", "The ORDER BY clause sorts first by percentage descending so the most popular contests appear first, with contest_id ascending as a tiebreaker.", "Multiplying by 100.0 rather than 100 ensures floating point arithmetic is used so the decimal portion of the percentage is preserved."],
             "dialogue": [
               { "role": "interviewer", "text": "For each contest, report the percentage of all users who registered." },
               { "role": "me", "text": "I'd GROUP BY contest_id and compute COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM Users)." },
@@ -2314,13 +2360,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "group-by", "avg", "conditional-aggregate"],
           "answer": {
-            "oneLiner": "Group by query_name; quality is AVG(rating/position) and poor percentage is AVG(rating < 3) * 100.",
+            "oneLiner": "For each query name I need two metrics: quality is the average of the rating-to-position ratio across all rows for that query, and the poor query percentage is the fraction of rows where the rating is below 3. I compute both in a single GROUP BY query using the fact that a boolean comparison in MySQL evaluates to 1 or 0, so averaging it gives the fraction of true rows.",
             "code": {
               "lang": "sql",
               "snippet": "SELECT query_name,\n       ROUND(AVG(rating / position), 2) AS quality,\n       ROUND(AVG(rating < 3) * 100, 2) AS poor_query_percentage\nFROM Queries\nWHERE query_name IS NOT NULL\nGROUP BY query_name;",
               "note": "AVG(rating < 3) averages a boolean to get the fraction"
             },
-            "keyPoints": ["AVG(rating/position) is the average per-row ratio.", "AVG(boolean)*100 gives the poor-query percentage."],
+            "keyPoints": ["Quality is computed as AVG of rating divided by position, which averages the per-row ratio of how good a result is relative to how high it ranked.", "The poor query percentage uses AVG of the boolean expression rating less than 3, which equals 1 for poor queries and 0 for others, giving a fraction that when multiplied by 100 is the percentage.", "Filtering out rows where query_name is NULL prevents a null group from appearing in the aggregated output.", "Both metrics are wrapped in ROUND to two decimal places to satisfy the output format requirement."],
             "dialogue": [
               { "role": "interviewer", "text": "Per query_name, compute quality = AVG(rating/position) and the percent of rows with rating < 3." },
               { "role": "me", "text": "I'd GROUP BY query_name, take AVG(rating / position) for quality, and AVG(rating < 3) * 100 for the poor percentage." },
@@ -2344,13 +2390,13 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "dense-rank", "nth", "limit-offset"],
           "answer": {
-            "oneLiner": "Rank distinct salaries with DENSE_RANK() descending and pick rank N; equivalently use DISTINCT ... LIMIT 1 OFFSET N-1.",
+            "oneLiner": "For the N-th highest distinct salary, I apply DENSE_RANK to all salaries ordered descending and filter to the row where the rank equals N. DENSE_RANK assigns the same rank to tied salaries without skipping numbers, which ensures the N-th distinct salary is correctly identified even when multiple employees earn the same amount. If fewer than N distinct salaries exist, the query returns NULL.",
             "code": {
               "lang": "sql",
               "snippet": "-- Window-function approach (parameter @N)\nSELECT DISTINCT salary AS NthHighestSalary\nFROM (\n    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk\n    FROM Employee\n) t\nWHERE rnk = @N;\n\n-- LIMIT/OFFSET form (MySQL); SET @N := @N - 1 first\n-- SELECT DISTINCT salary FROM Employee ORDER BY salary DESC LIMIT 1 OFFSET @N;",
               "note": "DENSE_RANK dedupes ties; LIMIT/OFFSET works over a DISTINCT set"
             },
-            "keyPoints": ["DENSE_RANK = N targets the Nth distinct salary.", "Empty result naturally yields NULL."],
+            "keyPoints": ["DENSE_RANK assigns the same rank number to equal salaries and does not leave gaps, so if two employees share the top salary they both receive rank 1 and the next distinct salary correctly gets rank 2.", "Filtering to rows where the rank equals N gives the N-th distinct salary level, and wrapping the query in a MAX or using DISTINCT on the outer level collapses any ties at that rank into a single value.", "Using LIMIT with OFFSET N minus 1 over DISTINCT salaries is an alternative in MySQL, and the DISTINCT is critical because duplicate salaries would shift the offset and return the wrong value.", "When fewer than N distinct salaries exist in the table, no row matches the rank filter and the query returns NULL, which is the correct output."],
             "dialogue": [
               { "role": "interviewer", "text": "Write a generic solution for the N-th highest distinct salary, NULL if it doesn't exist." },
               { "role": "me", "text": "I'd DENSE_RANK() salaries descending and pick rnk = N; DISTINCT salary in the outer select keeps ties collapsed." },
@@ -2374,11 +2420,12 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "group-by", "conditional-aggregate"],
           "answer": {
-            "oneLiner": "Group by month and country, then use conditional aggregation (SUM over a boolean) to fold the approved subset into the same scan.",
+            "oneLiner": "The goal is to produce four metrics per month and country in a single query without making multiple passes through the data. I group by both the formatted month and country, compute the overall count and sum for all transactions, and then use conditional aggregation to compute the same metrics restricted to only the approved transactions.",
             "keyPoints": [
-              "Bucket the month with DATE_FORMAT(trans_date,'%Y-%m').",
-              "SUM(state='approved') counts approved rows; SUM(IF(state='approved',amount,0)) totals their amount.",
-              "One GROUP BY pass produces all four metrics."
+              "DATE_FORMAT with the pattern percent-Y-percent-m groups rows by year and month together so January 2020 and January 2021 are treated as separate buckets.",
+              "COUNT of all rows gives the total transaction count and SUM of amount gives total revenue for all transactions in each month-country group.",
+              "SUM of the boolean expression state equal to approved evaluates to 1 for approved transactions and 0 otherwise, giving the count of approved transactions without a separate query.",
+              "SUM of IF state equals approved THEN amount ELSE 0 sums the amounts of only the approved transactions, which is the conditional revenue total."
             ],
             "code": {
               "lang": "sql",
@@ -2405,11 +2452,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "subquery", "percentage"],
           "answer": {
-            "oneLiner": "Restrict to each customer's earliest order, then average a boolean (immediate?) and scale to a percentage.",
+            "oneLiner": "The approach is to first identify each customer's earliest order date using MIN grouped by customer, then filter the Delivery table to only those first-order rows, and finally compute the percentage that are immediate by averaging a boolean check. An order is immediate when the preferred delivery date matches the order date.",
             "keyPoints": [
-              "First order = MIN(order_date) per customer, matched with an IN tuple.",
-              "AVG(order_date = pref_date) is the immediate fraction.",
-              "Multiply by 100 and ROUND to 2 decimals."
+              "Each customer's first order is identified by finding the MIN of order_date per customer using GROUP BY.",
+              "The tuple IN subquery matches on both customer_id and the first order date together, so only the rows from each customer's earliest order day are retained.",
+              "AVG of the boolean expression order_date equal to customer_pref_delivery_date gives the fraction of first orders that are immediate, which multiplied by 100 is the percentage.",
+              "A window function alternative is to use ROW_NUMBER partitioned by customer ordered by order_date and keep row number 1, which gives more control when a customer has multiple orders on the same earliest date."
             ],
             "code": {
               "lang": "sql",
@@ -2436,11 +2484,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "self-join", "date-math"],
           "answer": {
-            "oneLiner": "Find each player's first login, then count how many also have a row exactly one day later; divide by the total distinct players.",
+            "oneLiner": "I find each player's first login date using MIN of event_date grouped by player, add one day to that date, and then check whether a row with that next-day date exists in the Activity table for the same player. The number of players who have that next-day row, divided by the total distinct player count, gives the day-one retention fraction.",
             "keyPoints": [
-              "First login = MIN(event_date) per player.",
-              "Check existence of first_date + 1 day via a tuple IN / self-match.",
-              "Denominator is COUNT(DISTINCT player_id) over the whole table."
+              "DATE_ADD of the first login date plus an interval of 1 day computes the target return date, which is the day immediately after each player's debut.",
+              "The tuple IN on player_id and the computed next-day date checks whether the Activity table has an entry for that specific player on that specific date.",
+              "COUNT of DISTINCT player_id among the matching rows gives the number of players who returned the next day, and dividing by the total distinct player count from the whole table gives the retention fraction.",
+              "A window function alternative is to use LEAD of event_date over a partition ordered by date and filter to rows where the leading date is exactly one day after the current date."
             ],
             "code": {
               "lang": "sql",
@@ -2467,10 +2516,11 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "count-distinct", "group-by"],
           "answer": {
-            "oneLiner": "Group by teacher and COUNT(DISTINCT subject_id) so the same subject in two departments isn't double-counted.",
+            "oneLiner": "Each teacher can teach the same subject in multiple departments, so to count the number of unique subjects a teacher covers I need COUNT of DISTINCT subject_id rather than a plain COUNT. The composite primary key allows the same subject to appear under different departments for the same teacher, which is why the deduplication is necessary.",
             "keyPoints": [
-              "DISTINCT inside COUNT dedupes subject across departments.",
-              "Group by teacher_id."
+              "COUNT of DISTINCT subject_id grouped by teacher_id counts the number of different subjects a teacher handles, treating the same subject in two departments as one subject.",
+              "The composite primary key on subject_id and dept_id allows a teacher to appear multiple times with the same subject_id if they teach that subject in more than one department.",
+              "If you forgot the DISTINCT and used plain COUNT, you would overcount teachers who teach the same subject in multiple departments."
             ],
             "code": {
               "lang": "sql",
@@ -2497,11 +2547,11 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "date-range", "count-distinct"],
           "answer": {
-            "oneLiner": "Filter to the half-open 30-day window, then group by date and COUNT(DISTINCT user_id).",
+            "oneLiner": "The 30-day window ending on July 27 2019 inclusive contains exactly 30 days, starting from June 28 2019. I filter to that range and then group by activity date, counting distinct user IDs so that a user who has multiple sessions on the same day is counted only once as active for that day.",
             "keyPoints": [
-              "Window: activity_date > '2019-06-27' AND <= '2019-07-27' (30 days inclusive of the end).",
-              "DISTINCT user_id so multiple sessions in a day count once.",
-              "Days with zero activity simply don't appear."
+              "The date range uses a half-open bound: activity_date greater than June 27 and less than or equal to July 27 captures exactly 30 days from June 28 through July 27 inclusive.",
+              "COUNT of DISTINCT user_id per date ensures a user who opened multiple sessions or performed multiple activities on the same day is counted only once as an active user for that day.",
+              "Days within the window that have no activity at all simply produce no row in the output, since there is no data to group on those dates."
             ],
             "code": {
               "lang": "sql",
@@ -2528,11 +2578,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "subquery", "first-row"],
           "answer": {
-            "oneLiner": "Keep the row whose (product_id, year) matches the product's MIN(year); a tuple-IN handles ties when a product first sold in one year across multiple rows.",
+            "oneLiner": "To get the first year a product sold along with that year's quantity and price, I find the minimum year per product in a subquery and then use a tuple IN to match back to the actual rows from that year. This preserves all sales rows from the first year, which is important if a product had multiple transactions in its debut year.",
             "keyPoints": [
-              "First year = MIN(year) per product_id.",
-              "Match the full row with a (product_id, year) IN subquery.",
-              "Window RANK() OVER (PARTITION BY product_id ORDER BY year) is an equivalent approach."
+              "MIN of year grouped by product_id identifies the earliest year each product appeared in the Sales table.",
+              "The tuple IN matching on both product_id and year returns every Sales row from that first year, not just a single row, so multiple transactions on the debut year are all included.",
+              "Grouping by product_id and taking MIN of the numeric columns would not work correctly here because MIN of quantity and MIN of price are computed independently and may not correspond to the same row.",
+              "A window function alternative is RANK partitioned by product_id ordered by year, keeping rows where the rank equals 1."
             ],
             "code": {
               "lang": "sql",
@@ -2559,10 +2610,12 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "group-by", "having"],
           "answer": {
-            "oneLiner": "Group by class and keep groups whose student count is at least 5 with HAVING.",
+            "oneLiner": "This is a classic GROUP BY and HAVING problem. I group by class name and count the students in each group, then use HAVING to keep only classes with a count of at least 5. HAVING is what allows you to filter on an aggregated value like a count, because WHERE runs before the grouping happens and has no access to those aggregates yet.",
             "keyPoints": [
-              "HAVING filters aggregated groups, WHERE can't.",
-              "PK means (student,class) is unique, so COUNT(student) = distinct students."
+              "GROUP BY class produces one row per class with all the student rows for that class collapsed together.",
+              "COUNT of student within each group gives the number of students enrolled in that class.",
+              "HAVING is what you use when you want to filter on an aggregated value like a count or sum, because WHERE runs before the grouping happens and does not have access to those aggregates yet.",
+              "Because the composite primary key ensures each student-class combination is unique, plain COUNT of student is equivalent to COUNT of DISTINCT student here."
             ],
             "code": {
               "lang": "sql",
@@ -2589,10 +2642,11 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "group-by", "count"],
           "answer": {
-            "oneLiner": "Group by user_id and COUNT the follower rows; order by user_id.",
+            "oneLiner": "This is a straightforward aggregation: group the Followers table by user_id and count the rows in each group to get the number of followers per user. The composite primary key on user_id and follower_id guarantees there are no duplicate follower entries, so plain COUNT is safe without needing DISTINCT.",
             "keyPoints": [
-              "Composite PK guarantees no duplicate follower, so plain COUNT works.",
-              "ORDER BY user_id for the required ordering."
+              "GROUP BY user_id groups all follower rows for each user together so COUNT can tally them.",
+              "The composite primary key on user_id and follower_id prevents any user from having the same follower recorded more than once, which means COUNT of follower_id gives the exact follower count without risk of overcounting.",
+              "ORDER BY user_id at the end sorts the output by user as required."
             ],
             "code": {
               "lang": "sql",
@@ -2619,10 +2673,11 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "having", "null"],
           "answer": {
-            "oneLiner": "Keep values with COUNT = 1 in a subquery, then take MAX; MAX over an empty set yields NULL automatically.",
+            "oneLiner": "I group the numbers by value and use HAVING to keep only those that appear exactly once, giving me the set of singleton values. Then I wrap that in an outer MAX to return the largest singleton, and the nice property of MAX is that it returns NULL when applied to an empty set, which handles the edge case where no singletons exist without any extra conditional logic.",
             "keyPoints": [
-              "HAVING COUNT(*) = 1 isolates the singletons.",
-              "Wrapping in MAX returns NULL when there are no singletons."
+              "GROUP BY num with HAVING COUNT of all rows equal to 1 isolates values that appear exactly once in the table.",
+              "Wrapping the grouped result in an outer MAX returns the largest qualifying value.",
+              "MAX over an empty result set returns NULL by definition in SQL, so the edge case where no number appears exactly once is handled automatically without needing a CASE expression or IFNULL."
             ],
             "code": {
               "lang": "sql",
@@ -2649,11 +2704,12 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "group-by", "having", "division"],
           "answer": {
-            "oneLiner": "Group by customer and keep those whose distinct product count equals the total number of products (relational division).",
+            "oneLiner": "To find customers who bought every product, I count the distinct products each customer purchased and compare that number to the total number of products in the Product table. A customer who has bought all products will have a distinct product count equal to the catalog size.",
             "keyPoints": [
-              "COUNT(DISTINCT product_key) per customer.",
-              "Compare to (SELECT COUNT(*) FROM Product).",
-              "DISTINCT guards against a customer buying the same product twice."
+              "COUNT of DISTINCT product_key per customer counts how many different products that customer has purchased, deduplicating in case they bought the same product more than once.",
+              "A scalar subquery computing COUNT of all rows from the Product table gives the total number of products in the catalog.",
+              "HAVING compares the two counts and keeps only customers whose distinct product count matches the total, which is the relational division pattern.",
+              "If a customer bought the same product multiple times, DISTINCT inside COUNT ensures that still counts as one product toward their total, which is the correct behavior."
             ],
             "code": {
               "lang": "sql",
@@ -2680,11 +2736,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "self-join", "aggregate"],
           "answer": {
-            "oneLiner": "Self-join managers to their reports on manager_id = employee_id, then aggregate count and average age per manager.",
+            "oneLiner": "I self-join the Employees table using two aliases: one for the manager and one for each direct report, connecting them where the report's manager_id matches the manager's employee_id. Then I aggregate per manager to get the count of reports and the rounded average age of those reports.",
             "keyPoints": [
-              "Two aliases: m (manager) and e (report).",
-              "INNER JOIN naturally excludes managers with zero reports.",
-              "ROUND(AVG(e.age)) for the average age."
+              "The self-join connects each manager row to all the employee rows that list that manager's ID in their manager_id column.",
+              "An INNER JOIN naturally excludes managers who have no direct reports, since there are no matching report rows to join to.",
+              "COUNT of the report alias's employee_id gives the number of direct reports for each manager.",
+              "ROUND of AVG of the report's age gives the rounded average age of all employees who report to each manager."
             ],
             "code": {
               "lang": "sql",
@@ -2711,11 +2768,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "union", "group-by"],
           "answer": {
-            "oneLiner": "UNION the explicitly flagged 'Y' rows with employees who have exactly one department (so no flag is set).",
+            "oneLiner": "There are two cases to handle: employees who belong to multiple departments have an explicit primary flag that marks which one is primary, but employees who belong to only one department should have that department treated as primary regardless of the flag value. I handle both cases by unioning the flagged Y rows with employees who have exactly one department row.",
             "keyPoints": [
-              "Branch 1: primary_flag = 'Y'.",
-              "Branch 2: employees with COUNT(*) = 1 department.",
-              "UNION dedupes the rare overlap."
+              "The first branch of the UNION selects rows where primary_flag equals Y, capturing employees who are in multiple departments and have an explicitly designated primary.",
+              "The second branch uses GROUP BY employee_id with HAVING COUNT of all rows equal to 1 to find employees with a single department, then selects that department as their primary.",
+              "UNION rather than UNION ALL is used to deduplicate in case a single-department employee also happens to have their flag set to Y.",
+              "A window function approach computes COUNT of rows over a partition by employee_id to determine how many departments each employee belongs to, and then selects either the flagged row or the only row accordingly."
             ],
             "code": {
               "lang": "sql",
@@ -2742,10 +2800,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "case", "logic"],
           "answer": {
-            "oneLiner": "Apply the triangle inequality (each pair's sum exceeds the third side) inside a CASE expression.",
+            "oneLiner": "The triangle inequality states that for three lengths to form a valid triangle, each pair of sides must sum to more than the third side. I apply all three pairwise checks inside a CASE expression and return Yes or No for each row.",
             "keyPoints": [
-              "All three conditions must hold: x+y>z, x+z>y, y+z>x.",
-              "CASE returns 'Yes'/'No' per row."
+              "The three conditions are x plus y greater than z, x plus z greater than y, and y plus z greater than x, and all three must hold simultaneously for the triple to form a triangle.",
+              "Because I do not know in advance which side is the longest, I test all three inequalities rather than finding the maximum first.",
+              "A CASE expression is the natural SQL tool for conditional logic that produces a different string output based on whether conditions are met.",
+              "Strict greater than correctly rejects degenerate cases where one side equals the sum of the other two, because those three points form a straight line rather than a triangle."
             ],
             "code": {
               "lang": "sql",
@@ -2772,11 +2832,12 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "self-join", "consecutive"],
           "answer": {
-            "oneLiner": "Self-join the table to its next two ids and require all three to share the same num.",
+            "oneLiner": "To find numbers that appear three times consecutively by id, I self-join the Logs table three times: the first instance represents the starting row, the second must have an id one greater than the first and the same num, and the third must have an id two greater than the first and also the same num. DISTINCT removes duplicates that arise when the same run of three is matched by multiple overlapping windows.",
             "keyPoints": [
-              "Join l2 on id+1 and l3 on id+2.",
-              "All three nums equal => a run of 3.",
-              "DISTINCT collapses overlapping windows of the same value."
+              "The self-join approach works by connecting each row to the row with id plus 1 and the row with id plus 2, requiring equal num across all three.",
+              "This approach relies on the id values being consecutive with no gaps; if ids can have gaps, the three consecutive rows would not be id plus 1 and id plus 2 apart.",
+              "DISTINCT collapses multiple matches that occur when the same value appears four or more times in a row, since overlapping windows of three would each match and produce duplicate results without it.",
+              "A window function alternative uses LEAD of num over the partition ordered by id and checks whether the current num equals both the next and the one after that."
             ],
             "code": {
               "lang": "sql",
@@ -2803,11 +2864,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "correlated-subquery", "coalesce"],
           "answer": {
-            "oneLiner": "For each product take the latest change on or before the target date; COALESCE to 10 when there's none.",
+            "oneLiner": "For each product I find the most recent price change that occurred on or before the target date by selecting the new_price from the most recent applicable row. Products that have no price change recorded on or before that date receive the default price of 10 via COALESCE.",
             "keyPoints": [
-              "Latest applicable change = MAX(change_date) <= target, per product.",
-              "COALESCE(..., 10) supplies the default starting price.",
-              "Drive the list from DISTINCT product_id so untouched products still appear."
+              "A correlated subquery per product selects from the Products table where the product_id matches and the change_date is on or before the target date, ordered by change_date descending with LIMIT 1 to get the most recent applicable price.",
+              "COALESCE wraps that subquery result to substitute 10 when no rows match, which handles products that had their only price changes after the target date or never changed at all.",
+              "Driving the outer query from DISTINCT product_id ensures every product appears in the result, including those whose only changes are after the target date.",
+              "A window function alternative ranks price changes within each product by date descending and keeps rank 1 for dates on or before the target, then unions in products that have no qualifying change with a default price of 10."
             ],
             "code": {
               "lang": "sql",
@@ -2834,11 +2896,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "window", "running-total"],
           "answer": {
-            "oneLiner": "Compute a running weight by boarding order, keep rows where the cumulative weight is within 1000, and take the heaviest cumulative (last to board).",
+            "oneLiner": "I compute a running cumulative weight ordered by turn number using a SUM window function, keep only the rows where the cumulative weight is at most 1000 kilograms, and then take the row with the largest cumulative weight among those, which represents the last person who could board before the limit was reached.",
             "keyPoints": [
-              "SUM(weight) OVER (ORDER BY turn) is the running total.",
-              "Filter cum <= 1000.",
-              "The max cumulative among survivors is the last person on."
+              "SUM of weight over a window ordered by turn gives a running total of weight as passengers board in their assigned order.",
+              "Filtering to rows where the cumulative weight is less than or equal to 1000 retains only passengers who can fit on the bus given everyone before them in line.",
+              "Among the passengers who fit, the one with the largest cumulative weight is the last one admitted, because a larger cumulative means they were the most recent addition before the limit was hit.",
+              "ORDER BY cumulative weight descending with LIMIT 1 picks that final boarding passenger."
             ],
             "code": {
               "lang": "sql",
@@ -2865,11 +2928,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "union", "conditional-count"],
           "answer": {
-            "oneLiner": "UNION ALL three one-row aggregates, each summing a boolean range test, so every category appears regardless of count.",
+            "oneLiner": "All three category rows must appear in the output even if no accounts fall in a given band, so I cannot simply use GROUP BY on a CASE expression because that would omit categories with zero accounts. Instead I write three separate aggregation queries, one for each band, each summing a boolean test, and combine them with UNION ALL.",
             "keyPoints": [
-              "SUM(income < 20000) etc. counts rows in each band.",
-              "UNION ALL guarantees all three category rows exist.",
-              "BETWEEN is inclusive for the Average band."
+              "SUM of a boolean expression like income less than 20000 counts the rows satisfying that condition because the boolean evaluates to 1 when true and 0 when false.",
+              "Using UNION ALL to combine three queries guarantees that all three category rows appear in the output regardless of whether any accounts fall in each band.",
+              "If I used GROUP BY with a CASE expression instead, categories with zero accounts would simply not appear as rows in the result, failing the requirement to show all three.",
+              "BETWEEN is inclusive on both ends, so income BETWEEN 20000 AND 50000 correctly includes accounts earning exactly 20000 or exactly 50000 in the Average Salary category."
             ],
             "code": {
               "lang": "sql",

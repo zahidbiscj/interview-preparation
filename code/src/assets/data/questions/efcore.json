@@ -20,12 +20,12 @@
             "SQL translation"
           ],
           "answer": {
-            "oneLiner": "IQueryable builds an expression tree EF Core translates to SQL and runs on the database; IEnumerable runs LINQ in-memory in C#.",
+            "oneLiner": "IQueryable builds an expression tree that EF Core translates into SQL and runs on the database, so your filters and sorts happen server-side in one efficient query. IEnumerable, by contrast, pulls rows into C# memory first and then runs your LINQ operations in .NET — which can mean loading thousands of rows you never needed. The practical rule is: keep your query as IQueryable until you call something like ToListAsync(), and only switch to IEnumerable when you genuinely need to run C#-only logic that SQL cannot express.",
             "keyPoints": [
-              "IQueryable: filters/sorts compose into one SQL query on the DB.",
-              "IEnumerable: operators run in .NET memory after rows are fetched.",
-              "`.AsEnumerable()` is the boundary: SQL before, C# after.",
-              "Finalize the chain before enumerating to avoid loading whole tables."
+              "IQueryable composes filters, sorts, and projections into a single SQL statement that runs on the database — nothing is fetched until you call ToList or ToListAsync.",
+              "IEnumerable brings all matching rows into memory first, then runs LINQ in .NET — so a Where on an IEnumerable can silently load an entire table before filtering.",
+              "The AsEnumerable() call is the explicit boundary: everything before it becomes SQL, everything after runs in C# on the already-fetched rows.",
+              "Always finish shaping your query as IQueryable before enumerating it — avoid accidentally switching to IEnumerable mid-chain and pulling far more data than you intended."
             ],
             "detail": "Returning IQueryable from a repo keeps queries composable but leaks the abstraction to callers. Returning IEnumerable gives a clean boundary at the cost of composability.",
             "code": {
@@ -100,12 +100,12 @@
             "lazy loading"
           ],
           "answer": {
-            "oneLiner": "N+1 is one query for N parents plus one query per child collection; fix it with Include() so EF emits a single JOIN.",
+            "oneLiner": "The N+1 problem happens when you load a list of N parent records and then access a navigation property on each one — if lazy loading is on, EF fires a separate database query per item, giving you N extra round-trips on top of the original query. The fix is to use Include to tell EF to load the related data upfront with a JOIN, collapsing everything into one query. For more complex scenarios with multiple collections you may also need AsSplitQuery to avoid a different problem called Cartesian explosion.",
             "keyPoints": [
-              "Trigger: accessing a navigation in a loop with lazy loading on.",
-              "Fix with `Include()`/`ThenInclude()` to get a JOIN.",
-              "Or project with `Select` to a DTO, pulling only needed columns.",
-              "Use `AsSplitQuery()` to avoid Cartesian explosion on multiple collections."
+              "N+1 is triggered when you iterate over a collection and access a navigation property inside the loop — with lazy loading enabled, each access fires a separate SQL query.",
+              "The standard fix is eager loading: use Include and ThenInclude to ask EF to JOIN in the related data as part of the original query.",
+              "Alternatively, project with Select into a DTO that contains only the fields you need — this often produces the cleanest, most efficient SQL.",
+              "When you Include multiple collection navigations, you can hit Cartesian explosion where rows multiply across the JOINs — use AsSplitQuery to issue one SELECT per collection instead."
             ],
             "detail": "Eager loading multiple collections can blow up into a Cartesian product (10 comments x 10 tags = 100 rows). AsSplitQuery trades that for extra round-trips.",
             "code": {
@@ -180,12 +180,12 @@
             "read-only"
           ],
           "answer": {
-            "oneLiner": "AsNoTracking() stops EF from tracking returned entities, cutting memory and CPU — ideal for read-only queries you won't save.",
+            "oneLiner": "By default, EF Core tracks every entity it loads — it takes a snapshot of the values so it can detect changes and generate the right UPDATE statements when you call SaveChanges. AsNoTracking tells EF to skip all of that, returning plain C# objects with no EF state attached, which is faster and uses less memory. You should use it on any query where you are only reading data and have no intention of saving changes back through that same context.",
             "keyPoints": [
-              "Default tracking snapshots every entity to detect changes for SaveChanges.",
-              "NoTracking returns plain POCOs with no EF state attached.",
-              "Use it for GET endpoints, reports, projections.",
-              "Use `AsNoTrackingWithIdentityResolution()` to keep same-row = same instance."
+              "Tracked queries snapshot every returned entity so the change tracker can detect what changed and generate precise UPDATE statements — this has a memory and CPU cost.",
+              "AsNoTracking returns plain objects with no EF state, so SaveChanges will not pick them up unless you explicitly Attach or Update them first.",
+              "Use it for GET endpoints, reports, dropdown lists, or any read-only path — it is typically 20 to 40 percent faster on read-heavy queries.",
+              "AsNoTrackingWithIdentityResolution is a middle-ground option: it skips change-tracking snapshots but still ensures that the same database row maps to the same C# object instance, which matters when you use Include."
             ],
             "detail": "Because no snapshot is taken, SaveChanges won't update a no-tracking entity unless you Attach/Update it first. Typically 20-40% faster on read-heavy paths.",
             "code": {
@@ -259,12 +259,12 @@
             "EF Core 3"
           ],
           "answer": {
-            "oneLiner": "Server evaluation runs LINQ as SQL on the DB; client evaluation runs it in .NET memory. EF Core 3.0 banned implicit client evaluation to stop silent full-table scans.",
+            "oneLiner": "Server evaluation means your LINQ query gets translated into SQL and runs on the database — that is almost always what you want. Client evaluation means EF cannot translate part of your query, so it pulls rows into memory and runs that logic in C# instead, which can silently load huge amounts of data. In EF Core 3.0 Microsoft fixed this by throwing an exception when a query cannot be fully translated, forcing you to be explicit about when you want client-side processing.",
             "keyPoints": [
-              "EF 2.x silently fell back to client eval, sometimes loading whole tables.",
-              "EF 3.0+ throws if a query can't be fully translated to SQL.",
-              "Use `AsEnumerable()` to opt into client eval at a safe boundary.",
-              "Custom C# methods and unsupported functions cause untranslatable queries."
+              "In EF Core 2.x, if a LINQ expression could not be translated to SQL, EF would silently fall back to client evaluation — sometimes loading entire tables into memory before filtering, with no warning.",
+              "EF Core 3.0 changed this behavior to throw an InvalidOperationException at query execution time if any part of the query cannot be translated, making the performance cliff visible rather than silent.",
+              "To deliberately run C# logic that cannot be translated to SQL, filter as much as possible in SQL first, then call AsEnumerable() to mark the boundary and run C# after that point.",
+              "Custom C# methods, unsupported string functions, or provider-specific gaps are the most common causes of untranslatable queries — you can also map database functions using EF.Functions or HasDbFunction."
             ],
             "detail": "The 3.0 change forces you to be explicit: translate what you can, then call AsEnumerable() before any C#-only logic.",
             "code": {
@@ -338,12 +338,12 @@
             "columns"
           ],
           "answer": {
-            "oneLiner": "Project with Select() to a DTO so EF emits a SELECT with only the columns you need, cutting data transfer and skipping tracking.",
+            "oneLiner": "Instead of loading full entity objects with all their columns, you can use Select to project the query directly into a DTO with only the fields you actually need — EF Core translates that into a SELECT with just those columns, so less data travels over the wire. This is especially powerful because EF can translate things like collection counts and aggregates directly into SQL, meaning the database does the work rather than C#. As a bonus, projected objects are never tracked by the change tracker, so you get the performance of AsNoTracking automatically.",
             "keyPoints": [
-              "Without projection you get SELECT * including large unused fields.",
-              "Select to a DTO/anonymous type emits `SELECT col1, col2`.",
-              "Projected types aren't tracked — you get NoTracking for free.",
-              "Computed expressions like `Comments.Count` translate to SQL aggregates."
+              "Without a projection, EF issues a SELECT star and loads every column of every matched row into memory, including large fields you may never use.",
+              "Projecting with Select into a DTO or anonymous type produces a targeted SELECT that fetches only the columns you specify, reducing both data transfer and memory usage.",
+              "Expressions like Items.Count or Items.Sum inside a projection are translated into SQL aggregates such as COUNT or SUM — the items themselves are never loaded into memory.",
+              "Projected results are not tracked by the change tracker, so you get the benefits of no-tracking queries without needing to call AsNoTracking explicitly."
             ],
             "detail": "Projections also decouple your API contract from the domain model and prevent accidental lazy-load cycles during JSON serialization.",
             "code": {
@@ -415,12 +415,12 @@
             "query plan cache"
           ],
           "answer": {
-            "oneLiner": "Compiled queries pre-compile the LINQ expression to a delegate once, removing per-call translation overhead — worth it on hot paths run thousands of times a second.",
+            "oneLiner": "Every time EF Core executes a LINQ query it has to translate the expression tree into SQL — EF caches this translation so it only happens once per unique query shape, but it still does a cache lookup on every call. Compiled queries go a step further by pre-compiling the translation into a reusable delegate, eliminating even that cache-lookup overhead. This is worth doing on hot code paths that run thousands of times per second, but for most CRUD applications the database round-trip dominates, so the difference is negligible.",
             "keyPoints": [
-              "EF already caches query plans, so most queries translate only once.",
-              "`EF.CompileAsyncQuery` skips even the cache lookup overhead.",
-              "Parameters pass as delegate args, so the query stays reusable.",
-              "Best for high-frequency simple lookups; skip for rare/complex queries."
+              "EF Core's built-in query plan cache automatically stores translated SQL for each unique query shape, so the translation only happens once — not on every call.",
+              "Compiled queries, created with EF.CompileAsyncQuery, bypass even the cache lookup by returning a pre-built delegate you call directly, which can be roughly 2 to 3 times faster on hot paths.",
+              "Parameters are passed as delegate arguments, so the same compiled query is reused safely with different values.",
+              "Compiled queries are most valuable for simple, high-frequency lookups — for rare or complex queries the added code complexity is not worth it, so profile before reaching for this optimization."
             ],
             "detail": "Roughly 2-3x faster on hot paths, but most CRUD apps are IO-bound — profile before reaching for this.",
             "code": {
@@ -493,12 +493,12 @@
             "EnableSensitiveDataLogging"
           ],
           "answer": {
-            "oneLiner": "Log generated SQL with LogTo() in DbContext options or via ILoggerFactory, and use EnableSensitiveDataLogging in dev to see parameter values.",
+            "oneLiner": "When you need to see the actual SQL EF Core is generating — whether to debug a slow query, verify a projection, or investigate unexpected results — you can enable logging on the DbContext options. The quickest option in development is LogTo with Console.WriteLine, and you can also wire EF into your ASP.NET Core logging pipeline for structured logs. For production diagnostics, the TagWith method lets you embed a label directly in the SQL as a comment so you can match a slow query in a database trace back to the C# code that produced it.",
             "keyPoints": [
-              "`LogTo(Console.WriteLine, LogLevel.Information)` is the quick dev option.",
-              "`EnableSensitiveDataLogging()` shows parameters — never in production.",
-              "In ASP.NET Core, wire to the DI ILoggerFactory for structured logs.",
-              "`TagWith(\"label\")` injects a SQL comment to correlate code to DB traces."
+              "LogTo(Console.WriteLine, LogLevel.Information) on the DbContext options is the fastest way to see generated SQL during development.",
+              "EnableSensitiveDataLogging reveals the actual parameter values instead of placeholders like @p0 — this should only ever be enabled in development, never in production, because it can expose personally identifiable information.",
+              "In ASP.NET Core, wire EF logging to the dependency injection ILoggerFactory so SQL statements appear in your structured log output alongside the rest of your application logs.",
+              "TagWith adds a SQL comment to the generated query, which shows up in database traces and profilers and lets you trace a slow query directly back to the LINQ code that created it."
             ],
             "detail": "In production, never log parameter values (PII), and control verbosity via config log levels so you can toggle SQL logging without redeploying.",
             "code": {
@@ -570,12 +570,12 @@
             "LINQ"
           ],
           "answer": {
-            "oneLiner": "Use raw SQL for stored procs or queries LINQ can't express (CTEs, window functions), but always parameterize to prevent SQL injection.",
+            "oneLiner": "LINQ covers the vast majority of query scenarios, but sometimes you need stored procedures, common table expressions, window functions, or other SQL that LINQ simply cannot express — that is when you reach for FromSqlRaw or ExecuteSqlRaw. The critical rule is to never concatenate user input directly into the SQL string, because that opens a SQL injection vulnerability. Instead, use FromSqlInterpolated with an interpolated string, which EF automatically converts to parameterized SQL.",
             "keyPoints": [
-              "`FromSqlRaw` returns tracked entities you can compose LINQ on.",
-              "Prefer `FromSqlInterpolated` (`$\"\"`) — it auto-parameterizes values.",
-              "Never concatenate user input into FromSqlRaw strings.",
-              "`ExecuteSqlRaw`/`ExecuteSqlInterpolated` run non-query SQL and return rows affected."
+              "FromSqlRaw returns a queryable of tracked entities that you can continue composing with LINQ, such as adding a Where or OrderBy after the raw SQL.",
+              "FromSqlInterpolated takes an interpolated string and automatically parameterizes the values — it looks like string interpolation but EF converts it to safe parameterized SQL, so there is no injection risk.",
+              "Never concatenate or interpolate user input directly into a FromSqlRaw string — that creates a SQL injection vulnerability; always use parameterized approaches instead.",
+              "ExecuteSqlRaw and ExecuteSqlInterpolated are for non-query statements like UPDATE, DELETE, or calling a stored procedure — they return the number of rows affected, not entities."
             ],
             "detail": "LINQ is the default; raw SQL is the escape hatch. In EF Core 8, `FromSql` replaces `FromSqlInterpolated` with a cleaner API.",
             "code": {
@@ -646,12 +646,12 @@
             "performance"
           ],
           "answer": {
-            "oneLiner": "Split queries break a multi-collection Include into separate SELECTs instead of one big JOIN, avoiding the Cartesian row explosion at the cost of extra round-trips.",
+            "oneLiner": "When you use Include to load multiple collection navigations, EF Core normally produces a single SQL query with JOINs — but if you have several collections, those JOINs can multiply your row count explosively, a problem called Cartesian explosion. AsSplitQuery solves this by issuing a separate SELECT for each collection and then stitching the results together in memory, which keeps individual result sets small. The trade-off is more database round-trips and a subtle consistency risk because the separate queries do not run inside a single transaction.",
             "keyPoints": [
-              "Multiple collection Includes produce a Cartesian product: N x M x K rows.",
-              "`AsSplitQuery()` issues one SELECT per Include and stitches in memory.",
-              "Trade-off: fewer rows but more round-trips and possible consistency gaps.",
-              "Set globally via `UseQuerySplittingBehavior` or override per query."
+              "Including multiple collection navigations in a single query causes a Cartesian product — if a blog has 10 posts and each post has 10 comments, the JOIN returns 100 rows instead of 20.",
+              "AsSplitQuery instructs EF to run one SELECT for each Include separately and assemble the object graph in memory, dramatically reducing the number of rows transferred.",
+              "The trade-off is additional round-trips to the database and a potential consistency gap: because the separate SELECTs are not wrapped in a single transaction by default, data can change between them.",
+              "You can set split query behavior as the global default in DbContext options using UseQuerySplittingBehavior, and override it per query with AsSplitQuery or AsSingleQuery."
             ],
             "detail": "Split queries aren't wrapped in a transaction by default, so data can change between SELECTs. For audit/financial reads, use a transaction or single query.",
             "code": {
@@ -732,12 +732,12 @@
             "navigation"
           ],
           "answer": {
-            "oneLiner": "Eager (Include) fetches related data in one query, lazy fetches automatically on first access, explicit fetches on demand via Load() — pick based on whether you know upfront what you need.",
+            "oneLiner": "EF Core gives you three ways to load related data: eager loading with Include fetches everything in one SQL query upfront, lazy loading fires a separate query automatically the first time you access a navigation property, and explicit loading lets you load specific navigations on demand by calling Load when you decide you need them. Eager loading or projections are generally the right default for ASP.NET Core APIs because lazy loading can cause surprise queries and problems if the DbContext has been disposed. Explicit loading is the safest alternative when whether you need the related data depends on runtime conditions.",
             "keyPoints": [
-              "Eager: `Include()` when you know what's needed; one SQL with JOINs.",
-              "Lazy: virtual navs fire a SELECT on first access — convenient but N+1-prone.",
-              "Explicit: `Entry(e).Collection(...).LoadAsync()` for conditional loads.",
-              "Prefer eager/projection in ASP.NET Core; lazy is risky in request pipelines."
+              "Eager loading uses Include and ThenInclude to build a single SQL query with JOINs that returns the parent and related data together — you know upfront what you need and ask for it all at once.",
+              "Lazy loading works by making navigation properties virtual and enabling proxy generation — EF fires a separate SELECT automatically the first time you access the navigation, which is convenient but prone to N+1 queries and can fail if the context is already disposed.",
+              "Explicit loading uses Entry(entity).Collection(...).LoadAsync() or Reference(...).LoadAsync() to load a specific navigation on demand, giving you precise control over when and whether the query fires.",
+              "In ASP.NET Core request handlers, prefer eager loading or projections — lazy loading is risky because the context is scoped to the request and can be disposed before serialization triggers navigation access."
             ],
             "detail": "Lazy loading isn't on by default — it needs UseLazyLoadingProxies() and virtual navigation properties.",
             "code": {
@@ -809,12 +809,12 @@
             "unit of work"
           ],
           "answer": {
-            "oneLiner": "Register DbContext as Scoped so each HTTP request gets one instance acting as a unit-of-work, disposed when the request ends.",
+            "oneLiner": "DbContext should be registered as a scoped service in ASP.NET Core, which means one instance is created per HTTP request and disposed when that request ends. This is the right model because DbContext acts as a unit of work — it tracks all your changes for the duration of the request and commits them in one SaveChanges call. Registering it as a singleton is a common mistake that causes threading bugs, memory growth, and stale data, because DbContext is not thread-safe and its change tracker is never cleared.",
             "keyPoints": [
-              "`AddDbContext<T>()` registers it Scoped by default — one per request.",
-              "DbContext isn't thread-safe; never share across parallel threads.",
-              "Singleton causes thread bugs, stale data, and a growing ChangeTracker.",
-              "In background services use `IServiceScopeFactory.CreateScope()`."
+              "AddDbContext registers DbContext as scoped by default, meaning each HTTP request gets its own fresh instance that is automatically disposed at the end of the request.",
+              "DbContext is not thread-safe — it holds mutable state in its change tracker, identity map, and database connection, so you must never share one instance across parallel threads.",
+              "Registering DbContext as a singleton is dangerous: the change tracker grows indefinitely, threads collide on the same connection, and you get stale data from the never-reset identity map.",
+              "In background services that are singletons, use IServiceScopeFactory to create a new scope per unit of work, resolve a fresh DbContext from that scope, and dispose the scope when done — for Blazor Server use AddDbContextFactory instead."
             ],
             "detail": "AddDbContextFactory (EF 5+) registers a factory so stateful frameworks like Blazor Server can create short-lived contexts per operation.",
             "code": {
@@ -888,12 +888,12 @@
             "SaveChanges"
           ],
           "answer": {
-            "oneLiner": "EF snapshots property values on load, then on SaveChanges compares current values to the snapshot to decide which UPDATE statements to emit.",
+            "oneLiner": "When EF Core loads an entity it takes a snapshot of all its property values and stores that in the EntityEntry. When you call SaveChanges, EF runs an internal process called DetectChanges that compares each entity's current values against the original snapshot to figure out which properties changed. Only the modified properties end up in the UPDATE statement, so if you only changed one column out of twenty, EF generates a single-column SET clause — not a full-row overwrite.",
             "keyPoints": [
-              "Each tracked entity stores an OriginalValues snapshot in its EntityEntry.",
-              "`DetectChanges()` runs before SaveChanges and marks changed properties.",
-              "States: Unchanged, Added, Modified, Deleted, Detached.",
-              "Only modified columns get SET clauses — not the whole row."
+              "Every tracked entity has an EntityEntry that stores the original values as a snapshot taken at load time — this is what the change tracker compares against when you call SaveChanges.",
+              "DetectChanges runs automatically before SaveChanges and marks each property as Modified if its current value differs from the snapshot, resulting in targeted UPDATE statements.",
+              "Entity states — Unchanged, Added, Modified, Deleted, and Detached — drive what SQL SaveChanges generates for each entity.",
+              "DetectChanges is proportional to the number of tracked entities, so for large batch operations you should disable AutoDetectChangesEnabled or use ExecuteUpdateAsync which bypasses the tracker entirely."
             ],
             "detail": "DetectChanges is O(n) over tracked entities. For bulk work, disable AutoDetectChangesEnabled or use ExecuteUpdateAsync (EF 7) which bypasses the tracker.",
             "code": {
@@ -967,12 +967,12 @@
             "disconnected"
           ],
           "answer": {
-            "oneLiner": "Add marks Added (INSERT), Attach marks Unchanged (no SQL), Update marks all properties Modified (full UPDATE) — pick by whether the entity is new, existing, or changed.",
+            "oneLiner": "These three methods control what state EF assigns to a disconnected entity when you hand it to the context. Add marks the entity as Added, telling EF to INSERT it. Attach marks it as Unchanged, meaning EF knows about it but will only generate SQL if you then modify a property. Update marks every single property as Modified, which causes a full UPDATE of all columns — that can be dangerous with partial DTOs because it overwrites columns you did not intend to touch.",
             "keyPoints": [
-              "`Add` → Added → INSERT.",
-              "`Attach` → Unchanged → no SQL until you modify a property.",
-              "`Update` → Modified on all properties → full UPDATE.",
-              "Prefer Attach + setting only changed props to avoid overwriting with stale values."
+              "Add marks the entity as Added so EF will INSERT it when you call SaveChanges — use this for genuinely new records you are creating.",
+              "Attach marks the entity as Unchanged so no SQL is generated until you modify a property — useful when you have an entity by its primary key and only want to change specific fields without re-querying.",
+              "Update marks all properties as Modified and produces a full UPDATE of every column — if your entity is missing fields that exist in the database, those columns will be set to their default or null values.",
+              "For partial updates, prefer Attach followed by setting only the specific properties you want to change, so EF generates a targeted UPDATE with only the modified columns in the SET clause."
             ],
             "detail": "ctx.Update with a partial DTO is dangerous — it can zero out columns not in the DTO. Prefer load-modify-save or Attach + targeted properties.",
             "code": {
@@ -1045,12 +1045,12 @@
             "singleton"
           ],
           "answer": {
-            "oneLiner": "DbContext holds mutable single-threaded state (ChangeTracker, connection, identity map), so concurrent access corrupts it and throws or returns bad data.",
+            "oneLiner": "DbContext is explicitly not thread-safe because it holds mutable single-threaded state: a change tracker, an identity map that maps primary keys to object instances, and a database connection. If two threads use the same context simultaneously, they corrupt the change tracker or collide on the connection mid-command. The solution is to ensure each thread or parallel operation has its own DbContext instance, which you can achieve with IDbContextFactory.",
             "keyPoints": [
-              "The ChangeTracker isn't concurrent-safe — parallel access corrupts it.",
-              "A shared connection can be mid-command when another thread uses it.",
-              "Register Scoped so each request gets its own context.",
-              "For parallel work, use separate contexts via IDbContextFactory<T>."
+              "The change tracker and identity map inside DbContext are not concurrent-safe — two threads writing to them simultaneously corrupts the internal state and produces unpredictable results.",
+              "Concurrent async operations on one context throw a clear exception: a second operation was started before a previous operation completed.",
+              "Register DbContext as scoped so each HTTP request gets its own isolated instance — never inject a scoped context into a singleton service, because the context gets captured and shared across requests.",
+              "To run parallel database operations, use IDbContextFactory to create independent context instances, each with its own connection and change tracker, then use Task.WhenAll safely across them."
             ],
             "detail": "Running parallel queries on one context throws 'A second operation was started before a previous one completed.' Use sequential awaits or separate contexts.",
             "code": {
@@ -1122,12 +1122,12 @@
             "AsNoTrackingWithIdentityResolution"
           ],
           "answer": {
-            "oneLiner": "Identity resolution means the same DB row returns the same .NET instance instead of duplicates — handled by the change tracker's identity map.",
+            "oneLiner": "Identity resolution means that within a single DbContext, the same database row always maps to exactly one C# object instance — if you load the same entity twice, you get back the same reference, not two separate copies with the same data. This is managed by the change tracker's internal identity map, which is keyed by entity type plus primary key. It also means that FindAsync is smart enough to check this map first before hitting the database, so a second FindAsync for the same key is free.",
             "keyPoints": [
-              "The tracker keeps an identity map keyed by type + primary key.",
-              "On materialization it returns the existing instance if already tracked.",
-              "This makes navigation fix-up correct (shared refs point to one object).",
-              "AsNoTracking disables it; use AsNoTrackingWithIdentityResolution to keep it."
+              "The change tracker maintains an identity map that keys tracked entities by their type and primary key — any query that returns the same row gets the same C# instance back rather than a duplicate.",
+              "This ensures navigation fix-up is consistent: if two different navigations reference the same related entity, they point to the same object in memory.",
+              "FindAsync always checks the identity map before executing a query — if the entity is already tracked, it returns the in-memory instance without a round-trip to the database.",
+              "AsNoTracking disables identity resolution, which can cause duplicate instances for the same row when using Include — AsNoTrackingWithIdentityResolution preserves the deduplication without the overhead of full change tracking."
             ],
             "detail": "A request-scoped context acts as a first-level cache: two FindAsync(42) calls return the same instance with no second DB hit.",
             "code": {
@@ -1199,12 +1199,12 @@
             "DbContext"
           ],
           "answer": {
-            "oneLiner": "SaveChanges wraps all pending inserts/updates/deletes in one transaction — all succeed or all roll back — making DbContext a built-in unit-of-work.",
+            "oneLiner": "SaveChanges is how you commit all the pending changes tracked by the DbContext to the database in a single, atomic operation — EF inspects the change tracker, generates the minimum set of INSERT, UPDATE, and DELETE statements, and wraps them all in one database transaction. If anything fails, the entire transaction rolls back, so you never end up with partial writes. This is exactly what the unit-of-work pattern means: collect all your changes across multiple operations, then commit once.",
             "keyPoints": [
-              "Inspects the ChangeTracker, generates minimal SQL, runs it in one transaction.",
-              "Any failure rolls back the whole transaction and throws.",
-              "Use `BeginTransactionAsync()` to span multiple SaveChanges calls.",
-              "Prefer `SaveChangesAsync` to avoid thread-pool starvation."
+              "SaveChanges inspects the change tracker, generates the precise SQL needed for each tracked entity's state, and executes it all inside a single database transaction — all changes succeed or all are rolled back.",
+              "You can add, update, and delete multiple different entities within one context and commit them all atomically with a single SaveChanges call — this is the unit-of-work pattern in practice.",
+              "To span a transaction across multiple SaveChanges calls, open an explicit transaction with BeginTransactionAsync and call CommitAsync only after all operations succeed.",
+              "Always prefer SaveChangesAsync over the synchronous version in web applications to avoid blocking thread-pool threads while waiting for the database."
             ],
             "detail": "ISaveChangesInterceptor lets you inject cross-cutting logic like audit logging or soft deletes around SaveChanges.",
             "code": {
@@ -1278,12 +1278,12 @@
             "ChangeTracker"
           ],
           "answer": {
-            "oneLiner": "Tracking adds entities to the ChangeTracker with snapshots (enables updates and identity resolution); no-tracking skips all that for faster, lower-memory reads.",
+            "oneLiner": "Tracking adds every loaded entity to the change tracker with a snapshot, enabling EF to detect modifications and save them back — but this has a memory and CPU cost for every row fetched. No-tracking skips all of that, returning plain disconnected objects that are faster to load and use less memory, but cannot be saved without explicitly attaching them first. A good rule of thumb is to default to no-tracking for read paths and opt into tracking only at the write boundaries where you actually need to call SaveChanges.",
             "keyPoints": [
-              "Tracking: slower, more memory, but savable without Attach/Update.",
-              "No-tracking: faster, less memory, disconnected POCOs.",
-              "Tracking gives identity resolution; no-tracking doesn't (unless the variant).",
-              "Default to no-tracking; opt into tracking at write boundaries with AsTracking()."
+              "Tracking allocates an EntityEntry and snapshot per row, which consumes more memory and CPU — at scale this difference can be 40 percent or more.",
+              "No-tracking returns plain disconnected objects with no EF state — they are faster to load but SaveChanges will not pick them up unless you Attach or Update them explicitly.",
+              "Tracking gives you identity resolution so the same database row always maps to the same C# instance; no-tracking does not, which can cause duplicate instances when using Include — use AsNoTrackingWithIdentityResolution if this matters.",
+              "Set no-tracking as the context default using UseQueryTrackingBehavior and opt back into tracking per query with AsTracking where you intend to save changes."
             ],
             "detail": "At scale, tracking allocates an EntityEntry + snapshot per row, creating GC pressure. No-tracking reads are roughly 40% faster.",
             "code": {
@@ -1364,12 +1364,12 @@
             "database update"
           ],
           "answer": {
-            "oneLiner": "Run `dotnet ef migrations add <Name>` to generate Up/Down methods, then `dotnet ef database update` to apply them to the database.",
+            "oneLiner": "The migration workflow starts with you making a change to your C# model — adding a property, renaming a class, adding a relationship — then running dotnet ef migrations add to generate a new migration file. EF diffs your current model against the last saved snapshot and writes the Up and Down methods that describe exactly what needs to change in the database. After reviewing that generated code, you run dotnet ef database update to actually apply those changes to the database.",
             "keyPoints": [
-              "`migrations add` diffs the model snapshot and generates Up()/Down().",
-              "`database update` applies pending migrations, tracked in __EFMigrationsHistory.",
-              "Review generated code — a bad rename can produce DROP TABLE.",
-              "`ctx.Database.MigrateAsync()` applies at runtime; commit migration files."
+              "The migrations add command compares your current model against the stored model snapshot and generates an Up method that applies the change and a Down method that reverses it.",
+              "EF tracks which migrations have been applied by writing a row into a table called __EFMigrationsHistory — the update command only runs the ones that are not already in that table.",
+              "Always review the generated migration before applying it — a rename can look like a drop plus an add, which would destroy the column data instead of preserving it.",
+              "You can apply migrations at runtime using Database.MigrateAsync, which is fine in development, but in production it is safer to use a separate deployment step to avoid race conditions with multiple app instances starting at the same time."
             ],
             "detail": "Don't rely on MigrateAsync() in production with multiple pods — it can race. Run migrations as a separate CI/CD or init-container step.",
             "code": {
@@ -1443,12 +1443,12 @@
             "workflow"
           ],
           "answer": {
-            "oneLiner": "Code-first defines the schema in C# and generates the DB via migrations; database-first scaffolds C# entities and DbContext from an existing schema.",
+            "oneLiner": "Code-first means your C# classes are the source of truth — you write the entity classes, run migrations, and EF generates and evolves the database schema from those classes. Database-first is the opposite: you already have a database, and you use the scaffold command to generate C# entity classes and a DbContext from it. For greenfield projects, code-first with migrations is the standard approach because your schema is version-controlled in code alongside the rest of the application.",
             "keyPoints": [
-              "Code-first: entities → migrations → database, fully version-controlled.",
-              "Database-first: existing DB → `dotnet ef dbcontext scaffold` → entities.",
-              "Code-first is the default for greenfield projects.",
-              "You can scaffold DB-first then switch to code-first migrations."
+              "In code-first, you define entities in C#, run dotnet ef migrations add, and EF creates or updates the database schema to match — the schema is version-controlled as migration files in your repository.",
+              "In database-first, you run dotnet ef dbcontext scaffold with a connection string and provider, and EF generates C# entity classes and a DbContext that map to the existing tables.",
+              "Code-first is the default choice for new projects because it keeps the schema under developer control and versioned in source control alongside the application code.",
+              "You can start with database-first scaffolding to get your entity classes, then add an initial migration that matches the existing schema and continue evolving it with code-first migrations from that point."
             ],
             "detail": "Neither is universally better — team structure and existing infrastructure decide. DBA-owned schemas often favor database-first scaffolding.",
             "code": {
@@ -1519,12 +1519,12 @@
             "OnModelCreating"
           ],
           "answer": {
-            "oneLiner": "Use HasData() in OnModelCreating for static seed data baked into migrations; for large or environment-specific data, run a custom idempotent seeder after migrations.",
+            "oneLiner": "EF Core gives you two main ways to seed data into your database. For small, static reference data — like lookup tables that never change — you can use HasData inside OnModelCreating, which bakes the seed rows directly into a migration so they are applied when the schema is set up. For larger datasets or data that varies by environment, a better approach is to write a custom seeder that runs after migrations and only inserts rows that do not already exist, so it is safe to run repeatedly.",
             "keyPoints": [
-              "`HasData(...)` emits INSERTs in the migration's Up().",
-              "HasData rows must include the primary key value.",
-              "For env-specific/large data, use a custom check-then-insert seeder.",
-              "`IEntityTypeConfiguration<T>` keeps seed data with the entity config."
+              "HasData in OnModelCreating or in an IEntityTypeConfiguration class generates INSERT statements inside the migration's Up method, so the seed rows are applied as part of the schema update.",
+              "Every row passed to HasData must include an explicit primary key value, even if the column is normally auto-generated by the database — EF needs the value to detect changes between runs.",
+              "For large or environment-specific data, write a custom seeder that runs after migrations and uses a check-then-insert pattern so it is safe to run multiple times without creating duplicates.",
+              "HasData changes are detected by EF when you create a new migration — if you update a seeded row, EF generates a migration with the updated values."
             ],
             "detail": "HasData is best for static lookup/reference data. Use custom seeders gated by IsDevelopment() for test/dev data.",
             "code": {
@@ -1596,12 +1596,12 @@
             "IEntityTypeConfiguration"
           ],
           "answer": {
-            "oneLiner": "Fluent API gives full configuration power and keeps entities attribute-free; Data Annotations are simpler but limited and leak EF concerns into the domain model.",
+            "oneLiner": "Data Annotations are attributes you put directly on your entity classes — things like Required, MaxLength, or Key — and they are simple to use but only cover a subset of what EF Core can configure. Fluent API is code you write in OnModelCreating or in separate configuration classes, and it can express anything EF supports, including composite keys, value converters, owned types, and shadow properties. In practice, Fluent API in dedicated IEntityTypeConfiguration classes is the preferred approach because it keeps EF concerns out of your domain model and scales much better than a single bloated OnModelCreating method.",
             "keyPoints": [
-              "Annotations (`[Key]`, `[Required]`, `[MaxLength]`) cover only a subset.",
-              "Fluent API does everything: shadow props, owned types, value converters.",
-              "Annotations couple entities to EF/validation namespaces.",
-              "Prefer Fluent API in `IEntityTypeConfiguration<T>` classes; both can coexist."
+              "Data Annotations like Required, MaxLength, and Key are quick and readable but they couple your entity classes to EF and validation namespaces, and they cannot express advanced configurations.",
+              "Fluent API in OnModelCreating gives you the full power of EF Core's configuration API — composite keys, value converters, owned types, shadow properties, and query filters are all only available here.",
+              "The recommended pattern is one IEntityTypeConfiguration class per entity, which keeps configuration organized, testable, and co-located with the thing it configures.",
+              "You can auto-register all configuration classes at once by calling ApplyConfigurationsFromAssembly in OnModelCreating, so you never have to register each one manually."
             ],
             "detail": "`ApplyConfigurationsFromAssembly` auto-discovers all IEntityTypeConfiguration<T> implementations, so you don't register each one manually.",
             "code": {
@@ -1674,12 +1674,12 @@
             "join table"
           ],
           "answer": {
-            "oneLiner": "Use HasMany().WithOne() for one-to-many and HasMany().WithMany() for many-to-many; EF Core 5+ auto-creates the join table or you supply an explicit join entity for payload columns.",
+            "oneLiner": "For a one-to-many relationship, you use HasMany followed by WithOne to tell EF which side holds the collection and which side holds the foreign key, then HasForeignKey to name it explicitly. For many-to-many in EF Core 5 and later, HasMany followed by WithMany is enough — EF automatically creates a hidden join table for you. If you need extra columns on the join table, like a quantity or a created date, you define an explicit join entity with a composite primary key and configure each side as a separate one-to-many relationship.",
             "keyPoints": [
-              "One-to-many: `HasMany().WithOne().HasForeignKey().OnDelete(...)`.",
-              "Many-to-many implicit: `HasMany().WithMany()` creates a hidden join table.",
-              "Many-to-many with payload: define a join entity with a composite key.",
-              "Use `OnDelete(Restrict/NoAction)` to avoid cascade cycles SQL Server rejects."
+              "One-to-many uses HasMany on the parent followed by WithOne on the child, then HasForeignKey to name the foreign key column and OnDelete to control what happens when the parent is deleted.",
+              "Many-to-many in EF Core 5 and later is configured with HasMany followed by WithMany, and EF automatically creates and manages the join table with no extra work from you.",
+              "When the join table needs payload columns — like CreatedAt or Quantity — you define an explicit join entity, configure a composite primary key with HasKey, and wire each side as a separate one-to-many.",
+              "If SQL Server rejects your migration with a cascade cycle error, it means multiple delete paths lead to the same table — fix it by setting OnDelete to Restrict or NoAction on one of the relationships."
             ],
             "detail": "EF infers FKs by convention (BlogId for a Blog nav), but explicit Fluent API is clearer and more maintainable.",
             "code": {
@@ -1753,12 +1753,12 @@
             "blue-green"
           ],
           "answer": {
-            "oneLiner": "Generate idempotent SQL scripts and apply them as a separate deployment step before the app deploys, instead of MigrateAsync() at startup — enabling rollback and DBA review.",
+            "oneLiner": "Running migrations safely in production means never relying on MigrateAsync at application startup, because if you have multiple instances starting at the same time they will all try to run migrations concurrently and can corrupt the migration history. The safe approach is to generate an idempotent SQL script using dotnet ef migrations script with the idempotent flag, which adds safety checks so each change only applies once, and then run that script as a dedicated step in your deployment pipeline before the new version of the app starts. This also lets a DBA review the SQL before it touches production data.",
             "keyPoints": [
-              "`migrations script --idempotent` adds IF NOT EXISTS guards.",
-              "Apply migrations before the new app (expand-contract) for compatibility.",
-              "Never auto-run MigrateAsync() across multiple pods — it races.",
-              "Keep Down() current; use online operations for large-table changes."
+              "Generating an idempotent SQL script with dotnet ef migrations script --idempotent produces a SQL file where each change is wrapped in an IF NOT EXISTS check, so running it multiple times is always safe.",
+              "Apply migrations as a separate deployment step before the application starts — an init container in Kubernetes or a pipeline step in your CI/CD is the right place for this.",
+              "Calling MigrateAsync at startup in a multi-pod environment creates a race condition where several instances try to apply the same migration simultaneously, which can fail or produce inconsistent results.",
+              "For zero-downtime deployments, only apply backward-compatible schema changes — adding nullable columns or new tables is safe, but renaming or dropping columns will break the old version still running."
             ],
             "detail": "In blue-green/zero-downtime, schema changes must be backward compatible: adding nullable columns is safe; renaming or dropping columns breaks the old app version.",
             "code": {
@@ -1830,12 +1830,12 @@
             "DbUpdateConcurrencyException"
           ],
           "answer": {
-            "oneLiner": "EF adds the token's original value to the UPDATE/DELETE WHERE clause — if another process changed the row, 0 rows match and EF throws DbUpdateConcurrencyException.",
+            "oneLiner": "Optimistic concurrency in EF Core works by including a version token in the WHERE clause of every UPDATE or DELETE — when you save a change, EF checks that the row has not been modified since you loaded it by verifying the token still matches. If another user changed the row in the meantime, zero rows will match the WHERE clause and EF throws a DbUpdateConcurrencyException. The most reliable way to configure this on SQL Server is using a rowversion column, which the database automatically increments on every update.",
             "keyPoints": [
-              "Configure via `[ConcurrencyCheck]` or `.IsRowVersion()`.",
-              "SQL Server rowversion auto-increments on update — ideal token.",
-              "0 rows affected → DbUpdateConcurrencyException.",
-              "Handle by retrying with fresh data, conflict UI, or last-write-wins."
+              "You configure a concurrency token by marking a property with the ConcurrencyCheck attribute or by calling IsRowVersion in Fluent API — EF then includes that property in the WHERE clause of every UPDATE and DELETE it generates.",
+              "If the token value in the database has changed since you loaded the entity, EF sees zero rows affected and throws a DbUpdateConcurrencyException, which you need to catch and handle explicitly.",
+              "A SQL Server rowversion column is the most reliable token because the database itself increments it atomically on every update — you cannot accidentally forget to update it.",
+              "In an API, a concurrency conflict should return a 409 Conflict response, and you can expose the rowversion as an ETag header so clients can send it back in an If-Match header on subsequent requests."
             ],
             "detail": "For APIs, return 409 Conflict with the current state and use ETag / If-Match headers derived from RowVersion.",
             "code": {
@@ -1908,12 +1908,12 @@
             "data migration"
           ],
           "answer": {
-            "oneLiner": "Up() applies schema changes and Down() reverses them; you can also run arbitrary SQL via migrationBuilder.Sql() for data migrations, views, or stored procs.",
+            "oneLiner": "The Up method in a migration applies a schema change — adding a column, creating a table, creating an index — and the Down method is the exact reverse, so that rolling back a migration restores the database to its previous state. Beyond basic schema operations, you can also call migrationBuilder.Sql to run arbitrary SQL inside a migration, which is how you backfill data, create views, or set up stored procedures as part of a schema change. Combining a schema change and a data backfill in a single migration keeps the deployment atomic.",
             "keyPoints": [
-              "MigrationBuilder methods cover tables, columns, indexes, foreign keys.",
-              "`migrationBuilder.Sql(\"...\")` runs raw SQL for data migrations or DDL.",
-              "Down() should exactly reverse Up() for rollback.",
-              "Use `suppressTransaction: true` for SQL that can't run in a transaction."
+              "MigrationBuilder provides methods for every DDL operation EF supports — adding and dropping tables, columns, indexes, and foreign keys — and the Up method applies them while Down reverses each one.",
+              "Calling migrationBuilder.Sql inside a migration runs arbitrary SQL, which you can use to backfill data after adding a column, create database views, or set up stored procedures.",
+              "Down should exactly reverse what Up did — if Up creates an index and adds a column, Down must drop that index and remove the column in the right order.",
+              "For SQL statements that cannot run inside a transaction — such as certain online index operations — pass suppressTransaction: true to migrationBuilder.Sql."
             ],
             "detail": "EF doesn't track views/procs/functions, so anything created via Sql() in Up() must be manually dropped in Down().",
             "code": {
@@ -1986,12 +1986,12 @@
             "table splitting"
           ],
           "answer": {
-            "oneLiner": "Owned types (OwnsOne/OwnsMany) are stored in the owner's table by default, making them the EF answer to DDD value objects with no independent identity.",
+            "oneLiner": "Owned entity types are EF Core's way of mapping a value object — a type that has no identity of its own and exists only as part of its owner. You configure them with OwnsOne for a single value object, which by default stores its properties as columns on the owner's table, or OwnsMany for a collection of value objects, which uses a separate table with a foreign key back to the owner. Because they have no independent identity, they cannot be queried on their own through a DbSet — they always load as part of the owning entity.",
             "keyPoints": [
-              "`OwnsOne` stores a value object as columns in the owner's table.",
-              "`OwnsMany` stores a collection in a separate table with no own key.",
-              "Use `ToTable()` inside OwnsOne to split into its own table.",
-              "Owned types load with the owner — no lazy loading."
+              "OwnsOne configures a value object whose properties are stored as columns directly on the owner's table — there is no separate table or primary key for the owned type.",
+              "OwnsMany configures a collection of value objects in a separate table with a foreign key to the owner, but with no independent primary key on the items themselves.",
+              "Owned types do not have a DbSet and cannot be queried independently — they always load with their owner, and there is no lazy loading for owned types.",
+              "If you want an owned type in its own table rather than inlined on the owner's table, you can call ToTable inside the OwnsOne configuration."
             ],
             "detail": "Owned entities avoid a separate entity with a surrogate key while keeping the domain model clean — they have no DbSet and can't be queried independently.",
             "code": {
@@ -2070,12 +2070,12 @@
             "EntityEntry"
           ],
           "answer": {
-            "oneLiner": "Shadow properties exist in the EF model and map to a column but have no corresponding property on the C# class — you read/write them via the change tracker.",
+            "oneLiner": "Shadow properties are properties that exist in EF Core's model and map to a database column, but have no corresponding property on your C# entity class — EF manages them entirely through the change tracker. They are useful for columns you want in the database but do not want to expose on your domain model, like audit timestamps such as CreatedAt or LastModified. You define them using the Property method in OnModelCreating and access or set their values through the EntityEntry on the change tracker.",
             "keyPoints": [
-              "Defined in OnModelCreating with `Property<T>(\"Name\")`, no class member.",
-              "Great for audit columns (CreatedAt, LastModified) you don't want on the domain model.",
-              "Access via `ctx.Entry(e).Property(\"Name\").CurrentValue`.",
-              "EF also uses them automatically for conventional foreign keys."
+              "Shadow properties are declared in OnModelCreating using the Property generic method with just a name — there is no matching member on the C# class, so the value lives only in the EF model and change tracker.",
+              "They are ideal for audit columns like CreatedAt or LastModified that you want persisted in the database without polluting your domain model with infrastructure concerns.",
+              "To read or write a shadow property's value, use ctx.Entry(entity).Property(\"Name\").CurrentValue — you cannot access it as a regular C# property.",
+              "To reference a shadow property inside a LINQ query so EF can translate it to SQL, use EF.Property of T inside the expression — for example EF.Property of DateTime(entity, \"LastModified\")."
             ],
             "code": {
               "lang": "csharp",
@@ -2146,12 +2146,12 @@
             "IgnoreQueryFilters"
           ],
           "answer": {
-            "oneLiner": "Add an IsDeleted flag and register a global query filter with HasQueryFilter so EF automatically appends a WHERE on every query for that entity.",
+            "oneLiner": "Soft deletes mean you never actually remove a row from the database — instead, you flag it as deleted with an IsDeleted column and hide it from normal queries. EF Core makes this easy with global query filters: you register HasQueryFilter on the entity so that EF automatically appends a WHERE IsDeleted = false condition to every query for that entity, without you having to remember to add it manually. When your code calls Remove, you intercept that in a SaveChanges override and flip the state to Modified with IsDeleted set to true instead of issuing a real DELETE.",
             "keyPoints": [
-              "`HasQueryFilter(e => !e.IsDeleted)` auto-filters every query.",
-              "Override delete: set IsDeleted = true instead of removing (often in SaveChanges).",
-              "Use `IgnoreQueryFilters()` to see soft-deleted rows (admin/restore).",
-              "Filters compose with multi-tenancy filters on the same entity."
+              "HasQueryFilter on the entity configuration registers an automatic WHERE clause that EF Core appends to every query for that entity type, filtering out soft-deleted rows transparently.",
+              "In an overridden SaveChanges, scan the change tracker for entries in the Deleted state and flip them to Modified with IsDeleted set to true — this converts every hard delete into a soft delete.",
+              "Call IgnoreQueryFilters on a specific query to bypass the filter when you need to see deleted rows, for example in an admin interface or a restore operation.",
+              "Multiple query filters on the same entity are combined with AND, so a soft-delete filter and a multi-tenancy filter stack together without any extra configuration."
             ],
             "code": {
               "lang": "csharp",
@@ -2224,12 +2224,12 @@
             "performance"
           ],
           "answer": {
-            "oneLiner": "Avoid loading and tracking thousands of entities — use ExecuteUpdate/ExecuteDelete (EF7+) for set-based changes, or EFCore.BulkExtensions / SqlBulkCopy for high-volume inserts.",
+            "oneLiner": "The key insight for bulk operations in EF Core is to stop thinking in terms of loading entities one at a time and saving them back. For bulk updates and deletes, EF Core 7 introduced ExecuteUpdate and ExecuteDelete, which generate a single set-based SQL statement that touches every matching row in one operation without loading anything into memory. For high-volume inserts, libraries like EFCore.BulkExtensions or the lower-level SqlBulkCopy are the right tools because a SaveChanges loop is essentially one database round-trip per row.",
             "keyPoints": [
-              "EF7+ `ExecuteUpdate`/`ExecuteDelete` run one SQL statement, no tracking, no SaveChanges.",
-              "For large inserts use EFCore.BulkExtensions (BulkInsert) or raw SqlBulkCopy.",
-              "Classic SaveChanges loop = one round-trip per row; batches help but still slow at scale.",
-              "ExecuteUpdate/Delete bypass the change tracker, so loaded entities can go stale."
+              "EF Core 7's ExecuteUpdate generates a single SQL UPDATE statement that modifies all rows matching the query's WHERE clause in one round-trip — no entities are loaded, no change tracker is involved, and you do not call SaveChanges.",
+              "ExecuteDelete works the same way for deletions — one SQL DELETE statement for all matching rows, far faster than loading entities and calling Remove in a loop.",
+              "For inserting tens of thousands of rows, use EFCore.BulkExtensions BulkInsert or SqlBulkCopy directly — these use SQL Server's bulk copy protocol which is orders of magnitude faster than individual INSERTs.",
+              "ExecuteUpdate and ExecuteDelete bypass the change tracker, so any entities you already loaded before calling them will show stale values — load data after the bulk operation or clear the tracker."
             ],
             "code": {
               "lang": "csharp",
@@ -2301,12 +2301,12 @@
             "workflow"
           ],
           "answer": {
-            "oneLiner": "Code First means you define the model in C# and EF generates the schema; Database First scaffolds C# from an existing DB; Migrations is the mechanism that incrementally evolves the schema in a Code First workflow.",
+            "oneLiner": "Code First and Database First describe two different workflows for how you relate your C# classes to your database schema, and Migrations is the mechanism that powers the Code First workflow. In Code First, you write the C# entity classes and EF generates the schema from them using migrations — the schema is derived from the code. In Database First, you start with an existing database and use the scaffold command to generate the C# classes from the schema. Migrations is not a third separate approach, it is the tool you use to version and apply schema changes incrementally in a Code First project.",
             "keyPoints": [
-              "Code First: C# model is the source of truth, schema generated from it.",
-              "Database First: existing schema is the source of truth, scaffold entities from it.",
-              "Migrations isn't a third 'approach' — it's how Code First versions schema changes.",
-              "EF Core has no designer/EDMX; Code First + Migrations is the mainstream path."
+              "Code First treats your C# entity classes as the source of truth — you write the model, run dotnet ef migrations add, and EF generates and evolves the database schema to match.",
+              "Database First treats the existing database as the source of truth — you run dotnet ef dbcontext scaffold to generate C# entity classes and a DbContext from the current schema.",
+              "Migrations is the change-management tool for Code First: it records each schema change as a versioned file with Up and Down methods that EF applies incrementally to the database.",
+              "EF Core has no EDMX designer or visual model builder like EF6 — Code First with Migrations is the mainstream path, and Database First is handled by the CLI scaffold command."
             ],
             "code": {
               "lang": "csharp",
@@ -2378,12 +2378,12 @@
             "modeling"
           ],
           "answer": {
-            "oneLiner": "A value object is a DDD concept (no identity, equality by value); an owned entity is EF's mechanism to map one to columns; a shadow property is a single mapped column with no C# member at all.",
+            "oneLiner": "These three things operate at different levels and solve different problems. A value object is a domain design concept — a type that has no identity of its own and is compared by its values rather than by a key, like a Money or Address type. An owned entity is EF Core's mechanism for mapping a value object to the database — it tells EF to store the value object's properties as columns without giving it its own table or primary key. A shadow property is something else entirely: a single column in the database that has no corresponding property on the C# class at all.",
             "keyPoints": [
-              "Value object = domain concept; owned entity = the EF mapping for it.",
-              "Owned types are configured with OwnsOne/OwnsMany and stored in the owner's table by default.",
-              "Shadow property = one column, no C# property, accessed via the change tracker.",
-              "Use owned types for multi-field value objects (Address); shadow props for single hidden columns (audit dates)."
+              "A value object is a domain modeling concept — it has no identity, two instances with the same values are considered equal, and it is always owned by and loaded with a parent aggregate.",
+              "An owned entity in EF Core is the mapping mechanism for a value object — you configure it with OwnsOne or OwnsMany, and EF stores its properties as columns on the owner's table or in a related table with no independent primary key.",
+              "A shadow property is a completely different concept: it is a single database column with no C# property counterpart, managed entirely through the change tracker and useful for things like audit dates you want in the database but not on the domain object.",
+              "Use owned types for multi-field value objects like Address that need several columns, and shadow properties for single hidden columns like CreatedAt that you want persisted without exposing them on the class."
             ],
             "code": {
               "lang": "csharp",
@@ -2456,12 +2456,12 @@
             "rollback"
           ],
           "answer": {
-            "oneLiner": "A single SaveChanges is already transactional; to span multiple SaveChanges or operations, use Database.BeginTransaction() and commit explicitly, or TransactionScope for ambient/cross-resource transactions.",
+            "oneLiner": "A single call to SaveChanges is already wrapped in its own database transaction automatically, so within one call it is all-or-nothing. When you need two or more SaveChanges calls to be atomic together — for example, inserting an order and then recording a payment event — you open an explicit transaction with BeginTransactionAsync, run each SaveChanges call inside it, and call CommitAsync at the end. If anything throws, the transaction is rolled back and neither change is persisted.",
             "keyPoints": [
-              "`ctx.Database.BeginTransaction()` then Commit/Rollback wraps several SaveChanges.",
-              "Always commit in the happy path; the using block rolls back if you don't.",
-              "`TransactionScope` gives an ambient transaction across contexts/connections.",
-              "With retrying execution strategies, wrap the work in `strategy.ExecuteAsync(...)`."
+              "A single SaveChanges call is automatically transactional — EF wraps all its generated SQL in one database transaction, so either everything succeeds or nothing does.",
+              "To make multiple SaveChanges calls atomic, open an explicit transaction with ctx.Database.BeginTransactionAsync, call SaveChanges inside the transaction, and commit only after all operations succeed.",
+              "If you need an ambient transaction that spans two different DbContext instances or database connections, use TransactionScope, which can escalate to a distributed transaction if needed.",
+              "When EnableRetryOnFailure is configured, you must wrap any manual transaction inside Database.CreateExecutionStrategy().ExecuteAsync so that a retry replays the entire unit of work rather than only part of it."
             ],
             "code": {
               "lang": "csharp",
@@ -2533,12 +2533,12 @@
             "performance"
           ],
           "answer": {
-            "oneLiner": "Single query JOINs everything in one round-trip but can cause a Cartesian explosion with multiple collection Includes; AsSplitQuery issues one SELECT per collection, trading more round-trips for far fewer duplicated rows.",
+            "oneLiner": "The decision between a single query and AsSplitQuery comes down to whether your Includes involve multiple collections. With a single collection Include, a single query with a JOIN is almost always the right choice — one round-trip, no complexity. The problem arises when you Include multiple collection navigations, because the JOINs produce a Cartesian product where every row in one collection is multiplied against every row in another, which can blow up your result set to thousands of rows. AsSplitQuery avoids this by issuing a separate SELECT for each collection, at the cost of more database round-trips and a small risk that data changes between the separate queries.",
             "keyPoints": [
-              "One collection Include: single query is usually fine.",
-              "Multiple collection Includes: split query avoids N x M row duplication.",
-              "Split query = more round-trips and no single-snapshot consistency by default.",
-              "Set per query with `AsSplitQuery()`/`AsSingleQuery()` or globally."
+              "With a single collection Include, a single query is usually fine — there is no Cartesian product to worry about, so the extra complexity of splitting is not worth it.",
+              "When you Include two or more collection navigations, a single query produces a Cartesian product — if a blog has 10 posts and 10 contributors, the JOIN returns 100 rows instead of 20.",
+              "AsSplitQuery issues one SELECT per included collection and assembles the object graph in memory, which keeps individual result sets small and eliminates the row explosion.",
+              "Split queries are not in a single transaction by default, so there is a risk of data changing between the separate SELECTs — for reads where consistency matters, use a single query or wrap the split in an explicit transaction."
             ],
             "code": {
               "lang": "csharp",
