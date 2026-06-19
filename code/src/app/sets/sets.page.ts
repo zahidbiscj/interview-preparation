@@ -89,6 +89,12 @@ type Mode = 'add' | 'review';
               </div>
               <div class="run-actions">
                 <button
+                  class="run-btn run-btn-prompt"
+                  [disabled]="activeSet()!.questionIds.length === 0"
+                  (click)="openPromptModal()">
+                  📋 Generate Prompt
+                </button>
+                <button
                   class="run-btn"
                   [disabled]="activeSet()!.questionIds.length === 0"
                   (click)="runSimulator()">
@@ -172,6 +178,25 @@ type Mode = 'add' | 'review';
         </main>
       </div>
     </div>
+
+    <!-- ── Generate Prompt Modal ── -->
+    @if (showPromptModal()) {
+      <div class="modal-backdrop" (click)="closePromptModal()">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">ChatGPT Voice Interview Prompt</h2>
+            <button class="modal-close" (click)="closePromptModal()">✕</button>
+          </div>
+          <p class="modal-hint">Paste this into ChatGPT Voice (or any AI) to start a live interview session.</p>
+          <textarea class="prompt-textarea" readonly [value]="generatedPrompt()"></textarea>
+          <div class="modal-footer">
+            <button class="copy-btn" [class.copied]="promptCopied()" (click)="copyPrompt()">
+              {{ promptCopied() ? '✓ Copied!' : '📋 Copy to Clipboard' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     :host { display: block; height: 100vh; overflow: hidden; }
@@ -425,6 +450,81 @@ type Mode = 'add' | 'review';
       .pick-row { grid-template-columns: auto 1fr; }
       .pick-meta { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; padding-left: 0; }
     }
+
+    /* ── Generate Prompt button ── */
+    .run-btn-prompt {
+      background: color-mix(in srgb, #a855f7 14%, var(--surface-2));
+      color: #a855f7;
+      border-color: color-mix(in srgb, #a855f7 40%, var(--border));
+    }
+    .run-btn-prompt:hover { background: color-mix(in srgb, #a855f7 22%, var(--surface-2)); border-color: #a855f7; }
+    .run-btn-prompt:disabled { opacity: 0.5; cursor: default; }
+
+    /* ── Prompt Modal ── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 20px;
+    }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .modal-title { margin: 0; font-size: 1.1em; font-weight: 700; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.1em;
+      cursor: pointer;
+      color: var(--text-muted);
+      line-height: 1;
+      padding: 2px 6px;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-hint { margin: 0; font-size: 0.82em; color: var(--text-muted); }
+    .prompt-textarea {
+      flex: 1;
+      min-height: 340px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: 0.8em;
+      line-height: 1.7;
+      padding: 16px;
+      resize: vertical;
+      font-family: 'Consolas', 'Fira Code', 'Cascadia Code', monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .modal-footer { display: flex; justify-content: flex-end; }
+    .copy-btn {
+      background: #a855f7;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 0.88em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 150ms;
+    }
+    .copy-btn:hover { background: #9333ea; }
+    .copy-btn.copied { background: var(--accent); }
   `]
 })
 export class SetsPage implements OnInit {
@@ -447,6 +547,10 @@ export class SetsPage implements OnInit {
   readonly search = signal('');
   readonly typeFilter = signal<QuestionType | 'all'>('all');
   readonly categoryFilter = signal<string>('all');
+
+  readonly showPromptModal = signal(false);
+  readonly promptCopied = signal(false);
+  readonly generatedPrompt = signal('');
 
   readonly activeSet = computed(() =>
     this.sets().find(s => s.id === this.activeSetId()) ?? null);
@@ -553,5 +657,49 @@ export class SetsPage implements OnInit {
   runLive(): void {
     const id = this.activeSetId();
     if (id) this.router.navigate(['/live-interview'], { queryParams: { set: id } });
+  }
+
+  openPromptModal(): void {
+    const questions = this.setQuestions();
+    const setName = this.activeSet()!.name;
+    const numbered = questions.map((q, i) => `${i + 1}. ${q.q}`).join('\n');
+
+    const prompt = `You are a strict but supportive senior technical interviewer conducting a mock interview for the role: "${setName}".
+
+You have exactly ${questions.length} questions to ask, listed below. Follow these rules without exception:
+
+RULES:
+- Ask ONE question at a time, starting with question 1.
+- After I give my answer, respond with:
+  a) Accuracy score: X/10
+  b) What I got right (briefly)
+  c) What I missed or got wrong — give the correct explanation
+  d) A short "key takeaway" if my answer was incomplete
+- Then immediately ask the next question.
+- Never reveal upcoming questions in advance.
+- If I say "skip" or "next", move to the next question without feedback.
+- If I say "hint", give a one-sentence nudge without answering.
+- After the last question, give a short overall performance summary.
+- Keep all responses concise — this is a voice interview.
+
+QUESTIONS:
+${numbered}
+
+Begin now. Ask me question 1.`;
+
+    this.generatedPrompt.set(prompt);
+    this.showPromptModal.set(true);
+    this.promptCopied.set(false);
+  }
+
+  closePromptModal(): void {
+    this.showPromptModal.set(false);
+  }
+
+  copyPrompt(): void {
+    navigator.clipboard.writeText(this.generatedPrompt()).then(() => {
+      this.promptCopied.set(true);
+      setTimeout(() => this.promptCopied.set(false), 2000);
+    });
   }
 }
