@@ -2960,11 +2960,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "not-in", "anti-join"],
           "answer": {
-            "oneLiner": "Filter salary < 30000 and a non-null manager_id that is absent from the set of existing employee_ids.",
+            "oneLiner": "I filter for employees earning under 30000 who have a manager assigned but whose manager no longer exists as an employee. The key insight is that NOT IN is safe here because employee_id is the primary key — a primary key column can never contain NULL, so there is no risk of NOT IN silently returning zero rows due to a NULL in the subquery. I also guard with manager_id IS NOT NULL to exclude top-level employees who were never assigned a manager in the first place.",
             "keyPoints": [
-              "manager_id IS NOT NULL excludes top-level employees.",
-              "manager_id NOT IN (SELECT employee_id ...) is the 'manager left' test.",
-              "employee_id values are non-null, so NOT IN is safe."
+              "The first condition checks that salary is below 30000, which narrows the result to low-paid employees only.",
+              "The second condition requires manager_id IS NOT NULL because top-level employees have no manager assigned, and we only want employees whose manager actually left, not employees who never had one.",
+              "The third condition checks that manager_id does not appear in the set of current employee IDs, which is how we detect that the manager has left the company.",
+              "NOT IN is safe here specifically because employee_id is a primary key and primary keys cannot contain NULL — in general, if a subquery used in NOT IN could return a NULL, the entire NOT IN predicate evaluates to UNKNOWN and returns no rows, which is a common bug."
             ],
             "code": {
               "lang": "sql",
@@ -2991,12 +2992,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "case", "parity"],
           "answer": {
-            "oneLiner": "Remap ids by parity: odd id moves to id+1, even moves to id-1, except a final odd id (the max) stays.",
+            "oneLiner": "The trick is to remap each seat id using a CASE expression based on whether the id is odd or even, so that every pair of neighbours effectively swaps positions. An odd id moves to id plus 1, an even id moves to id minus 1, with one exception — if the total count of students is odd, the very last student has an odd id and there is no partner to swap with, so that one stays in place. I detect that exception by comparing the current id to the maximum id in the table.",
             "keyPoints": [
-              "Odd id and not the last => id + 1.",
-              "Even id => id - 1.",
-              "Odd id equal to MAX(id) => unchanged.",
-              "ORDER BY the computed id."
+              "A CASE expression drives the remapping: an odd id gets id plus 1 to swap forward, an even id gets id minus 1 to swap backward.",
+              "The exception is when an odd id equals the maximum id in the table, meaning it is the last seat with no pair, so it keeps its original id value unchanged.",
+              "Ordering the result by the newly computed id column puts the students in their new seat order, which is the required output.",
+              "An alternative approach uses LEAD and LAG window functions to pull the neighbour's student name directly rather than remapping the seat id, which avoids the scalar subquery for MAX."
             ],
             "code": {
               "lang": "sql",
@@ -3023,11 +3024,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "union-all", "order-by", "tie-break"],
           "answer": {
-            "oneLiner": "Two ranked one-row queries UNION ALL'd: top rater by count then name, top Feb-2020 movie by average rating then title.",
+            "oneLiner": "This problem has two completely separate parts that happen to need their results stacked into one column, which makes UNION ALL the natural connector. The first part finds the user who has left the most ratings by grouping by user, counting rows, and taking the top one with the alphabetically smaller name as the tiebreaker. The second part restricts to February 2020, groups by movie, averages the ratings, and again takes the top one with the alphabetically smaller title as the tiebreaker.",
             "keyPoints": [
-              "Part 1: GROUP BY user, ORDER BY COUNT(*) DESC, name ASC, LIMIT 1.",
-              "Part 2: filter created_at to Feb 2020, GROUP BY movie, ORDER BY AVG(rating) DESC, title ASC, LIMIT 1.",
-              "UNION ALL stacks both single-column results."
+              "Each part is written as its own independent query inside parentheses so the ORDER BY and LIMIT clauses apply to that part alone rather than to the entire UNION result.",
+              "For the top rater, you group by user ID, count how many movies they rated, then order by that count descending with the user name ascending as a tiebreaker, and limit to one row.",
+              "For the top-rated February movie, you filter created_at to the half-open range from 2020-02-01 up to but not including 2020-03-01 so all timestamps within the month are included, then group by movie, average the ratings, and take the top row with title as tiebreaker.",
+              "UNION ALL rather than UNION is used because if the two results happen to be the same string it should still appear twice in the output, and UNION would silently deduplicate it."
             ],
             "code": {
               "lang": "sql",
@@ -3054,11 +3056,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "moving-average", "window"],
           "answer": {
-            "oneLiner": "Aggregate to one row per day, sum each day with the prior six via a self-join (or window frame), and only emit days at least 6 days after the first.",
+            "oneLiner": "Because multiple customers can visit on the same day, I first collapse the data to one row per day by summing amounts, then for each day I sum across that day and the six preceding days to get a trailing 7-day total. I only emit results starting from the seventh day onward, because earlier days do not yet have a full seven-day window to average over, and I divide the 7-day sum by 7 to get the moving average.",
             "keyPoints": [
-              "Collapse to daily totals first (multiple customers per day).",
-              "Sum the trailing 7-day window per day.",
-              "Skip the first 6 days where a full window doesn't exist; divide by 7 for the average."
+              "Before building the window, you must aggregate to one row per date by summing amounts across all customers who visited that day — otherwise the trailing window would span rows rather than calendar days.",
+              "The trailing 7-day sum can be computed with a self-join where you join each day to all rows within the prior six days, or more cleanly with a window function using ROWS BETWEEN 6 PRECEDING AND CURRENT ROW.",
+              "The output starts from the day that is at least six days after the first data point, because earlier days would produce a moving average based on fewer than seven days of data, which would not match the intended definition.",
+              "The moving average is simply the 7-day running total divided by 7, both rounded to two decimal places."
             ],
             "code": {
               "lang": "sql",
@@ -3085,11 +3088,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "union-all", "group-by"],
           "answer": {
-            "oneLiner": "Treat both columns as friend endpoints by UNION ALL-ing them into one id column, then group and take the top count.",
+            "oneLiner": "Since a friendship is mutual, both the person who sent the request and the person who accepted it gain a friend from the same row. So I flatten both columns into a single list using UNION ALL, then group by id and count how many times each person appears, which gives the total friend count for each user. The person at the top of that count is the one with the most friends.",
             "keyPoints": [
-              "UNION ALL requester_id and accepter_id into a single id list.",
-              "GROUP BY id, COUNT(*) = number of friendships.",
-              "ORDER BY count DESC LIMIT 1."
+              "Each accepted request benefits two people, so the requester ID and the accepter ID both need to be counted as gaining a friend from that interaction.",
+              "UNION ALL stacks both columns into one column without removing duplicates — this is important because a person can appear as both a requester and an accepter across different friendships and all of those appearances should be counted.",
+              "After unioning, grouping by id and counting gives each user's total number of friends, and ordering that count descending with LIMIT 1 returns the most-connected user.",
+              "If there could be ties for the top position, LIMIT 1 would return only one winner arbitrarily — to return all tied leaders you would need to compare against the maximum count rather than just taking the first row."
             ],
             "code": {
               "lang": "sql",
@@ -3116,11 +3120,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "group-by", "having", "subquery"],
           "answer": {
-            "oneLiner": "Keep rows whose tiv_2015 appears more than once and whose (lat,lon) appears exactly once, then SUM tiv_2016.",
+            "oneLiner": "There are two independent conditions that a policyholder must satisfy, and I express each as a subquery that I use as a filter. The first condition is that the policyholder shares their 2015 investment value with at least one other holder, which I find by grouping on tiv_2015 and keeping groups with more than one row. The second condition is that the policyholder is at a unique geographical location, which I find by grouping on the latitude and longitude pair and keeping only pairs that appear exactly once. Once both filters are applied, I sum the 2016 investment values.",
             "keyPoints": [
-              "Shared tiv_2015: GROUP BY tiv_2015 HAVING COUNT(*) > 1.",
-              "Unique location: GROUP BY lat, lon HAVING COUNT(*) = 1.",
-              "Combine both as IN filters, then SUM and ROUND."
+              "To find shared tiv_2015 values, group by tiv_2015 and keep those with a count greater than 1, then use those values in an IN filter on the main query.",
+              "To find unique locations, group by both lat and lon together as a pair and keep pairs with a count of exactly 1, then use those coordinate pairs in a tuple IN filter since uniqueness is about the combination of both coordinates, not either one alone.",
+              "Combining both filters with AND in the WHERE clause keeps only policyholders who meet both criteria simultaneously.",
+              "An equivalent window-function approach computes COUNT over PARTITION BY tiv_2015 and COUNT over PARTITION BY lat, lon in a subquery, then filters in an outer query — this avoids the correlated subqueries and often performs better on large tables."
             ],
             "code": {
               "lang": "sql",
@@ -3147,11 +3152,12 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "window", "dense-rank"],
           "answer": {
-            "oneLiner": "DENSE_RANK salaries within each department descending and keep ranks 1–3, then join to department names.",
+            "oneLiner": "I use DENSE_RANK partitioned by department and ordered by salary descending to assign a rank to each employee's salary within their department, then keep only those with a rank of 3 or lower. The reason I use DENSE_RANK specifically rather than ROW_NUMBER is that the problem asks for the top three distinct salary levels, so if two employees in the same department earn the same amount they should both count as being at the same rank rather than being arbitrarily split.",
             "keyPoints": [
-              "DENSE_RANK() OVER (PARTITION BY departmentId ORDER BY salary DESC).",
-              "DENSE_RANK so tied salaries share a rank (top-3 distinct salaries).",
-              "Filter rank <= 3 and join Department for the name."
+              "DENSE_RANK partitioned by department ID and ordered by salary descending assigns rank 1 to the highest salary in each department, rank 2 to the next distinct salary, and so on without skipping numbers for ties.",
+              "Filtering where the rank is less than or equal to 3 returns everyone who earns one of the three highest distinct salaries in their department, which can be more than three actual employees when there are ties.",
+              "After ranking and filtering, joining to the Department table on department ID adds the department name to the output.",
+              "RANK would also work for the ranking step but leaves gaps after ties — for example if two people share rank 1 then the next rank would be 3 — which makes it less intuitive; DENSE_RANK keeps ranks contiguous."
             ],
             "code": {
               "lang": "sql",
@@ -3178,11 +3184,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "string-functions"],
           "answer": {
-            "oneLiner": "Concatenate the uppercased first character with the lowercased remainder.",
+            "oneLiner": "I split the name into two parts — the first character and everything after it — apply UPPER to the first part and LOWER to the rest, then concatenate them back together. SQL's SUBSTRING is 1-based, so starting at position 2 gives me everything after the first character. This handles all edge cases including single-character names, where the tail substring is empty and the result is just the uppercased letter.",
             "keyPoints": [
-              "UPPER(LEFT(name,1)) for the initial.",
-              "LOWER(SUBSTRING(name,2)) for the tail.",
-              "CONCAT joins them; ORDER BY user_id."
+              "LEFT of name with length 1 extracts just the first character, and wrapping it in UPPER forces it to uppercase regardless of how it was stored.",
+              "SUBSTRING of name starting at position 2 extracts everything from the second character to the end, and wrapping that in LOWER forces the rest to lowercase.",
+              "CONCAT joins the two pieces back into a single string, and the result is ordered by user_id as required.",
+              "For a name that is only one character long, SUBSTRING from position 2 returns an empty string rather than an error, so the result is just the uppercased single character — no special case needed."
             ],
             "code": {
               "lang": "sql",
@@ -3209,11 +3216,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "like", "string-match"],
           "answer": {
-            "oneLiner": "Match the prefix at the start of the string or after a space, so 'DIAB1...' is found but not a code that merely contains DIAB1 mid-token.",
+            "oneLiner": "Because the conditions column is a space-separated list of codes, I need to match DIAB1 as a whole token rather than as a substring that could appear inside another code. I handle this with two LIKE patterns joined by OR — one that matches DIAB1 at the very start of the string, and one that matches a space followed by DIAB1 anywhere later in the string. The leading space in the second pattern is what anchors the match to a word boundary and prevents false positives like a code called SADIAB1.",
             "keyPoints": [
-              "conditions LIKE 'DIAB1%' covers the first token.",
-              "OR conditions LIKE '% DIAB1%' covers later tokens.",
-              "The leading space prevents matching e.g. 'SADIAB1' substrings."
+              "The conditions LIKE 'DIAB1%' pattern covers the case where the diabetes code appears as the very first token in the space-separated list, since there is no preceding space in that position.",
+              "The conditions LIKE '% DIAB1%' pattern covers the case where the diabetes code appears anywhere after the first token, because each subsequent token is preceded by a space.",
+              "The leading space in the second pattern is essential — without it, a code like XDIAB1 or SADIAB1 would also match, which would be a false positive.",
+              "A more concise alternative is to use a regular expression like REGEXP with a pattern that anchors the match to either the start of the string or a whitespace character, which collapses both cases into one predicate."
             ],
             "code": {
               "lang": "sql",
@@ -3240,11 +3248,12 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "delete", "self-join"],
           "answer": {
-            "oneLiner": "Self-join Person on equal email and a larger id, then delete the higher-id side so the minimum id survives.",
+            "oneLiner": "I self-join the Person table to itself on the condition that two rows share the same email but the first alias has a larger id than the second. Any row that satisfies this join condition is a duplicate that should be removed, because there exists a lower-id row with the same email. Deleting from the first alias removes all those higher-id duplicates and leaves exactly one row per email — the one with the smallest id.",
             "keyPoints": [
-              "Join condition: same email, p1.id > p2.id.",
-              "DELETE p1 removes every non-minimal duplicate.",
-              "Only the smallest id per email remains."
+              "The self-join joins p1 to p2 on equal email and the condition that p1.id is greater than p2.id, which means p1 is a row for which there exists a lower-id row with the same email.",
+              "The DELETE p1 statement removes all rows matched as p1 in the join, which are precisely the non-minimal duplicates.",
+              "The minimum id row per email is never matched as p1 because there is no p2 with a smaller id and the same email, so it is never targeted by the delete.",
+              "An alternative using window functions would assign ROW_NUMBER partitioned by email and ordered by id, then delete all rows where that row number is greater than 1, which expresses the same intent and is supported by most modern databases."
             ],
             "code": {
               "lang": "sql",
@@ -3271,11 +3280,12 @@
           "freq": "high",
           "tags": ["sql", "leetcode", "limit-offset", "null"],
           "answer": {
-            "oneLiner": "Order distinct salaries descending and take OFFSET 1; wrapping in a subquery makes the empty case return NULL instead of no row.",
+            "oneLiner": "I select the distinct set of salaries ordered from highest to lowest, then skip the first one using OFFSET 1 and take the next with LIMIT 1, which lands on the second highest unique salary. The reason I use DISTINCT is that if two employees share the top salary, without it that same value would appear in both position 0 and position 1, so OFFSET 1 would return the top salary again rather than the actual runner-up. Wrapping the whole thing in a scalar subquery is the trick that turns an empty result into NULL rather than returning no rows at all.",
             "keyPoints": [
-              "DISTINCT so duplicate top salaries don't occupy the second slot.",
-              "LIMIT 1 OFFSET 1 picks the runner-up.",
-              "The outer SELECT (...) yields NULL when there's no second salary."
+              "DISTINCT deduplicated the salary list before the OFFSET is applied, so tied salaries at the top do not artificially push the second distinct value down to position 2.",
+              "LIMIT 1 OFFSET 1 says to skip one row and return the next, which after deduplication and sorting gives the second highest unique salary.",
+              "Wrapping the inner query in a scalar subquery in the outer SELECT is what converts the no-row case into a NULL result — a bare LIMIT/OFFSET query returns zero rows when nothing qualifies, but a scalar subquery produces a NULL when its inner query returns nothing.",
+              "An alternative approach uses DENSE_RANK to rank salaries descending and then filters for rank equal to 2, which is more general and can be parameterized to find the N-th highest."
             ],
             "code": {
               "lang": "sql",
@@ -3302,11 +3312,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "group-concat", "distinct"],
           "answer": {
-            "oneLiner": "Group by date, COUNT(DISTINCT product) for the tally, and GROUP_CONCAT(DISTINCT product ORDER BY product) for the sorted list.",
+            "oneLiner": "I group by the sell date and use two aggregates in the same query — COUNT with DISTINCT to get the unique product count, and GROUP_CONCAT with DISTINCT and an ORDER BY inside it to build the alphabetically sorted comma-separated list. The DISTINCT inside both aggregates is important because the same product can appear multiple times on the same date, and without it the count would be inflated and the list would contain duplicates.",
             "keyPoints": [
-              "DISTINCT inside both aggregates dedupes repeated sales.",
-              "GROUP_CONCAT ... ORDER BY product gives alphabetical names.",
-              "ORDER BY sell_date for output order."
+              "COUNT with DISTINCT inside it counts only the unique product names per date, ignoring repeated rows for the same product on the same day.",
+              "GROUP_CONCAT with DISTINCT and ORDER BY product inside the function builds the comma-separated list in alphabetical order and also deduplicates product names so each appears only once.",
+              "The outer ORDER BY sell_date sorts the final result chronologically, which is separate from the ORDER BY inside GROUP_CONCAT that only controls the order within each concatenated string.",
+              "GROUP_CONCAT is MySQL-specific; in PostgreSQL and SQL Server you would use STRING_AGG with an ORDER BY clause inside it to achieve the same result."
             ],
             "code": {
               "lang": "sql",
@@ -3333,11 +3344,12 @@
           "freq": "medium",
           "tags": ["sql", "leetcode", "regexp", "validation"],
           "answer": {
-            "oneLiner": "Validate with a single anchored regular expression: a leading letter, allowed prefix characters, then the exact @leetcode.com domain.",
+            "oneLiner": "I use a single anchored regular expression to validate the email format in one pass. The pattern requires the prefix to start with a letter, followed by any combination of letters, digits, underscores, dots, and dashes, then the exact literal string at-leetcode-dot-com at the end. The anchors at the start and end of the pattern are critical — without them, a partial match anywhere in the string would falsely validate an email that only contains a valid sequence somewhere in the middle.",
             "keyPoints": [
-              "^[A-Za-z] forces a leading letter.",
-              "[A-Za-z0-9_.-]* allows the rest of the prefix.",
-              "@leetcode\\.com$ matches the literal domain (escaped dot), anchored to the end."
+              "The caret anchor at the start of the pattern means the match must begin at position zero in the string, ensuring the prefix starts with a letter rather than allowing any leading characters.",
+              "The first character class allows only letters, which enforces the rule that the email prefix must start with an alphabetic character.",
+              "The second character class with the star quantifier allows zero or more of the permitted prefix characters — letters, digits, underscore, dot, and dash — for the rest of the prefix.",
+              "The dot in the domain part must be escaped with a backslash to match a literal dot rather than any character, and the dollar sign anchor at the end ensures the domain extends exactly to the end of the string with nothing after it."
             ],
             "code": {
               "lang": "sql",
