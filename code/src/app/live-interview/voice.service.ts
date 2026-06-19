@@ -114,8 +114,12 @@ export class VoiceService {
           if (this.manualStop) {
             done(this.capturedText);
           } else {
-            // Auto-restart — browser killed recognition on silence
-            try { start(); } catch { done(this.capturedText); }
+            // Brief pause before restarting so the browser's audio buffer drains.
+            // Without this, the new session re-transcribes buffered audio from the
+            // old session, duplicating words the user already said.
+            setTimeout(() => {
+              try { start(); } catch { done(this.capturedText); }
+            }, 300);
           }
         };
 
