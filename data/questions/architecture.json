@@ -1,4 +1,4 @@
-﻿{
+{
   "topicId": "architecture",
   "topicName": "System Design & Architecture",
   "subtopics": [
@@ -2466,182 +2466,182 @@
       "freq": "high",
       "tags": ["singleton", "creational", "thread-safety", "dependency-injection", "lazy"],
       "answer": {
-        "oneLiner": "Singleton ensures exactly one instance exists for the app lifetime â€” in modern .NET, express it as services.AddSingleton<T>() rather than a hand-rolled static.",
+        "oneLiner": "Singleton guarantees exactly one instance for the entire app lifetime. In modern .NET you express this as services.AddSingleton<T>() rather than a hand-rolled static class.",
         "keyPoints": [
-          "Thread-safe init: use static `Lazy<T>` with ExecutionAndPublication â€” never hand-write double-checked locking.",
-          "All web requests share the singleton concurrently â€” internal state must be thread-safe (use ConcurrentDictionary, not Dictionary).",
-          "DI-as-singleton beats static: same one-instance guarantee, but injectable, mockable, and lifetime-managed by the container.",
-          "Captive dependency: injecting a Scoped service into a Singleton captures it for the app lifetime â€” stale and non-thread-safe."
+          "Thread-safe initialisation: use static Lazy<T> with LazyThreadSafetyMode.ExecutionAndPublication. Never hand-write double-checked locking.",
+          "Every web request shares the singleton concurrently, so its internal state must be thread-safe. Use ConcurrentDictionary, not Dictionary.",
+          "DI-as-singleton is strictly better than a static class: same single-instance guarantee, but injectable, mockable, and container-managed.",
+          "Captive dependency: injecting a Scoped service into a Singleton captures it for the app lifetime, making it stale and non-thread-safe."
         ],
-        "detail": "A static Singleton hides its dependency and forces shared mutable state in tests. Registering with AddSingleton gives the single-instance guarantee while keeping it injectable and replaceable.",
+        "detail": "A static Singleton hides its dependency and forces shared mutable state in tests. Registering with AddSingleton gives the same guarantee while keeping the class injectable and replaceable.",
         "code": {
           "lang": "csharp",
-          "snippet": "// BAD: static global â€” hidden coupling, untestable\npublic class Config { public static Config Instance { get; } = new(); }\n\n// OK: Lazy<T> when DI isn't available\nprivate static readonly Lazy<Clock> _instance =\n    new(() => new Clock(), LazyThreadSafetyMode.ExecutionAndPublication);\npublic static Clock Instance => _instance.Value;\n\n// BEST: DI singleton â€” one instance, injectable and testable\nservices.AddSingleton<IClock, SystemClock>();",
+          "snippet": "// BAD: static global -- hidden coupling, untestable\npublic class Config { public static Config Instance { get; } = new(); }\n\n// OK: Lazy<T> when DI is not available\nprivate static readonly Lazy<Clock> _instance =\n    new(() => new Clock(), LazyThreadSafetyMode.ExecutionAndPublication);\npublic static Clock Instance => _instance.Value;\n\n// BEST: DI singleton -- one instance, injectable and testable\nservices.AddSingleton<IClock, SystemClock>();",
           "note": "Lazy<T> handles one-time thread-safe init. DI singleton is the same guarantee without the static global."
         },
-        "analogy": "DI singleton: same guarantee, zero global coupling.",
+        "analogy": "One instance. Injected, not hidden. The container owns it.",
         "redFlags": [
-          "Hand-rolling double-checked locking when Lazy<T> exists for exactly this purpose.",
+          "Hand-rolling double-checked locking when Lazy<T> already solves this correctly.",
           "Storing per-request mutable state in a singleton shared across all concurrent threads.",
-          "Injecting a Scoped service (e.g. DbContext) into a Singleton â€” classic captive dependency."
+          "Injecting a Scoped service such as DbContext into a Singleton (captive dependency)."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "How would you implement a shared in-memory cache as a Singleton?"
+            "text": "Your team needs a shared in-memory cache across the entire application. How would you implement that as a Singleton?"
           },
           {
             "role": "me",
-            "text": "I'd register it with services.AddSingleton â€” the container creates one instance and injects it everywhere. No static global needed."
+            "text": "I would register the cache class with services.AddSingleton. The container creates one instance and injects it wherever it is needed. No static global required."
           },
           {
             "role": "interviewer",
-            "text": "Why avoid the static global approach?"
+            "text": "Why avoid the static global approach at all?"
           },
           {
             "role": "me",
-            "text": "Hidden coupling â€” callers can't see the dependency in the constructor, and you can't swap it in tests without hacky workarounds like reflection or a static setter."
+            "text": "Hidden coupling. Callers cannot see the dependency in the constructor, and you cannot swap it in tests without reflection hacks or a static setter. Constructor injection keeps everything explicit."
           },
           {
             "role": "interviewer",
-            "text": "Suppose you genuinely can't use DI â€” how do you make the classic Singleton thread-safe?"
+            "text": "Suppose you genuinely cannot use a DI container here. How do you make the classic Singleton thread-safe?"
           },
           {
             "role": "me",
-            "text": "Static Lazy<T> with ExecutionAndPublication mode. It guarantees exactly one init even when two threads hit it simultaneously â€” no double-checked locking I can get wrong."
+            "text": "Static Lazy<T> with ExecutionAndPublication mode. It guarantees exactly one initialisation even when two threads arrive simultaneously on the first call. I never have to write double-checked locking."
           },
           {
             "role": "interviewer",
-            "text": "What's the danger with that cache singleton in a multi-threaded web app?"
+            "text": "What is the concrete danger with a mutable cache in a multi-threaded web application?"
           },
           {
             "role": "me",
-            "text": "Every request shares it, so writes must be thread-safe. I'd back it with ConcurrentDictionary. A plain Dictionary under concurrent writes is data corruption waiting to happen."
+            "text": "Every request shares the same instance concurrently. Concurrent writes to a plain Dictionary will corrupt it silently. I would back it with ConcurrentDictionary."
           },
           {
             "role": "interviewer",
-            "text": "You inject a Scoped DbContext into that Singleton. What happens?"
+            "text": "You register a Singleton service and inject a DbContext into its constructor. What goes wrong?"
           },
           {
             "role": "me",
-            "text": "Captive dependency â€” the Singleton captures the DbContext for the app's lifetime. It gets reused across requests, goes stale, and isn't thread-safe. I'd inject IServiceScopeFactory and create a scope per operation instead."
+            "text": "Captive dependency. The Singleton holds the Scoped DbContext for the application lifetime. It gets reused across requests, is not thread-safe, and eventually becomes stale. I would inject IServiceScopeFactory instead and create a scope per operation."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Why is DI-as-singleton better than a static Singleton?",
-            "a": "Same single-instance guarantee but injectable, mockable, and container-managed.",
+            "a": "Same single-instance guarantee but injectable, mockable, and managed by the container.",
             "relatedId": "architecture-dp-013"
           },
           {
             "q": "Can you inject a Scoped service into a Singleton?",
-            "a": "No â€” captive dependency; inject IServiceScopeFactory and create a scope per use instead."
+            "a": "No. Captive dependency. Inject IServiceScopeFactory and create a scope per use instead."
           },
           {
             "q": "Why use Lazy<T> over double-checked locking?",
             "a": "Lazy<T> is correct, concise, and handles memory-model subtleties for you."
           },
           {
-            "q": "What must always be true of a Singleton in a web app?",
-            "a": "Thread-safe â€” all requests share the single instance concurrently."
+            "q": "What must always be true of a Singleton in a web application?",
+            "a": "Thread-safe, because all requests share the single instance concurrently."
           }
         ]
       }
     },
     {
       "id": "architecture-dp-002",
-      "q": "Factory Method vs Abstract Factory â€” what's the difference and when do you use each?",
+      "q": "Factory Method vs Abstract Factory -- what's the difference and when do you use each?",
       "level": "mid",
       "type": "comparison",
       "freq": "high",
       "tags": ["factory-method", "abstract-factory", "creational", "object-creation"],
       "answer": {
-        "oneLiner": "Factory Method creates one product via a single method; Abstract Factory creates a whole matched family of products through one interface so they stay consistent.",
+        "oneLiner": "Factory Method creates one product by deferring the concrete-type decision to a single method. Abstract Factory creates an entire family of related products that are guaranteed to be compatible with each other.",
         "keyPoints": [
-          "Factory Method: one `Create(input)` method returns the right product â€” answers 'give me ONE thing of the right type.'",
-          "Abstract Factory: one factory interface produces ALL members of a family â€” answers 'give me a MATCHED SET that stays consistent.'",
-          "Mixing is impossible with Abstract Factory: one concrete factory creates everything, so you can't accidentally pair a DarkButton with a LightCheckbox.",
-          "In idiomatic .NET, skip class hierarchies and use keyed DI services or `Func<TKey,T>` instead â€” cleaner and fewer files."
+          "Factory Method answers: give me ONE object of the right type for this input.",
+          "Abstract Factory answers: give me a MATCHED SET of objects that must all come from the same provider.",
+          "Abstract Factory prevents mixing incompatible parts by design: one concrete factory produces the entire family.",
+          "In idiomatic .NET, skip class hierarchies and use keyed DI services (.NET 8) or a Func<TKey,T> resolver instead."
         ],
-        "detail": "Factory Method defers the concrete-type decision to a method or subclass. Abstract Factory extends this: one concrete factory produces ALL related objects guaranteeing they match â€” crucial when the family must be internally consistent.",
+        "detail": "Factory Method defers one concrete-type decision. Abstract Factory extends this by ensuring an entire family stays internally consistent. The classic failure case is mixing parts from different families: a Stripe webhook validator with a PayPal gateway will reject every webhook signature.",
         "code": {
           "lang": "csharp",
-          "snippet": "// Factory Method â€” ONE product\npublic INotification Create(Channel c) => c switch {\n    Channel.Email => new EmailNotification(),\n    Channel.Sms   => new SmsNotification(),\n    _ => throw new NotSupportedException()\n};\n\n// Abstract Factory â€” MATCHED FAMILY\npublic interface IUiFactory {\n    IButton   CreateButton();\n    ICheckbox CreateCheckbox();\n}\npublic class DarkThemeFactory : IUiFactory {\n    public IButton   CreateButton()   => new DarkButton();\n    public ICheckbox CreateCheckbox() => new DarkCheckbox();\n}",
-          "note": "Factory Method = one product. Abstract Factory = a consistent family (all dark-theme controls together, impossible to mix)."
+          "snippet": "// Factory Method: create ONE matching service\npublic IShippingService Create(Carrier c) => c switch {\n    Carrier.FedEx => new FedExService(),\n    Carrier.DHL   => new DhlService(),\n    _ => throw new NotSupportedException()\n};\n\n// Abstract Factory: create a MATCHED FAMILY that must be compatible\npublic interface IPaymentEcosystem {\n    IPaymentGateway  CreateGateway();\n    IFraudDetector   CreateFraudDetector();\n    IRefundHandler   CreateRefundHandler();\n}\npublic class StripeEcosystem : IPaymentEcosystem {\n    public IPaymentGateway CreateGateway()      => new StripeGateway();\n    public IFraudDetector  CreateFraudDetector() => new StripeFraudDetector();\n    public IRefundHandler  CreateRefundHandler() => new StripeRefundHandler();\n}",
+          "note": "Factory Method gives you one carrier. Abstract Factory gives you a complete Stripe or PayPal ecosystem where all parts speak the same protocol."
         },
-        "analogy": "Factory Method: one product. Abstract Factory: a matched family.",
+        "analogy": "One product per call. Abstract Factory: a matched set per call.",
         "redFlags": [
-          "Calling any method that returns an object an 'Abstract Factory' â€” it must create a family.",
+          "Calling any method that returns an object an 'Abstract Factory'. It must produce a family, not a single item.",
           "Building full class hierarchies when a keyed DI service or Func<T> is simpler.",
-          "Can't explain why Abstract Factory guarantees family consistency â€” that's the entire point."
+          "Cannot explain why a family must be consistent. That is the entire reason Abstract Factory exists."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "You support email, SMS, and push notifications selected at runtime. How do you structure creation?"
+            "text": "Your logistics platform needs to create the right shipping carrier service at runtime based on destination and weight. How do you design the creation logic?"
           },
           {
             "role": "me",
-            "text": "Factory Method â€” a single Create(channel) method returns the right INotification implementation. Callers depend on the interface, not the concrete classes."
+            "text": "Factory Method. A single Create(carrier) method returns the right IShippingService implementation. Callers depend on the interface and never know which carrier is underneath."
           },
           {
             "role": "interviewer",
-            "text": "Now you need dark and light UI themes â€” each needs matching buttons, checkboxes, and dialogs. Same pattern?"
+            "text": "Good. Now the platform supports two payment providers, Stripe and PayPal. Each provider needs a payment gateway, a fraud detector, and a refund handler, and they must all come from the same provider. What changes?"
           },
           {
             "role": "me",
-            "text": "No â€” Abstract Factory. I define IUiFactory with CreateButton and CreateCheckbox, then have DarkThemeFactory and LightThemeFactory. The entire set is consistent because one factory creates everything."
+            "text": "Now I need Abstract Factory. I define IPaymentEcosystem with three creation methods. StripeEcosystem creates StripeGateway, StripeFraudDetector, and StripeRefundHandler. PayPalEcosystem creates its matching set. One factory, one family."
           },
           {
             "role": "interviewer",
-            "text": "What breaks if you mix a DarkButton with a LightCheckbox?"
+            "text": "What actually breaks if you mix a Stripe gateway with a PayPal fraud detector?"
           },
           {
             "role": "me",
-            "text": "Visual inconsistency at minimum, potentially runtime errors if the components share theme state. Abstract Factory prevents mixing by design â€” one factory, one family."
+            "text": "Webhook signature validation fails immediately. Stripe signs events with its own secret and algorithm. If the fraud detector is PayPal, it will try to verify a Stripe signature using PayPal keys and reject every legitimate event."
           },
           {
             "role": "interviewer",
-            "text": "Isn't all that a lot of classes? When would you skip the hierarchy?"
+            "text": "Could you not just use three separate Factory Methods, one per component?"
           },
           {
             "role": "me",
-            "text": "When there's only one product type or the choice is trivial. I'd use keyed DI services in .NET 8 or a Func â€” the pattern only earns its keep when the matched-family guarantee is actually needed."
+            "text": "You could, but then nothing prevents a caller from accidentally combining a Stripe factory result with a PayPal one. Abstract Factory makes mixing impossible by design: one factory produces everything, so the family is always consistent."
           },
           {
             "role": "interviewer",
-            "text": "How do you wire keyed services for this in .NET 8?"
+            "text": "How would you wire the right ecosystem in .NET without a switch statement?"
           },
           {
             "role": "me",
-            "text": "Register each implementation under a key: AddKeyedScoped<IUiFactory, DarkThemeFactory>(\"dark\"), resolve with GetRequiredKeyedService<IUiFactory>(themeKey). No switch, open to new themes by adding a class."
+            "text": "Keyed services in .NET 8. Register StripeEcosystem under 'stripe' and PayPalEcosystem under 'paypal'. Resolve by the provider key at runtime. Adding a new provider is a new class and one registration line, nothing else changes."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "One-line distinction?",
-            "a": "Factory Method makes one product; Abstract Factory makes a consistent family of related products."
+            "a": "Factory Method creates one product. Abstract Factory creates a compatible family of products."
           },
           {
-            "q": "How does Abstract Factory guarantee consistency?",
-            "a": "One concrete factory creates the whole family â€” you can't mix parts from different factories."
+            "q": "Why does Abstract Factory guarantee consistency?",
+            "a": "One concrete factory produces the whole family, so you cannot mix incompatible parts."
           },
           {
-            "q": "Idiomatic .NET alternative?",
-            "a": "Keyed DI services (.NET 8) or a Func<TKey, T> resolver â€” fewer classes, same result.",
+            "q": "Idiomatic .NET alternative to class hierarchies?",
+            "a": "Keyed DI services in .NET 8 or a Func<TKey, T> resolver.",
             "relatedId": "architecture-dp-013"
           },
           {
-            "q": "When do factories earn their keep?",
-            "a": "When you need to hide construction and centralise the 'which concrete type' decision from callers."
+            "q": "When does a factory earn its keep?",
+            "a": "When you need to centralise the concrete-type decision and hide construction from callers."
           }
         ]
       }
@@ -2654,87 +2654,87 @@
       "freq": "medium",
       "tags": ["builder", "creational", "fluent-api", "immutability"],
       "answer": {
-        "oneLiner": "Builder assembles a complex object step by step through a fluent API, separating construction from representation â€” ideal when you have many optional parameters or need validation at assembly time.",
+        "oneLiner": "Builder assembles a complex object step by step through a fluent API, letting callers set only what they need and centralising all validation in a single Build() call.",
         "keyPoints": [
-          "Eliminates telescoping constructors: callers set only what they need, in any order.",
-          "`Build()` is the single validation choke point â€” cross-field rules live there, not scattered across setters.",
-          "C# object initializers cover simple cases â€” reach for Builder only when there are steps, validation, or computed defaults an initializer can't enforce.",
-          ".NET uses it everywhere: WebApplication.CreateBuilder, HostBuilder, StringBuilder, EF model configuration."
+          "Eliminates telescoping constructors: callers chain only the methods that apply to their case.",
+          "Build() is the single validation choke point. Cross-field rules live there, not scattered across individual setters.",
+          "C# object initializers already cover simple property-setting cases. Reach for Builder only when there are steps, computed defaults, or mandatory cross-field validation.",
+          ".NET uses this pattern extensively: WebApplication.CreateBuilder, HostBuilder, HttpClient configuration."
         ],
-        "detail": "Each fluent method sets part of a private mutable object and returns `this` for chaining. The final `Build()` call validates accumulated state and returns the finished â€” often immutable â€” object.",
+        "detail": "Each fluent method mutates a private object and returns 'this' for chaining. Build() validates the accumulated state and returns the finished, often immutable, object. The caller gets back either a valid object or an exception, never an invalid one.",
         "code": {
           "lang": "csharp",
-          "snippet": "// BAD: telescoping constructor â€” which null is which?\nnew Email(\"a@x.com\", null, null, \"Report\", \"...\", null);\n\n// GOOD: Builder â€” set only what you need, validate once\nvar email = new EmailBuilder()\n    .To(\"a@x.com\").Subject(\"Report\").Body(\"...\").Attach(\"report.pdf\")\n    .Build(); // throws if no recipient\n\npublic Email Build() {\n    if (_email.To.Count == 0)\n        throw new InvalidOperationException(\"No recipient.\");\n    return _email; // caller gets a valid, complete object\n}",
-          "note": "Each step returns this for chaining; Build() is the single point where the object is complete and validated."
+          "snippet": "// BAD: telescoping constructor -- which null is which?\nnew LoanApplication(\"Alice\", 250000m, null, null, \"FIXED\", null, true);\n\n// GOOD: Builder -- callers set what they need, validate once\nvar application = new LoanApplicationBuilder()\n    .For(\"Alice\", customerId: 42)\n    .Amount(250_000m)\n    .Term(years: 25)\n    .Fixed()\n    .Build(); // throws if amount or applicant is missing\n\npublic LoanApplication Build() {\n    if (Amount <= 0) throw new InvalidOperationException(\"Amount required.\");\n    if (string.IsNullOrEmpty(ApplicantName)) throw new InvalidOperationException(\"Applicant required.\");\n    return new LoanApplication(this);\n}",
+          "note": "Build() is the single gate. The returned LoanApplication is always in a valid, consistent state."
         },
-        "analogy": "Build() is where validation lives â€” not scattered across setters.",
+        "analogy": "Build() is your last line of defence against an invalid object.",
         "redFlags": [
-          "Reaching for Builder when a C# object initializer would do â€” it's ceremony for a simple problem.",
-          "No validation in Build() â€” the entire point is a safe, single construction choke point.",
-          "Builder that mutates and returns a shared internal instance, causing aliasing bugs across multiple Build() calls."
+          "Using Builder when a C# object initializer handles the case cleanly. It is unnecessary ceremony.",
+          "No validation in Build(). Without it, the Builder adds complexity without adding safety.",
+          "Builder that mutates and returns the same internal instance, causing aliasing when Build() is called twice."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "Your email object has recipient, optional CC, subject, body, priority, and attachments. The constructor is getting unwieldy. How do you fix it?"
+            "text": "You have a LoanApplication object with an applicant name, amount, term, interest type, guarantor, collateral, and several optional flags. The constructor is becoming unmanageable. How do you clean this up?"
           },
           {
             "role": "me",
-            "text": "Builder with a fluent API â€” To, Subject, Body, Attach each return this for chaining, and a final Build() validates and returns the email. Callers set only what they need."
+            "text": "Builder with a fluent API. Each method sets one aspect of the application and returns 'this'. A final Build() validates and returns the application. Callers only chain the methods relevant to their case."
           },
           {
             "role": "interviewer",
-            "text": "Couldn't a C# object initializer do the same thing?"
+            "text": "Could you not just use a C# object initializer instead?"
           },
           {
             "role": "me",
-            "text": "For simple cases yes, and I'd prefer it for brevity. Builder earns its place when there's step-wise validation or computed defaults an initializer can't enforce."
+            "text": "For simple cases, yes, and I would prefer it. Builder earns its place when there are cross-field validation rules or computed defaults that an initializer cannot enforce. A loan without an applicant or a zero amount should never be creatable."
           },
           {
             "role": "interviewer",
-            "text": "Where exactly do you check that an email must have at least one recipient?"
+            "text": "Where exactly do you enforce that a loan application must have an amount greater than zero?"
           },
           {
             "role": "me",
-            "text": "In Build() â€” that's the single choke point. I throw before handing back the finished object, so an Email in the wild is always valid."
+            "text": "In Build(). That is the single choke point. I throw before returning the finished object, so a LoanApplication in the wild is always valid. Spreading validation across individual setters means partial objects can escape."
           },
           {
             "role": "interviewer",
-            "text": "How do you produce an immutable Email at the end?"
+            "text": "How do you ensure the final LoanApplication is immutable?"
           },
           {
             "role": "me",
-            "text": "Have Build() construct a record with init-only properties from the accumulated state. The builder builds; the result is locked."
+            "text": "Have Build() construct a record with init-only properties from the builder's accumulated state. The builder builds; the result is locked."
           },
           {
             "role": "interviewer",
-            "text": "What happens if someone calls Build() twice on the same builder?"
+            "text": "What happens if a developer calls Build() twice on the same builder instance?"
           },
           {
             "role": "me",
-            "text": "Good catch â€” I'd either return a new object each time from a snapshot of the state, or reset the internal state after Build(), to avoid two callers sharing the same mutable instance."
+            "text": "If Build() returns a reference to the same internal mutable object, both callers alias the same instance. The fix is to either snapshot the state into a fresh object at Build() time, or reset internal state after each Build() call."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
-            "q": "When is an object initializer enough instead of Builder?",
-            "a": "When construction is just setting independent properties with no steps or validation."
+            "q": "When is a C# object initializer enough?",
+            "a": "When construction is just setting independent properties with no steps or cross-field validation."
           },
           {
             "q": "Where does .NET use the Builder pattern?",
-            "a": "WebApplication.CreateBuilder, HostBuilder, StringBuilder â€” all builders in the BCL."
+            "a": "WebApplication.CreateBuilder, HostBuilder, and HttpClient pipeline configuration."
           },
           {
             "q": "How do you produce an immutable result from a Builder?",
             "a": "Have Build() construct a record with init-only properties from the accumulated mutable state."
           },
           {
-            "q": "Why validate in Build() rather than each fluent step?",
-            "a": "Cross-field rules need the full picture; Build() is the single point where the object is complete."
+            "q": "Why validate in Build() rather than each setter?",
+            "a": "Cross-field rules need the full picture. Build() is the single point where the object is complete."
           }
         ]
       }
@@ -2747,45 +2747,45 @@
       "freq": "low",
       "tags": ["prototype", "creational", "cloning", "deep-copy", "records"],
       "answer": {
-        "oneLiner": "Prototype creates new objects by cloning an existing configured instance rather than constructing from scratch â€” useful when the template object is cheaper to copy than to rebuild.",
+        "oneLiner": "Prototype creates new objects by cloning an existing configured instance rather than constructing from scratch, which is the right choice when copying a template is cheaper or simpler than rebuilding it.",
         "keyPoints": [
-          "Shallow copy shares reference members between original and clone â€” mutating one mutates the other.",
-          "C# records' `with` expression gives a non-destructive shallow copy â€” still shallow for List, Dictionary, or any reference field.",
-          "Deep-clone mutable reference members explicitly: `with { Sections = new List<string>(original.Sections) }`.",
-          "Only reach for Prototype when construction is genuinely expensive or the pre-configured object is the right starting point."
+          "Shallow copy shares reference members between the original and the clone. Mutating a List on the clone also mutates the original.",
+          "Records' 'with' expression gives a non-destructive shallow copy. It is still shallow for any reference-type field such as List or Dictionary.",
+          "Deep-clone mutable reference members explicitly: with { Sections = new List<string>(original.Sections) }.",
+          "Only reach for Prototype when construction is genuinely expensive or a pre-configured template is the natural starting point."
         ],
-        "detail": "`MemberwiseClone` copies field values; `with` does the same for records. Both are shallow â€” reference-type fields point to the same underlying objects. Deep copies require cloning nested objects manually or via serialization.",
+        "detail": "MemberwiseClone copies field values, not what the fields point to. The 'with' expression on records does the same. Deep copies require cloning nested objects manually or serialising and deserialising the graph.",
         "code": {
           "lang": "csharp",
-          "snippet": "public record DocumentTemplate(string Title, List<string> Sections);\n\nvar baseTemplate = new DocumentTemplate(\"Report\", new() { \"Intro\", \"Body\" });\n\n// SHALLOW copy â€” Sections list is SHARED (danger!)\nvar invoice = baseTemplate with { Title = \"Invoice\" };\n\n// DEEP copy â€” Sections is independent\nvar deep = baseTemplate with { Sections = new List<string>(baseTemplate.Sections) };\n\n// Proof: modifying invoice's list mutates baseTemplate if shallow\ninvoice.Sections.Add(\"Footer\"); // also appears in baseTemplate!",
-          "note": "'with' copies field values but shares reference objects; deep-clone collections explicitly to prevent shared mutable state."
+          "snippet": "public record ContractTemplate(string Title, List<string> Clauses, decimal DefaultValue);\n\nvar master = new ContractTemplate(\"NDA\", new() { \"Confidentiality\", \"Term\" }, 0m);\n\n// SHALLOW copy -- Clauses list is SHARED (dangerous)\nvar clientCopy = master with { Title = \"NDA - Acme Corp\" };\n\n// DEEP copy -- Clauses is independent\nvar safeCopy = master with {\n    Title    = \"NDA - Acme Corp\",\n    Clauses  = new List<string>(master.Clauses) // own copy\n};\n\nclientCopy.Clauses.Add(\"Penalty\"); // also mutates master if shallow!",
+          "note": "'with' copies field values but shares reference objects. Deep-clone collections explicitly to avoid shared mutable state."
         },
-        "analogy": "`with` is shallow â€” always deep-clone the mutable parts.",
+        "analogy": "Always deep-clone what you intend to own independently.",
         "redFlags": [
-          "Assuming MemberwiseClone or records' `with` produces a deep copy â€” both are shallow.",
-          "Sharing mutable collections between original and clone, causing spooky action-at-a-distance bugs.",
-          "Using Prototype where a plain constructor is cheap and clear â€” it's over-engineering."
+          "Assuming MemberwiseClone or records' 'with' produces a deep copy. Both are shallow.",
+          "Sharing mutable collections between original and clone, causing silent aliasing bugs.",
+          "Using Prototype where a plain constructor is cheap and clear. It adds complexity for no gain."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "You have a heavily configured document template and users create slight variations of it. How do you handle that efficiently?"
+            "text": "Your legal platform has a master contract template with dozens of configured clauses. Users create client-specific variations of it constantly. How do you handle that efficiently?"
           },
           {
             "role": "me",
-            "text": "Prototype â€” clone the configured template and tweak a few fields rather than reconstructing from scratch. With records, that's a `with` expression."
+            "text": "Prototype pattern. Clone the configured master template and adjust a few fields rather than reconstructing the whole thing from scratch each time. With records in C# I use a 'with' expression."
           },
           {
             "role": "interviewer",
-            "text": "A user edits the cloned template's Sections list and the original gets modified too. What happened?"
+            "text": "A paralegal edits the Clauses list on their cloned contract, and the master template gets modified as well. What went wrong?"
           },
           {
             "role": "me",
-            "text": "Shallow copy â€” the clone shares the same List reference. I need to deep-clone the mutable members: `with { Sections = new List<string>(original.Sections) }`."
+            "text": "Shallow copy. The clone shares the same List reference as the original. I need to deep-clone the mutable members explicitly: with { Clauses = new List<string>(master.Clauses) }."
           },
           {
             "role": "interviewer",
-            "text": "Why does `with` behave that way?"
+            "text": "Why does 'with' behave that way?"
           },
           {
             "role": "me",
@@ -2793,29 +2793,29 @@
           },
           {
             "role": "interviewer",
-            "text": "When would you NOT use Prototype at all?"
+            "text": "When would you not use Prototype at all?"
           },
           {
             "role": "me",
-            "text": "When construction is cheap and clear. A plain constructor or factory is more readable and less surprising. Prototype only pays off when copying a pre-built instance is genuinely faster or simpler."
+            "text": "When construction is cheap and clear. A plain constructor or factory is more readable. Prototype only pays off when copying a pre-built instance is genuinely faster or simpler than rebuilding."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Shallow vs deep copy?",
-            "a": "Shallow copies field values (references stay shared); deep copy duplicates the referenced objects too."
+            "a": "Shallow copies field values so references are shared. Deep copy duplicates the referenced objects too."
           },
           {
             "q": "How do records help with Prototype?",
-            "a": "The `with` expression gives non-destructive copies, though still shallow for reference members."
+            "a": "The 'with' expression gives non-destructive copies, though still shallow for reference members."
           },
           {
             "q": "How do you deep clone in C#?",
-            "a": "Clone nested objects manually, or serialize then deserialize for a generic deep copy."
+            "a": "Clone nested objects manually, or serialise then deserialise for a generic deep copy."
           },
           {
             "q": "When is Prototype worth it?",
@@ -2832,57 +2832,57 @@
       "freq": "high",
       "tags": ["adapter", "structural", "integration", "third-party", "wrapper"],
       "answer": {
-        "oneLiner": "Adapter converts one interface into another the client expects, letting incompatible classes work together â€” the go-to pattern for isolating a third-party or legacy API behind your own abstraction.",
+        "oneLiner": "Adapter converts one interface into the interface the client expects, letting incompatible classes work together without modifying either. It is the standard way to wrap a third-party SDK behind your own abstraction.",
         "keyPoints": [
-          "Keeps vendor SDK types out of your domain: swap providers by writing a new adapter and changing one DI registration.",
-          "Lives in the Infrastructure layer in Clean Architecture, implementing an Application-layer interface.",
-          "Enables testability: callers depend on your interface, so you mock that, not the awkward SDK.",
-          "An adapter must contain zero business logic â€” pure translation between interfaces only."
+          "Keeps vendor SDK types out of your domain. Swap providers by writing a new adapter and changing one DI registration.",
+          "Lives in the Infrastructure layer in Clean Architecture, implementing an Application-layer interface so vendor types never leak inward.",
+          "Enables testability: callers depend on your interface, so you substitute a fake in tests instead of mocking an awkward SDK.",
+          "An adapter must contain zero business logic. Pure translation between interfaces only."
         ],
-        "detail": "A wrapper class implements your target interface and delegates internally to the adaptee. The SDK's types never cross the Infrastructure boundary â€” domain stays clean and the adapter is the only file that changes if the vendor does.",
+        "detail": "A wrapper class implements your target interface and delegates internally to the adaptee. The SDK's types never cross the Infrastructure boundary. The domain stays clean and the adapter is the only file that needs to change when the vendor does.",
         "code": {
           "lang": "csharp",
-          "snippet": "// Application layer â€” your abstraction (vendor-free)\npublic interface IPaymentGateway {\n    Task<PaymentResult> ChargeAsync(decimal amount, string token, CancellationToken ct);\n}\n\n// Infrastructure layer â€” Stripe stays HERE, never leaks inward\npublic class StripePaymentAdapter : IPaymentGateway {\n    private readonly StripeClient _stripe;\n    public StripePaymentAdapter(StripeClient s) => _stripe = s;\n    public async Task<PaymentResult> ChargeAsync(decimal amount, string token, CancellationToken ct) {\n        var c = await _stripe.Charges.CreateAsync(\n            new ChargeCreateOptions { Amount = (long)(amount * 100), Source = token }, ct);\n        return new PaymentResult(c.Status == \"succeeded\", c.Id);\n    }\n}",
-          "note": "Stripe SDK type lives only inside the adapter. The rest of the app sees IPaymentGateway â€” swap to PayPal with a new class and one registration."
+          "snippet": "// Application layer -- your abstraction, vendor-free\npublic interface IPaymentGateway {\n    Task<PaymentResult> ChargeAsync(decimal amount, string token, CancellationToken ct);\n}\n\n// Infrastructure layer -- Stripe stays HERE, never leaks inward\npublic class StripeGatewayAdapter : IPaymentGateway {\n    private readonly StripeClient _stripe;\n    public StripeGatewayAdapter(StripeClient stripe) => _stripe = stripe;\n    public async Task<PaymentResult> ChargeAsync(decimal amount, string token, CancellationToken ct) {\n        var charge = await _stripe.Charges.CreateAsync(\n            new ChargeCreateOptions { Amount = (long)(amount * 100), Source = token }, ct);\n        return new PaymentResult(charge.Status == \"succeeded\", charge.Id);\n    }\n}",
+          "note": "Stripe SDK types live only inside the adapter. Swap to PayPal by writing PayPalGatewayAdapter and changing one DI registration."
         },
-        "analogy": "Adapter: vendor in, your interface out. Domain stays clean.",
+        "analogy": "Vendor goes in. Your interface comes out. Domain never sees it.",
         "redFlags": [
-          "Letting third-party SDK types leak into the domain or application layer â€” kills swappability.",
-          "Putting business logic inside the adapter instead of pure interface translation.",
-          "Confusing Adapter (convert interface) with Facade (simplify a whole subsystem)."
+          "Letting third-party SDK types leak into the domain or application layer. This destroys swappability.",
+          "Putting business logic inside the adapter. It should be pure interface translation, nothing more.",
+          "Confusing Adapter (converts one interface to another) with Facade (simplifies a whole subsystem)."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "You're integrating Stripe but don't want its SDK types spreading through your codebase. How do you isolate it?"
+            "text": "You are integrating Stripe for payments but you do not want Stripe SDK types spreading throughout your codebase. How do you isolate it?"
           },
           {
             "role": "me",
-            "text": "Adapter pattern â€” I define IPaymentGateway in the Application layer and write a StripePaymentAdapter in Infrastructure that implements it. Stripe SDK types stay inside the adapter."
+            "text": "Adapter pattern. I define IPaymentGateway in the Application layer and write a StripeGatewayAdapter in Infrastructure that implements it. Stripe SDK types stay inside the adapter and never cross that boundary."
           },
           {
             "role": "interviewer",
-            "text": "Why go to that trouble instead of calling Stripe directly?"
+            "text": "Why go to that trouble instead of calling Stripe directly from the application?"
           },
           {
             "role": "me",
-            "text": "If Stripe types spread into the domain, switching to PayPal means touching every caller. With the adapter, I write a PayPalPaymentAdapter and change one DI registration â€” nothing else moves."
+            "text": "If Stripe types spread into the domain, switching to Adyen means touching every caller. With the adapter, I write an AdyenGatewayAdapter and change one DI registration. Nothing else moves."
           },
           {
             "role": "interviewer",
-            "text": "How does this help testing?"
+            "text": "How does this help with testing?"
           },
           {
             "role": "me",
-            "text": "Callers inject IPaymentGateway, so in tests I replace it with a fake. I never have to mock the Stripe SDK, which needs a live key and awkward setup."
+            "text": "Callers inject IPaymentGateway, so in tests I replace it with a fake implementation. I never have to mock the Stripe SDK, which requires a live API key and is painful to set up."
           },
           {
             "role": "interviewer",
-            "text": "What do you absolutely NOT put in the adapter?"
+            "text": "What do you absolutely not put inside the adapter?"
           },
           {
             "role": "me",
-            "text": "Business logic. If I'm making domain decisions inside the adapter, I've got the wrong boundary. It's pure translation: your interface in, vendor call out."
+            "text": "Business logic. If I am making domain decisions inside the adapter, I have drawn the boundary in the wrong place. It translates calls. Domain rules live in the domain."
           },
           {
             "role": "interviewer",
@@ -2890,22 +2890,22 @@
           },
           {
             "role": "me",
-            "text": "Adapter converts one interface into another the client expects. Facade simplifies a complex subsystem behind one easy entry point. Different intent â€” Adapter is about conversion, Facade is about simplification."
+            "text": "Adapter converts one interface into another that the client expects. Facade simplifies a whole subsystem behind one entry point. Different intent: Adapter is about conversion, Facade is about simplification."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Adapter vs Facade?",
-            "a": "Adapter converts one interface to another; Facade simplifies a complex subsystem.",
+            "a": "Adapter converts one interface to another. Facade simplifies a complex subsystem.",
             "relatedId": "architecture-dp-006"
           },
           {
             "q": "Where does the adapter live in Clean Architecture?",
-            "a": "In Infrastructure, implementing an Application-layer interface so vendor types don't leak inward.",
+            "a": "In Infrastructure, implementing an Application-layer interface so vendor types stay out of the domain.",
             "relatedId": "architecture-patterns-001"
           },
           {
@@ -2913,8 +2913,8 @@
             "a": "Callers depend on your interface, so you substitute a fake instead of mocking an awkward SDK."
           },
           {
-            "q": "What should an adapter NOT contain?",
-            "a": "Business logic â€” pure translation between interfaces only."
+            "q": "What must an adapter never contain?",
+            "a": "Business logic. Pure translation between interfaces only."
           }
         ]
       }
@@ -2927,81 +2927,81 @@
       "freq": "medium",
       "tags": ["facade", "structural", "simplification", "subsystem", "api-design"],
       "answer": {
-        "oneLiner": "Facade provides a single simplified entry point over a complex subsystem, hiding its moving parts so callers invoke one method instead of orchestrating many classes.",
+        "oneLiner": "Facade provides one simplified entry point over a complex subsystem so that callers make a single method call instead of orchestrating multiple services themselves.",
         "keyPoints": [
-          "Delegates, never decides â€” accumulating business logic turns a Facade into a god class.",
-          "Doesn't change the subsystem's interfaces â€” just offers a higher-level one on top.",
-          "Controllers injecting 4+ services and orchestrating them directly is the symptom that a Facade is missing.",
-          "Application-layer use-case handlers in Clean Architecture naturally act as facades over domain services and infrastructure."
+          "Facade delegates, it does not decide. The moment it accumulates business rules it becomes a god class.",
+          "It does not change the subsystem's interfaces. It adds a simpler layer on top.",
+          "Controllers injecting four or more services and orchestrating them directly is the symptom that a Facade is missing.",
+          "Application-layer use-case handlers in Clean Architecture naturally act as Facades over domain services and infrastructure."
         ],
-        "detail": "A Facade orchestrates and delegates. It shouldn't hold business rules itself â€” any real logic lives in the domain or the individual services. It reduces coupling by giving clients one thing to depend on instead of every subsystem class.",
+        "detail": "A Facade orchestrates and delegates. It should hold no business rules. Real logic lives in the domain or the individual services. Its job is to reduce coupling by giving clients one thing to depend on instead of every subsystem class.",
         "code": {
           "lang": "csharp",
-          "snippet": "// BAD: controller orchestrating directly â€” fragile and repeated everywhere\npublic async Task<IActionResult> Post(OrderRequest req) {\n    await _inventory.ReserveAsync(req.Items);\n    await _payment.ChargeAsync(req.Total, req.Token);\n    await _shipping.ScheduleAsync(req.Address);\n    await _notify.ConfirmAsync(req.CustomerId); // copy-pasted in every action\n}\n\n// GOOD: Facade â€” one call hides the whole subsystem\npublic class CheckoutFacade {\n    public async Task<OrderResult> PlaceOrderAsync(OrderRequest req, CancellationToken ct) {\n        await _inventory.ReserveAsync(req.Items, ct);\n        var pay  = await _payment.ChargeAsync(req.Total, req.Token, ct);\n        var ship = await _shipping.ScheduleAsync(req.Address, ct);\n        await _notify.ConfirmAsync(req.CustomerId, ct);\n        return new OrderResult(pay.TransactionId, ship.TrackingId);\n    }\n}",
-          "note": "Controller calls PlaceOrderAsync once; the facade coordinates inventory, payment, shipping, and notifications."
+          "snippet": "// BAD: controller orchestrating directly -- fragile, duplicated in every action\npublic async Task<IActionResult> Post(OrderRequest req) {\n    await _inventory.ReserveAsync(req.Items);\n    await _payment.ChargeAsync(req.Total, req.Token);\n    await _shipping.ScheduleAsync(req.Address);\n    await _notify.ConfirmAsync(req.CustomerId);\n}\n\n// GOOD: Facade -- one call, subsystem is hidden\npublic class CheckoutFacade {\n    public async Task<OrderResult> PlaceOrderAsync(OrderRequest req, CancellationToken ct) {\n        await _inventory.ReserveAsync(req.Items, ct);\n        var pay  = await _payment.ChargeAsync(req.Total, req.Token, ct);\n        var ship = await _shipping.ScheduleAsync(req.Address, ct);\n        await _notify.ConfirmAsync(req.CustomerId, ct);\n        return new OrderResult(pay.TransactionId, ship.TrackingId);\n    }\n}",
+          "note": "The controller calls PlaceOrderAsync once. The Facade coordinates inventory, payment, shipping, and notifications."
         },
-        "analogy": "Facade delegates. The moment it decides, it's a god class.",
+        "analogy": "It delegates or it becomes a god class. No middle ground.",
         "redFlags": [
-          "Facade accumulating business logic and becoming a god object â€” it should only coordinate.",
-          "Exposing subsystem internals through the facade, defeating the entire purpose.",
-          "Confusing Facade (simplify a subsystem) with Adapter (convert one interface to another)."
+          "Facade accumulating business logic and becoming a god object. It should coordinate, not decide.",
+          "Exposing subsystem internals through the Facade, which defeats the purpose of having one.",
+          "Confusing Facade (simplifies a subsystem) with Adapter (converts one interface to another)."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "Placing an order touches inventory, payment, shipping, and notifications. Controllers call all four services directly. How do you clean that up?"
+            "text": "Placing an order touches inventory, payment, shipping, and notifications. Every controller action that creates an order duplicates the same four service calls. How do you clean that up?"
           },
           {
             "role": "me",
-            "text": "Facade â€” a CheckoutFacade with one PlaceOrderAsync that orchestrates those four services. The controller makes a single call and knows nothing about the steps."
+            "text": "Facade. A CheckoutFacade with one PlaceOrderAsync method orchestrates all four services. The controller makes a single call and is completely unaware of the steps involved."
           },
           {
             "role": "interviewer",
-            "text": "How do you stop that facade from turning into a god class over time?"
+            "text": "How do you stop that Facade from turning into a god class over time?"
           },
           {
             "role": "me",
-            "text": "Keep it as pure orchestration â€” it delegates to the services and holds no business rules. Any real logic lives in the domain or the individual services."
+            "text": "Keep it as pure orchestration. It delegates to the services and holds no business rules. If I find myself writing conditional logic in the Facade, that logic belongs in the domain, not here."
           },
           {
             "role": "interviewer",
-            "text": "How is a Facade different from just a service class?"
+            "text": "How is a Facade different from a plain service class?"
           },
           {
             "role": "me",
-            "text": "It's deliberately thin â€” it coordinates, not decides. If I find myself writing if/switch logic in it, that belongs in a domain service, not the facade."
+            "text": "It is deliberately thin. It coordinates, it does not decide. A service class might contain domain logic. A Facade never should."
           },
           {
             "role": "interviewer",
-            "text": "Isn't this just an Adapter?"
+            "text": "Is this not just an Adapter?"
           },
           {
             "role": "me",
-            "text": "Different intent. Adapter converts one interface into another the client expects. Facade simplifies a whole subsystem behind one entry point. Same 'wrapping' shape, different problems."
+            "text": "Different intent. Adapter converts one interface into another the client expects. Facade simplifies a whole subsystem behind one convenient entry point. Same structural idea of wrapping, different problems they solve."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Facade vs Adapter?",
-            "a": "Facade simplifies a subsystem; Adapter converts one interface into another.",
+            "a": "Facade simplifies a subsystem. Adapter converts one interface into another.",
             "relatedId": "architecture-dp-005"
           },
           {
             "q": "How does a Facade reduce coupling?",
-            "a": "Clients depend on one high-level interface, not on every subsystem class."
+            "a": "Clients depend on one high-level interface, not on every individual subsystem class."
           },
           {
             "q": "How does it relate to use-case handlers?",
-            "a": "Application-layer handlers naturally act as facades over domain and infrastructure services.",
+            "a": "Application-layer handlers naturally act as Facades over domain and infrastructure services.",
             "relatedId": "architecture-patterns-010"
           },
           {
             "q": "What turns a Facade into an anti-pattern?",
-            "a": "Accumulating business logic instead of just delegating â€” it becomes a god object."
+            "a": "Accumulating business logic instead of delegating. It becomes a god object."
           }
         ]
       }
@@ -3014,49 +3014,49 @@
       "freq": "high",
       "tags": ["decorator", "structural", "composition", "cross-cutting", "open-closed"],
       "answer": {
-        "oneLiner": "Decorator wraps an object with the same interface as the original to add behaviour at runtime â€” stacking features by composition instead of exploding into subclasses.",
+        "oneLiner": "Decorator wraps an object with the same interface as the original to add behaviour at runtime, composing features by stacking wrappers instead of exploding into subclass hierarchies.",
         "keyPoints": [
-          "Both decorator and target implement the same interface â€” wrapping is transparent to callers.",
-          "Beats inheritance: behaviour composes at runtime; no class explosion (CachingLogging, CachingRetry, all three).",
-          "Order matters: logging outside caching logs every call including cache hits; logging inside only logs DB hits.",
-          "MediatR pipeline behaviours are decorators â€” Scrutor's `.Decorate<T>()` wires them automatically in DI."
+          "Both decorator and the wrapped target implement the same interface, so wrapping is completely transparent to callers.",
+          "Beats inheritance: you compose behaviour at runtime and avoid a separate subclass for every feature combination.",
+          "Order matters. Logging placed outside a caching decorator logs every call including cache hits. Logging inside only logs actual database calls.",
+          "MediatR pipeline behaviours are Decorators. Scrutor's .Decorate<T>() wires them automatically in the DI container."
         ],
-        "detail": "The decorator holds a reference to the inner object, delegates the real call to it, and adds behaviour before or after. Cross-cutting concerns (caching, logging, retry) are the classic use: wrap the real service without touching it.",
+        "detail": "The decorator holds a reference to the inner object, delegates the actual call to it, and adds behaviour before or after. Cross-cutting concerns such as caching, logging, and retry are the textbook use case: wrap the real service without ever touching it.",
         "code": {
           "lang": "csharp",
-          "snippet": "// BAD: inheritance â€” a new subclass for every combination\nclass CachingProductService : ProductService { ... }\nclass LoggingCachingProductService : CachingProductService { ... }\n\n// GOOD: Decorator â€” compose at runtime\npublic class CachingProductService : IProductService {\n    private readonly IProductService _inner;\n    private readonly IMemoryCache _cache;\n    public CachingProductService(IProductService inner, IMemoryCache cache) =>\n        (_inner, _cache) = (inner, cache);\n    public Task<Product> GetAsync(int id, CancellationToken ct) =>\n        _cache.GetOrCreateAsync($\"product:{id}\", _ => _inner.GetAsync(id, ct))!;\n}\n// Wire with Scrutor\nservices.AddScoped<IProductService, ProductService>();\nservices.Decorate<IProductService, CachingProductService>();",
-          "note": "Decorator implements the same interface, delegates to the inner instance, adds caching â€” transparently to every caller."
+          "snippet": "// BAD: inheritance -- a new subclass for every combination\nclass CachingProductRepo   : ProductRepository { ... }\nclass LoggingCachingRepo   : CachingProductRepo { ... } // class explosion\n\n// GOOD: Decorator -- compose at runtime, same interface\npublic class CachingProductRepo : IProductRepository {\n    private readonly IProductRepository _inner;\n    private readonly IMemoryCache _cache;\n    public CachingProductRepo(IProductRepository inner, IMemoryCache cache) =>\n        (_inner, _cache) = (inner, cache);\n    public Task<Product> GetByIdAsync(int id, CancellationToken ct) =>\n        _cache.GetOrCreateAsync($\"product:{id}\", _ => _inner.GetByIdAsync(id, ct))!;\n}\n// Wire with Scrutor -- adds caching transparently\nservices.AddScoped<IProductRepository, EfProductRepository>();\nservices.Decorate<IProductRepository, CachingProductRepo>();",
+          "note": "Decorator implements the same interface, delegates to the inner instance, and adds caching transparently to every caller."
         },
-        "analogy": "Compose behaviour at runtime. Never subclass for features.",
+        "analogy": "Stack behaviour at runtime. Never inherit it.",
         "redFlags": [
-          "Editing the core class for every cross-cutting concern instead of wrapping it â€” breaks Open/Closed.",
-          "Subclassing for every feature combination â€” class explosion is the symptom Decorator cures.",
-          "Decorator that breaks the wrapped interface's contract (Liskov Substitution Principle violation)."
+          "Editing the original class for every cross-cutting concern. This violates the Open/Closed Principle.",
+          "Creating a subclass for every feature combination. Class explosion is the symptom Decorator cures.",
+          "Decorator that breaks the wrapped interface's contract, which is a Liskov Substitution Principle violation."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "You have a ProductService. Now add caching, later logging and retry â€” without touching the original class. How?"
+            "text": "You have an IProductRepository backed by EF Core. You now need to add caching, and later logging and retry, without touching the original class. How do you approach this?"
           },
           {
             "role": "me",
-            "text": "Decorators. A CachingProductService implements IProductService and wraps the real one. A LoggingProductService wraps that. Each adds behaviour and delegates inward."
+            "text": "Decorators. A CachingProductRepo implements IProductRepository and wraps the real EF one. A LoggingProductRepo wraps that. Each adds one behaviour and delegates everything else inward."
           },
           {
             "role": "interviewer",
-            "text": "Why not just subclass ProductService for each combination?"
+            "text": "Why not subclass the EfProductRepository for each combination?"
           },
           {
             "role": "me",
-            "text": "Class explosion â€” caching+logging, caching+retry, all three â€” a new subclass per combination, all fixed at compile time. Decorators compose at runtime, so I stack exactly the layers I need."
+            "text": "Class explosion. Caching plus logging, caching plus retry, all three -- a new subclass per combination, all fixed at compile time. Decorators compose at runtime, so I stack exactly the layers I need."
           },
           {
             "role": "interviewer",
-            "text": "How do you actually wire that in .NET DI?"
+            "text": "How do you actually wire this in .NET without manually nesting constructors?"
           },
           {
             "role": "me",
-            "text": "Scrutor's Decorate<T>. Register the real service first, then Decorate<IProductService, CachingProductService>(). Scrutor rewires the DI graph so the decorator gets the original injected as inner."
+            "text": "Scrutor's Decorate extension. Register the real EfProductRepository first, then call Decorate<IProductRepository, CachingProductRepo>(). Scrutor rewires the DI graph so the decorator receives the original as its inner dependency."
           },
           {
             "role": "interviewer",
@@ -3064,37 +3064,37 @@
           },
           {
             "role": "me",
-            "text": "Yes. Logging wrapped outside caching logs every call including cache hits. Logging inside means only actual DB calls get logged. Right order depends on what you want to observe."
+            "text": "Very much so. Logging placed outside the caching decorator logs every call including cache hits. Logging inside the caching decorator only logs calls that actually reach the database. Right order depends on what you want to observe."
           },
           {
             "role": "interviewer",
-            "text": "You mentioned MediatR pipeline behaviours are decorators â€” how exactly?"
+            "text": "You mentioned MediatR pipeline behaviours. How are those Decorators?"
           },
           {
             "role": "me",
-            "text": "Each IPipelineBehavior wraps the next step in the chain. They're registered in order, each calls next() to pass to the inner layer â€” exactly the decorator chain but for request handling."
+            "text": "Each IPipelineBehavior<TRequest, TResponse> wraps the next step in the chain. The outermost behaviour runs first, calls next() to pass control to the next behaviour, and so on until the actual handler runs. Structurally identical to our decorator chain."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Why is Decorator better than inheritance here?",
-            "a": "Composes behaviour at runtime, avoids a new subclass per feature combination."
+            "a": "Composes behaviour at runtime and avoids a new subclass per feature combination."
           },
           {
             "q": "How do you wire decorators in .NET DI?",
-            "a": "Scrutor's .Decorate<TInterface, TDecorator>() or register manually wrapping the inner instance."
+            "a": "Scrutor's .Decorate<TInterface, TDecorator>() or manual wrapping in the composition root."
           },
           {
-            "q": "How does wrapping order affect behaviour?",
-            "a": "Each layer sees the result of the inner one â€” logging outside caching also logs cache hits."
+            "q": "Why does wrapping order matter?",
+            "a": "Each layer sees the result of the inner one. Logging outside caching also logs cache hits."
           },
           {
             "q": "How do MediatR pipeline behaviours relate to Decorator?",
-            "a": "They ARE decorators over the request pipeline â€” same pattern, application-layer scale.",
+            "a": "They are Decorators over the request pipeline, structurally identical.",
             "relatedId": "architecture-patterns-010"
           }
         ]
@@ -3108,33 +3108,33 @@
       "freq": "medium",
       "tags": ["proxy", "structural", "lazy-loading", "virtual-proxy", "interception"],
       "answer": {
-        "oneLiner": "Proxy is a stand-in with the same interface as the real object that controls access to it â€” adding lazy loading, access checks, or caching transparently without the caller knowing.",
+        "oneLiner": "Proxy is a stand-in that shares the real object's interface and controls access to it, adding lazy initialisation, permission checks, or transparent caching without the caller knowing.",
         "keyPoints": [
-          "Decorator adds behaviour; Proxy controls access â€” often deciding whether or when to call the real object at all.",
-          "Four types: virtual (lazy init), protection (auth check), remote (network call), caching.",
-          "EF Core lazy-loading proxies are the canonical .NET example â€” and the root cause of N+1 queries.",
-          "Castle DynamicProxy generates proxies at runtime to intercept method calls â€” used by some DI frameworks and AOP libraries."
+          "Decorator adds behaviour. Proxy controls access and often decides whether to call the real object at all.",
+          "Four types: virtual (lazy initialisation), protection (access control), remote (network call), caching.",
+          "EF Core lazy-loading proxies are the canonical .NET example and the root cause of N+1 query problems.",
+          "Castle DynamicProxy generates proxies at runtime for AOP interception, used by some DI frameworks."
         ],
-        "detail": "The proxy holds a reference to (or lazily creates) the real object. When a method is called, it decides whether/when to forward. EF overrides entity classes at runtime â€” accessing a navigation property transparently triggers a DB query.",
+        "detail": "The proxy holds or lazily creates the real object. When a method is called, the proxy decides whether and when to forward. EF Core overrides entity classes at runtime so that accessing a navigation property transparently triggers a database query.",
         "code": {
           "lang": "csharp",
-          "snippet": "public interface IReportService { Report Generate(int id); }\n\n// Proxy: lazy init + permission check â€” caller is unaware\npublic class ReportServiceProxy : IReportService {\n    private readonly Lazy<RealReportService> _real =\n        new(() => new RealReportService());\n    private readonly IUserContext _user;\n    public ReportServiceProxy(IUserContext user) => _user = user;\n\n    public Report Generate(int id) {\n        if (!_user.HasPermission(\"reports.read\"))\n            throw new UnauthorizedAccessException();\n        return _real.Value.Generate(id); // real object created only here\n    }\n}",
-          "note": "Proxy shares the same interface, checks permission (protection), and lazily creates the real service (virtual) â€” caller is unaware of both."
+          "snippet": "public interface IReportService { Report Generate(int id); }\n\n// Proxy: lazy init + permission check -- caller is unaware of both\npublic class ReportServiceProxy : IReportService {\n    private readonly Lazy<RealReportService> _real =\n        new(() => new RealReportService());\n    private readonly IUserContext _user;\n    public ReportServiceProxy(IUserContext user) => _user = user;\n\n    public Report Generate(int id) {\n        if (!_user.HasPermission(\"reports.read\"))\n            throw new UnauthorizedAccessException();\n        return _real.Value.Generate(id); // real object created only here\n    }\n}",
+          "note": "Proxy shares the same interface, checks permission (protection proxy) and lazily creates the real service (virtual proxy). Caller is aware of neither."
         },
-        "analogy": "Decorator adds behaviour. Proxy controls whether you get there.",
+        "analogy": "Decorator adds. Proxy gatekeeps. Different jobs, same disguise.",
         "redFlags": [
-          "Confusing Proxy (controls access) with Decorator (adds behaviour) â€” different intents.",
-          "Not knowing EF lazy-loading proxies can cause N+1 â€” every navigation in a loop fires a query.",
-          "Hiding expensive work behind a property so callers don't realise they're triggering a DB hit."
+          "Confusing Proxy (controls access) with Decorator (adds behaviour). They solve different problems.",
+          "Not knowing EF Core lazy-loading proxies cause N+1. Every navigation access in a loop fires a query.",
+          "Hiding expensive work behind a property so callers do not realise they are triggering a database call."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "You have an expensive report service. You want to defer creating it until first use and enforce a permission check. How?"
+            "text": "You have an expensive report generation service. You want to defer creating it until first use and also enforce a permission check before every call. How do you structure that?"
           },
           {
             "role": "me",
-            "text": "Proxy â€” implementing the same IReportService interface, it checks the permission first, then lazily creates the real service on first call. Callers are unaware of both."
+            "text": "Proxy implementing the same IReportService interface. It checks the permission first, then lazily creates the real service on the first call. Callers are unaware of both the permission check and the deferred creation."
           },
           {
             "role": "interviewer",
@@ -3142,7 +3142,7 @@
           },
           {
             "role": "me",
-            "text": "Decorator adds behaviour around an existing call â€” the inner object always runs. Proxy controls access â€” it can decide NOT to call the real object at all, like when the permission check fails."
+            "text": "A Decorator always calls the inner object and adds behaviour around it. A Proxy controls access and can decide not to call the real object at all, for example when the permission check fails."
           },
           {
             "role": "interviewer",
@@ -3150,38 +3150,38 @@
           },
           {
             "role": "me",
-            "text": "EF Core lazy-loading proxies are the most common. Accessing a navigation property transparently fires a DB query â€” the entity IS the proxy at runtime."
+            "text": "EF Core lazy-loading proxies are the most common. When you access a navigation property on an entity, EF has replaced the entity with a proxy subclass that fires a database query transparently. The caller has no idea."
           },
           {
             "role": "interviewer",
-            "text": "What's the danger with those EF lazy-loading proxies?"
+            "text": "What is the danger with those EF lazy-loading proxies?"
           },
           {
             "role": "me",
-            "text": "N+1 â€” if I loop over a collection and touch navigations per item, I silently trigger a query per row. I'd use eager loading with Include where I know I need the related data."
+            "text": "N+1 queries. If I iterate over a list of orders and access the Customer navigation property on each one, I silently fire one query per order. I would use eager loading with Include where I know I need the related data."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Proxy vs Decorator?",
-            "a": "Proxy controls access to the real object; Decorator adds behaviour around it.",
+            "a": "Proxy controls access to the real object. Decorator adds behaviour around it.",
             "relatedId": "architecture-dp-007"
           },
           {
             "q": "Name the four proxy types.",
-            "a": "Virtual (lazy init), protection (auth), remote (network call), caching."
+            "a": "Virtual (lazy init), protection (access control), remote (network call), caching."
           },
           {
             "q": "Where does .NET use proxies?",
-            "a": "EF Core lazy loading, gRPC/HTTP typed clients, Castle DynamicProxy for AOP interception."
+            "a": "EF Core lazy loading, gRPC and HTTP typed clients, Castle DynamicProxy for AOP interception."
           },
           {
-            "q": "What's the N+1 risk with EF lazy-loading proxies?",
-            "a": "Accessing a navigation inside a loop silently fires one query per iteration.",
+            "q": "What is the N+1 risk with EF lazy-loading proxies?",
+            "a": "Accessing a navigation property inside a loop fires one database query per iteration.",
             "relatedId": "architecture-realworld-003"
           }
         ]
@@ -3195,33 +3195,33 @@
       "freq": "high",
       "tags": ["strategy", "behavioral", "open-closed", "polymorphism", "switch-replacement"],
       "answer": {
-        "oneLiner": "Strategy defines a family of interchangeable algorithms behind a common interface and lets you pick one at runtime â€” the canonical way to kill a growing if/switch on a type.",
+        "oneLiner": "Strategy defines a family of interchangeable algorithms behind one interface and lets you select the right one at runtime, which is the canonical way to eliminate a switch statement that grows with every new variant.",
         "keyPoints": [
-          "Open/Closed Principle: add a new variant by adding a new class â€” no existing code changes.",
-          "Selection is data-driven, not a switch: keyed DI services (.NET 8) or a dictionary map by variant key.",
-          "Strategy vs State: same structure, different intent â€” Strategy swaps algorithms externally; State changes behaviour automatically as internal state changes.",
-          "Trade-off: more classes â€” two simple stable branches don't need the ceremony."
+          "Open/Closed Principle: adding a new variant means adding a new class and one DI registration. Zero existing code changes.",
+          "Selection is data-driven, not a switch: keyed DI services in .NET 8 or a dictionary mapping the key to the strategy.",
+          "Strategy vs State: same structure, different intent. Strategy swaps algorithms by external choice. State changes behaviour automatically as the object's own internal state changes.",
+          "Trade-off: more classes. Two simple, stable branches do not justify the ceremony."
         ],
-        "detail": "Each algorithm variant is its own class implementing one interface. The context delegates to the current strategy. In .NET, register strategies in DI with a key and resolve at runtime â€” no switch statement in sight.",
+        "detail": "Each algorithm variant is its own class implementing one interface. The context delegates to whichever strategy is currently selected. In .NET, register strategies by key and resolve at runtime so the switch statement never appears.",
         "code": {
           "lang": "csharp",
-          "snippet": "// BAD: switch that gets edited every time a provider is added\npublic Receipt Pay(string method, decimal amount) => method switch {\n    \"card\"   => ChargeCard(amount),\n    \"paypal\" => ChargePayPal(amount),\n    _ => throw new NotSupportedException() // broken Open/Closed\n};\n\n// GOOD: Strategy + keyed DI (.NET 8) â€” no switch ever again\npublic interface IPaymentStrategy {\n    Task<Receipt> PayAsync(decimal amount, CancellationToken ct);\n}\nservices.AddKeyedScoped<IPaymentStrategy, CreditCardStrategy>(\"card\");\nservices.AddKeyedScoped<IPaymentStrategy, PayPalStrategy>(\"paypal\");\n\n// Resolution â€” no switch, Open/Closed satisfied\nvar strategy = sp.GetRequiredKeyedService<IPaymentStrategy>(method);\nreturn await strategy.PayAsync(amount, ct);",
-          "note": "Adding a new provider = new class + one AddKeyedScoped line. Zero existing code changes."
+          "snippet": "// BAD: switch that gets edited every time a new tier is added\npublic decimal Calculate(string tier, decimal price) => tier switch {\n    \"standard\"    => price,\n    \"vip\"         => price * 0.9m,\n    \"wholesale\"   => price * 0.75m,\n    _ => throw new NotSupportedException() // broken Open/Closed\n};\n\n// GOOD: Strategy + keyed DI (.NET 8)\npublic interface IDiscountStrategy { decimal Apply(decimal price); }\nservices.AddKeyedScoped<IDiscountStrategy, StandardDiscount>(\"standard\");\nservices.AddKeyedScoped<IDiscountStrategy, VipDiscount>(\"vip\");\nservices.AddKeyedScoped<IDiscountStrategy, WholesaleDiscount>(\"wholesale\");\n\n// No switch anywhere -- Open/Closed satisfied\nvar strategy = sp.GetRequiredKeyedService<IDiscountStrategy>(tier);\nreturn strategy.Apply(price);",
+          "note": "Adding a new tier is one new class and one AddKeyedScoped line. Zero existing code changes."
         },
-        "analogy": "New payment provider = new class. The switch is gone forever.",
+        "analogy": "A new pricing tier is a new class. The switch dies here.",
         "redFlags": [
-          "A switch/if-else that grows every time a new variant is added â€” that's Strategy waiting to happen.",
-          "Putting all variants' logic in one class with branches â€” the switch is just hidden.",
-          "Over-engineering two simple stable branches into three new classes."
+          "A switch or if/else chain that grows every time a new variant is added. That is Strategy waiting to happen.",
+          "Putting all variant logic in one class with branches. The switch is just hidden.",
+          "Over-engineering two simple, stable branches into three new classes."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "Your checkout has a switch on payment method that gets edited every time marketing adds a provider. How do you fix it?"
+            "text": "Your e-commerce platform has a pricing engine with a switch on customer tier: standard, VIP, and wholesale. Every time sales adds a new tier, a developer has to edit that switch. How do you fix this?"
           },
           {
             "role": "me",
-            "text": "Strategy pattern â€” an IPaymentStrategy interface with one implementation per provider. The switch disappears and each variant's logic is isolated and independently testable."
+            "text": "Strategy pattern. An IDiscountStrategy interface with one implementation per tier. The switch disappears and each tier's logic is isolated in its own class, independently testable."
           },
           {
             "role": "interviewer",
@@ -3229,54 +3229,54 @@
           },
           {
             "role": "me",
-            "text": "Keyed services in .NET 8. I register CreditCardStrategy under 'card', PayPalStrategy under 'paypal', and resolve by the method string. No switch, no dictionary of lambdas."
+            "text": "Keyed services in .NET 8. Register each strategy under its tier name. At runtime, resolve using GetRequiredKeyedService with the tier string. Selection is data-driven, not code-driven."
           },
           {
             "role": "interviewer",
-            "text": "What's the Open/Closed benefit?"
+            "text": "What is the Open/Closed benefit here?"
           },
           {
             "role": "me",
-            "text": "Adding a new provider is one new class and one registration line â€” no existing code changes. I can't accidentally break the card handler while adding Bitcoin."
+            "text": "When the enterprise tier arrives, I add one new class and one registration line. No existing code is touched. I cannot accidentally break the VIP calculation while adding enterprise pricing."
           },
           {
             "role": "interviewer",
-            "text": "Strategy and State pattern look structurally identical. What's the difference?"
+            "text": "Strategy and State pattern look structurally identical. What is the actual difference?"
           },
           {
             "role": "me",
-            "text": "Same structure, different intent. Strategy swaps algorithms by external choice. State changes behaviour automatically as the object's own internal state changes â€” the object drives it, not the caller."
+            "text": "Same structure, different intent. Strategy is externally selected: the caller chooses which algorithm to use. State changes behaviour automatically as the object's own internal state changes. With Strategy I pick the algorithm. With State the object picks it for me."
           },
           {
             "role": "interviewer",
-            "text": "When would you NOT use Strategy?"
+            "text": "When would you not use Strategy?"
           },
           {
             "role": "me",
-            "text": "Two simple, stable branches that never grow â€” a switch is more readable than three new classes and a keyed DI registration for a binary choice."
+            "text": "Two simple, stable branches that will never grow. A plain if/else is more readable than three new classes and a keyed DI registration for a permanent binary choice."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "How do you select a strategy without a switch?",
-            "a": "Keyed DI services (.NET 8) or a dictionary mapping the variant key to the strategy instance.",
+            "a": "Keyed DI services in .NET 8 or a dictionary mapping the variant key to the strategy.",
             "relatedId": "architecture-dp-013"
           },
           {
             "q": "How does Strategy support Open/Closed?",
-            "a": "New behaviour = new class + one registration line â€” zero changes to existing code."
+            "a": "A new variant is a new class and one registration. Zero changes to existing code."
           },
           {
-            "q": "Strategy vs State pattern?",
-            "a": "Same structure, different intent: Strategy swaps algorithms externally; State changes behaviour as internal state changes."
+            "q": "Strategy vs State?",
+            "a": "Strategy: external caller selects the algorithm. State: the object changes its own behaviour as internal state changes."
           },
           {
             "q": "When is Strategy overkill?",
-            "a": "Two simple, stable branches â€” a switch is clearer than three new classes."
+            "a": "Two simple, stable branches that will never grow. A switch is clearer than three new classes."
           }
         ]
       }
@@ -3289,88 +3289,88 @@
       "freq": "high",
       "tags": ["observer", "behavioral", "events", "iobservable", "pub-sub", "reactive"],
       "answer": {
-        "oneLiner": "Observer lets a subject notify any number of subscribers automatically when its state changes, without knowing who they are â€” C# implements this natively via events (multicast delegates) and IObservable<T>/Rx for push streams.",
+        "oneLiner": "Observer lets a subject automatically notify any number of subscribers when its state changes, without coupling them directly. C# implements this natively via events and, for push streams, via IObservable<T>.",
         "keyPoints": [
-          "C# `event` is the built-in Observer: a multicast delegate â€” subscribers use `+=`, unsubscribe with `-=`.",
-          "Lapsed-listener memory leak: if a subscriber never `-=` unsubscribes, the subject keeps it alive indefinitely.",
-          "MediatR `INotification` is Observer at the application layer â€” publish once, fan out to many handlers.",
-          "One subscriber's unhandled exception kills subsequent subscribers in the same invocation â€” wrap or isolate."
+          "C# events are the built-in Observer implementation: a multicast delegate. Subscribers add handlers with +=, remove with -=.",
+          "Lapsed-listener memory leak: if a subscriber never unsubscribes with -=, the event delegate holds a reference to it indefinitely.",
+          "MediatR INotification is Observer at the application layer: publish once, fan out to every registered handler.",
+          "An unhandled exception in one subscriber aborts the remaining subscribers in the same invocation unless you isolate each call."
         ],
-        "detail": "The subject holds a multicast delegate (event) and invokes all subscribers on state change. `IObservable<T>`/Rx extends this to async push streams with composition operators, completion, and error signals.",
+        "detail": "The subject holds a multicast delegate and invokes all subscribers when state changes. IObservable<T> with Reactive Extensions extends this to async push streams with composition operators, completion signals, and error channels.",
         "code": {
           "lang": "csharp",
-          "snippet": "// C# event = built-in Observer (multicast delegate)\npublic class Stock {\n    public event EventHandler<decimal>? PriceChanged;\n    private decimal _price;\n    public decimal Price {\n        get => _price;\n        set { _price = value; PriceChanged?.Invoke(this, value); }\n    }\n}\nvar stock = new Stock();\nstock.PriceChanged += (_, p) => Console.WriteLine($\"Alert: {p}\");\nstock.PriceChanged += (_, p) => dashboard.Update(p);\nstock.Price = 42.5m;     // BOTH observers notified\nstock.PriceChanged -= handler; // always unsubscribe â€” prevent lapsed-listener leak",
-          "note": "Subject raises event; multiple observers subscribe with +=; always unsubscribe with -= or you leak memory."
+          "snippet": "// C# event = built-in Observer (multicast delegate)\npublic class OrderService {\n    public event EventHandler<Order>? OrderPlaced;\n    public void Place(Order order) {\n        // ... persist order ...\n        OrderPlaced?.Invoke(this, order); // notifies all subscribers\n    }\n}\nvar svc = new OrderService();\nsvc.OrderPlaced += (_, o) => emailService.SendConfirmation(o);\nsvc.OrderPlaced += (_, o) => inventoryService.DeductStock(o);\nsvc.OrderPlaced += (_, o) => analyticsService.Track(o);\n// IMPORTANT: unsubscribe when done to prevent lapsed-listener leak\nsvc.OrderPlaced -= handler;",
+          "note": "Publisher raises the event once. All three subscribers are notified without the OrderService knowing who they are."
         },
-        "analogy": "Subscribe with `+=`. Always unsubscribe with `-=`. Or leak memory.",
+        "analogy": "Publisher never knows who is listening. That is the point.",
         "redFlags": [
-          "Forgetting to `-=` unsubscribe â€” classic lapsed-listener memory leak, especially with long-lived publishers.",
-          "Relying on a specific order of observer invocation â€” multicast delegates don't guarantee it.",
-          "One observer's exception silently killing subsequent observers with no error isolation."
+          "Forgetting to unsubscribe with -=. The event delegate keeps the subscriber alive as long as the publisher lives.",
+          "Relying on a specific order of subscriber invocation. Multicast delegates do not guarantee order.",
+          "One subscriber throwing an unhandled exception and silently killing every subsequent subscriber."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "Stock prices update and a dashboard, alert service, and audit log all need to react. How do you wire that loosely?"
+            "text": "When an order is placed, the email service, the inventory service, the analytics service, and the loyalty points service all need to react. How do you wire them together without coupling OrderService to any of them?"
           },
           {
             "role": "me",
-            "text": "Observer. The stock exposes a PriceChanged event; each component subscribes with +=. The stock never references them directly."
+            "text": "Observer pattern. OrderService raises an OrderPlaced event. Each service subscribes independently. The order service never references any of them directly."
           },
           {
             "role": "interviewer",
-            "text": "What's the classic bug with C# event subscriptions?"
+            "text": "What is the classic bug with this approach?"
           },
           {
             "role": "me",
-            "text": "Lapsed-listener leak â€” if a subscriber forgets to -= the event delegate holds a reference to it forever. The subscriber can never be garbage collected even if nothing else uses it."
+            "text": "Lapsed-listener memory leak. If a subscriber is disposed but never calls -=, the event delegate keeps a reference to it. The garbage collector cannot reclaim it even though nothing else holds a reference."
           },
           {
             "role": "interviewer",
-            "text": "What happens if one subscriber throws an exception?"
+            "text": "What happens if the inventory service throws an unhandled exception?"
           },
           {
             "role": "me",
-            "text": "By default it aborts the chain â€” subsequent subscribers never run. I'd wrap each invocation in a try/catch, or use Rx where operators handle errors per stream independently."
+            "text": "By default the exception aborts the multicast invocation. The analytics service and loyalty service never run. I would wrap each subscriber call in a try/catch, or use MediatR's notification pattern which can isolate handler exceptions."
           },
           {
             "role": "interviewer",
-            "text": "For domain-wide notification rather than one object's event, what would you use?"
+            "text": "How does MediatR INotification compare to a C# event?"
           },
           {
             "role": "me",
-            "text": "MediatR's INotification. One Publish call fans out to all registered handlers â€” Observer at the application layer. Publisher and handlers are completely decoupled."
+            "text": "Same Observer intent but at the application layer. IMediator.Publish routes the notification to every registered INotificationHandler. Handlers are decoupled, resolved from DI, and can be added without touching the publisher."
           },
           {
             "role": "interviewer",
-            "text": "When would you use IObservable over events?"
+            "text": "When would you use IObservable over a plain event?"
           },
           {
             "role": "me",
-            "text": "When I need stream composition â€” debounce, throttle, merge, or completion signals. Events are fire-and-forget; Rx gives me operators to shape the stream and handle async push sequences."
+            "text": "When I need stream composition: debounce, throttle, merge, or completion signals. For example, buffering inventory updates for 200ms before processing them in a batch, or merging two event streams. Plain events cannot express those shapes."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "How do C# events implement Observer?",
-            "a": "An event is a multicast delegate; subscribers += handlers; the subject invokes them all.",
+            "a": "An event is a multicast delegate. Subscribers add with +=, subject invokes all of them.",
             "relatedId": "architecture-dp-011"
           },
           {
             "q": "When use IObservable/Rx over events?",
-            "a": "For async push streams needing composition: throttle, merge, debounce, or completion/error signals."
+            "a": "For async push streams needing composition such as throttle, merge, debounce, or completion signals."
           },
           {
             "q": "What is the lapsed-listener problem?",
-            "a": "Forgetting -= keeps subscribers alive via the event reference, causing a memory leak."
+            "a": "Forgetting -= keeps the subscriber alive through the event reference, causing a memory leak."
           },
           {
             "q": "How does MediatR INotification fit Observer?",
-            "a": "Publish once, fan out to many handlers â€” Observer at the application layer.",
+            "a": "Publish once, fan out to every registered handler. Observer at the application layer.",
             "relatedId": "architecture-patterns-010"
           }
         ]
@@ -3378,47 +3378,47 @@
     },
     {
       "id": "architecture-dp-011",
-      "q": "What is the Mediator pattern and how does MediatR apply it in a .NET app?",
+      "q": "What is the Mediator pattern and how does MediatR apply it in a .NET application?",
       "level": "mid",
       "type": "conceptual",
       "freq": "high",
       "tags": ["mediator", "mediatr", "behavioral", "decoupling", "cqrs"],
       "answer": {
-        "oneLiner": "Mediator centralises communication so components talk through a hub instead of directly to each other â€” MediatR implements this in .NET by routing request objects to their registered handlers.",
+        "oneLiner": "Mediator centralises communication so that components talk through a hub instead of directly to each other, reducing many-to-many coupling to many-to-one. MediatR implements this by routing request objects to their single registered handler.",
         "keyPoints": [
-          "MediatR is NOT CQRS â€” it facilitates routing; CQRS is the read/write separation architectural decision.",
-          "`IRequest` routes to ONE handler and returns a result; `INotification` fans out to MANY handlers (Observer pattern).",
+          "MediatR is not CQRS. It facilitates the routing. CQRS is the architectural decision to separate read and write models.",
+          "IRequest routes to exactly one IRequestHandler and returns a result. INotification fans out to many handlers with no return value.",
           "Pipeline behaviours are Decorators over the request pipeline: validation, logging, and transactions wrap every request centrally.",
-          "Downside: indirect navigation â€” you can't cmd+click from a request to its handler."
+          "Downside: navigation is indirect. You cannot jump from a request class to its handler with a single keypress."
         ],
-        "detail": "The sender (controller) sends a request object through IMediator. MediatR resolves the registered IRequestHandler and invokes it. Neither the sender nor the handler knows about the other â€” pure decoupling.",
+        "detail": "The controller sends a request object through IMediator. MediatR resolves the registered handler and invokes it. Sender and handler never reference each other. The pipeline behaviour chain is itself a Chain of Responsibility.",
         "code": {
           "lang": "csharp",
-          "snippet": "// Request (command) â€” a plain record\npublic record CreateOrder(Guid CustomerId, List<OrderLine> Lines) : IRequest<Guid>;\n\n// Handler â€” focused, isolated, testable\npublic class CreateOrderHandler : IRequestHandler<CreateOrder, Guid> {\n    public async Task<Guid> Handle(CreateOrder cmd, CancellationToken ct) {\n        var id = Guid.NewGuid(); // create + persist\n        return id;\n    }\n}\n\n// Controller â€” depends ONLY on IMediator\n[HttpPost]\npublic Task<Guid> Post(CreateOrder cmd, CancellationToken ct) =>\n    _mediator.Send(cmd, ct); // routes to handler automatically",
-          "note": "Sender and handler never reference each other. MediatR is the hub; pipeline behaviours add cross-cutting concerns."
+          "snippet": "// Request as a plain record -- no dependency on any handler\npublic record PlaceOrder(Guid CustomerId, List<OrderLine> Lines) : IRequest<Guid>;\n\n// Handler -- focused, isolated, testable without the controller\npublic class PlaceOrderHandler : IRequestHandler<PlaceOrder, Guid> {\n    public async Task<Guid> Handle(PlaceOrder cmd, CancellationToken ct) {\n        // validate, create, persist\n        return Guid.NewGuid();\n    }\n}\n\n// Controller knows only IMediator -- zero handler references\n[HttpPost]\npublic Task<Guid> Post(PlaceOrder cmd, CancellationToken ct) =>\n    _mediator.Send(cmd, ct);",
+          "note": "Sender and handler never reference each other. MediatR is the hub. Pipeline behaviours add cross-cutting concerns centrally."
         },
-        "analogy": "Controllers send requests. Handlers handle them. Neither knows the other.",
+        "analogy": "Sender sends. Handler handles. Neither knows the other exists.",
         "redFlags": [
-          "Saying MediatR IS CQRS â€” it's a routing tool that facilitates CQRS, not the pattern itself.",
-          "Using MediatR in a small app with no pipeline behaviours where injecting a service is simpler.",
-          "Handlers calling other handlers through IMediator â€” you recreate spaghetti through the hub."
+          "Saying MediatR is CQRS. It is a routing tool that makes CQRS convenient, not the pattern itself.",
+          "Using MediatR in a small application with a few endpoints and no pipeline. A service call is simpler.",
+          "Handlers calling other handlers through IMediator. You recreate spaghetti through the hub."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "Your controllers each inject five services and orchestrate them directly. How do you simplify that?"
+            "text": "Your API controllers each inject five or six services and orchestrate them directly. Navigation is hard, testing is harder. How do you simplify the architecture?"
           },
           {
             "role": "me",
-            "text": "Mediator via MediatR. Controllers send request objects â€” CreateOrder, GetDashboard â€” through IMediator. Dedicated handlers do the work. Controllers know nothing about the implementation."
+            "text": "Mediator via MediatR. Controllers send request objects through IMediator. Dedicated handlers do the work. The controller knows nothing about what happens next."
           },
           {
             "role": "interviewer",
-            "text": "Beyond decoupling, what's the practical win in .NET?"
+            "text": "Beyond decoupling controllers from handlers, what is the practical win?"
           },
           {
             "role": "me",
-            "text": "Pipeline behaviours â€” validation, logging, and transactions wrap every request centrally. Handlers stay focused and I don't repeat cross-cutting code across every endpoint."
+            "text": "Pipeline behaviours. Validation, logging, and transaction management wrap every request centrally via IPipelineBehavior. Handlers stay focused on business logic and I never repeat cross-cutting code across endpoints."
           },
           {
             "role": "interviewer",
@@ -3426,48 +3426,48 @@
           },
           {
             "role": "me",
-            "text": "No. MediatR routes messages. CQRS is the architectural decision to separate read and write models. I can use MediatR without CQRS and vice versa â€” MediatR just makes it convenient."
+            "text": "No. MediatR routes messages. CQRS is the decision to have separate models for reads and writes. You can use MediatR without CQRS and you can implement CQRS without MediatR. They are independent."
           },
           {
             "role": "interviewer",
-            "text": "What's the downside you'd warn the team about?"
+            "text": "What downside would you warn the team about before adopting it?"
           },
           {
             "role": "me",
-            "text": "Indirection â€” you can't navigate from a request to its handler in one click. For a small app with a few endpoints it's also ceremony, so I'd only adopt it when the pipeline pays off."
+            "text": "Indirection. You cannot navigate from a request class to its handler in a single keypress. For a small application with a handful of endpoints it is also unnecessary ceremony. I adopt it only when the pipeline pays off."
           },
           {
             "role": "interviewer",
-            "text": "A handler calls another handler through IMediator. Is that fine?"
+            "text": "A developer writes a handler that calls IMediator.Send to invoke a different handler. Is that acceptable?"
           },
           {
             "role": "me",
-            "text": "No â€” you recreate spaghetti through the mediator. If handler A needs handler B's logic, that logic should be a shared domain service they both depend on directly."
+            "text": "No. That recreates spaghetti through the mediator. If two handlers share logic, that logic belongs in a shared domain service that both depend on directly, not a mediator hop."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Is MediatR the same as CQRS?",
-            "a": "No â€” MediatR routes commands and queries; CQRS is the read/write separation pattern.",
+            "a": "No. MediatR routes requests. CQRS is the read/write separation pattern. They are independent.",
             "relatedId": "architecture-patterns-004"
           },
           {
             "q": "IRequest vs INotification?",
-            "a": "IRequest has one handler and returns a result; INotification fans out to many handlers (Observer).",
+            "a": "IRequest goes to one handler and returns a result. INotification fans out to many with no return.",
             "relatedId": "architecture-dp-010"
           },
           {
             "q": "How do pipeline behaviours relate to Decorator?",
-            "a": "Each behaviour decorates the request pipeline, wrapping the next step.",
+            "a": "Each behaviour decorates the request pipeline by wrapping the next step.",
             "relatedId": "architecture-dp-007"
           },
           {
             "q": "When is MediatR overkill?",
-            "a": "A handful of endpoints with no cross-cutting concerns â€” inject services directly.",
+            "a": "A small application with a few endpoints and no cross-cutting concerns. Inject services directly.",
             "relatedId": "architecture-patterns-010"
           }
         ]
@@ -3481,84 +3481,84 @@
       "freq": "medium",
       "tags": ["command", "behavioral", "encapsulation", "undo", "queueing"],
       "answer": {
-        "oneLiner": "Command encapsulates a request as an object, letting you queue, log, retry, and undo operations independently of who executes them.",
+        "oneLiner": "Command encapsulates a request as a first-class object, letting you queue it, log it, retry it, or undo it independently of who ultimately executes it.",
         "keyPoints": [
-          "The key insight: when a request IS an object, you can store it in a DB, put it on a queue, replay it, or undo it.",
-          "Undo/redo = a stack of command objects that each know how to reverse themselves.",
-          "MediatR commands and Hangfire/Azure Queue job payloads are everyday Command pattern examples.",
-          "Command vs Strategy: Command encapsulates a request plus its data (storable, undoable); Strategy encapsulates a swappable algorithm."
+          "The key insight: when a request is an object, you can store it in a database, put it on a queue, replay it later, or reverse it.",
+          "Undo/redo is a stack of command objects that each carry enough state to reverse themselves.",
+          "MediatR commands and Hangfire or Azure Queue job payloads are everyday Command pattern examples.",
+          "Command vs Strategy: Command encapsulates a specific request and its data. Strategy encapsulates a swappable algorithm."
         ],
-        "detail": "The command object holds the action and its data. The invoker stores or triggers it without knowing the receiver. The receiver (handler) executes the operation. Separating these three roles enables auditing, queueing, and undo stacks.",
+        "detail": "The command object holds the action and its data. The invoker stores or triggers it without knowing the receiver. The receiver executes. Separating these three roles enables auditing, queuing, and undo stacks.",
         "code": {
           "lang": "csharp",
-          "snippet": "public interface ICommand { void Execute(); void Undo(); }\n\npublic class AddTextCommand : ICommand {\n    private readonly Document _doc;\n    private readonly string _text;\n    public AddTextCommand(Document doc, string text) => (_doc, _text) = (doc, text);\n    public void Execute() => _doc.Append(_text);\n    public void Undo()    => _doc.RemoveLast(_text.Length); // knows how to reverse itself\n}\n\n// Invoker: execute and track for undo\nvar history = new Stack<ICommand>();\nvar cmd = new AddTextCommand(doc, \"Hello\");\ncmd.Execute(); history.Push(cmd);\nhistory.Pop().Undo(); // reverse the last action",
-          "note": "Command object carries action + data. Invoker drives it. Receiver executes. Stack enables undo."
+          "snippet": "public interface ICommand { void Execute(); void Undo(); }\n\npublic class AddItemCommand : ICommand {\n    private readonly ShoppingCart _cart;\n    private readonly CartItem _item;\n    public AddItemCommand(ShoppingCart cart, CartItem item) =>\n        (_cart, _item) = (cart, item);\n    public void Execute() => _cart.Add(_item);\n    public void Undo()    => _cart.Remove(_item); // knows how to reverse itself\n}\n\n// Invoker: execute and track for undo\nvar history = new Stack<ICommand>();\nvar cmd = new AddItemCommand(cart, item);\ncmd.Execute(); history.Push(cmd);\nhistory.Pop().Undo(); // remove the last added item",
+          "note": "Command object carries the action and data. Invoker drives execution. Stack enables undo. The cart never knows about undo."
         },
-        "analogy": "A command is a request you can save, queue, and undo.",
+        "analogy": "A request you can save is a request you can undo.",
         "redFlags": [
-          "Wrapping trivial one-line actions in command classes when there's no queue, log, or undo need.",
-          "Commands that can't undo or replay when that was the entire motivation for the pattern.",
-          "Confusing Command (encapsulate a request + data) with Strategy (swap a reusable algorithm)."
+          "Wrapping trivial one-line actions in command classes when there is no queue, log, or undo requirement.",
+          "Commands that cannot undo or replay when those were the entire reason for choosing the pattern.",
+          "Confusing Command (encapsulate a specific request with data) with Strategy (encapsulate a swappable algorithm)."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "You're building a text editor with undo/redo. How do you structure the operations?"
+            "text": "You are building a shopping cart with an undo feature. Users can add items, apply coupon codes, and change quantities, and they expect to be able to undo each action. How do you structure this?"
           },
           {
             "role": "me",
-            "text": "Command pattern. Each edit â€” AddText, DeleteText, FormatParagraph â€” is an object with Execute and Undo. I push executed commands onto a stack; undo pops the last one and calls Undo on it."
+            "text": "Command pattern. Each cart action is an object with Execute and Undo methods. I push executed commands onto a history stack. Undo pops the last command and calls Undo on it."
           },
           {
             "role": "interviewer",
-            "text": "Why does encapsulating as an object specifically enable undo?"
+            "text": "Why does encapsulating the action as an object specifically enable undo?"
           },
           {
             "role": "me",
-            "text": "The command object carries its own data and knows how to reverse itself. Without that, I'd need to capture state somewhere external â€” messier and fragile."
+            "text": "The command object carries its own data and knows how to reverse itself. AddItemCommand holds the item reference and removes it on Undo. Without this encapsulation I would need to capture and store state somewhere external, which is fragile."
           },
           {
             "role": "interviewer",
-            "text": "Where does this same idea appear in a typical web backend?"
+            "text": "Where does this same idea appear in a backend system?"
           },
           {
             "role": "me",
-            "text": "Hangfire or Azure Queue job payloads â€” a serialised command queued for later execution. And MediatR commands are the same concept â€” a request as an object routed to a handler."
+            "text": "Hangfire and Azure Queue job payloads are serialised command objects queued for later execution. MediatR commands are the same concept in memory. In both cases the request is an object that travels independently of its executor."
           },
           {
             "role": "interviewer",
-            "text": "How is Command different from Strategy? They both have one interface."
+            "text": "How is Command different from Strategy? Both have a single interface and one Execute method."
           },
           {
             "role": "me",
-            "text": "Same shape, different intent. Command encapsulates a full request with data so you can store, queue, or undo it. Strategy encapsulates a swappable algorithm â€” it's about HOW you do something, not WHAT you're doing."
+            "text": "Different intent. Command encapsulates a specific request with its data so you can store, queue, or undo it. Strategy encapsulates a swappable algorithm. Command is about what you are doing. Strategy is about how you do it."
           },
           {
             "role": "interviewer",
-            "text": "If a command is serialised to a queue, what must you be careful about?"
+            "text": "If you serialise a command to a message queue, what constraint does that place on the handler?"
           },
           {
             "role": "me",
-            "text": "Idempotency â€” queues deliver at least once, possibly more. Each execution must be safe to repeat without double-charging or double-booking. I'd include a command ID and deduplicate on the handler side."
+            "text": "Idempotency. Message queues deliver at least once, so the handler may receive the same command more than once. Each execution must be safe to repeat without double-charging or double-booking. I include a command ID and deduplicate on the handler side."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
-            "q": "What does turning a request into an object enable?",
-            "a": "Queueing, logging, retrying, and undo/redo of operations."
+            "q": "What does encapsulating a request as an object enable?",
+            "a": "Queuing, logging, retrying, and undo/redo of operations."
           },
           {
             "q": "Where does .NET use Command?",
-            "a": "MediatR commands, WPF ICommand/MVVM, and Hangfire/Azure Queue job payloads.",
+            "a": "MediatR commands, WPF ICommand in MVVM, Hangfire and Azure Queue job payloads.",
             "relatedId": "architecture-dp-011"
           },
           {
             "q": "Command vs Strategy?",
-            "a": "Command encapsulates a request + data (storable/undoable); Strategy encapsulates a swappable algorithm.",
+            "a": "Command encapsulates a specific request with data. Strategy encapsulates a swappable algorithm.",
             "relatedId": "architecture-dp-009"
           },
           {
@@ -3576,49 +3576,49 @@
       "freq": "low",
       "tags": ["template-method", "behavioral", "inheritance", "hook-methods", "strategy"],
       "answer": {
-        "oneLiner": "Template Method fixes the skeleton of an algorithm in a base class and lets subclasses override specific steps without changing the overall sequence.",
+        "oneLiner": "Template Method defines an algorithm's fixed skeleton in a base class and lets subclasses override the variable steps without changing the sequence.",
         "keyPoints": [
-          "The template method itself must NOT be overridable â€” it locks the sequence that is the value of the pattern.",
-          "Virtual hook methods provide optional overridable steps with a default implementation for subclasses that don't need to change that step.",
-          "Template Method = inheritance (compile-time variation); Strategy = composition (runtime variation via injection).",
-          "Prefer Strategy in modern .NET â€” composition is more flexible, testable, and avoids deep inheritance hierarchies."
+          "The template method itself must not be overridable. Making it sealed locks the sequence, which is the value of the pattern.",
+          "Virtual hook methods provide optional overridable steps with a shared default for subclasses that do not need to customise them.",
+          "Template Method uses inheritance and fixes variation at compile time. Strategy uses composition and fixes variation at runtime via injection.",
+          "Prefer Strategy in modern .NET. Composition is more flexible, testable, and avoids rigid inheritance hierarchies."
         ],
-        "detail": "The base class calls abstract or virtual step methods in a fixed order. Subclasses fill in the variable steps. Strategy achieves the same variance by injecting a step as a dependency â€” no inheritance required.",
+        "detail": "The base class calls abstract or virtual step methods in a fixed order. Subclasses fill in the variable steps. Strategy achieves the same variance by injecting the variable behaviour as a dependency, requiring no inheritance at all.",
         "code": {
           "lang": "csharp",
-          "snippet": "public abstract class DataImporter {\n    // Template method â€” sequence is LOCKED, not overridable\n    public void Import(string path) {\n        var raw     = Read(path);   // varies per format\n        var records = Parse(raw);   // varies per format\n        Validate(records);          // hook â€” has a default\n        Save(records);              // varies per format\n    }\n    protected abstract string       Read(string path);\n    protected abstract List<Record> Parse(string raw);\n    protected virtual  void         Validate(List<Record> r) { } // hook with default\n    protected abstract void         Save(List<Record> r);\n}\npublic class CsvImporter : DataImporter {\n    protected override string       Read(string p) => File.ReadAllText(p);\n    protected override List<Record> Parse(string r) => /* CSV */ new();\n    protected override void         Save(List<Record> r) { /* persist */ }\n}",
-          "note": "Import() locks the sequence; subclasses fill in Read/Parse/Save. Validate is an overridable hook with a shared default."
+          "snippet": "public abstract class ReportExporter {\n    // Template method -- sequence is LOCKED, sealed prevents override\n    public sealed void Export(ReportData data, string path) {\n        var filtered  = Filter(data);    // varies per format\n        var formatted = Format(filtered); // varies per format\n        Validate(formatted);             // shared default (hook)\n        Write(formatted, path);          // varies per format\n    }\n    protected abstract ReportData    Filter(ReportData d);\n    protected abstract string        Format(ReportData d);\n    protected virtual  void          Validate(string content) { } // hook\n    protected abstract void          Write(string content, string path);\n}\npublic class CsvExporter : ReportExporter {\n    protected override ReportData Filter(ReportData d)  => /* remove nulls */ d;\n    protected override string     Format(ReportData d)  => /* CSV lines */ \"\";\n    protected override void       Write(string c, string p) => File.WriteAllText(p, c);\n}",
+          "note": "Export() locks the sequence. Subclasses fill in Filter/Format/Write. Validate is an overridable hook with a shared default."
         },
-        "analogy": "Skeleton fixed in the base. Steps filled in by subclasses.",
+        "analogy": "The sequence is locked. Only the steps are yours to change.",
         "redFlags": [
-          "Subclasses overriding the template method itself â€” breaks the locked skeleton that is the whole point.",
-          "Using Template Method when the steps need to vary independently at runtime â€” that's Strategy.",
-          "Deep inheritance hierarchies just to vary one step â€” composition is almost always cleaner."
+          "Subclasses overriding the template method itself. This breaks the locked skeleton that is the purpose of the pattern.",
+          "Using Template Method when the steps need to vary independently at runtime. Use Strategy instead.",
+          "Deep inheritance hierarchies just to vary one step. Composition is almost always the cleaner option."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "You import from CSV, XML, and JSON. The steps are always read-parse-validate-save, but each format reads and parses differently. How do you structure it?"
+            "text": "Your reporting system exports data to CSV, Excel, and PDF. The steps are always filter, format, validate, and write, but each format implements filter and format differently. How do you structure this?"
           },
           {
             "role": "me",
-            "text": "Template Method. A base DataImporter has an Import method that locks the read-parse-validate-save sequence. Each format subclass overrides Read and Parse. Validate has a shared default as a hook."
+            "text": "Template Method. A base ReportExporter has a sealed Export method locking the filter-format-validate-write sequence. CsvExporter, ExcelExporter, and PdfExporter each override Filter and Format. Validate has a shared default as a hook."
           },
           {
             "role": "interviewer",
-            "text": "What exactly is a hook method?"
+            "text": "What is a hook method exactly?"
           },
           {
             "role": "me",
-            "text": "A virtual method with a default implementation in the base class. Subclasses can override it if they need different behaviour, or just inherit the default. Validate is a good example â€” most formats use the same rules."
+            "text": "A virtual method with a default implementation in the base class. Subclasses override it only when their format needs different behaviour. Validate is a good example: most formats use the same basic checks, but a PDF exporter might add digital signature verification."
           },
           {
             "role": "interviewer",
-            "text": "Why can't subclasses override the Import method itself?"
+            "text": "Why must Export be sealed?"
           },
           {
             "role": "me",
-            "text": "The locked sequence is the value of the pattern. If a subclass can change the order, the guarantee disappears. Import should be sealed or non-virtual."
+            "text": "The locked sequence is the entire value of the pattern. If a subclass can change the order, the guarantee disappears. Sealed prevents that."
           },
           {
             "role": "interviewer",
@@ -3626,26 +3626,26 @@
           },
           {
             "role": "me",
-            "text": "When I need to swap a step at runtime, or compose steps independently â€” Strategy uses injection so it's flexible. Template Method bakes the choice into the subclass at compile time."
+            "text": "When I need to swap a formatting step at runtime, or compose steps independently without inheriting a whole class. Strategy injects the behaviour so I can mix and match without building a class hierarchy."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Template Method vs Strategy?",
-            "a": "Template Method varies steps via inheritance at compile time; Strategy swaps behaviour via composition at runtime.",
+            "a": "Template Method varies steps via inheritance at compile time. Strategy swaps via composition at runtime.",
             "relatedId": "architecture-dp-009"
           },
           {
             "q": "What is a hook method?",
-            "a": "An optional overridable step with a default â€” subclasses extend selectively without overriding everything."
+            "a": "An optional overridable step with a shared default. Subclasses extend it selectively."
           },
           {
             "q": "Why prefer Strategy over Template Method today?",
-            "a": "Composition is more flexible and testable than inheritance; avoids rigid hierarchies."
+            "a": "Composition is more flexible and testable. Inheritance hierarchies are rigid."
           },
           {
             "q": "What stays in the base class?",
@@ -3662,33 +3662,33 @@
       "freq": "medium",
       "tags": ["chain-of-responsibility", "behavioral", "middleware", "pipeline", "aspnet-core"],
       "answer": {
-        "oneLiner": "Chain of Responsibility passes a request along a chain of handlers, each deciding to handle it and/or pass it to the next â€” decoupling the sender from whichever handler ultimately acts.",
+        "oneLiner": "Chain of Responsibility passes a request along a sequence of handlers, each deciding to process it or pass it to the next, without the sender knowing which handler ultimately acts.",
         "keyPoints": [
-          "ASP.NET Core middleware IS Chain of Responsibility â€” each component calls `next()` or short-circuits by returning without calling it.",
-          "Short-circuit: a handler writes the response (e.g. 401) and returns without calling `next()` â€” remaining middleware never runs.",
-          "Ordering is critical: auth before rate-limiting, CORS before auth â€” wrong order exposes the wrong behaviour.",
-          "MediatR pipeline behaviours and `DelegatingHandler` (HttpClient) are also Chain of Responsibility."
+          "ASP.NET Core middleware is a direct implementation of this pattern. Each component calls next() or short-circuits by returning without calling it.",
+          "Short-circuit: a handler sets the response and returns without calling next(). Remaining middleware never runs.",
+          "Ordering is critical. Authentication must run before rate-limiting. Rate-limiting must run before routing. Wrong order can expose unauthenticated requests to the wrong handler.",
+          "MediatR pipeline behaviours and DelegatingHandler chains for HttpClient are both Chain of Responsibility."
         ],
-        "detail": "Each handler holds a reference to the next. When invoked, it does its work and either terminates (short-circuits) or calls the next handler. The sender knows only the first link â€” who handles ultimately is transparent.",
+        "detail": "Each handler holds a reference to the next. When invoked, it does its work and either terminates (short-circuits) or calls the next handler. The sender knows only the first link. Who ultimately responds is transparent.",
         "code": {
           "lang": "csharp",
-          "snippet": "// ASP.NET Core middleware = textbook Chain of Responsibility\napp.Use(async (ctx, next) => {\n    if (!ctx.Request.Headers.ContainsKey(\"X-Api-Key\")) {\n        ctx.Response.StatusCode = 401; // SHORT-CIRCUIT: don't call next()\n        return;\n    }\n    await next(); // PASS: continue the chain\n});\n\n// Classic OO form\npublic abstract class Handler {\n    protected Handler? Next;\n    public Handler SetNext(Handler n) { Next = n; return n; }\n    public abstract void Handle(Request r);\n}",
-          "note": "Each middleware/handler: short-circuit (set response, return) OR pass (call next()). Order of registration = order of execution."
+          "snippet": "// ASP.NET Core middleware = textbook Chain of Responsibility\napp.Use(async (ctx, next) => {\n    // Authentication link\n    if (!ctx.User.Identity!.IsAuthenticated) {\n        ctx.Response.StatusCode = 401;\n        return; // SHORT-CIRCUIT: do not call next()\n    }\n    await next(); // PASS: continue to the next handler\n});\n\n// Classic OO form\npublic abstract class Handler {\n    protected Handler? Next;\n    public Handler SetNext(Handler n) { Next = n; return n; }\n    public abstract void Handle(HttpContext ctx);\n}",
+          "note": "Each link: short-circuit by returning, or pass by calling next(). Registration order determines execution order."
         },
-        "analogy": "Call next() or stop. Each handler decides its own fate.",
+        "analogy": "Call next or stop. Nothing in between.",
         "redFlags": [
-          "Requests silently falling through the entire chain with no handler responding.",
-          "Registering middleware in the wrong order â€” auth after rate-limiting is a common, dangerous mistake.",
-          "One monolithic handler doing everything instead of each link being focused on one concern."
+          "Requests silently falling through the entire chain with no handler processing them and no response written.",
+          "Middleware registered in the wrong order. Authentication after authorisation is a common and dangerous mistake.",
+          "One monolithic handler doing everything instead of each link being focused on a single concern."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "Every incoming request needs auth, then logging, then rate-limiting â€” any step might reject it. How do you structure that?"
+            "text": "Every API request needs to pass through authentication, then rate-limiting, then request logging, and any step may reject the request. How do you structure that pipeline?"
           },
           {
             "role": "me",
-            "text": "Chain of Responsibility. Each concern is a link â€” it either rejects and stops, or passes to the next. In ASP.NET Core that's exactly the middleware pipeline with next()."
+            "text": "Chain of Responsibility. Each concern is one link. It either rejects and stops, or passes to the next. In ASP.NET Core that is the middleware pipeline with next()."
           },
           {
             "role": "interviewer",
@@ -3696,7 +3696,7 @@
           },
           {
             "role": "me",
-            "text": "Short-circuit â€” write the response, say a 401 for failed auth, and return without calling next(). Subsequent middleware never executes."
+            "text": "Short-circuit. Write the response, for example a 401 for failed authentication, and return without calling next(). All subsequent middleware is never reached."
           },
           {
             "role": "interviewer",
@@ -3704,7 +3704,7 @@
           },
           {
             "role": "me",
-            "text": "Because each handler processes in sequence. If I put rate-limiting before auth, I count unauthenticated requests against a rate limit before rejecting them. Auth must come first."
+            "text": "Because each handler processes sequentially. If I register rate-limiting before authentication, I count unauthenticated requests against a quota before rejecting them. An attacker could exhaust legitimate users' rate limits. Authentication must always come first."
           },
           {
             "role": "interviewer",
@@ -3712,38 +3712,38 @@
           },
           {
             "role": "me",
-            "text": "Each IPipelineBehavior wraps the next one. The outermost runs first, calls next to pass to the next behaviour, and so on until the actual handler runs. Same shape as middleware."
+            "text": "Each IPipelineBehavior wraps the next one. The outermost behaviour runs first, calls next() to pass control inward, and so on until the actual handler runs. Structurally identical to the middleware pipeline."
           },
           {
             "role": "interviewer",
-            "text": "What happens if a request falls through the entire chain unhandled?"
+            "text": "What happens if a request falls all the way through the chain with no middleware writing a response?"
           },
           {
             "role": "me",
-            "text": "In middleware it hits the end with no response written â€” you'd get a 200 with no body or an exception. I'd always have terminal middleware or a fallback handler to catch that."
+            "text": "The client receives an empty 200 or a connection close with no body, which is confusing and incorrect. I always have a terminal handler or fallback middleware at the end to catch unhandled requests and return a proper 404 or 400."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "Where does ASP.NET Core use this pattern?",
-            "a": "The middleware pipeline â€” each component handles or calls next()."
+            "a": "The middleware pipeline. Each component handles the request or calls next()."
           },
           {
             "q": "How does short-circuiting work?",
-            "a": "A handler writes the response and returns without calling next() â€” remaining middleware never runs."
+            "a": "A handler writes the response and returns without calling next(). Remaining middleware never runs."
           },
           {
             "q": "How do MediatR behaviours relate?",
-            "a": "They form a chain around the handler, each calling next() to pass to the inner layer.",
+            "a": "They form a chain around the handler, each calling next() to pass control to the inner layer.",
             "relatedId": "architecture-dp-011"
           },
           {
-            "q": "What's the key risk?",
-            "a": "Requests falling through unhandled, or ordering mistakes exposing the wrong behaviour."
+            "q": "What is the key risk?",
+            "a": "Requests falling through unhandled, or handlers registered in the wrong order."
           }
         ]
       }
@@ -3756,24 +3756,24 @@
       "freq": "high",
       "tags": ["dependency-injection", "ioc", "dip", "lifetimes", "enterprise"],
       "answer": {
-        "oneLiner": "Dependency Injection is a pattern where a class receives its dependencies from outside rather than newing them up internally â€” the practical realisation of the Dependency Inversion Principle.",
+        "oneLiner": "Dependency Injection is a pattern where a class receives its dependencies from outside rather than creating them internally. It is the practical realisation of the Dependency Inversion Principle.",
         "keyPoints": [
-          "DI is a pattern, not a framework: hand-wiring constructors is still DI â€” the container just automates graph resolution.",
-          "Three lifetimes: Transient (new per resolution), Scoped (one per request), Singleton (one per app).",
-          "Captive dependency: a Singleton holding a Scoped service keeps it alive for the app's lifetime â€” stale and non-thread-safe.",
-          "Service Locator is the anti-pattern: pulling from the container inside a class hides dependencies and kills testability."
+          "DI is a pattern, not a framework. Hand-wiring constructors is still DI. The container automates graph resolution, nothing more.",
+          "Three lifetimes: Transient (new instance per resolution), Scoped (one per request), Singleton (one per application lifetime).",
+          "Captive dependency: a Singleton holding a Scoped service captures it for the application lifetime, making it stale and non-thread-safe.",
+          "Service Locator is the anti-pattern: pulling from the container inside a class hides its dependencies and kills testability."
         ],
-        "detail": "Dependencies are declared as constructor parameters. The composition root wires them at startup. The container automates the graph, but the pattern is just constructor injection â€” you could do it without a container at all.",
+        "detail": "Dependencies are declared as constructor parameters. The composition root wires them at startup. The container automates the graph, but the underlying pattern is just constructor injection. You could do it by hand without any framework.",
         "code": {
           "lang": "csharp",
-          "snippet": "// BAD: Service Locator â€” hidden dependency, kills testability\npublic class OrderService {\n    public void Place() {\n        var repo = ServiceLocator.Get<IOrderRepository>(); // hidden dep\n    }\n}\n\n// GOOD: Constructor injection â€” explicit, injectable, testable\npublic class OrderService {\n    private readonly IOrderRepository _repo;\n    private readonly ILogger<OrderService> _log;\n    public OrderService(IOrderRepository repo, ILogger<OrderService> log) =>\n        (_repo, _log) = (repo, log);\n}\n// Composition root â€” wired once\nservices.AddScoped<IOrderRepository, EfOrderRepository>();\nservices.AddSingleton<IClock, SystemClock>();\nservices.AddTransient<IEmailSender, SmtpEmailSender>();",
-          "note": "Constructor makes dependencies explicit and injectable. Service Locator hides them â€” never use it inside classes."
+          "snippet": "// BAD: Service Locator -- hidden dependency, untestable\npublic class OrderService {\n    public void Place(OrderRequest req) {\n        var repo = ServiceLocator.Get<IOrderRepository>(); // invisible dep\n    }\n}\n\n// GOOD: Constructor injection -- explicit, injectable, testable\npublic class OrderService {\n    private readonly IOrderRepository _repo;\n    private readonly ILogger<OrderService> _log;\n    public OrderService(IOrderRepository repo, ILogger<OrderService> log) =>\n        (_repo, _log) = (repo, log);\n}\n// Composition root -- wired once at startup\nservices.AddScoped<IOrderRepository, EfOrderRepository>();\nservices.AddSingleton<IClock, SystemClock>();\nservices.AddTransient<IEmailSender, SmtpEmailSender>();",
+          "note": "Constructor makes dependencies explicit and testable. Service Locator hides them. Always prefer constructor injection."
         },
-        "analogy": "Constructor injection. Dependencies declared, not hidden. Always.",
+        "analogy": "Name your dependencies. Hide nothing. Test everything.",
         "redFlags": [
-          "Saying DI is 'just the .NET container' â€” it's a pattern you can do without any container at all.",
+          "Saying DI is 'just the .NET container'. It is a pattern you can apply with hand-wired constructors and no framework.",
           "Using Service Locator inside classes as a substitute for proper constructor injection.",
-          "Injecting Scoped into Singleton â€” the captive dependency that causes stale, non-thread-safe state."
+          "Injecting a Scoped service into a Singleton (captive dependency causing stale, non-thread-safe state)."
         ],
         "dialogue": [
           {
@@ -3782,62 +3782,62 @@
           },
           {
             "role": "me",
-            "text": "It's a genuine pattern â€” supplying dependencies from outside instead of newing them internally. The container automates it, but I could hand-wire constructors and still be doing DI. It's how I apply the Dependency Inversion Principle."
+            "text": "It is a genuine design pattern. The core idea is: supply a class's dependencies from outside rather than having it create them. The container automates graph resolution, but I could hand-wire constructors in a composition root and still be doing DI with no framework at all."
           },
           {
             "role": "interviewer",
-            "text": "What IS the Dependency Inversion Principle?"
+            "text": "What is the Dependency Inversion Principle and how does DI realise it?"
           },
           {
             "role": "me",
-            "text": "High-level modules depend on abstractions, not concretions. DI makes it practical â€” OrderService injects IOrderRepository, not EfOrderRepository. I can swap the implementation without touching the consumer."
+            "text": "High-level modules should depend on abstractions, not on concretions. DI makes this practical. OrderService declares IOrderRepository in its constructor, not EfOrderRepository. I can swap the implementation without touching the consumer."
           },
           {
             "role": "interviewer",
-            "text": "You register a Singleton that injects a DbContext. What goes wrong?"
+            "text": "A developer registers a Singleton service that takes a DbContext in its constructor. What goes wrong?"
           },
           {
             "role": "me",
-            "text": "Captive dependency â€” the Singleton captures the Scoped DbContext for the app's lifetime. Reused across requests, not thread-safe, goes stale. I'd inject IServiceScopeFactory and create a scope per operation."
+            "text": "Captive dependency. The Singleton captures the Scoped DbContext for the application lifetime. It is reused across requests, is not thread-safe, and eventually becomes stale. I would inject IServiceScopeFactory instead and create a scope per operation."
           },
           {
             "role": "interviewer",
-            "text": "What's the anti-pattern people reach for instead of proper injection?"
+            "text": "What is the anti-pattern people reach for that looks like DI but is not?"
           },
           {
             "role": "me",
-            "text": "Service Locator â€” pulling from the container inside the class. It hides what the class needs, makes testing harder, and couples the class to the container. Explicit constructor injection always wins."
+            "text": "Service Locator. Pulling from the container inside the class. It hides what the class needs from its constructor signature, makes testing require a real container, and couples the class to the DI framework itself."
           },
           {
             "role": "interviewer",
-            "text": "When would you use Transient vs Scoped vs Singleton?"
+            "text": "When would you choose Transient vs Scoped vs Singleton?"
           },
           {
             "role": "me",
-            "text": "Singleton for shared stateless services like IClock. Scoped for per-request things like DbContext or the current user context. Transient for lightweight stateless services where sharing across a request would cause issues."
+            "text": "Singleton for stateless shared services like IClock or IConfiguration. Scoped for per-request things like DbContext or the current user context that must be created fresh per request. Transient for lightweight, stateless services where sharing across a request would cause problems."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "DI vs Service Locator?",
-            "a": "DI passes dependencies explicitly via constructor; Service Locator hides them by resolving from the container internally."
+            "a": "DI passes dependencies explicitly via constructor. Service Locator hides them by resolving from the container inside the class."
           },
           {
             "q": "What are the three lifetimes?",
-            "a": "Transient per resolution, Scoped per request/scope, Singleton once per application."
+            "a": "Transient per resolution, Scoped per request, Singleton once per application."
           },
           {
             "q": "What is a captive dependency?",
-            "a": "A longer-lived service holding a shorter-lived one â€” e.g. Scoped DbContext inside a Singleton.",
+            "a": "A longer-lived service holding a shorter-lived one, for example a Scoped DbContext inside a Singleton.",
             "relatedId": "architecture-dp-001"
           },
           {
             "q": "How does DI relate to SOLID?",
-            "a": "It's the practical realisation of the Dependency Inversion Principle â€” depend on abstractions, passed in from outside.",
+            "a": "It is the practical realisation of the Dependency Inversion Principle: depend on abstractions supplied from outside.",
             "relatedId": "architecture-patterns-001"
           }
         ]
@@ -3851,57 +3851,57 @@
       "freq": "medium",
       "tags": ["options-pattern", "configuration", "enterprise", "ioptions", "validation"],
       "answer": {
-        "oneLiner": "The Options pattern binds configuration sections to strongly-typed classes injected via IOptions<T>, replacing raw string key lookups with type-safe, validated objects.",
+        "oneLiner": "The Options pattern binds configuration sections to strongly typed, validated classes injected via IOptions<T>, replacing raw string key lookups with type-safe objects that fail fast at startup.",
         "keyPoints": [
-          "`ValidateDataAnnotations().ValidateOnStart()` causes the app to refuse to start on bad config â€” fail fast, not mid-request.",
-          "Three interfaces: `IOptions<T>` (singleton snapshot), `IOptionsSnapshot<T>` (per-request fresh value), `IOptionsMonitor<T>` (live change notifications for background services).",
-          "Consumers depend only on the settings class they need â€” not the entire IConfiguration (Interface Segregation).",
-          "Injecting IConfiguration with string keys everywhere is the anti-pattern: stringly-typed, typo-prone, and unchecked."
+          "ValidateDataAnnotations().ValidateOnStart() causes the application to refuse to start on invalid config, not fail mid-request.",
+          "Three interfaces: IOptions<T> (singleton snapshot), IOptionsSnapshot<T> (per-request fresh value), IOptionsMonitor<T> (live change notifications for background services).",
+          "Consumers depend only on the settings class they need, not on the entire IConfiguration. This is Interface Segregation in practice.",
+          "Injecting IConfiguration with magic string keys is the anti-pattern: stringly typed, typo-prone, and validated only at the call site if at all."
         ],
-        "detail": "`services.AddOptions<T>().Bind(section)` sets up binding at startup. `IOptions<T>.Value` returns the bound object. `IOptionsSnapshot<T>` re-binds per request scope; `IOptionsMonitor<T>` pushes change notifications as config reloads.",
+        "detail": "services.AddOptions<T>().Bind(section) sets up binding at startup. IOptions<T>.Value returns the bound object. IOptionsSnapshot re-binds per request scope. IOptionsMonitor pushes change notifications as config reloads at runtime.",
         "code": {
           "lang": "csharp",
-          "snippet": "// BAD: stringly-typed, unchecked, spread across the app\nvar host = _config[\"Email:SmtpHost\"]; // typo? null. Wrong type? runtime fail.\n\n// GOOD: Options pattern â€” typed, validated, fail-fast\npublic class EmailOptions {\n    [Required] public string SmtpHost { get; set; } = \"\";\n    [Range(1, 65535)] public int Port { get; set; }\n}\nservices.AddOptions<EmailOptions>()\n    .Bind(builder.Configuration.GetSection(\"Email\"))\n    .ValidateDataAnnotations()\n    .ValidateOnStart(); // app refuses to start with bad config\n\npublic class EmailSender(IOptions<EmailOptions> opts) {\n    private readonly EmailOptions _cfg = opts.Value;\n}",
-          "note": "Config is bound to a typed class, validated at startup, and injected. No raw string lookups in consumers."
+          "snippet": "// BAD: stringly typed, unchecked, spread across the whole application\nvar host = _config[\"Email:SmtpHost\"]; // typo? returns null silently.\n\n// GOOD: Options pattern -- typed, validated, fail-fast\npublic class EmailOptions {\n    [Required] public string SmtpHost { get; set; } = \"\";\n    [Range(1, 65535)] public int Port { get; set; }\n}\nservices.AddOptions<EmailOptions>()\n    .Bind(builder.Configuration.GetSection(\"Email\"))\n    .ValidateDataAnnotations()\n    .ValidateOnStart(); // refuses to start with bad config\n\npublic class EmailSender(IOptions<EmailOptions> opts) {\n    private readonly EmailOptions _cfg = opts.Value;\n}",
+          "note": "Config is bound to a typed class, validated at startup, and injected. No raw string lookups reach any consumer."
         },
-        "analogy": "Bad config should crash startup, not a customer's request.",
+        "analogy": "Invalid config kills a startup, not a customer's request.",
         "redFlags": [
-          "Injecting IConfiguration everywhere and reading magic string keys â€” stringly-typed and unchecked.",
-          "Not calling ValidateOnStart â€” a bad value fails deep in a request instead of at startup.",
-          "Using IOptions<T> when you need live config reload â€” should be IOptionsSnapshot or IOptionsMonitor."
+          "Injecting IConfiguration everywhere and reading config with string keys. Stringly typed and completely unchecked.",
+          "Not calling ValidateOnStart. A bad value fails deep inside a customer request instead of at startup.",
+          "Using IOptions<T> when you need live reload. Use IOptionsSnapshot per-request or IOptionsMonitor for background services."
         ],
         "dialogue": [
           {
             "role": "interviewer",
-            "text": "Across the app, classes read IConfiguration[\"Email:SmtpHost\"] directly. What's wrong and how do you fix it?"
+            "text": "Across the application, classes are reading configuration with lines like _config[\"Email:SmtpHost\"]. What is wrong with this approach?"
           },
           {
             "role": "me",
-            "text": "It's stringly-typed and unchecked â€” a typo compiles fine but returns null at runtime, and a missing value fails deep in a request. I'd use the Options pattern: bind the Email section to a typed EmailOptions class."
+            "text": "It is stringly typed and completely unchecked. A typo in the key compiles fine but returns null at runtime. A missing or misformatted value fails deep inside a request when the email is first attempted, not when the application starts."
           },
           {
             "role": "interviewer",
-            "text": "Walk me through the setup."
+            "text": "Walk me through how you would fix this with the Options pattern."
           },
           {
             "role": "me",
-            "text": "AddOptions<EmailOptions>().Bind(config.GetSection(\"Email\")).ValidateDataAnnotations().ValidateOnStart(). Consumers inject IOptions<EmailOptions> and get a fully typed object."
+            "text": "I create a typed EmailOptions class with SmtpHost and Port as properties. Then I call AddOptions<EmailOptions>().Bind(config.GetSection(\"Email\")).ValidateDataAnnotations().ValidateOnStart(). Consumers inject IOptions<EmailOptions> and access the typed object."
           },
           {
             "role": "interviewer",
-            "text": "How do you make sure a missing SMTP host fails at startup, not during the first email send?"
+            "text": "How do you ensure a missing SMTP host fails at startup rather than at the point of the first email send?"
           },
           {
             "role": "me",
-            "text": "Annotate SmtpHost with [Required] and Port with [Range(1,65535)], then call ValidateOnStart(). The app refuses to start with invalid config â€” fail fast, not mid-customer-request."
+            "text": "Annotate SmtpHost with [Required] and call ValidateOnStart(). The application refuses to start if validation fails. The problem surfaces during deployment, not during a customer interaction."
           },
           {
             "role": "interviewer",
-            "text": "What if the SMTP config changes at runtime without restarting?"
+            "text": "What if the SMTP configuration changes at runtime without restarting the application?"
           },
           {
             "role": "me",
-            "text": "Switch from IOptions â€” which is a fixed singleton snapshot â€” to IOptionsSnapshot for a fresh value per request, or IOptionsMonitor if I'm in a background service and need to react to changes as they happen."
+            "text": "Switch from IOptions which is a singleton snapshot to IOptionsSnapshot for a fresh value per request, or IOptionsMonitor if I am in a background service and need to be notified of changes as they happen."
           },
           {
             "role": "interviewer",
@@ -3909,25 +3909,25 @@
           },
           {
             "role": "me",
-            "text": "Consumers depend on the specific settings class they need â€” not the entire IConfiguration. EmailSender gets only SmtpHost and Port, nothing else. That's ISP in practice."
+            "text": "Consumers depend on the specific settings class they need, not on the entire IConfiguration tree. EmailSender gets only SmtpHost and Port. It has no visibility into database connection strings or feature flags. Each class declares exactly the configuration it requires."
           },
           {
             "role": "interviewer",
-            "text": "Perfect. That's exactly the depth I was looking for. âœ…"
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
           }
         ],
         "followUpsQA": [
           {
             "q": "IOptions vs IOptionsSnapshot vs IOptionsMonitor?",
-            "a": "IOptions is a singleton snapshot; IOptionsSnapshot reloads per request; IOptionsMonitor pushes live changes."
+            "a": "IOptions is a singleton snapshot. IOptionsSnapshot reloads per request. IOptionsMonitor pushes live changes."
           },
           {
-            "q": "Why prefer it over injecting IConfiguration?",
-            "a": "Type safety, validation, and consumers depend only on the settings they need (Interface Segregation)."
+            "q": "Why prefer Options over injecting IConfiguration?",
+            "a": "Type safety, startup validation, and consumers depend only on the settings they need (Interface Segregation)."
           },
           {
-            "q": "How do you fail fast on bad config?",
-            "a": "ValidateDataAnnotations().ValidateOnStart() so startup fails on invalid or missing values."
+            "q": "How do you fail fast on bad configuration?",
+            "a": "ValidateDataAnnotations().ValidateOnStart() so the application refuses to start on invalid values."
           },
           {
             "q": "How does it relate to DI/DIP?",
