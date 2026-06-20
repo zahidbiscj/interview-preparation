@@ -188,46 +188,57 @@ Pairs naturally with CQRS (events feed projections) but **doesn't require** it.
 
 ## Design Patterns (GoF & Enterprise) — Quick Map
 
+> **Interview format:** Definition → Under the hood → Never miss → Closing line → Code → Red flags → Follow-ups → Simulation.
+
 ### Creational (how objects are made)
 
-| Pattern | Intent (one line) | .NET reality / when |
-|---|---|---|
-| **Singleton** | Exactly one instance, global access | Prefer `AddSingleton<T>()` (injectable, testable) over static. Hand-rolled: `Lazy<T>` for thread-safe init. Must be thread-safe. |
-| **Factory Method** | Create **one** product, defer the concrete choice | `Create(channel)` returns the right `INotification`. In DI: keyed services / `Func<T>`. |
-| **Abstract Factory** | Create a **family** of related products that stay consistent | `IUiFactory` → matching dark/light button + checkbox. |
-| **Builder** | Assemble a complex object step-by-step (fluent) | `WebApplication.CreateBuilder`, `StringBuilder`; use over telescoping ctors / when steps need validation. |
-| **Prototype** | Create by **cloning** a configured instance | Records `with` expression (shallow!); deep-clone mutable members explicitly. |
+| Pattern | Definition (one sentence) | Never miss | Closing line |
+|---|---|---|---|
+| **Singleton** | One instance, global access — prefer `AddSingleton<T>()` over static. | `Lazy<T>` for thread-safe init; web app = must be thread-safe; captive dep if Scoped injected into Singleton. | *DI singleton: same guarantee, zero global coupling.* |
+| **Factory Method** | Creates ONE product, deferring the concrete choice to a method. | "One product" not "a family"; in .NET use keyed DI / `Func<T>` over class hierarchies. | *Factory Method: one product. Abstract Factory: a matched family.* |
+| **Abstract Factory** | Creates a FAMILY of related products guaranteed to be consistent. | One concrete factory makes all members of the set — mixing is impossible by design. | *Factory Method: one product. Abstract Factory: a matched family.* |
+| **Builder** | Assembles a complex object step-by-step via a fluent API. | `Build()` is the single validation choke-point; object initializers cover simple cases. | *Build() is where validation lives — not scattered across setters.* |
+| **Prototype** | Creates by cloning a configured instance instead of rebuilding. | `with` on records is **shallow** — deep-clone mutable reference members explicitly. | *`with` is shallow — always deep-clone the mutable parts.* |
 
 ### Structural (how objects are composed)
 
-| Pattern | Intent | Key distinction / .NET use |
-|---|---|---|
-| **Adapter** | Convert one interface into the one the client expects | Wrap a vendor SDK (Stripe) behind your `IPaymentGateway`; lives in Infrastructure. |
-| **Facade** | One simple entry point over a complex subsystem | `CheckoutFacade.PlaceOrderAsync` hides inventory/payment/shipping. **Simplifies** (vs Adapter = converts). |
-| **Decorator** | Wrap to **add behaviour**, same interface | Caching/logging/retry wrappers; Scrutor `.Decorate<T>()`; MediatR behaviours. Beats inheritance (composes at runtime, no class explosion). |
-| **Proxy** | Stand-in that **controls access** | EF lazy-loading proxies (N+1!), gRPC/HTTP clients, virtual/protection/remote/caching. **Controls access** (vs Decorator = adds behaviour). |
+| Pattern | Definition | Never miss | Closing line |
+|---|---|---|---|
+| **Adapter** | Converts one interface into the one the client expects. | Lives in Infrastructure; no business logic inside — pure translation only. | *Adapter: vendor in, your interface out. Domain stays clean.* |
+| **Facade** | One simplified entry point over a complex subsystem. | Delegates, never decides — accumulating logic turns it into a god class. | *Facade delegates. The moment it decides, it's a god class.* |
+| **Decorator** | Wraps an object with the same interface to add behaviour at runtime. | Order matters; Scrutor `.Decorate<T>()`; MediatR pipeline behaviours ARE decorators. | *Compose behaviour at runtime. Never subclass for features.* |
+| **Proxy** | Stand-in that controls access to the real object. | Decorator adds behaviour; Proxy controls access — EF lazy-loading = N+1 risk. | *Decorator adds behaviour. Proxy controls whether you get there.* |
 
 ### Behavioral (how objects interact)
 
-| Pattern | Intent | .NET use / note |
-|---|---|---|
-| **Strategy** | Interchangeable algorithms behind one interface | **Replaces the growing if/switch** (payment providers, pricing). Select via keyed DI / dictionary. Open/Closed. |
-| **Observer** | One-to-many auto-notification | C# `event` (built-in); `IObservable<T>`/Rx for streams; MediatR `INotification`. Watch the lapsed-listener leak (`-=`). |
-| **Mediator** | Components talk through a hub, not each other | **MediatR** `Send` → handler; pipeline behaviours for cross-cutting. MediatR ≠ CQRS. |
-| **Command** | Encapsulate a request as an object | Enables queue/log/retry/undo. MediatR commands, WPF `ICommand`, job payloads. (vs Strategy = swap algorithm.) |
-| **Template Method** | Fix the algorithm skeleton, override the steps | Import/ETL pipelines via inheritance + hook methods. Inheritance (compile-time) vs Strategy (composition, runtime). |
-| **Chain of Responsibility** | Pass request along handlers until one handles it | **ASP.NET Core middleware** (`next()` / short-circuit), MediatR behaviours, `DelegatingHandler`, approval flows. |
+| Pattern | Definition | Never miss | Closing line |
+|---|---|---|---|
+| **Strategy** | Family of interchangeable algorithms behind one interface, selected at runtime. | Keyed DI services kill the switch; Open/Closed — new variant = new class only. | *New payment provider = new class. The switch is gone forever.* |
+| **Observer** | Subject notifies many subscribers automatically when state changes. | C# `event` is multicast delegate; lapsed-listener leak if no `-=`; MediatR `INotification` is Observer. | *Subscribe with `+=`. Always unsubscribe with `-=`. Or leak memory.* |
+| **Mediator** | Components talk through a hub, not directly to each other. | MediatR ≠ CQRS; `IRequest` = one handler; `INotification` = many (Observer); pipeline behaviours = Decorator. | *Controllers send requests. Handlers handle them. Neither knows the other.* |
+| **Command** | Encapsulates a request as an object enabling queue, log, retry, undo. | Command = request + data (storable/undoable); Strategy = swappable algorithm. | *A command is a request you can save, queue, and undo.* |
+| **Template Method** | Fixes algorithm skeleton in base class; subclasses override specific steps. | Template method itself must not be overridable; hook methods have defaults; Strategy preferred for runtime variation. | *Skeleton fixed in the base. Steps filled in by subclasses.* |
+| **Chain of Responsibility** | Passes request along a chain; each handler handles or passes to next. | ASP.NET Core middleware IS this pattern; short-circuit = don't call `next()`; ordering is critical. | *Call next() or stop. Each handler decides its own fate.* |
 
 ### Enterprise / .NET
 
-| Pattern | Intent | Note |
-|---|---|---|
-| **Repository + Unit of Work** | Collection-like data abstraction + atomic commit | `DbContext` *is* UoW, `DbSet` *is* a repo — often redundant on EF Core (see `patterns` Qs). |
-| **CQRS** | Separate read model from write model | Reads bypass domain → DTO; writes run full validation (see `patterns` Qs). |
-| **Dependency Injection** | Supply dependencies from outside (DIP in practice) | A pattern, not just the container. Lifetimes: Transient/Scoped/Singleton. Avoid captive deps (Scoped in Singleton) & Service Locator. |
-| **Options pattern** | Bind config to validated, strongly-typed classes | `IOptions` (snapshot) / `IOptionsSnapshot` (per-request) / `IOptionsMonitor` (live). `ValidateOnStart()` to fail fast vs raw `IConfiguration`. |
+| Pattern | Definition | Never miss | Closing line |
+|---|---|---|---|
+| **Dependency Injection** | Class receives dependencies from outside — practical realisation of DIP. | It's a pattern (not a framework); 3 lifetimes; Service Locator is the anti-pattern; captive dep = Scoped in Singleton. | *Constructor injection. Dependencies declared, not hidden. Always.* |
+| **Options pattern** | Binds config sections to typed classes injected via `IOptions<T>`. | `ValidateOnStart()` fails fast; `IOptionsSnapshot` per-request; `IOptionsMonitor` live-reload for background services. | *Bad config should crash startup, not a customer's request.* |
 
-**Pairs interviewers love to contrast:** Factory Method vs Abstract Factory (one vs family) · Adapter vs Facade (convert vs simplify) · Decorator vs Proxy (add behaviour vs control access) · Strategy vs Command (swap algorithm vs encapsulate request) · Strategy vs Template Method (composition/runtime vs inheritance/compile-time).
+---
+
+### Contrast pairs interviewers love
+
+| Pair | Key distinction |
+|---|---|
+| Factory Method vs Abstract Factory | One product vs a matched family |
+| Adapter vs Facade | Convert an interface vs simplify a subsystem |
+| Decorator vs Proxy | Add behaviour vs control access |
+| Strategy vs Command | Swap algorithm vs encapsulate a request+data |
+| Strategy vs Template Method | Composition/runtime vs inheritance/compile-time |
+| Observer vs Mediator | Direct fan-out vs hub-routed communication |
 
 ---
 
