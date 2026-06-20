@@ -74,23 +74,20 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
           @if (state() === 'full') {
             <div class="full-answer fade-slide-enter">
 
-              @if (q().answer.dialogue?.length) {
+              <!-- 🔹 Under the Hood -->
+              @if (q().answer.detail) {
                 <section class="answer-section">
-                  <h4 class="section-title">💬 DIALOGUE</h4>
-                  <div class="dialogue">
-                    @for (turn of q().answer.dialogue!; track $index) {
-                      <div class="turn turn-{{ turn.role }}">
-                        <span class="turn-who">{{ turn.role === 'interviewer' ? 'Interviewer' : 'Me' }}</span>
-                        <div class="turn-text md-content"><markdown [data]="turn.text" /></div>
-                      </div>
-                    }
+                  <h4 class="section-title">🔹 UNDER THE HOOD</h4>
+                  <div class="md-content">
+                    <markdown [data]="q().answer.detail!" />
                   </div>
                 </section>
               }
 
+              <!-- 🔹 Never Miss These Points -->
               @if (q().answer.keyPoints?.length) {
                 <section class="answer-section">
-                  <h4 class="section-title">KEY POINTS</h4>
+                  <h4 class="section-title">🔹 NEVER MISS THESE POINTS</h4>
                   <ul class="key-points">
                     @for (pt of q().answer.keyPoints!; track $index) {
                       <li class="md-content"><markdown [data]="pt" /></li>
@@ -99,15 +96,17 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
                 </section>
               }
 
-              @if (q().answer.detail) {
-                <section class="answer-section">
-                  <h4 class="section-title">DEEP DIVE</h4>
-                  <div class="md-content">
-                    <markdown [data]="q().answer.detail!" />
+              <!-- 🔹 Closing Line -->
+              @if (q().answer.analogy) {
+                <section class="answer-section closing-line-section">
+                  <h4 class="section-title">🔹 CLOSING LINE</h4>
+                  <div class="md-content closing-line-text">
+                    <markdown [data]="q().answer.analogy!" />
                   </div>
                 </section>
               }
 
+              <!-- 💻 Code -->
               @if (q().answer.code && !isPredict()) {
                 <section class="answer-section">
                   <div class="code-block">
@@ -123,18 +122,22 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
                 <p class="code-note">📤 {{ q().answer.code!.note }}</p>
               }
 
-              @if (q().answer.analogy) {
-                <section class="answer-section analogy-section">
-                  <h4 class="section-title">💡 ANALOGY</h4>
-                  <div class="md-content">
-                    <markdown [data]="q().answer.analogy!" />
-                  </div>
+              <!-- 🚩 Red Flags -->
+              @if (q().answer.redFlags?.length) {
+                <section class="answer-section red-flags-section">
+                  <h4 class="section-title">🚩 RED FLAGS</h4>
+                  <ul class="red-flags-list">
+                    @for (rf of q().answer.redFlags!; track $index) {
+                      <li>✗ {{ rf }}</li>
+                    }
+                  </ul>
                 </section>
               }
 
+              <!-- ❓ Follow-up Questions -->
               @if (q().answer.followUpsQA?.length) {
                 <section class="answer-section">
-                  <h4 class="section-title">📌 FOLLOW-UP QUESTIONS</h4>
+                  <h4 class="section-title">❓ FOLLOW-UP QUESTIONS</h4>
                   <ul class="followqa-list">
                     @for (fu of q().answer.followUpsQA!; track $index) {
                       <li class="followqa">
@@ -153,7 +156,7 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
                 </section>
               } @else if (q().answer.followUps?.length) {
                 <section class="answer-section">
-                  <h4 class="section-title">➡ COMMON FOLLOW-UPS</h4>
+                  <h4 class="section-title">❓ FOLLOW-UP QUESTIONS</h4>
                   <ul class="followup-list">
                     @for (fu of q().answer.followUps!; track $index) {
                       <li>→ {{ fu }}</li>
@@ -162,14 +165,18 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
                 </section>
               }
 
-              @if (q().answer.redFlags?.length) {
-                <section class="answer-section red-flags-section">
-                  <h4 class="section-title">🚩 RED FLAGS</h4>
-                  <ul class="red-flags-list">
-                    @for (rf of q().answer.redFlags!; track $index) {
-                      <li>✗ {{ rf }}</li>
+              <!-- 💬 Interview Simulation (Part 2) -->
+              @if (q().answer.dialogue?.length) {
+                <section class="answer-section simulation-section">
+                  <h4 class="section-title">💬 INTERVIEW SIMULATION</h4>
+                  <div class="dialogue">
+                    @for (turn of q().answer.dialogue!; track $index) {
+                      <div class="turn turn-{{ turn.role }}">
+                        <span class="turn-who">{{ turn.role === 'interviewer' ? 'Interviewer' : 'You' }}</span>
+                        <div class="turn-text md-content"><markdown [data]="turn.text" /></div>
+                      </div>
                     }
-                  </ul>
+                  </div>
                 </section>
               }
 
@@ -359,11 +366,24 @@ type RevealState = 'collapsed' | 'one-liner' | 'full';
       font-style: italic;
     }
 
-    .analogy-section {
-      background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
-      border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+    .closing-line-section {
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+      border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
       border-radius: 6px;
-      padding: 10px 12px;
+      padding: 10px 14px;
+    }
+
+    .closing-line-text {
+      font-size: 0.92em;
+      font-style: italic;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .simulation-section {
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      margin-top: 4px;
     }
 
     .followup-list {
