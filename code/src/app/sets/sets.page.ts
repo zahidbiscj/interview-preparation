@@ -2,7 +2,7 @@ import {
   ChangeDetectionStrategy, Component, computed, inject, OnInit, signal
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { QuestionBankService } from '../question-bank/question-bank.service';
 import { QuestionView, QuestionType } from '../question-bank/models/question-bank.models';
 import { QuestionCardComponent } from '../question-bank/components/question-card/question-card.component';
@@ -530,6 +530,7 @@ type Mode = 'add' | 'review';
 export class SetsPage implements OnInit {
   svc = inject(QuestionBankService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   readonly isDark = this.svc.isDark;
   readonly sets = this.svc.sets;
@@ -606,9 +607,14 @@ export class SetsPage implements OnInit {
     this.allQuestions.set(await this.svc.buildPool([], []));
     this.loading.set(false);
 
-    // open the first set by default if one exists
-    const first = this.sets()[0];
-    if (first) this.activeSetId.set(first.id);
+    // open set from URL ?set=<id>, fall back to first
+    const paramId = this.route.snapshot.queryParamMap.get('set');
+    const target = paramId ? this.sets().find(s => s.id === paramId) : null;
+    const id = target?.id ?? this.sets()[0]?.id ?? null;
+    if (id) {
+      this.activeSetId.set(id);
+      this.router.navigate([], { queryParams: { set: id }, replaceUrl: true });
+    }
   }
 
   createSet(): void {
@@ -617,11 +623,13 @@ export class SetsPage implements OnInit {
     const id = this.svc.createSet(name);
     this.newSetName.set('');
     this.activeSetId.set(id);
+    this.router.navigate([], { queryParams: { set: id }, replaceUrl: true });
     this.mode.set('add');
   }
 
   selectSet(id: string): void {
     this.activeSetId.set(id);
+    this.router.navigate([], { queryParams: { set: id }, replaceUrl: true });
   }
 
   startRename(set: { id: string; name: string }, e: Event): void {

@@ -6,7 +6,7 @@
       "icon": "🔷",
       "file": "csharp.json",
       "order": 1,
-      "count": 133
+      "count": 141
     },
     {
       "id": "aspnet",
@@ -14,7 +14,7 @@
       "icon": "🌐",
       "file": "aspnet.json",
       "order": 2,
-      "count": 48
+      "count": 54
     },
     {
       "id": "efcore",
@@ -22,7 +22,7 @@
       "icon": "🗃️",
       "file": "efcore.json",
       "order": 3,
-      "count": 33
+      "count": 36
     },
     {
       "id": "sql",
@@ -30,7 +30,7 @@
       "icon": "🗄️",
       "file": "sql.json",
       "order": 4,
-      "count": 26
+      "count": 33
     },
     {
       "id": "angular",
@@ -54,7 +54,7 @@
       "icon": "☁️",
       "file": "azure.json",
       "order": 7,
-      "count": 63
+      "count": 64
     },
     {
       "id": "security",

@@ -1114,6 +1114,328 @@
               }
             ]
           }
+        },
+        {
+          "id": "sql-queries-015",
+          "q": "What is the difference between a View and an Index in SQL Server?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["view", "index", "performance", "stored query", "B-tree"],
+          "answer": {
+            "oneLiner": "A View is a saved SELECT statement — a logical layer that makes a complex query look like a table. An Index is a physical data structure (B-tree or hash) that the engine uses to find rows faster without scanning the whole table. They solve completely different problems.",
+            "keyPoints": [
+              "A View stores the query definition, not the data. Every time you query the view, the underlying SELECT runs against the base tables.",
+              "An Index stores a sorted copy of one or more columns with pointers to the full rows. The query optimizer decides when to use it.",
+              "An Indexed View (materialized view) bridges the two: you create a unique clustered index on a view, and SQL Server stores the pre-computed result set on disk — great for aggregate-heavy dashboards.",
+              "Use a view for code reuse and security (grant SELECT on the view, not the tables). Use an index to speed up WHERE, JOIN, and ORDER BY operations."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- View: saved SELECT, no stored data\nCREATE VIEW vw_ActiveOrders AS\nSELECT o.OrderId, c.Name, o.Total\nFROM Orders o JOIN Customers c ON o.CustomerId = c.Id\nWHERE o.Status = 'Active';\n\n-- Query through the view (runs the SELECT each time)\nSELECT * FROM vw_ActiveOrders WHERE Total > 1000;\n\n-- Index: physical structure for faster lookup\nCREATE NONCLUSTERED INDEX IX_Orders_Status ON Orders(Status);\n\n-- Indexed (materialized) view\nCREATE UNIQUE CLUSTERED INDEX IX_vw ON vw_ActiveOrders(OrderId);",
+              "note": "Indexed views require SCHEMABINDING and strict SET options"
+            },
+            "redFlags": [
+              "Confusing a view with an index — they serve opposite purposes.",
+              "Not knowing that querying a regular view re-runs the underlying SELECT."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between a view and an index?"
+              },
+              {
+                "role": "me",
+                "text": "A view is a named SELECT — a reusable abstraction. It stores the query definition, not data. An index is a physical B-tree structure the optimizer uses to find rows faster. They're complementary: you might index a view to pre-compute its results."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is an indexed view?",
+                "a": "A view with a unique clustered index — SQL Server materializes the result on disk."
+              },
+              {
+                "q": "Can you always add an index to a view?",
+                "a": "Only if it uses SCHEMABINDING and meets strict requirements (no DISTINCT, TOP, OUTER JOIN, etc.)."
+              }
+            ]
+          }
+        },
+        {
+          "id": "sql-queries-016",
+          "q": "What is the difference between a Stored Procedure and a Function in SQL Server?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["stored procedure", "function", "TVF", "scalar", "SQL Server"],
+          "answer": {
+            "oneLiner": "A Stored Procedure is a named block of SQL that can do anything — DML, DDL, RETURN codes — but cannot be used inside a SELECT. A Function must return a value, cannot have side effects (no INSERT/UPDATE/DELETE on base tables in scalar/inline functions), and can be used inline in a query.",
+            "keyPoints": [
+              "Stored Procedures: called with EXEC, can return result sets, OUTPUT parameters, and a RETURN code. Can modify data, call other procedures, manage transactions, and use temporary tables.",
+              "Scalar Functions: return a single value and can be used anywhere an expression is valid (SELECT, WHERE). But scalar UDFs are notoriously slow — they execute once per row and cannot be parallelized in older SQL Server versions.",
+              "Inline Table-Valued Functions (iTVF): return a table and are expanded inline into the query plan like a parameterized view — fast and composable.",
+              "Multi-Statement Table-Valued Functions (mTVF): use BEGIN...END and build a table variable — less efficient because they block parallelism."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Stored Procedure (EXEC, can DML)\nCREATE PROCEDURE usp_CreateOrder @CustomerId INT\nAS BEGIN\n    INSERT INTO Orders(CustomerId) VALUES(@CustomerId);\n    RETURN @@ROWCOUNT;  -- RETURN code\nEND;\nEXEC usp_CreateOrder 5;\n\n-- Scalar Function (one value, usable in SELECT)\nCREATE FUNCTION dbo.GetDiscount(@Price DECIMAL)\nRETURNS DECIMAL\nAS BEGIN\n    RETURN @Price * 0.9;\nEND;\nSELECT dbo.GetDiscount(Price) FROM Products;\n\n-- Inline TVF (table result, fast, composable)\nCREATE FUNCTION dbo.GetOrdersByCustomer(@CustId INT)\nRETURNS TABLE AS RETURN\n    SELECT * FROM Orders WHERE CustomerId = @CustId;",
+              "note": "Prefer iTVF over scalar UDF for performance"
+            },
+            "redFlags": [
+              "Using a scalar UDF in a WHERE clause on millions of rows — catastrophic performance.",
+              "Thinking functions can modify base tables — scalar and inline TVFs cannot."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "When would you use a function instead of a stored procedure?"
+              },
+              {
+                "role": "me",
+                "text": "When I need the result inline in a SELECT or WHERE — functions are composable. A scalar UDF returns one value; an inline TVF returns a table and is as fast as a view. SPs can't be used inside a query but can do DML and manage transactions."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Why are scalar UDFs slow?",
+                "a": "They execute row-by-row and prevent parallelism in SQL Server versions before 2019."
+              },
+              {
+                "q": "What SQL Server 2019 improved for UDFs?",
+                "a": "Scalar UDF inlining — the optimizer can inline simple scalar UDFs into the query plan."
+              }
+            ]
+          }
+        },
+        {
+          "id": "sql-queries-017",
+          "q": "Can a SQL Server function return multiple values or result sets?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["function", "scalar", "TVF", "multiple return", "table-valued"],
+          "answer": {
+            "oneLiner": "A scalar function returns exactly one value. But a Table-Valued Function returns a table — which is effectively multiple rows and columns. That's the correct way to return multiple values from a function; a stored procedure can also return multiple result sets but it's not composable in a SELECT.",
+            "keyPoints": [
+              "Scalar functions (RETURNS scalar_type) return exactly one value — no more. If you need multiple pieces of data from a scalar function you must call it multiple times.",
+              "Inline Table-Valued Functions (RETURNS TABLE) return a result set you can SELECT from, JOIN on, or CROSS APPLY. This is the right way to return multiple rows/columns from a function.",
+              "Multi-Statement TVFs also return a table, but they are less performant because the optimizer can't look inside the block to optimize the plan.",
+              "A function cannot return multiple independent result sets the way a stored procedure can — it has one return value or one table result."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Scalar: one value only\nCREATE FUNCTION dbo.GetTax(@Amount DECIMAL)\nRETURNS DECIMAL AS\nBEGIN RETURN @Amount * 0.06; END;\n\n-- Inline TVF: multiple rows and columns\nCREATE FUNCTION dbo.GetTopProducts(@N INT)\nRETURNS TABLE AS RETURN\n    SELECT TOP (@N) Id, Name, Price\n    FROM Products\n    ORDER BY Price DESC;\n\n-- Usage — composable in any query\nSELECT * FROM dbo.GetTopProducts(10) WHERE Price > 100;",
+              "note": "TVFs are the idiomatic way to return multiple values from a SQL function"
+            },
+            "redFlags": [
+              "Thinking a scalar function can return multiple values — it cannot.",
+              "Using a multi-statement TVF where an inline TVF would work — performance difference is significant."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Can a SQL function return multiple values?"
+              },
+              {
+                "role": "me",
+                "text": "Not from a scalar function — that's always one value. If I need multiple values I'd use an inline Table-Valued Function, which returns a table. I can then SELECT from it, JOIN it, or CROSS APPLY it inside any query."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "CROSS APPLY vs OUTER APPLY with a TVF?",
+                "a": "CROSS APPLY: only rows where the TVF returns results. OUTER APPLY: all rows, NULLs when TVF returns nothing."
+              }
+            ]
+          }
+        },
+        {
+          "id": "sql-queries-018",
+          "q": "Write a query to return 0 when commission is NULL for an employee.",
+          "level": "junior",
+          "type": "code",
+          "freq": "high",
+          "tags": ["ISNULL", "COALESCE", "NULL", "NVL", "commission"],
+          "answer": {
+            "oneLiner": "Use ISNULL(Commission, 0) or COALESCE(Commission, 0). Both replace NULL with 0. COALESCE is ANSI-standard and accepts multiple fallback values; ISNULL is SQL Server-specific and slightly faster for a single fallback.",
+            "keyPoints": [
+              "ISNULL(expression, replacement): SQL Server-specific. Returns replacement if expression is NULL. Only two arguments.",
+              "COALESCE(expr1, expr2, ...): ANSI standard, works across databases. Returns the first non-NULL argument. Preferred for portability.",
+              "NULLIF(a, b) is the reverse: it returns NULL if a equals b, useful to avoid division by zero.",
+              "NULL arithmetic: any arithmetic with NULL yields NULL (5 + NULL = NULL), so replacing NULL before arithmetic is important."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- ISNULL (SQL Server-specific)\nSELECT EmployeeId, Name,\n       ISNULL(Commission, 0) AS Commission\nFROM Employees;\n\n-- COALESCE (ANSI standard, portable)\nSELECT EmployeeId, Name,\n       COALESCE(Commission, 0) AS Commission\nFROM Employees;\n\n-- Using in arithmetic (e.g., total pay)\nSELECT Name,\n       Salary + COALESCE(Commission, 0) AS TotalPay\nFROM Employees;",
+              "note": "COALESCE is preferred for cross-database portability"
+            },
+            "redFlags": [
+              "Using = NULL in a WHERE clause instead of IS NULL.",
+              "Forgetting that NULL + 1 = NULL without a null-replacement function."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you handle NULL commission in a salary calculation?"
+              },
+              {
+                "role": "me",
+                "text": "I'd use COALESCE(Commission, 0) — it returns 0 when Commission is NULL so the arithmetic doesn't collapse. ISNULL is the SQL Server equivalent but COALESCE is ANSI standard and I can chain multiple fallbacks if needed."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "ISNULL vs COALESCE performance?",
+                "a": "ISNULL is marginally faster; COALESCE evaluates as CASE WHEN ... THEN."
+              },
+              {
+                "q": "What does NULLIF do?",
+                "a": "Returns NULL if both arguments are equal — useful to avoid divide-by-zero: NULLIF(Denominator, 0)."
+              }
+            ]
+          }
+        },
+        {
+          "id": "sql-queries-019",
+          "q": "Write a query to find departments that have zero employees.",
+          "level": "mid",
+          "type": "code",
+          "freq": "high",
+          "tags": ["LEFT JOIN", "NOT EXISTS", "NOT IN", "anti-join", "aggregate"],
+          "answer": {
+            "oneLiner": "Use a LEFT JOIN from Departments to Employees and filter WHERE the employee key IS NULL — this is an anti-join that keeps departments with no matching employees. Alternatively use NOT EXISTS or a GROUP BY with HAVING COUNT = 0.",
+            "keyPoints": [
+              "LEFT JOIN + IS NULL (anti-join): most readable. Join departments to employees; any department with no employees will have NULL in the employee columns after the left join.",
+              "NOT EXISTS: often the most efficient — SQL Server can short-circuit as soon as it finds one employee for a department.",
+              "NOT IN: works but has a NULL gotcha — if Employees table contains a NULL DepartmentId, the entire NOT IN returns empty.",
+              "GROUP BY + HAVING COUNT(*) = 0: does not work directly because COUNT(*) with a left join counts the NULLs as 1. Use COUNT(e.EmployeeId) instead."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Method 1: LEFT JOIN anti-join (most common)\nSELECT d.DepartmentId, d.Name\nFROM Departments d\nLEFT JOIN Employees e ON e.DepartmentId = d.DepartmentId\nWHERE e.EmployeeId IS NULL;\n\n-- Method 2: NOT EXISTS (efficient)\nSELECT d.DepartmentId, d.Name\nFROM Departments d\nWHERE NOT EXISTS (\n    SELECT 1 FROM Employees e\n    WHERE e.DepartmentId = d.DepartmentId\n);\n\n-- Method 3: GROUP BY + HAVING (count non-null column)\nSELECT d.DepartmentId, d.Name\nFROM Departments d\nLEFT JOIN Employees e ON e.DepartmentId = d.DepartmentId\nGROUP BY d.DepartmentId, d.Name\nHAVING COUNT(e.EmployeeId) = 0;",
+              "note": "Always use NOT EXISTS over NOT IN when the subquery may have NULLs"
+            },
+            "redFlags": [
+              "Using NOT IN without considering NULLs in the subquery.",
+              "Using COUNT(*) instead of COUNT(column) in the HAVING approach."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you find departments with no employees?"
+              },
+              {
+                "role": "me",
+                "text": "I'd use a LEFT JOIN from Departments to Employees and filter WHERE the EmployeeId IS NULL — that's an anti-join. NOT EXISTS is an equally good alternative and often the optimizer's preferred shape."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why not NOT IN?"
+              },
+              {
+                "role": "me",
+                "text": "If any employee has a NULL DepartmentId, NOT IN returns nothing at all — a subtle but dangerous bug. NOT EXISTS handles NULLs correctly."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Anti-join vs semi-join?",
+                "a": "Semi-join: EXISTS (rows that have a match). Anti-join: NOT EXISTS (rows with no match)."
+              }
+            ]
+          }
+        },
+        {
+          "id": "sql-queries-020",
+          "q": "How do you identify a missing index in SQL Server?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["missing index", "DMV", "execution plan", "performance", "sys.dm_db_missing_index"],
+          "answer": {
+            "oneLiner": "SQL Server tracks missing index hints in Dynamic Management Views (DMVs) as it executes queries. You query sys.dm_db_missing_index_details and sys.dm_db_missing_index_group_stats to see what the optimizer wished it had, and you can also see the suggestion directly in an actual execution plan as a green 'Missing Index' banner.",
+            "keyPoints": [
+              "sys.dm_db_missing_index_details: shows the table, equality columns, inequality columns, and included columns the optimizer would have liked for specific queries since the last restart.",
+              "sys.dm_db_missing_index_group_stats: gives aggregate statistics — user seeks, user scans, average improvement percentage — so you can prioritize which missing index to create first.",
+              "Execution plan: run a query with 'Include Actual Execution Plan' in SSMS. If a missing index would help, a green banner shows the CREATE INDEX script and the estimated improvement percentage.",
+              "Query Store (SQL Server 2016+): identifies regressed queries and the plans causing them — a higher-level view useful for finding queries that became slow after statistics changes or plan regressions."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- Top missing indexes by estimated impact\nSELECT TOP 10\n    mig.index_group_handle,\n    mid.statement AS [Table],\n    mid.equality_columns,\n    mid.inequality_columns,\n    mid.included_columns,\n    migs.avg_total_user_cost * migs.avg_user_impact * (migs.user_seeks + migs.user_scans) AS [Priority Score]\nFROM sys.dm_db_missing_index_groups mig\nJOIN sys.dm_db_missing_index_group_stats migs ON mig.index_group_handle = migs.group_handle\nJOIN sys.dm_db_missing_index_details mid ON mig.index_handle = mid.index_handle\nORDER BY [Priority Score] DESC;",
+              "note": "DMV data resets on SQL Server restart; use Query Store for persistent history"
+            },
+            "redFlags": [
+              "Adding every suggested missing index blindly — indexes cost write performance and storage.",
+              "Not checking if a similar index already exists with slightly different columns."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you find a missing index on a slow query?"
+              },
+              {
+                "role": "me",
+                "text": "Two approaches: look at the actual execution plan in SSMS — it shows a green missing index banner with an estimated improvement. Or query sys.dm_db_missing_index_group_stats joined with sys.dm_db_missing_index_details to find the highest-impact suggestions across all recent queries."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Should you always add suggested indexes?",
+                "a": "No — validate with testing. Every index slows writes and uses storage. Evaluate whether the read gain outweighs the write cost."
+              }
+            ]
+          }
+        },
+        {
+          "id": "sql-queries-021",
+          "q": "What keyword or function do you use to retrieve the last inserted record ID in SQL Server?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["SCOPE_IDENTITY", "@@IDENTITY", "IDENT_CURRENT", "OUTPUT", "identity"],
+          "answer": {
+            "oneLiner": "Use SCOPE_IDENTITY() — it returns the last identity value inserted in the current scope and session. @@IDENTITY is similar but crosses trigger boundaries, making it unsafe. IDENT_CURRENT(tableName) returns the last identity for a specific table across all sessions — useful for reporting but not for returning your own insert.",
+            "keyPoints": [
+              "SCOPE_IDENTITY(): returns the identity value generated by the INSERT in the current session AND scope. Not affected by triggers that insert into other tables. This is the standard choice.",
+              "@@IDENTITY: returns the last identity generated in the current session, including inside triggers. If your insert fires a trigger that inserts into another identity table, @@IDENTITY will return the trigger's value — a common bug.",
+              "IDENT_CURRENT('TableName'): returns the most recent identity for that table across all sessions — useful for inspection but not for capturing your own INSERT's ID.",
+              "OUTPUT clause: the safest and most powerful approach. It returns the generated identity (and any other columns) as part of the INSERT statement itself, works with bulk inserts, and avoids race conditions."
+            ],
+            "code": {
+              "lang": "sql",
+              "snippet": "-- SCOPE_IDENTITY (recommended for single row)\nINSERT INTO Orders(CustomerId, Total) VALUES(5, 199.99);\nSELECT SCOPE_IDENTITY() AS NewOrderId;\n\n-- OUTPUT clause (safest, works for multi-row inserts)\nINSERT INTO Orders(CustomerId, Total)\nOUTPUT inserted.OrderId, inserted.Total\nVALUES(5, 199.99);\n\n-- Capture OUTPUT into a variable\nDECLARE @inserted TABLE (OrderId INT);\nINSERT INTO Orders(CustomerId, Total)\nOUTPUT inserted.OrderId INTO @inserted\nVALUES(5, 199.99);\nSELECT * FROM @inserted;",
+              "note": "OUTPUT clause is the only safe approach for multi-row INSERTs"
+            },
+            "redFlags": [
+              "Using @@IDENTITY — trigger cross-contamination is a real bug.",
+              "Using IDENT_CURRENT to get 'your own' ID — it's shared across sessions."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you get the ID of a row you just inserted?"
+              },
+              {
+                "role": "me",
+                "text": "SCOPE_IDENTITY() for a single-row insert — it returns the identity value for the current session and scope, so trigger inserts don't corrupt it. For multi-row inserts I use the OUTPUT clause and capture the inserted IDs into a table variable."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why not @@IDENTITY?"
+              },
+              {
+                "role": "me",
+                "text": "If a trigger fires on my INSERT and inserts into another identity table, @@IDENTITY returns the trigger's ID, not mine. SCOPE_IDENTITY stays within my scope."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What about in EF Core?",
+                "a": "EF Core reads the generated identity using OUTPUT inserted.Id automatically after each INSERT."
+              }
+            ]
+          }
         }
       ]
     },

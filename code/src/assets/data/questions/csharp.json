@@ -6418,6 +6418,420 @@
               }
             ]
           }
+        },
+        {
+          "id": "csharp-advanced-035",
+          "q": "How do you prevent a class from being instantiated without marking it static or abstract?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["private constructor", "singleton", "factory", "instantiation", "design pattern"],
+          "answer": {
+            "oneLiner": "You make the constructor private. The caller then cannot use new directly, so you provide a controlled entry point — usually a static factory method or a static property — that decides when and whether to create an instance.",
+            "keyPoints": [
+              "A private constructor prevents external code from calling new ClassName(), but the class itself can still create instances internally.",
+              "The classic use is the Singleton pattern: a private constructor plus a static Instance property that lazily creates one object and returns it every time.",
+              "A static factory method (Create(), GetInstance()) gives you full control — you can validate parameters, return a cached object, or throw before the object is ever built.",
+              "This differs from static (no instance at all) and abstract (must be subclassed). A private-constructor class is a concrete, instantiable type — just controlled."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public sealed class ConfigManager\n{\n    private static ConfigManager? _instance;\n\n    // No public constructor — cannot call new ConfigManager()\n    private ConfigManager() { }\n\n    public static ConfigManager Instance =>\n        _instance ??= new ConfigManager();\n\n    public string GetSetting(string key) => /* ... */ key;\n}\n\n// Usage\nvar cfg = ConfigManager.Instance; // OK\n// var bad = new ConfigManager(); // compile error",
+              "note": "sealed prevents subclasses from exposing a public constructor"
+            },
+            "redFlags": [
+              "Thinking you need static or abstract to prevent instantiation.",
+              "Not mentioning the factory or singleton pattern as the typical consumer of this technique.",
+              "Forgetting that sealed is often paired so a subclass cannot re-expose a public constructor."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "I don't want anyone to call new on my class. How do I stop them without making it static or abstract?"
+              },
+              {
+                "role": "me",
+                "text": "Make the constructor private. External code can't call new, but the class itself can still create instances — usually via a static factory method or a static Instance property."
+              },
+              {
+                "role": "interviewer",
+                "text": "What pattern does that describe?"
+              },
+              {
+                "role": "me",
+                "text": "Singleton is the most common one. You store one private instance and return it through a property so everyone shares the same object."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Difference from static class?",
+                "a": "A static class can never be instantiated at all; a private-constructor class controls when it is instantiated."
+              },
+              {
+                "q": "Why add sealed?",
+                "a": "Prevents a subclass from adding a public constructor that bypasses the restriction."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-036",
+          "q": "What is constructor chaining in C# and how does it work?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["constructor chaining", "this", "base", "constructor overloading"],
+          "answer": {
+            "oneLiner": "Constructor chaining is when one constructor calls another constructor in the same class using the :this() syntax, so the common initialization logic lives in one place instead of being duplicated across every overload.",
+            "keyPoints": [
+              ":this() calls another constructor in the same class before the current constructor body runs, letting you share initialization code without repeating it.",
+              ":base() calls a constructor in the parent class and is how you pass arguments up the inheritance chain during construction.",
+              "The chained constructor runs first, then the body of the calling constructor runs — so initialization order is parent-to-child, shared-to-specific.",
+              "Common pattern: a single 'master' constructor does all the real work and every other overload delegates to it with :this(defaultValue)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "public class Order\n{\n    public int Id { get; }\n    public string Status { get; }\n    public DateTime CreatedAt { get; }\n\n    // Master constructor\n    public Order(int id, string status, DateTime createdAt)\n    {\n        Id = id;\n        Status = status;\n        CreatedAt = createdAt;\n    }\n\n    // Chaining with :this() — status defaults to \"Pending\"\n    public Order(int id) : this(id, \"Pending\", DateTime.UtcNow) { }\n\n    // :base() — call parent\n    // public SpecialOrder(int id) : base(id) { ... }\n}",
+              "note": ":this() runs the target constructor first, then the body of the caller"
+            },
+            "redFlags": [
+              "Thinking :this() and :base() run after the constructor body.",
+              "Duplicating initialization logic across overloads instead of chaining.",
+              "Confusing :this() (same class) with :base() (parent class)."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is constructor chaining and why use it?"
+              },
+              {
+                "role": "me",
+                "text": "It's using :this() to call another constructor in the same class. The master constructor does the real initialization and every overload delegates to it, so you have one place to maintain."
+              },
+              {
+                "role": "interviewer",
+                "text": "Which runs first — the chained constructor or the calling body?"
+              },
+              {
+                "role": "me",
+                "text": "The chained one runs first. So if Order(int id) calls :this(id, 'Pending', DateTime.UtcNow), that three-parameter constructor body executes before the single-parameter body."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": ":this() vs :base()?",
+                "a": ":this() calls a constructor in the same class; :base() calls the parent class constructor."
+              },
+              {
+                "q": "Can you chain in a circle?",
+                "a": "No — the compiler detects circular chains and gives a compile error."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-037",
+          "q": "What is a partial class in C# and when would you use it?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["partial class", "code generation", "designer", "splitting"],
+          "answer": {
+            "oneLiner": "A partial class lets you split the definition of a single class across multiple files. The compiler merges them into one class at compile time, so there's no runtime overhead — it's purely a source-organization tool.",
+            "keyPoints": [
+              "The partial keyword on a class declaration tells the compiler that this type is defined in more than one file; all parts must be in the same assembly and namespace.",
+              "The most common real-world use is code generators: tools like WinForms Designer or EF scaffolding write generated code into one file, and you write your custom code in another, so regenerating doesn't overwrite your changes.",
+              "You can also use it to break a genuinely huge class into logical sections — but that's often a smell that the class should be split into proper separate types instead.",
+              "All partial parts must have the same access modifier, and only one part can inherit from a base class or declare an interface (though all parts can implement interface members)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// File: Customer.cs  (your handwritten code)\npublic partial class Customer\n{\n    public void SendWelcomeEmail() { /* ... */ }\n}\n\n// File: Customer.Designer.cs  (generated by a tool)\npublic partial class Customer\n{\n    public int Id { get; set; }\n    public string Name { get; set; }\n}\n\n// At runtime: one merged Customer class with all members",
+              "note": "Regenerating Customer.Designer.cs never touches SendWelcomeEmail()"
+            },
+            "redFlags": [
+              "Thinking partial classes exist at runtime — they don't; it's purely a compile-time merge.",
+              "Using partial just to split a large class instead of redesigning it."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is a partial class and when is it useful?"
+              },
+              {
+                "role": "me",
+                "text": "The partial keyword lets you spread one class definition across multiple files in the same assembly. The compiler merges them. The main use-case is code generation: a tool writes to one file and you write your logic in another, so regenerating doesn't erase your code."
+              },
+              {
+                "role": "interviewer",
+                "text": "Any restrictions?"
+              },
+              {
+                "role": "me",
+                "text": "All parts must be in the same namespace and assembly, same accessibility modifier, and you can only specify the base class in one part."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "When does the merge happen?",
+                "a": "At compile time — there's only one class in the IL output."
+              },
+              {
+                "q": "Can a partial method span parts?",
+                "a": "Yes — you declare it in one part and implement it in another."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-038",
+          "q": "Can a partial class be split across different projects or assemblies?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["partial class", "assembly", "project", "compile time"],
+          "answer": {
+            "oneLiner": "No. All parts of a partial class must be in the same assembly (same project). The compiler merges the parts during compilation of that one assembly, so parts in separate projects are never seen together.",
+            "keyPoints": [
+              "Partial classes are a compiler feature — all parts must be compiled together in the same pass, which means the same project/assembly.",
+              "If you put a partial class part in Project A and another part in Project B, Project B's compiler doesn't see Project A's source files — it only sees the compiled output, so the merge never happens and you get a compile error.",
+              "The same restriction applies to partial structs, partial interfaces, and partial methods.",
+              "If you need to extend a type from another assembly, you should use inheritance, extension methods, or composition instead."
+            ],
+            "redFlags": [
+              "Saying partial classes can span projects — they cannot.",
+              "Confusing partial with extension methods, which do work across assemblies."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Can I split a partial class between two different projects?"
+              },
+              {
+                "role": "me",
+                "text": "No. All parts of a partial class must live in the same assembly. The compiler merges them at compile time, and it only sees source files in the same project. Across projects you'd use inheritance or extension methods instead."
+              },
+              {
+                "role": "interviewer",
+                "text": "What would happen if you tried?"
+              },
+              {
+                "role": "me",
+                "text": "You'd get a compile error in the other project — it would see an incomplete type with members it never finds."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Alternative to extend a type from another assembly?",
+                "a": "Extension methods (for behavior) or inheritance (for full override capability)."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-039",
+          "q": "What causes a NullReferenceException and what are the common types / scenarios?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["NullReferenceException", "null", "nullable", "null safety"],
+          "answer": {
+            "oneLiner": "A NullReferenceException is thrown whenever you dereference a variable that holds null — call a method on it, access a property, or index into it. It's the runtime's way of saying 'you asked me to work with an object that doesn't exist'.",
+            "keyPoints": [
+              "Calling a method or accessing a property on a null reference: customer.GetOrders() when customer is null.",
+              "Accessing an element of a null collection: list[0] when list was never initialized.",
+              "Chaining member access without checking: order.Customer.Address.City when any link in the chain is null.",
+              "Uninitialized class fields that are reference types default to null, so using them before assignment causes the exception.",
+              "C# 8+ nullable reference types (string? vs string) and the ?. null-conditional operator help catch most of these at compile time or avoid the throw at runtime."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// 1. Null object\nCustomer? c = null;\nc.GetOrders(); // NullReferenceException\n\n// 2. Null collection\nList<int>? items = null;\nvar x = items[0]; // NullReferenceException\n\n// 3. Chained access\nstring city = order.Customer.Address.City; // any null in chain throws\n\n// Fix: null-conditional operator\nstring? city = order?.Customer?.Address?.City; // returns null instead",
+              "note": "?.  returns null rather than throwing when any step is null"
+            },
+            "redFlags": [
+              "Thinking NullReferenceException has 'types' like checked/unchecked — it's one exception; the scenarios differ.",
+              "Not mentioning the ?. operator or nullable reference types as the modern mitigation."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What causes a NullReferenceException and how do you avoid it?"
+              },
+              {
+                "role": "me",
+                "text": "It's thrown when you try to use a reference variable that is null — call a method, read a property, or index a collection. Common scenarios: uninitialized fields, returning null from a method and not checking, or chaining member access. The ?. operator short-circuits the chain, and C# 8's nullable reference types surface these issues at compile time."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How does ?. help?",
+                "a": "It returns null instead of throwing when any step in the chain is null."
+              },
+              {
+                "q": "C# 8 improvement?",
+                "a": "Nullable reference types make the compiler warn when you may dereference null, turning runtime errors into compile-time warnings."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-040",
+          "q": "Compare Hashtable vs Dictionary and HashSet vs Dictionary in C#.",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["Hashtable", "Dictionary", "HashSet", "generic", "thread safety", "collections"],
+          "answer": {
+            "oneLiner": "Dictionary is the modern, generic, type-safe replacement for Hashtable. HashSet is like a Dictionary with keys only and no values — it's for unique-element membership checks. Hashtable is non-generic, stores object, needs boxing for value types, and is considered legacy.",
+            "keyPoints": [
+              "Hashtable is from .NET 1.0: non-generic (object keys/values), requires boxing for value types, and is thread-safe for one-writer-many-readers but has no compile-time type safety.",
+              "Dictionary<TKey,TValue> is the generic successor: type-safe at compile time, faster for value types (no boxing), and is not thread-safe by default — use ConcurrentDictionary for multithreaded access.",
+              "HashSet<T> stores only keys (no associated values). It gives O(1) Contains(), Add(), and Remove() and is ideal for deduplication, set intersection, and membership tests.",
+              "When comparing HashSet vs Dictionary: if you only need 'does this item exist?' use HashSet. If you need to look up a value by key, use Dictionary."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Hashtable (legacy, non-generic)\nHashtable ht = new Hashtable();\nht[\"key\"] = 42; // stores as object\nint val = (int)ht[\"key\"]; // must cast\n\n// Dictionary (generic, type-safe)\nDictionary<string, int> dict = new();\ndict[\"key\"] = 42;\nint v = dict[\"key\"]; // no cast needed\n\n// HashSet (unique items, O(1) lookup)\nHashSet<string> seen = new();\nseen.Add(\"alice\");\nbool exists = seen.Contains(\"alice\"); // true",
+              "note": "Prefer Dictionary over Hashtable; use HashSet when values are not needed"
+            },
+            "redFlags": [
+              "Saying Hashtable and Dictionary are the same — they differ in generics, performance, and thread safety.",
+              "Not knowing HashSet has no values — just keys.",
+              "Recommending Hashtable for new code."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "When would you use HashSet over Dictionary?"
+              },
+              {
+                "role": "me",
+                "text": "When you only care whether an item exists, not any associated value. HashSet is a Dictionary with no value slot — Contains() is O(1) and it enforces uniqueness automatically."
+              },
+              {
+                "role": "interviewer",
+                "text": "Is Hashtable still useful?"
+              },
+              {
+                "role": "me",
+                "text": "Rarely. Dictionary is faster (no boxing for value types), type-safe, and more readable. You'd only see Hashtable in legacy code."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Thread-safe alternative to Dictionary?",
+                "a": "ConcurrentDictionary<TKey,TValue>."
+              },
+              {
+                "q": "Time complexity for Dictionary lookup?",
+                "a": "O(1) average case."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-041",
+          "q": "What is the difference between ref and out parameters in C#?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["ref", "out", "parameters", "pass by reference", "value type"],
+          "answer": {
+            "oneLiner": "Both ref and out pass a variable by reference so the method can modify the caller's variable, but ref requires the variable to be initialized before the call, while out does not — the method is required to assign it before returning.",
+            "keyPoints": [
+              "ref: the variable must be initialized before being passed. The method may read and write the existing value. Use it when the method needs the original value AND returns a new one.",
+              "out: the variable does not need to be initialized before the call. The compiler guarantees the method assigns it before the method returns. Use it when the method produces a new value with no interest in the original.",
+              "int.TryParse is the canonical out example: the caller declares a variable, passes it out, and if parsing succeeds the variable is set — no initialization needed.",
+              "In C# 7+ you can declare out variables inline: int.TryParse(s, out int result), which is idiomatic modern C#."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// out — caller doesn't need to initialize\nbool ok = int.TryParse(\"42\", out int result); // result declared inline\nConsole.WriteLine(result); // 42\n\n// ref — caller must initialize\nint counter = 0;\nIncrement(ref counter);\nConsole.WriteLine(counter); // 1\n\nvoid Increment(ref int n) => n++;\n\n// out — method MUST assign before returning\nvoid Parse(string s, out int n)\n{\n    n = int.Parse(s); // must set before any return path\n}",
+              "note": "out enforces assignment by the method; ref trusts the caller already set it"
+            },
+            "redFlags": [
+              "Saying ref and out are interchangeable — they differ in initialization requirements.",
+              "Not knowing the compiler enforces out assignment before the method returns.",
+              "Forgetting the inline out variable declaration from C# 7."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What's the difference between ref and out?"
+              },
+              {
+                "role": "me",
+                "text": "Both pass a variable by reference so the caller sees changes. The difference: ref requires the variable to be initialized beforehand; out doesn't, but the method is required by the compiler to assign it before returning."
+              },
+              {
+                "role": "interviewer",
+                "text": "Real-world example of out?"
+              },
+              {
+                "role": "me",
+                "text": "int.TryParse — you pass a variable out and if parsing succeeds it's set. Since C# 7 you can even declare it inline: TryParse(s, out int n)."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Can you use ref/out on properties?",
+                "a": "No — only on local variables and fields."
+              },
+              {
+                "q": "What's 'in' parameter?",
+                "a": "Read-only by-reference — like ref but the method cannot modify the value."
+              }
+            ]
+          }
+        },
+        {
+          "id": "csharp-advanced-042",
+          "q": "What is the difference between .NET Framework and .NET Core from a developer's perspective?",
+          "level": "mid",
+          "type": "comparison",
+          "freq": "high",
+          "tags": [".NET Framework", ".NET Core", ".NET 5+", "cross-platform", "performance"],
+          "answer": {
+            "oneLiner": ".NET Framework is the original Windows-only runtime that ships with Windows and supports WinForms, WPF, and COM interop. .NET Core (now just .NET 5+) is the modern cross-platform, open-source successor that is faster, smaller, and deployable on Linux and macOS — but dropped some Windows-specific APIs.",
+            "keyPoints": [
+              ".NET Framework runs only on Windows; it ships with the OS and many enterprise apps still depend on it for WinForms, WPF, COM, and legacy ASP.NET.",
+              ".NET Core / .NET 5+ is cross-platform (Windows, Linux, macOS), open-source, and designed for cloud-native and microservice workloads; it is significantly faster at IO-bound operations.",
+              "Performance: Kestrel in .NET Core consistently benchmarks faster than IIS-hosted .NET Framework. The runtime itself is also leaner because it doesn't carry the full Windows BCL surface.",
+              "Deployment: .NET Core can be self-contained (bundle the runtime with your app) or framework-dependent; .NET Framework always requires the correct version installed on the machine.",
+              "New development: Microsoft has stated that .NET Framework is in maintenance mode — only security fixes. All new features go into .NET (Core)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// .csproj target framework moniker\n// .NET Framework:\n<TargetFramework>net48</TargetFramework>\n\n// .NET 8 (Core):\n<TargetFramework>net8.0</TargetFramework>\n\n// .NET 8 self-contained publish\ndotnet publish -r linux-x64 --self-contained true",
+              "note": "net48 = .NET Framework 4.8; net8.0 = .NET 8 (Core)"
+            },
+            "redFlags": [
+              "Thinking .NET Core is just a lite version — it's a complete rewrite and the future of .NET.",
+              "Not knowing .NET Framework is Windows-only.",
+              "Saying they are fully compatible — some APIs (WCF server-side, WinForms on non-Windows) don't exist in .NET Core."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Why would you choose .NET Core over .NET Framework for a new project?"
+              },
+              {
+                "role": "me",
+                "text": "Cross-platform deployment, better performance especially on IO, self-contained packaging, and active feature development — .NET Framework is in maintenance mode. The only reason to stay on Framework is if I need WinForms, WPF, or COM interop on Windows and can't migrate."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": ".NET Standard?",
+                "a": "A compatibility spec that both could target so libraries could be shared — superseded by .NET 5+ TFMs."
+              },
+              {
+                "q": "Is .NET Framework dead?",
+                "a": "Not removed, but in maintenance mode — security patches only, no new features."
+              }
+            ]
+          }
         }
       ]
     },

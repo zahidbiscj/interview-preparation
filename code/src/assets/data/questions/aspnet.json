@@ -3438,6 +3438,296 @@
               }
             ]
           }
+        },
+        {
+          "id": "aspnet-advanced-010",
+          "q": "How does logging work in ASP.NET Core?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["logging", "ILogger", "Serilog", "log level", "structured logging"],
+          "answer": {
+            "oneLiner": "ASP.NET Core has a built-in logging abstraction — ILogger<T> — that you inject anywhere and call methods like LogInformation, LogWarning, LogError. Providers (Console, EventLog, Serilog, Application Insights) receive the log entries. Log levels filter which entries are written; you configure them per namespace in appsettings.json.",
+            "keyPoints": [
+              "ILogger<T> is the abstraction you inject. T is the category name (usually the class name) that appears in the output so you know where a log entry came from.",
+              "Log levels from lowest to highest: Trace, Debug, Information, Warning, Error, Critical, None. You set a minimum level per provider and per category in appsettings.json.",
+              "Providers: the built-in ones are Console, Debug, EventSource, EventLog (Windows). Third-party ones like Serilog and NLog integrate via AddSerilog() and support sinks (files, Seq, Application Insights, Elastic).",
+              "Structured logging with message templates preserves properties as searchable fields: LogInformation(\"Order {OrderId} placed by {UserId}\", id, userId) — Serilog and Seq make this queryable.",
+              "Always use message templates with placeholders, never string interpolation — interpolation bakes the value in and loses structure."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Inject and use\npublic class OrderService\n{\n    private readonly ILogger<OrderService> _log;\n    public OrderService(ILogger<OrderService> log) => _log = log;\n\n    public void PlaceOrder(int id)\n    {\n        _log.LogInformation(\"Placing order {OrderId}\", id); // structured\n        // ... logic ...\n        _log.LogWarning(\"Order {OrderId} flagged for review\", id);\n    }\n}\n\n// appsettings.json — level per namespace\n{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\"\n    }\n  }\n}",
+              "note": "Use placeholders {Name}, not $\"...\", to keep structured logging queryable"
+            },
+            "redFlags": [
+              "Using string interpolation in log calls instead of message templates.",
+              "Not knowing ILogger<T> is injected from DI, not instantiated directly."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you add logging to an ASP.NET Core service?"
+              },
+              {
+                "role": "me",
+                "text": "Inject ILogger<T> via the constructor — T becomes the category name. Call LogInformation, LogWarning, LogError with message templates. Configure minimum levels per namespace in appsettings.json and add providers like Serilog for file or cloud sinks."
+              },
+              {
+                "role": "interviewer",
+                "text": "Why use message templates instead of string interpolation?"
+              },
+              {
+                "role": "me",
+                "text": "Templates keep the structured data separate so tools like Seq or Application Insights can index and query on OrderId as a field. Interpolation collapses it to a string and you lose that ability."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Serilog vs built-in logging?",
+                "a": "Serilog adds structured log sinks (file, Seq, Elastic, Azure), enrichers, and filtering — the built-in providers only cover console/EventLog."
+              },
+              {
+                "q": "What is a log scope?",
+                "a": "A context block (using (_log.BeginScope(...))) that attaches properties to all log entries inside it — useful for correlating request logs with a TraceId."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "subtopicId": "mvc",
+      "subtopicName": "MVC & UI Patterns",
+      "order": 6,
+      "questions": [
+        {
+          "id": "aspnet-mvc-001",
+          "q": "How can multiple controllers share the same view, or a controller use multiple views in ASP.NET Core MVC?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["MVC", "views", "Shared", "View()", "partial view"],
+          "answer": {
+            "oneLiner": "You share a view by placing it in the /Views/Shared/ folder — any controller can return it by name. You return a different view from a controller action by passing the view name to View(): return View(\"AnotherView\", model). This is how you reuse layouts, partial views, and common templates.",
+            "keyPoints": [
+              "Views/Shared/: files here are accessible by all controllers. Layouts (_Layout.cshtml), error pages, and commonly shared partial views live here.",
+              "return View(): by default renders the view matching the action name. return View(\"ViewName\") renders a specific view by name regardless of the action.",
+              "return View(\"~/Views/OtherController/SomeView.cshtml\") renders a view from another controller's folder using the tilde-rooted path.",
+              "Partial views: a view fragment (e.g., _ProductCard.cshtml in Shared/) that any view can include with @Html.PartialAsync or <partial name=\"...\">.",
+              "View Components are the modern alternative to partial views when the fragment needs its own logic (e.g., a shopping cart count)."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Controller: return a named view\npublic IActionResult Dashboard()\n    => View(\"Overview\", model); // renders Views/Analytics/Overview.cshtml\n\n// Return a view from another controller's folder\npublic IActionResult SharedReport()\n    => View(\"~/Views/Reports/Summary.cshtml\", model);\n\n// Or place Summary.cshtml in Views/Shared/ and any controller can:\n    => View(\"Summary\", model);",
+              "note": "Shared/ views are resolved before controller-specific folders in the view engine search order"
+            },
+            "redFlags": [
+              "Not knowing about the Shared/ folder lookup order.",
+              "Duplicating the same .cshtml file across controller folders instead of moving it to Shared/."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do two controllers share the same view?"
+              },
+              {
+                "role": "me",
+                "text": "Put it in Views/Shared/. The MVC view engine always looks in Shared/ as a fallback, so any controller can return View(\"ViewName\") and find it there. If the view is only shared by a couple of controllers and has specific logic, I'd consider a View Component instead."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "View engine lookup order?",
+                "a": "1. Views/[ControllerName]/[ActionName].cshtml → 2. Views/Shared/[ActionName].cshtml."
+              },
+              {
+                "q": "Partial view vs View Component?",
+                "a": "Partial views are pure HTML fragments. View Components have their own C# logic and DI — use them when the fragment needs to query data or call a service."
+              }
+            ]
+          }
+        },
+        {
+          "id": "aspnet-mvc-002",
+          "q": "How do you handle dropdown performance in an ASP.NET Core MVC application?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "medium",
+          "tags": ["dropdown", "SelectList", "caching", "performance", "static data"],
+          "answer": {
+            "oneLiner": "The most common dropdown performance problem is re-querying the database on every page load for data that rarely changes — countries, categories, roles. The fix is caching: cache the SelectList in IMemoryCache (or IDistributedCache for multi-server), populate it once, and refresh only when the data changes.",
+            "keyPoints": [
+              "Static or near-static dropdown data (countries, status codes) should be cached in IMemoryCache with a sliding or absolute expiry so the database is only hit once per cache miss.",
+              "Use ViewBag/ViewData sparingly for passing a SelectList to the view; prefer a strongly-typed ViewModel that includes a property of type IEnumerable<SelectListItem>.",
+              "For very large datasets, consider cascading dropdowns with AJAX — load only the top-level list on page load and fetch sub-options by API call when the user selects a parent item.",
+              "If the data changes infrequently, seed it at application startup and hold it in a singleton service instead of hitting the database at all.",
+              "For high-traffic pages: combine caching with Tag Helper output caching or Response Caching so the entire partial view is cached."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Cached dropdown in a service\npublic class CategoryService\n{\n    private readonly IMemoryCache _cache;\n    private readonly AppDbContext _db;\n\n    public CategoryService(IMemoryCache cache, AppDbContext db)\n    { _cache = cache; _db = db; }\n\n    public async Task<List<SelectListItem>> GetCategoryOptionsAsync()\n    {\n        return await _cache.GetOrCreateAsync(\"category-options\", async entry =>\n        {\n            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);\n            return await _db.Categories\n                .Select(c => new SelectListItem(c.Name, c.Id.ToString()))\n                .ToListAsync();\n        });\n    }\n}",
+              "note": "Invalidate the cache key when a category is created/updated/deleted"
+            ],
+            "redFlags": [
+              "Querying the database for static dropdown data on every page load.",
+              "Loading 10,000 options into a single dropdown — use typeahead/search instead."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "We have a dropdown of categories that appears on every page. It's slow — how do you fix it?"
+              },
+              {
+                "role": "me",
+                "text": "Cache it. Categories rarely change so I'd use IMemoryCache.GetOrCreateAsync with a 1-hour expiry and invalidate the key whenever a category is saved. That way the database is only hit on the first load and after changes. For very large lists I'd switch to an AJAX-powered typeahead instead of loading everything upfront."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "IMemoryCache vs IDistributedCache?",
+                "a": "MemoryCache lives in the process — fast but not shared across web farm nodes. DistributedCache (Redis) is shared across all instances."
+              },
+              {
+                "q": "When would you skip caching and use a static list?",
+                "a": "If the data is fixed at deployment time (e.g., status codes) — hard-code it as a static list, no database needed."
+              }
+            ]
+          }
+        },
+        {
+          "id": "aspnet-di-008",
+          "q": "Where does an injected dependency actually reside in memory?",
+          "level": "mid",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["DI", "lifetime", "singleton", "scoped", "heap", "memory"],
+          "answer": {
+            "oneLiner": "All injected services are reference types and live on the managed heap. Their lifetime — how long the GC keeps them alive — is controlled by the DI container: Singleton services are held by the root IServiceProvider for the application's lifetime; Scoped services are held by the per-request IServiceScope; Transient services are released as soon as the scope that resolved them is disposed.",
+            "keyPoints": [
+              "Services are objects on the heap, pointed to by the IServiceProvider's internal dictionary. As long as the container holds a reference, the GC won't collect them.",
+              "Singleton: one instance per application. The root container holds a strong reference to it for the process lifetime — it's effectively a static object.",
+              "Scoped: one instance per request (or per scope). The per-request IServiceScope holds the reference; when the request ends and the scope is disposed, the reference is released and the GC can collect it.",
+              "Transient: new instance every time it's resolved. The scope holds no long-lived reference — the object can be collected as soon as the dependent that received it goes out of scope.",
+              "Captive dependency problem: if a Singleton holds a Scoped service, the Singleton keeps the Scoped service alive for the application's lifetime — longer than intended, causing bugs."
+            ],
+            "redFlags": [
+              "Injecting a Scoped service into a Singleton (captive dependency bug).",
+              "Thinking transient services are collected immediately — they live as long as their dependent."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Where in memory does an injected service actually live?"
+              },
+              {
+                "role": "me",
+                "text": "On the managed heap, held alive by the container's reference. A Singleton is held by the root IServiceProvider for the app's lifetime. A Scoped service is held by the per-request scope and collected after the request ends. Transient has no long-lived container reference — it lives as long as the object that received it."
+              },
+              {
+                "role": "interviewer",
+                "text": "What is the captive dependency problem?"
+              },
+              {
+                "role": "me",
+                "text": "Injecting a Scoped service into a Singleton. The Singleton keeps a reference to the Scoped service for the whole app lifetime, bypassing its intended per-request scope — the ASP.NET Core runtime throws on this in development by default."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How does ASP.NET Core detect captive dependencies?",
+                "a": "The DI container's ValidateScopes option (on by default in Development) throws on startup if a shorter-lived service is captured by a longer-lived one."
+              }
+            ]
+          }
+        },
+        {
+          "id": "aspnet-restapi-009",
+          "q": "What is the difference between HTTP 200 OK and 201 Created?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["HTTP status", "200", "201", "REST", "Location header"],
+          "answer": {
+            "oneLiner": "200 OK means the request succeeded and the response body contains the result. 201 Created means a new resource was created as a result of the request, and the Location header points to the URL of the newly created resource. In REST, POST to a collection should return 201, not 200.",
+            "keyPoints": [
+              "200 OK: general success. Used for GET (here's the data), PUT (updated, here's the resource), and DELETE (deleted) responses.",
+              "201 Created: the server created a new resource. The Location header should contain the URI of the new resource (e.g., /api/orders/42). Often includes the new resource in the body.",
+              "In ASP.NET Core: return Ok(data) → 200; return CreatedAtAction(nameof(GetById), new { id }, data) → 201 with a correct Location header built automatically.",
+              "Why it matters: API clients can rely on 201 to know where to find the newly created item without parsing the body."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// POST endpoint — returns 201 Created\n[HttpPost]\npublic async Task<IActionResult> Create(CreateOrderDto dto)\n{\n    var order = await _service.CreateOrderAsync(dto);\n    return CreatedAtAction(\n        nameof(GetById),        // action name for Location URL\n        new { id = order.Id },  // route values\n        order);                 // body\n}\n// Response: HTTP 201, Location: /api/orders/42\n\n// GET endpoint — returns 200 OK\n[HttpGet(\"{id}\")]\npublic async Task<IActionResult> GetById(int id)\n    => Ok(await _service.GetAsync(id));",
+              "note": "CreatedAtAction builds the Location header automatically using the route"
+            },
+            "redFlags": [
+              "Returning 200 from a POST that creates a resource — semantically wrong.",
+              "Returning 201 without a Location header — clients need it to find the new resource."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "When should a POST return 201 instead of 200?"
+              },
+              {
+                "role": "me",
+                "text": "Always when a new resource is created. 201 signals creation and includes a Location header pointing to the new resource's URL. I use CreatedAtAction in ASP.NET Core which builds the header automatically."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What should the Location header contain?",
+                "a": "The URL of the newly created resource, e.g., https://api.example.com/orders/42."
+              },
+              {
+                "q": "What status for a PUT that creates if not exists (upsert)?",
+                "a": "200 if it updated, 201 if it created — or simply 200 for simplicity in most APIs."
+              }
+            ]
+          }
+        },
+        {
+          "id": "aspnet-restapi-010",
+          "q": "Can you use the [HttpPost] attribute on a GET action in ASP.NET Core? What happens?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "medium",
+          "tags": ["HttpPost", "HttpGet", "routing", "verb", "action"],
+          "answer": {
+            "oneLiner": "Yes, you can put [HttpPost] on any action method regardless of what you name it. The attribute controls which HTTP verb the route responds to, not the method name. But you should not — naming a method Get* while it only responds to POST is a deliberate lie in your code that will confuse every developer and client who reads it.",
+            "keyPoints": [
+              "[HttpGet], [HttpPost], [HttpPut], etc., are route attributes that constrain the verb a route will match — they are independent of the C# method name.",
+              "If you put [HttpPost] on a method named GetOrders(), ASP.NET Core happily routes POST /orders to it. It compiles and runs without error.",
+              "The practical result is that a GET /orders request will return 405 Method Not Allowed, which will confuse clients who expect a GET endpoint named GetOrders.",
+              "REST conventions and readable code both demand that your verb attribute and method name agree — a semantic mismatch is a maintenance hazard."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Legal but wrong — GetOrders only answers POST\n[HttpPost]\npublic IActionResult GetOrders() => Ok(_service.GetAll());\n// GET /orders → 405 Method Not Allowed\n// POST /orders → 200 (confusing!)\n\n// Correct\n[HttpGet]\npublic IActionResult GetOrders() => Ok(_service.GetAll());\n\n// Multiple verbs on one action (edge cases)\n[HttpGet]\n[HttpHead]\npublic IActionResult GetOrders() => Ok();",
+              "note": "Multiple verb attributes on one action is valid for HEAD/GET pairs"
+            },
+            "redFlags": [
+              "Thinking [HttpPost] on a Get method is a compile error — it isn't.",
+              "Mixing verb and method name conventions without understanding the routing implications."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What happens if you put [HttpPost] on a method called GetOrders?"
+              },
+              {
+                "role": "me",
+                "text": "It compiles and works — the action will only respond to POST requests. GET requests to that route will get a 405. The verb attribute is what controls routing, not the method name. But it's semantically wrong and a code smell."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Can one action respond to multiple verbs?",
+                "a": "Yes — stack multiple attributes: [HttpGet][HttpHead] for a HEAD-compatible endpoint."
+              }
+            ]
+          }
         }
       ]
     }

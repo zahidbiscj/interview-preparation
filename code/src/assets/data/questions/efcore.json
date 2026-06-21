@@ -2597,6 +2597,144 @@
           }
         }
       ]
+    },
+    {
+      "subtopicId": "adonet",
+      "subtopicName": "ADO.NET",
+      "order": 5,
+      "questions": [
+        {
+          "id": "efcore-adonet-001",
+          "q": "What is ADO.NET?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["ADO.NET", "SqlConnection", "SqlCommand", "DataReader", "data access"],
+          "answer": {
+            "oneLiner": "ADO.NET is the foundational .NET data-access library. It gives you explicit control over SQL execution through objects like SqlConnection, SqlCommand, and SqlDataReader — there is no ORM, no change tracking, and no abstraction. You write the SQL, you open the connection, you read the results row by row.",
+            "keyPoints": [
+              "ADO.NET sits at the lowest level of .NET data access. It maps directly to database driver calls without any query translation or object mapping in between.",
+              "Core objects: SqlConnection (opens a database session), SqlCommand (holds the SQL and parameters), SqlDataReader (forward-only, read-only cursor over the result set), and SqlDataAdapter (fills a DataSet for disconnected scenarios).",
+              "Because you write raw SQL, ADO.NET is the most performant option — no LINQ translation overhead, no change-tracking state machine, and you control exactly what SQL hits the database.",
+              "EF Core itself uses ADO.NET internally. Dapper is a micro-ORM layered on top of ADO.NET that adds object mapping while keeping the raw-SQL control."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "using var conn = new SqlConnection(connectionString);\nawait conn.OpenAsync();\n\nusing var cmd = new SqlCommand(\"SELECT Id, Name FROM Products WHERE Id = @id\", conn);\ncmd.Parameters.AddWithValue(\"@id\", productId);\n\nusing var reader = await cmd.ExecuteReaderAsync();\nwhile (await reader.ReadAsync())\n{\n    int id     = reader.GetInt32(0);\n    string name = reader.GetString(1);\n}",
+              "note": "Always use parameterized queries — never string-concatenate user input into SQL"
+            },
+            "redFlags": [
+              "Saying ADO.NET is obsolete — it is still the foundation that EF Core and Dapper sit on.",
+              "Using string concatenation for SQL parameters instead of SqlParameter."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "What is ADO.NET and how does it compare to EF Core?"
+              },
+              {
+                "role": "me",
+                "text": "ADO.NET is the raw, low-level data access layer in .NET. You write SQL explicitly and control the connection, command, and reader yourself. EF Core sits on top of ADO.NET and adds object mapping, LINQ translation, and change tracking. ADO.NET is faster but requires more boilerplate."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "What is Dapper?",
+                "a": "A micro-ORM built on ADO.NET that adds object mapping (maps result rows to POCOs) while keeping raw SQL control."
+              },
+              {
+                "q": "When would you prefer ADO.NET over EF Core?",
+                "a": "Bulk operations, complex report queries, or when you need maximum performance and precise SQL control."
+              }
+            ]
+          }
+        },
+        {
+          "id": "efcore-adonet-002",
+          "q": "Can you call a Stored Procedure using ADO.NET?",
+          "level": "junior",
+          "type": "conceptual",
+          "freq": "high",
+          "tags": ["ADO.NET", "stored procedure", "SqlCommand", "CommandType"],
+          "answer": {
+            "oneLiner": "Yes. You set SqlCommand.CommandText to the stored procedure name and SqlCommand.CommandType to CommandType.StoredProcedure, then add any parameters with SqlParameter. ADO.NET handles the RPC call to the database and you read the result just like any query.",
+            "keyPoints": [
+              "Set CommandType = CommandType.StoredProcedure so the driver issues an RPC EXECUTE rather than sending the name as raw SQL.",
+              "Add parameters with cmd.Parameters.AddWithValue() or cmd.Parameters.Add() — these map to the SP's @param names.",
+              "To capture an OUTPUT parameter, set SqlParameter.Direction = ParameterDirection.Output and read its .Value after ExecuteNonQuery().",
+              "To get a return value (RETURN 0 from within the SP), add a parameter with Direction = ReturnValue."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "using var conn = new SqlConnection(connectionString);\nawait conn.OpenAsync();\n\nusing var cmd = new SqlCommand(\"usp_GetOrdersByCustomer\", conn);\ncmd.CommandType = CommandType.StoredProcedure;\ncmd.Parameters.AddWithValue(\"@customerId\", customerId);\n\n// OUTPUT parameter example\nvar outParam = new SqlParameter(\"@orderCount\", SqlDbType.Int);\noutParam.Direction = ParameterDirection.Output;\ncmd.Parameters.Add(outParam);\n\nusing var reader = await cmd.ExecuteReaderAsync();\nwhile (await reader.ReadAsync()) { /* map row */ }\n\nreader.Close(); // must close reader before reading output params\nint count = (int)outParam.Value;",
+              "note": "Close the reader before reading OUTPUT parameter values"
+            },
+            "redFlags": [
+              "Setting CommandType to Text and writing EXEC sp_name — works but misses output parameter handling.",
+              "Forgetting to close the SqlDataReader before reading output parameter values."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How do you execute a stored procedure in ADO.NET?"
+              },
+              {
+                "role": "me",
+                "text": "Create a SqlCommand, set CommandText to the SP name, CommandType to StoredProcedure, add SqlParameter objects for each @param, then call ExecuteReader or ExecuteNonQuery. For OUTPUT parameters, set Direction to Output and read the value after the reader is closed."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "CommandType.Text vs StoredProcedure?",
+                "a": "Text sends raw SQL to the server; StoredProcedure issues an RPC call — required for proper OUTPUT param handling."
+              }
+            ]
+          }
+        },
+        {
+          "id": "efcore-adonet-003",
+          "q": "What is the difference between executing a raw SQL query and a Stored Procedure in ADO.NET?",
+          "level": "junior",
+          "type": "comparison",
+          "freq": "high",
+          "tags": ["ADO.NET", "stored procedure", "SQL query", "CommandType", "performance"],
+          "answer": {
+            "oneLiner": "A raw SQL query sends T-SQL text directly; the database parses, compiles, and executes it on each call. A stored procedure is a pre-compiled named block on the server; the first call compiles and caches the plan, subsequent calls reuse it — so SPs are faster for repeated execution and keep business logic server-side.",
+            "keyPoints": [
+              "Raw SQL (CommandType.Text): you send the full T-SQL string each time. The database must parse and compile it unless the plan is already in the cache. Easy to write but harder to reuse.",
+              "Stored Procedure (CommandType.StoredProcedure): the SP is pre-compiled and the execution plan is cached permanently. Subsequent calls just pass parameters and execute the plan — no re-parsing.",
+              "Security: SPs can be granted EXECUTE permission without exposing the underlying table — you don't have to give the application SELECT/INSERT rights on the tables.",
+              "Maintenance: SP logic lives in the database, so a DBA can update the SP without redeploying the application. This is a double-edged sword — it can be harder to version-control.",
+              "Parameterized raw SQL can match SP performance if the plan caches (which it usually does for parameterized queries), so raw SQL with SqlParameter is not dramatically slower in practice."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Raw SQL query\nusing var cmd1 = new SqlCommand(\n    \"SELECT * FROM Orders WHERE CustomerId = @id\", conn);\ncmd1.CommandType = CommandType.Text;  // default\ncmd1.Parameters.AddWithValue(\"@id\", 5);\n\n// Stored Procedure\nusing var cmd2 = new SqlCommand(\"usp_GetOrdersByCustomer\", conn);\ncmd2.CommandType = CommandType.StoredProcedure;\ncmd2.Parameters.AddWithValue(\"@customerId\", 5);",
+              "note": "Both use SqlParameter — never concatenate user input into SQL"
+            },
+            "redFlags": [
+              "Saying SPs are always faster — parameterized SQL with plan caching is competitive.",
+              "Not knowing SPs can have OUTPUT parameters and RETURN values that raw SQL cannot."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "Why use a stored procedure over a raw SQL query in ADO.NET?"
+              },
+              {
+                "role": "me",
+                "text": "Pre-compiled execution plan, reusability, and tighter permission control. You grant EXECUTE on the SP without giving the app direct table rights. The logic also lives in the DB, so it can be updated without an app deployment. Parameterized SQL can get close in performance, but SPs win on permissions and reuse."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "Can EF Core call stored procedures?",
+                "a": "Yes — FromSqlRaw for queries and ExecuteSqlRaw/ExecuteSqlRawAsync for non-queries."
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }

@@ -4037,6 +4037,61 @@
               }
             ]
           }
+        },
+        {
+          "id": "azure-platform-020",
+          "q": "How do you integrate Azure Key Vault with a .NET API to store and retrieve secrets?",
+          "level": "mid",
+          "type": "scenario",
+          "freq": "high",
+          "tags": ["Key Vault", "secrets", "managed identity", "Azure SDK", "IConfiguration"],
+          "answer": {
+            "oneLiner": "Add the Azure.Extensions.AspNetCore.Configuration.Secrets NuGet package and call AddAzureKeyVault() on the configuration builder in Program.cs. The recommended auth is Managed Identity (no secrets in code or config). Your app then reads Key Vault secrets through IConfiguration just like appsettings.json values.",
+            "keyPoints": [
+              "Authentication: use Managed Identity (System-assigned or User-assigned) so there are no client IDs or secrets in appsettings.json. Locally, DefaultAzureCredential falls through to your Visual Studio / Azure CLI login.",
+              "Configuration integration: Azure.Extensions.AspNetCore.Configuration.Secrets + AddAzureKeyVault() loads all secrets at startup as configuration keys. Secret names use -- as a hierarchy separator (MyApp--Database--Password → MyApp:Database:Password).",
+              "Direct SDK access: for secrets you want to retrieve on demand (not all at startup), inject SecretClient and call GetSecretAsync(\"SecretName\").",
+              "Secret rotation: use a separate Worker Service or Azure Function to reload secrets without restarting the app, or configure the Key Vault provider with a reload interval.",
+              "Never put the Key Vault URL or client secret in source control — put the vault URI in appsettings.json (it's not sensitive) and all actual secrets inside the vault."
+            ],
+            "code": {
+              "lang": "csharp",
+              "snippet": "// Program.cs — config provider approach (loads all secrets at startup)\nvar keyVaultUri = new Uri(builder.Configuration[\"KeyVault:Uri\"]!);\nbuilder.Configuration.AddAzureKeyVault(\n    keyVaultUri,\n    new DefaultAzureCredential()); // uses Managed Identity in Azure, CLI locally\n\n// Now read like any config value\nvar connStr = builder.Configuration[\"MyApp--Database--ConnectionString\"];\n\n// — OR — direct SecretClient for on-demand access\nbuilder.Services.AddSingleton(new SecretClient(keyVaultUri, new DefaultAzureCredential()));\n\npublic class OrderService\n{\n    private readonly SecretClient _kv;\n    public OrderService(SecretClient kv) => _kv = kv;\n\n    public async Task DoWork()\n    {\n        KeyVaultSecret secret = await _kv.GetSecretAsync(\"ExternalApiKey\");\n        string apiKey = secret.Value;\n    }\n}",
+              "note": "-- in secret names maps to : in IConfiguration hierarchy"
+            },
+            "redFlags": [
+              "Putting the vault's client secret in appsettings.json — use Managed Identity instead.",
+              "Not knowing about the -- to : name mapping for nested configuration keys."
+            ],
+            "dialogue": [
+              {
+                "role": "interviewer",
+                "text": "How would you use Azure Key Vault to store your database connection string?"
+              },
+              {
+                "role": "me",
+                "text": "I'd add the Key Vault configuration provider in Program.cs with AddAzureKeyVault() and authenticate using Managed Identity — no credentials in code. The connection string stored in Key Vault as MyApp--Database--ConnectionString is accessible through IConfiguration[\"MyApp:Database:ConnectionString\"] automatically."
+              },
+              {
+                "role": "interviewer",
+                "text": "How does local development work without a Managed Identity?"
+              },
+              {
+                "role": "me",
+                "text": "DefaultAzureCredential tries multiple sources in order — Managed Identity in Azure, then Environment Variables, then Visual Studio/VS Code/Azure CLI login. Locally it uses my developer login so no extra configuration is needed."
+              }
+            ],
+            "followUpsQA": [
+              {
+                "q": "How do you handle secret rotation?",
+                "a": "Configure a reload interval on the provider, or use a Background Service that refreshes secrets on a timer or on a change notification from Event Grid."
+              },
+              {
+                "q": "What is Managed Identity?",
+                "a": "An Azure-managed service principal for an Azure resource (App Service, Function App). Azure issues and rotates its credentials automatically — no passwords to manage."
+              }
+            ]
+          }
         }
       ]
     }
