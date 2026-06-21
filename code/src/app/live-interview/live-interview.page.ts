@@ -6,7 +6,6 @@ import { RouterLink, ActivatedRoute } from '@angular/router';
 import { QuestionBankService } from '../question-bank/question-bank.service';
 import { QuestionView } from '../question-bank/models/question-bank.models';
 import { ReviewLogService } from '../shared/review-log.service';
-import { VoiceService } from './voice.service';
 import { GraderService } from './grader.service';
 import { LiveSettingsService } from './live-settings.service';
 import { GradeResult, LiveResult, SavedSession } from './live-interview.models';
@@ -23,7 +22,7 @@ type LivePhase = 'loading' | 'listening' | 'evaluating' | 'feedback' | 'done';
       <!-- ── Top bar ── -->
       <header class="topbar">
         <a routerLink="/" class="back-link">← <span>Question Bank</span></a>
-        <span class="app-brand">🎤 Live Interview</span>
+        <span class="app-brand">📝 Live Interview</span>
         <span class="topbar-right">
           <a routerLink="/simulator" class="nav-link">Simulator</a>
           <button class="icon-btn" (click)="openSettings()" title="AI Settings">⚙</button>
@@ -77,39 +76,17 @@ type LivePhase = 'loading' | 'listening' | 'evaluating' | 'feedback' | 'done';
             <!-- Phase zone -->
             <div class="phase-zone">
 
-              <!-- LISTENING: mic open or textarea fallback -->
+              <!-- LISTENING: type your answer -->
               @if (phase() === 'listening') {
                 <div class="listening-zone fade-slide-enter">
-
-                  @if (micError()) {
-                    <div class="mic-error">{{ micError() }}</div>
-                  }
-
-                  @if (voice.sttSupported && !micError()) {
-                    <!-- STT mode -->
-                    <div class="mic-row">
-                      <div class="mic-dot"></div>
-                      <span class="mic-label">Listening… speak your answer, then click Done Speaking</span>
-                    </div>
-                    <div class="live-transcript">
-                      @if (transcript()) {
-                        {{ transcript() }}
-                      } @else {
-                        <span class="transcript-placeholder">Start speaking — your words will appear here…</span>
-                      }
-                    </div>
-                    <button class="done-btn" (click)="doneSpeaking()">Done Speaking</button>
-                  } @else {
-                    <!-- Textarea fallback (Firefox / mic denied) -->
-                    <textarea
-                      class="textarea-fallback"
-                      [value]="transcript()"
-                      (input)="transcript.set($any($event.target).value)"
-                      placeholder="Type your answer here…"
-                      rows="5"
-                    ></textarea>
-                    <button class="done-btn" (click)="submitTyped()">Submit Answer</button>
-                  }
+                  <textarea
+                    class="textarea-fallback"
+                    [value]="transcript()"
+                    (input)="transcript.set($any($event.target).value)"
+                    placeholder="Type your answer here…"
+                    rows="5"
+                  ></textarea>
+                  <button class="done-btn" (click)="submitTyped()">Submit Answer</button>
                 </div>
               }
 
@@ -321,7 +298,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   private static readonly SESSION_KEY = 'live.session';
 
   readonly svc          = inject(QuestionBankService);
-  readonly voice        = inject(VoiceService);
   readonly grader       = inject(GraderService);
   readonly liveSettings = inject(LiveSettingsService);
   private readonly reviewLog = inject(ReviewLogService);
@@ -337,7 +313,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   readonly grade          = signal<GradeResult | null>(null);
   readonly results        = signal<LiveResult[]>([]);
   readonly elapsed        = signal('0:00');
-  readonly micError       = signal<string | null>(null);
   readonly sessionRestored = signal(false);
 
   // ── settings panel ──
@@ -370,7 +345,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
 
   private timerId: ReturnType<typeof setInterval> | null = null;
   private startMs = 0;
-  private listenCallId = 0; // guards against stale listen().then() calling evaluate()
 
   async ngOnInit(): Promise<void> {
     this.svc.applyStoredTheme();
@@ -383,7 +357,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopTimer();
-    this.voice.stopListening();
   }
 
   private async launchSession(): Promise<void> {
@@ -409,7 +382,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     this.results.set([]);
     this.transcript.set('');
     this.grade.set(null);
-    this.micError.set(null);
     this.sessionRestored.set(false);
     this.startMs = Date.now();
     this.startTimer();
@@ -422,37 +394,8 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
     if (!q) return;
     this.transcript.set('');
     this.grade.set(null);
-    this.micError.set(null);
     this.saveSession();
-    this.openInput();
-  }
-
-  private openInput(): void {
     this.phase.set('listening');
-
-    if (!this.voice.sttSupported) return;
-
-    const callId = ++this.listenCallId;
-
-    void this.voice.listen(
-      t => this.transcript.set(t),
-      msg => this.micError.set(msg),
-    ).then(finalText => {
-      // Discard result if a newer listen call has started (retry / next question)
-      if (this.listenCallId !== callId) return;
-      const text = finalText || this.transcript();
-      this.transcript.set(text);
-      if (this.micError()) return;
-      if (!text.trim()) {
-        this.micError.set('No speech captured. Type your answer below, or refresh and allow mic access.');
-        return;
-      }
-      void this.evaluate();
-    });
-  }
-
-  doneSpeaking(): void {
-    this.voice.stopListening();
   }
 
   submitTyped(): void {
@@ -479,11 +422,9 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   }
 
   retryQuestion(): void {
-    this.voice.stopListening();
     this.transcript.set('');
     this.grade.set(null);
-    this.micError.set(null);
-    this.openInput();
+    this.phase.set('listening');
   }
 
   advance(): void {
@@ -505,7 +446,6 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   finish(): void {
     if (this.phase() === 'done') return;
     this.stopTimer();
-    this.voice.stopListening();
     const q = this.current();
     const g = this.grade();
     if (q && g && this.phase() === 'feedback') {
@@ -525,14 +465,12 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
   newSession(): void {
     this.clearSession();
     this.stopTimer();
-    this.voice.stopListening();
     this.phase.set('loading');
     this.questions.set([]);
     this.results.set([]);
     this.index.set(0);
     this.transcript.set('');
     this.grade.set(null);
-    this.micError.set(null);
     void this.launchSession();
   }
 
@@ -597,7 +535,7 @@ export class LiveInterviewPage implements OnInit, OnDestroy {
       if (data.phase === 'feedback' && data.grade) {
         this.phase.set('feedback');
       } else {
-        this.openInput();
+        this.phase.set('listening');
       }
       return true;
     } catch {

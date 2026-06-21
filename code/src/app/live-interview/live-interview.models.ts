@@ -10,25 +10,19 @@ export interface GradeResult {
 }
 
 export type LivePhase =
-  | 'setup'
-  | 'asking'      // TTS reading the question
-  | 'listening'   // mic open or textarea active
+  | 'listening'   // textarea active
   | 'evaluating'  // grading in flight
-  | 'feedback'    // showing + speaking result
+  | 'feedback'    // showing result
   | 'done';
 
 export interface LiveSettings {
   openrouterKey: string;
   model: string;
-  rate: number;            // TTS speed 0.8..1.5
-  voiceURI: string | null; // null = browser default
 }
 
 export const DEFAULT_LIVE_SETTINGS: LiveSettings = {
   openrouterKey: environment.openrouterKey,
   model: environment.openrouterModel,
-  rate: 1.0,
-  voiceURI: null,
 };
 
 export interface LiveResult {
