@@ -11,11 +11,46 @@ const THEME_KEY = 'qbank.theme';
 const DAILY_KEY = 'qbank.daily';
 const SETS_KEY = 'qbank.sets';
 const SETS_VERSION_KEY = 'qbank.sets.version';
-const SETS_VERSION = 2;
+const SETS_VERSION = 3;
 const REMOVED_PRESET_IDS = new Set(['preset-dotnet-fullstack-interview']);
 
 /** Pre-built sets seeded on first visit (keyed to real question IDs in the bank). */
 const PRESET_SETS: QuestionSet[] = [
+  {
+    id: 'preset-most-important',
+    name: 'Most important questions',
+    createdAt: 5,
+    questionIds: [
+      // .NET / C#
+      'csharp-memory-001', 'csharp-memory-003', 'csharp-advanced-035',
+      'csharp-oop-004', 'aspnet-di-008', 'csharp-advanced-036',
+      'csharp-advanced-037', 'csharp-advanced-038', 'csharp-advanced-039',
+      'csharp-async-003', 'csharp-memory-005', 'csharp-advanced-040',
+      'csharp-advanced-041', 'csharp-memory-006', 'csharp-advanced-042',
+      'csharp-async-001',
+      // Entity Framework / ADO.NET
+      'efcore-adonet-001', 'efcore-adonet-002', 'efcore-adonet-003',
+      'efcore-migrations-001', 'efcore-querying-003', 'efcore-migrations-002',
+      'efcore-loading-001',
+      // SQL
+      'sql-queries-015', 'sql-queries-007', 'sql-queries-006',
+      'sql-queries-016', 'sql-queries-014', 'sql-queries-009',
+      'sql-queries-004', 'sql-queries-017', 'sql-queries-002',
+      'sql-queries-018', 'sql-queries-008', 'sql-queries-019',
+      'sql-queries-020', 'sql-queries-003', 'sql-queries-021',
+      // ASP.NET Core / MVC / API
+      'aspnet-restapi-004', 'aspnet-restapi-005', 'aspnet-advanced-010',
+      'aspnet-restapi-003', 'aspnet-middleware-001', 'aspnet-restapi-001',
+      'aspnet-middleware-004', 'aspnet-restapi-008', 'aspnet-restapi-007',
+      'aspnet-restapi-009', 'aspnet-restapi-010', 'aspnet-mvc-001',
+      'aspnet-mvc-002',
+      // Azure
+      'azure-compute-003', 'azure-platform-020', 'azure-compute-014',
+      // Architecture / Design
+      'architecture-dp-002', 'csharp-oop-002',
+      'architecture-patterns-advanced-003', 'architecture-patterns-005',
+    ],
+  },
   {
     id: 'preset-fullstack-dotnet-react',
     name: 'Fullstack .NET + React (KL Contract)',
