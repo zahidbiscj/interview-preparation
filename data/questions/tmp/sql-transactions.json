@@ -1,0 +1,781 @@
+{
+  "subtopicId": "transactions",
+  "questions": [
+    {
+      "id": "sql-transactions-001",
+      "q": "What are ACID properties? Explain each in the context of SQL Server transactions.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["acid", "atomicity", "consistency", "isolation", "durability", "transactions"],
+      "answer": {
+        "oneLiner": "ACID stands for Atomicity, Consistency, Isolation, and Durability. Together they guarantee that a transaction either completes fully and safely, or leaves the database unchanged.",
+        "detail": "Atomicity means all statements in a transaction succeed together or all roll back - you never get half an update. Consistency means the database stays in a valid state after every transaction - constraints, rules, and triggers all still hold. Isolation means one running transaction cannot see the half-done work of another - controlled by isolation levels and locks. Durability means once a COMMIT succeeds, the data survives even a server crash. SQL Server achieves Durability through Write-Ahead Logging (WAL): the log record is written to disk before the commit returns, so recovery can replay or undo it. In practice, use SET XACT_ABORT ON so any runtime error rolls back the entire transaction, not just the failing statement.",
+        "keyPoints": [
+          "Atomicity: all statements commit together or all roll back - no partial updates",
+          "Consistency: constraints and triggers keep the database valid after every transaction",
+          "Isolation: controlled by isolation levels - transactions do not see each other's partial work",
+          "Durability: the Write-Ahead Log is flushed to disk before commit returns, surviving crashes",
+          "Use SET XACT_ABORT ON with TRY/CATCH to enforce Atomicity in stored procedures"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - no error handling leaves the account debited but not credited on failure\nUPDATE BankAccounts SET Balance = Balance - 500 WHERE AccountId = 101;\nUPDATE BankAccounts SET Balance = Balance + 500 WHERE AccountId = 202;\n\n// ✅ GOOD - atomic bank transfer with full error handling\nSET XACT_ABORT ON;\nBEGIN TRY\n    BEGIN TRANSACTION;\n    UPDATE BankAccounts SET Balance = Balance - 500 WHERE AccountId = 101;\n    UPDATE BankAccounts SET Balance = Balance + 500 WHERE AccountId = 202;\n    IF (SELECT Balance FROM BankAccounts WHERE AccountId = 101) < 0\n        THROW 50001, 'Insufficient funds', 1;\n    COMMIT TRANSACTION;\nEND TRY\nBEGIN CATCH\n    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;\n    THROW;\nEND CATCH;",
+          "note": "XACT_ABORT ON ensures any runtime error rolls back the whole transaction - the CATCH block re-raises the error to the caller."
+        },
+        "analogy": "All four wheels turn together, or the car does not move.",
+        "redFlags": [
+          "Confusing Isolation with Consistency - they protect different things",
+          "Not knowing Write-Ahead Logging is how Durability is physically implemented",
+          "Saying a TRY/CATCH alone is enough without SET XACT_ABORT ON or checking @@TRANCOUNT"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How is Durability actually guaranteed after a power failure?",
+            "a": "Write-Ahead Logging flushes the log to disk before the commit returns, so on restart SQL Server replays committed transactions and rolls back incomplete ones."
+          },
+          {
+            "q": "What is XACT_ABORT and why should you use it?",
+            "a": "It makes any runtime error roll back the entire transaction automatically - without it, some errors only abort the single statement and leave the transaction open."
+          },
+          {
+            "q": "What enforces Consistency in SQL Server?",
+            "a": "Constraints, foreign keys, triggers, and the application logic inside the transaction all work together to keep the database in a valid state."
+          },
+          {
+            "q": "What is a SAVEPOINT and how does it relate to Atomicity?",
+            "a": "A SAVEPOINT lets you roll back to a named point inside a transaction without undoing the whole thing - partial rollback while keeping the outer transaction alive."
+          },
+          {
+            "q": "What happens if you forget to check @@TRANCOUNT before ROLLBACK?",
+            "a": "If there is no open transaction, ROLLBACK throws an error - always check @@TRANCOUNT > 0 first inside a CATCH block."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through ACID using a bank transfer as the example."
+          },
+          {
+            "role": "me",
+            "text": "Atomicity means the debit and credit both commit or both roll back - you never see money leave one account without arriving in the other. Consistency means balance constraints still hold after the transfer. Isolation stops other transactions from seeing the half-done state, and Durability means once it commits it survives a crash."
+          },
+          {
+            "role": "interviewer",
+            "text": "How is Durability actually implemented under the hood?"
+          },
+          {
+            "role": "me",
+            "text": "Through Write-Ahead Logging - the log record is hardened to disk before the COMMIT returns, so on recovery SQL Server can replay committed transactions and undo anything incomplete. The data pages themselves can still be in memory at commit time."
+          },
+          {
+            "role": "interviewer",
+            "text": "In a stored procedure, how do you make sure a mid-transaction error does not leave the data half-applied?"
+          },
+          {
+            "role": "me",
+            "text": "I use SET XACT_ABORT ON at the top and wrap the work in a TRY/CATCH. If anything fails, XACT_ABORT rolls back automatically, and the CATCH double-checks @@TRANCOUNT > 0 before issuing ROLLBACK, then re-throws with THROW."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why re-throw the error instead of just swallowing it?"
+          },
+          {
+            "role": "me",
+            "text": "The calling application needs to know the transaction failed so it can surface an error to the user or trigger a retry. Swallowing it silently leaves the caller thinking the operation succeeded when it did not."
+          },
+          {
+            "role": "interviewer",
+            "text": "Which ACID property is most commonly misunderstood in your experience?"
+          },
+          {
+            "role": "me",
+            "text": "Isolation - developers often confuse it with Consistency. Isolation is about concurrent transactions not seeing each other's partial work, controlled by isolation levels like READ COMMITTED or SNAPSHOT. Consistency is about the database rules staying valid, enforced by constraints and triggers."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-transactions-002",
+      "q": "What are SQL Server isolation levels, and what concurrency problems does each prevent?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["isolation levels", "dirty read", "phantom read", "non-repeatable read", "snapshot", "read committed"],
+      "answer": {
+        "oneLiner": "Isolation levels control what one transaction can see from another. There are five levels, each trading concurrency for protection against dirty reads, non-repeatable reads, and phantom reads.",
+        "detail": "A dirty read means reading uncommitted data that might be rolled back - only possible at Read Uncommitted. A non-repeatable read means reading the same row twice and getting different values because another transaction updated it in between - fixed at Repeatable Read and above. A phantom read means a range query returns different rows on re-execution because another transaction inserted or deleted rows - fixed at Serializable and Snapshot. SQL Server's default is Read Committed, which blocks readers on uncommitted data but does not prevent non-repeatable or phantom reads. RCSI (READ_COMMITTED_SNAPSHOT ON) upgrades Read Committed to use row versioning so readers see the last committed version without taking shared locks - eliminating most reader-writer blocking with no application code changes. Full Snapshot Isolation versions at the start of the whole transaction and detects write conflicts, erroring if another transaction changed a row you already read.",
+        "keyPoints": [
+          "Read Uncommitted: allows dirty reads - never use in production",
+          "Read Committed (default): no dirty reads but allows non-repeatable reads",
+          "Repeatable Read: holds shared locks until commit - prevents non-repeatable reads",
+          "Serializable: range locks prevent phantoms - lowest concurrency",
+          "RCSI: readers use row versions with no shared locks, eliminates most blocking - recommended for OLTP"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - NOLOCK hint risks dirty reads and missing or duplicate rows during page splits\nSELECT * FROM Orders WITH (NOLOCK) WHERE CustomerId = 42;\n\n// ✅ GOOD - enable RCSI at database level; readers get last committed version with no blocking\nALTER DATABASE ShopDb\n    SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;\n\n-- Ordinary queries now use versioning instead of shared locks\nSELECT OrderId, Total FROM Orders WHERE CustomerId = 42;\n\n-- Use Snapshot when the whole transaction needs a consistent point-in-time view\nSET TRANSACTION ISOLATION LEVEL SNAPSHOT;\nBEGIN TRANSACTION;\n    SELECT Balance FROM BankAccounts WHERE AccountId = 101;\n    SELECT Balance FROM BankAccounts WHERE AccountId = 202;\nCOMMIT;",
+          "note": "Enable RCSI at the database level to stop reader-writer blocking without touching any application code."
+        },
+        "analogy": "Read Committed is a window into the past minute; Snapshot is a photograph taken when your transaction started.",
+        "redFlags": [
+          "Recommending NOLOCK as a performance fix without explaining it allows dirty reads and phantom rows",
+          "Confusing RCSI (statement-level versioning) with Snapshot Isolation (transaction-level versioning)",
+          "Not knowing the three concurrency problems: dirty read, non-repeatable read, and phantom read"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is a dirty read and which isolation level allows it?",
+            "a": "Reading uncommitted data from another transaction that might still be rolled back - only Read Uncommitted allows this."
+          },
+          {
+            "q": "How is RCSI different from Snapshot Isolation?",
+            "a": "RCSI versions per statement so each statement sees the latest committed data; Snapshot versions at transaction start and can throw a write-conflict error on concurrent updates."
+          },
+          {
+            "q": "Why is NOLOCK dangerous in a high-write environment?",
+            "a": "It can return duplicate or missing rows during page splits because it bypasses all locking, not just committed-data checks."
+          },
+          {
+            "q": "What is a phantom read?",
+            "a": "Running the same range query twice in a transaction and getting different rows because another transaction inserted or deleted in that range between the two reads."
+          },
+          {
+            "q": "What does enabling RCSI cost?",
+            "a": "Extra tempdb usage for the version store, and a 14-byte version pointer added to each row in the database."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Name the isolation levels and what concurrency problem each one prevents."
+          },
+          {
+            "role": "me",
+            "text": "Read Uncommitted allows dirty reads. Read Committed - the default - stops dirty reads. Repeatable Read also stops non-repeatable reads by holding shared locks. Serializable and Snapshot additionally prevent phantom reads by covering ranges."
+          },
+          {
+            "role": "interviewer",
+            "text": "Our OLTP app has heavy blocking between readers and writers. What would you recommend?"
+          },
+          {
+            "role": "me",
+            "text": "Turn on RCSI - it upgrades Read Committed to use row versioning so readers see the last committed row without taking a shared lock. Writers and readers stop blocking each other and no application code changes are needed."
+          },
+          {
+            "role": "interviewer",
+            "text": "A developer says they already use NOLOCK everywhere. Why is that a problem?"
+          },
+          {
+            "role": "me",
+            "text": "NOLOCK reads uncommitted data - dirty reads - and during page splits it can return the same row twice or skip rows entirely. RCSI gives you the same non-blocking reads but always returns committed, consistent data."
+          },
+          {
+            "role": "interviewer",
+            "text": "How is RCSI different from full Snapshot Isolation?"
+          },
+          {
+            "role": "me",
+            "text": "RCSI is statement-level: each statement sees the latest committed version at the moment it runs. Full Snapshot takes a single point-in-time view for the entire transaction and will throw a write-conflict error if another transaction modifies a row you already read."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you choose full Snapshot over RCSI?"
+          },
+          {
+            "role": "me",
+            "text": "When you need a consistent multi-statement view - for example a financial report that reads account balances in multiple queries and must see exactly the same committed state across all of them, without locks blocking writers."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-transactions-003",
+      "q": "What causes a deadlock in SQL Server and how do you prevent or resolve it?",
+      "level": "senior",
+      "type": "scenario",
+      "freq": "high",
+      "tags": ["deadlock", "locking", "transaction", "deadlock graph", "prevention"],
+      "answer": {
+        "oneLiner": "A deadlock is a circular wait where two transactions each hold a lock the other needs. SQL Server detects the cycle and kills the cheaper victim with error 1205. Prevent it with consistent lock order, short transactions, and good indexes.",
+        "detail": "SQL Server's lock monitor runs every five seconds looking for wait cycles. When it finds one, it picks the cheapest transaction to roll back - usually the one with the least log written - and returns error 1205 to that connection. The surviving transaction completes normally. To prevent deadlocks: always access tables in the same order across all transactions to break the circular wait pattern. Keep transactions as short as possible so locks are released quickly. Use good indexes so locks cover fewer rows. RCSI removes a large category of reader-writer deadlocks because readers no longer take shared locks. For diagnosis, the system_health Extended Events session captures deadlock graphs by default with no setup - query sys.dm_xe_session_targets to get the XML showing exactly who held what and who waited. The application must always catch error 1205 and retry with exponential backoff.",
+        "keyPoints": [
+          "Deadlock = circular lock wait; SQL Server auto-selects the cheapest victim and raises error 1205",
+          "Always access tables in the same order in every transaction to break the circular wait",
+          "Keep transactions short - commit as quickly as possible to release locks",
+          "RCSI removes reader-writer deadlocks because readers stop taking shared locks",
+          "Application must catch error 1205 and retry - EF Core uses EnableRetryOnFailure for this"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - Session A locks Orders then Customers; Session B locks Customers then Orders - circular wait\n-- Session A: BEGIN TRAN; UPDATE Orders ... then UPDATE Customers ...\n-- Session B: BEGIN TRAN; UPDATE Customers ... then UPDATE Orders ...\n-- Each waits for the other -> error 1205 on the victim\n\n// ✅ GOOD - both sessions access tables in the same order to break the cycle\nBEGIN TRAN;\n    UPDATE Customers SET CreditLimit = 2000 WHERE CustomerId = 42;\n    UPDATE Orders SET Status = 'Shipped' WHERE OrderId = 501;\nCOMMIT;\n\n-- Read deadlock graphs from the system_health Extended Events session\nSELECT xdr.value('@timestamp', 'datetime2') AS DeadlockTime,\n       xdr.query('.') AS DeadlockGraph\nFROM (SELECT CAST(target_data AS XML) AS TargetData\n      FROM sys.dm_xe_session_targets t\n      JOIN sys.dm_xe_sessions s ON t.event_session_address = s.address\n      WHERE s.name = 'system_health' AND t.target_name = 'ring_buffer') AS Data\nCROSS APPLY TargetData.nodes('//RingBufferTarget/event[@name=\"xml_deadlock_report\"]') AS XEventData(xdr)\nORDER BY DeadlockTime DESC;",
+          "note": "The system_health Extended Events session captures deadlock graphs automatically - no configuration required."
+        },
+        "analogy": "Two delivery trucks on a single-lane bridge, each waiting for the other to reverse.",
+        "redFlags": [
+          "Saying NOLOCK solves deadlocks - it avoids some but creates dirty read problems",
+          "Not knowing SQL Server automatically resolves deadlocks by killing a victim",
+          "Not knowing the application must catch error 1205 and retry"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How does SQL Server choose the deadlock victim?",
+            "a": "It picks the transaction that is cheapest to roll back, usually the one with the least transaction log written - you can influence this with SET DEADLOCK_PRIORITY."
+          },
+          {
+            "q": "How does RCSI reduce deadlocks?",
+            "a": "Readers use row versions instead of shared locks, eliminating the reader-writer lock cycle that causes many common deadlocks."
+          },
+          {
+            "q": "Where do you find the deadlock graph without setting up any monitoring?",
+            "a": "In the system_health Extended Events session - it captures deadlock XML by default and you can query sys.dm_xe_session_targets to read it."
+          },
+          {
+            "q": "What is lock escalation and how can it contribute to deadlocks?",
+            "a": "When many row locks escalate to a single table lock, the locked scope widens, increasing the chance that another transaction is waiting on the same table lock."
+          },
+          {
+            "q": "How does EF Core handle transient deadlock retries?",
+            "a": "Through EnableRetryOnFailure in the connection configuration, which retries on SQL error 1205 and other transient errors with backoff."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain what actually causes a deadlock and how SQL Server handles it."
+          },
+          {
+            "role": "me",
+            "text": "A deadlock is a circular wait - transaction A holds a lock B needs while B holds one A needs. The lock monitor detects the cycle and picks the cheaper victim to roll back, returning error 1205 to that connection so the other transaction can complete."
+          },
+          {
+            "role": "interviewer",
+            "text": "What are the main ways to prevent deadlocks in the first place?"
+          },
+          {
+            "role": "me",
+            "text": "Access tables in a consistent order everywhere - that breaks the circular wait pattern. Keep transactions short so locks are held as briefly as possible. Index well so locks cover fewer rows. And turn on RCSI to eliminate the reader-writer deadlock category entirely."
+          },
+          {
+            "role": "interviewer",
+            "text": "They still happen occasionally in production. How do you diagnose them?"
+          },
+          {
+            "role": "me",
+            "text": "The system_health Extended Events session captures deadlock graphs by default - I query sys.dm_xe_session_targets to get the XML, which shows exactly who held what lock and who was waiting. No setup needed."
+          },
+          {
+            "role": "interviewer",
+            "text": "Once you know the root cause, what do you do at the application level?"
+          },
+          {
+            "role": "me",
+            "text": "Catch error 1205 and retry with exponential backoff - in EF Core that is EnableRetryOnFailure. The victim transaction was already rolled back by SQL Server, so a clean retry is safe."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you control which transaction gets sacrificed?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - SET DEADLOCK_PRIORITY LOW makes a session more likely to be chosen as victim, and HIGH makes it less likely. You might set a background reporting query to LOW so the critical write transaction always survives."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-transactions-004",
+      "q": "Explain database normalization. What are 1NF, 2NF, and 3NF? When would you denormalize?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["normalization", "denormalization", "1nf", "2nf", "3nf", "database design"],
+      "answer": {
+        "oneLiner": "Normalization removes data redundancy step by step. 1NF requires atomic column values. 2NF removes partial dependency on a composite key. 3NF removes transitive dependency between non-key columns. Denormalize deliberately for read-heavy analytics.",
+        "detail": "First Normal Form (1NF) means every column holds a single atomic value - no comma-separated lists, no repeating column groups like Phone1, Phone2, Phone3. The table must have a primary key. Second Normal Form (2NF) applies only when the primary key is composite. Every non-key column must depend on the full key, not just part of it. Example violation: storing ProductName in an OrderItems table keyed by (OrderId, ProductId) is wrong because ProductName depends only on ProductId. Third Normal Form (3NF) removes transitive dependencies. If DepartmentName is stored in an Employees table, it depends on DepartmentId rather than EmployeeId - move it to a Departments table. OLTP databases target 3NF to minimize update anomalies. Data warehouses deliberately denormalize into star schemas - a central fact table with dimension tables - because joins are expensive at analytical scale and data is loaded in bulk rather than updated row by row.",
+        "keyPoints": [
+          "1NF: atomic values per cell, no repeating groups, must have a primary key",
+          "2NF: every non-key column depends on the full composite key, not just part of it",
+          "3NF: no non-key column depends on another non-key column - remove transitive dependencies",
+          "Denormalize for read-heavy reporting and data warehouses where join cost dominates reads",
+          "Indexed views in SQL Server give denormalized read speed without manual data duplication"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - 3NF violation: DepartmentName depends on DepartmentId, not on EmployeeId\nCREATE TABLE Employees (\n    EmployeeId     INT PRIMARY KEY,\n    Name           NVARCHAR(100),\n    DepartmentId   INT,\n    DepartmentName NVARCHAR(100)  -- transitive dependency - remove this column\n);\n\n// ✅ GOOD - 3NF: DepartmentName lives in its own table\nCREATE TABLE Departments (\n    DepartmentId   INT PRIMARY KEY,\n    DepartmentName NVARCHAR(100) NOT NULL\n);\nCREATE TABLE Employees (\n    EmployeeId   INT PRIMARY KEY,\n    Name         NVARCHAR(100) NOT NULL,\n    DepartmentId INT NOT NULL REFERENCES Departments(DepartmentId)\n);\n\n-- Denormalized read-optimized reporting table (deliberate, documented decision)\nCREATE TABLE EmployeeSalesReport (\n    EmployeeId     INT,\n    EmployeeName   NVARCHAR(100),\n    DepartmentName NVARCHAR(100),  -- redundant but avoids join in every report\n    TotalSales     DECIMAL(18,2)\n);",
+          "note": "Normalize for OLTP to prevent update anomalies; denormalize deliberately for analytics to reduce join cost."
+        },
+        "analogy": "Normalize once, then denormalize only where the join tax is worth paying.",
+        "redFlags": [
+          "Not being able to give a concrete example of a 2NF or 3NF violation",
+          "Thinking full normalization always means better query performance",
+          "Not knowing when and why a data warehouse uses a star schema instead of 3NF"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is a 2NF violation with a concrete example?",
+            "a": "Storing ProductName in an OrderItems table keyed by (OrderId, ProductId) - ProductName depends only on ProductId, not on the full composite key."
+          },
+          {
+            "q": "What is BCNF and how does it differ from 3NF?",
+            "a": "Boyce-Codd Normal Form is stricter - every determinant must be a candidate key. Some tables can be in 3NF but still violate BCNF."
+          },
+          {
+            "q": "What is a star schema and when do you use it?",
+            "a": "A star schema has a central fact table joined to denormalized dimension tables - used in data warehouses where read speed matters more than update efficiency."
+          },
+          {
+            "q": "How do indexed views avoid physical denormalization?",
+            "a": "An indexed view materializes and maintains a join or aggregate automatically, giving denormalized read speed without manually duplicating data in another table."
+          },
+          {
+            "q": "What update anomalies does normalization prevent?",
+            "a": "Insert anomalies, update anomalies where the same fact stored in multiple places goes out of sync, and delete anomalies where removing one row accidentally destroys unrelated data."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain 1NF, 2NF, and 3NF quickly and give a real example for each."
+          },
+          {
+            "role": "me",
+            "text": "1NF is atomic values with no repeating groups - for example splitting a comma-separated Tags column into a separate Tags table with one row per tag. 2NF removes partial dependency on a composite key - ProductName in OrderItems keyed by (OrderId, ProductId) should move to a Products table because it only depends on ProductId. 3NF removes transitive dependencies - DepartmentName in Employees should move to Departments because it depends on DepartmentId, not on EmployeeId."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you deliberately break normalization?"
+          },
+          {
+            "role": "me",
+            "text": "For read-heavy analytics or a data warehouse using a star schema, where avoiding expensive joins matters more than preventing redundancy. Analytical queries scan millions of rows and a join to a dimension table can dominate the cost."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there a way to get denormalized read speed without physically duplicating data?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - an indexed view in SQL Server materializes a join or aggregate and keeps it in sync automatically. You query it like a table but the join has already been done. The trade-off is extra write overhead when the underlying tables change."
+          },
+          {
+            "role": "interviewer",
+            "text": "What concrete problem does violating 3NF cause in production?"
+          },
+          {
+            "role": "me",
+            "text": "Update anomalies - if DepartmentName is stored in every Employees row and the department renames, you must update every row. Miss one and you have inconsistent data in the same table. In a normalized design you change a single row in Departments."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-transactions-005",
+      "q": "What is the difference between a primary key and a unique key? What is a foreign key?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["primary key", "unique key", "foreign key", "constraints", "null", "clustered"],
+      "answer": {
+        "oneLiner": "A primary key uniquely identifies each row, cannot be NULL, and is clustered by default. A unique key also enforces uniqueness but allows a single NULL and is non-clustered by default. A foreign key links a child column to a parent key to enforce referential integrity.",
+        "detail": "A table can have only one primary key - it defines the row's identity and is implemented as a clustered B-tree index by default in SQL Server. A unique constraint allows one NULL value because SQL Server considers NULL an unknown value - however two NULLs in the same unique column are rejected as duplicates. A table can have many unique constraints. A foreign key ensures that a value in the child table either exists in the parent table or is NULL. When you add a foreign key, SQL Server does NOT automatically create an index on the child column. Without that index, deleting a parent row causes a full scan of the child table to check for dependent rows. Always index foreign key columns yourself. Foreign keys also support cascading actions: ON DELETE CASCADE, SET NULL, or RESTRICT to control what happens when a parent row is removed.",
+        "keyPoints": [
+          "Primary key: NOT NULL, one per table, creates a clustered index by default",
+          "Unique key: allows one NULL, many per table, non-clustered by default",
+          "Foreign key: child value must exist in parent or be NULL - enforces referential integrity",
+          "SQL Server does NOT auto-index FK columns - always add the index manually",
+          "FK supports ON DELETE/UPDATE CASCADE, SET NULL, or RESTRICT"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - FK column not indexed; parent DELETE causes a full child table scan\nCREATE TABLE Orders (\n    OrderId    INT IDENTITY PRIMARY KEY,\n    CustomerId INT NOT NULL REFERENCES Customers(CustomerId)\n    -- no index on CustomerId - every parent delete scans this entire table\n);\n\n// ✅ GOOD - FK column indexed; named constraints for readable error messages\nCREATE TABLE Orders (\n    OrderId    INT IDENTITY CONSTRAINT PK_Orders PRIMARY KEY,\n    CustomerId INT NOT NULL CONSTRAINT FK_Orders_Customers\n                   REFERENCES Customers(CustomerId)\n                   ON DELETE RESTRICT\n                   ON UPDATE CASCADE\n);\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId ON Orders (CustomerId);\n\n-- Unique key on Email: enforces uniqueness, one NULL allowed\nALTER TABLE Customers\n    ADD CONSTRAINT UQ_Customers_Email UNIQUE (Email);",
+          "note": "Always create an index on foreign key columns - SQL Server will silently scan the child table without one."
+        },
+        "analogy": "PK is the passport number - unique, mandatory, never blank. FK is the visa stamp that says the destination country must exist.",
+        "redFlags": [
+          "Saying a unique constraint allows multiple NULLs - SQL Server only allows one",
+          "Not knowing SQL Server does not auto-index foreign key columns on the child table",
+          "Thinking a table can have more than one clustered index"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can a foreign key reference a unique key instead of the primary key?",
+            "a": "Yes - a foreign key can target any column covered by a primary key or unique constraint on the parent table."
+          },
+          {
+            "q": "Why must you index the foreign key column on the child table?",
+            "a": "Without an index, deleting or updating a parent row forces SQL Server to scan the entire child table to check for dependent rows - very slow on large tables."
+          },
+          {
+            "q": "What is the difference between ON DELETE CASCADE and ON DELETE RESTRICT?",
+            "a": "CASCADE automatically deletes child rows when the parent is deleted; RESTRICT blocks the parent delete if any dependent child rows exist."
+          },
+          {
+            "q": "Can a PK column ever be NULL?",
+            "a": "No - a primary key is NOT NULL by definition and SQL Server enforces this even without an explicit NOT NULL constraint on the column."
+          },
+          {
+            "q": "What happens if you insert a child row with an FK value that does not exist in the parent?",
+            "a": "SQL Server raises a foreign key violation error and rejects the insert - referential integrity is enforced at the database level."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the practical difference between a primary key and a unique key?"
+          },
+          {
+            "role": "me",
+            "text": "A primary key enforces uniqueness plus NOT NULL, allows only one per table, and by default creates a clustered index. A unique key also enforces uniqueness but permits a single NULL value and creates a non-clustered index by default - you can have many per table."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does a foreign key actually do at the database level?"
+          },
+          {
+            "role": "me",
+            "text": "It enforces referential integrity - SQL Server checks that every non-NULL value in the child column exists in the parent. It also controls cascading actions: if the parent row is deleted you can cascade the delete, set the child FK to NULL, or block the delete entirely with RESTRICT."
+          },
+          {
+            "role": "interviewer",
+            "text": "One common performance mistake with foreign keys?"
+          },
+          {
+            "role": "me",
+            "text": "Not indexing the FK column on the child table. SQL Server does not create that index automatically. Without it, every DELETE on the parent table triggers a full scan of the child table - on a table with millions of orders that is a serious problem."
+          },
+          {
+            "role": "interviewer",
+            "text": "How many NULLs can a unique constraint hold in SQL Server?"
+          },
+          {
+            "role": "me",
+            "text": "Just one. SQL Server treats two NULLs as duplicates for the purpose of a unique constraint, so the second NULL insert will be rejected - unlike some other databases that allow multiple NULLs in a unique column."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can a foreign key reference a column that is not the primary key?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - it can target any column covered by a PRIMARY KEY or UNIQUE constraint on the parent table. This is useful when you want to reference a natural business key like ProductSKU from other tables without going through the surrogate integer ID."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-transactions-006",
+      "q": "How does a clustered index affect the physical storage of a table?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["clustered index", "physical order", "b-tree", "page splits", "heap", "identity"],
+      "answer": {
+        "oneLiner": "A clustered index physically orders the table rows by its key - the B-tree leaf level IS the data. Range scans on the key are fast and sequential. Random key inserts cause page splits and fragmentation.",
+        "detail": "Without a clustered index the table is a heap - rows are stored in any order and located by a Row ID (RID). With a clustered index the rows are sorted by the key value across all data pages. The B-tree root and intermediate levels hold key values and page pointers; the leaf level holds the actual rows in key order. This makes range scans very efficient because the data is already sequential on disk. The downside is inserts with random or out-of-order keys - the row must go in the correct sorted position, potentially splitting a full page. A page split writes half the existing page to a new page, causing fragmentation and extra I/O on future reads. IDENTITY columns avoid this because they always append to the end. Wide clustered keys are also expensive because every non-clustered index on the table carries the clustered key as its row locator - a wide key bloats all other indexes. Fix fragmentation with REORGANIZE (5-30% fragmentation) or REBUILD (above 30%), and tune the fill factor to leave room for inserts.",
+        "keyPoints": [
+          "Clustered index leaf level IS the data rows - not a separate structure pointing to data",
+          "A table without a clustered index is a heap with random row order and RID locators",
+          "All non-clustered indexes carry the clustered key as their row locator",
+          "Random keys like GUIDs cause page splits and fragmentation on insert",
+          "Fix fragmentation with REORGANIZE (5-30%) or REBUILD (above 30%)"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - GUID clustered key causes random inserts and page splits\nCREATE TABLE Shipments (\n    ShipmentId UNIQUEIDENTIFIER DEFAULT NEWID() PRIMARY KEY,  -- random, fragments badly\n    CustomerId INT,\n    ShippedAt  DATETIME2\n);\n\n// ✅ GOOD - sequential IDENTITY key always appends to the end\nCREATE TABLE Shipments (\n    ShipmentId BIGINT    IDENTITY CONSTRAINT PK_Shipments PRIMARY KEY,\n    CustomerId INT       NOT NULL,\n    ShippedAt  DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()\n);\n\n-- Check fragmentation on the Shipments table\nSELECT i.name AS IndexName,\n       ips.avg_fragmentation_in_percent,\n       ips.page_count\nFROM sys.dm_db_index_physical_stats(DB_ID(), OBJECT_ID('Shipments'), NULL, NULL, 'LIMITED') ips\nJOIN sys.indexes i ON ips.object_id = i.object_id AND ips.index_id = i.index_id\nWHERE ips.avg_fragmentation_in_percent > 5;\n\n-- Rebuild the clustered index online to remove fragmentation\nALTER INDEX PK_Shipments ON Shipments REBUILD WITH (ONLINE = ON);",
+          "note": "Use NEWSEQUENTIALID() instead of NEWID() if you must use a GUID primary key - it generates sequential GUIDs to reduce page splits."
+        },
+        "analogy": "A clustered index is a filing cabinet with folders in alphabetical order - inserting a new folder in the middle means shuffling all the folders after it.",
+        "redFlags": [
+          "Thinking the clustered index is a separate structure from the table data",
+          "Not knowing that all non-clustered indexes carry the clustered key as their row locator",
+          "Not knowing GUID primary keys cause page splits on insert-heavy tables"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is a heap and when might you use one?",
+            "a": "A table with no clustered index - rows are unordered and located by RID. Useful for staging tables where you always truncate and never do range scans."
+          },
+          {
+            "q": "Why does a wide clustered key bloat all other indexes?",
+            "a": "Every non-clustered index uses the clustered key as its row locator at the leaf level - a 16-byte GUID key bloats all non-clustered indexes versus a 4-byte INT."
+          },
+          {
+            "q": "What is NEWSEQUENTIALID and why is it better than NEWID for a clustered key?",
+            "a": "NEWSEQUENTIALID generates GUIDs in ascending order so inserts always go at the end of the clustered index, avoiding page splits - similar to IDENTITY."
+          },
+          {
+            "q": "What fill factor setting helps high-insert tables?",
+            "a": "A lower fill factor like 70-80% leaves free space in each page for new inserts, reducing page splits at the cost of using more disk space."
+          },
+          {
+            "q": "REBUILD vs REORGANIZE - when do you use each?",
+            "a": "REORGANIZE defragments online with less locking and suits 5-30% fragmentation; REBUILD recreates the index fully and is used above 30%, with ONLINE option available in Enterprise edition."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How does adding a clustered index change the physical storage of a table?"
+          },
+          {
+            "role": "me",
+            "text": "The rows are physically ordered by the key value across the data pages. The leaf level of the B-tree is the actual row data - not a pointer to rows elsewhere. So range scans on the key read sequential pages and are very efficient."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens when you insert a row with a GUID primary key?"
+          },
+          {
+            "role": "me",
+            "text": "GUIDs are random, so the new row must go in the middle of the sorted pages. If the target page is full it splits - half the rows move to a new page. This causes fragmentation and extra I/O. An IDENTITY column avoids this completely because it always appends to the end."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the knock-on effect of a wide clustered key on other indexes?"
+          },
+          {
+            "role": "me",
+            "text": "Every non-clustered index uses the clustered key as its row locator at the leaf level. A 16-byte GUID key makes every non-clustered index 12 bytes wider per row compared to a 4-byte INT key - multiplied across millions of rows and many indexes that adds up significantly."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you monitor and fix fragmentation?"
+          },
+          {
+            "role": "me",
+            "text": "Query sys.dm_db_index_physical_stats to get avg_fragmentation_in_percent. Between 5 and 30 percent I run REORGANIZE - it is fully online with minimal locking. Above 30 percent I run REBUILD WITH ONLINE = ON which recreates the index and also updates statistics."
+          },
+          {
+            "role": "interviewer",
+            "text": "If you must use a GUID, how do you reduce the split problem?"
+          },
+          {
+            "role": "me",
+            "text": "Use NEWSEQUENTIALID() instead of NEWID() - it generates GUIDs in ascending order so inserts still go near the end of the index. Alternatively use a surrogate BIGINT IDENTITY as the clustered key and store the GUID in a separate column with a UNIQUE constraint."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-transactions-007",
+      "q": "Explain key database design decisions: when to use surrogate vs natural keys, and how to design for scalability.",
+      "level": "senior",
+      "type": "design",
+      "freq": "medium",
+      "tags": ["database design", "surrogate key", "natural key", "scalability", "sharding", "partitioning"],
+      "answer": {
+        "oneLiner": "Use surrogate keys - an INT or BIGINT IDENTITY - as the clustered primary key for stability and narrow indexes. Enforce the natural key with a separate UNIQUE constraint. Plan for scale with date partitioning, archiving, and audit columns from day one.",
+        "detail": "A natural key is a business attribute like email address, product SKU, or VAT number. Natural keys cause problems: they may change over time, be reused after deletion, contain sensitive data that leaks into all FK columns, or be too wide for efficient joining. A surrogate key is a system-generated identifier with no business meaning - INT IDENTITY for smaller tables, BIGINT for anything that might grow large. The surrogate key is narrow, immutable, and never carries business meaning that might evolve. Still enforce the natural key with a UNIQUE constraint so business rules are guaranteed at the database level. For scalability, design large tables with partitioning in mind from the start. Partition by a date column so old data can be archived in milliseconds using partition switching - a metadata-only operation with no data movement. Add CreatedAt and ModifiedAt columns to every table from day one - retrofitting them later is expensive. For multi-tenant SaaS, include a TenantId on every table and index it, designing so you can shard by tenant into dedicated databases or elastic pools as the tenant count grows.",
+        "keyPoints": [
+          "Surrogate key: narrow INT/BIGINT IDENTITY, no business meaning, immutable - use as clustered PK",
+          "Natural key: enforce with a UNIQUE constraint, not as the clustered PK",
+          "Date-partition large tables from day one for fast archiving via partition switching",
+          "Always add CreatedAt and ModifiedAt columns - retrofitting them later is expensive",
+          "Multi-tenant SaaS: put TenantId on every table, index it, design for shard-readiness from the start"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - email as clustered PK: can change, wide, leaks into every FK column\nCREATE TABLE Customers (Email NVARCHAR(256) PRIMARY KEY, Name NVARCHAR(100));\n\n// ✅ GOOD - surrogate PK + separate unique constraint for natural key\nCREATE TABLE Customers (\n    CustomerId  BIGINT        IDENTITY CONSTRAINT PK_Customers PRIMARY KEY,\n    Email       NVARCHAR(256) NOT NULL  CONSTRAINT UQ_Customers_Email UNIQUE,\n    Name        NVARCHAR(200) NOT NULL,\n    TenantId    INT           NOT NULL,\n    CreatedAt   DATETIME2     NOT NULL  DEFAULT SYSUTCDATETIME(),\n    ModifiedAt  DATETIME2     NOT NULL  DEFAULT SYSUTCDATETIME()\n);\nCREATE INDEX IX_Customers_TenantId ON Customers (TenantId);\n\n-- Date-partitioned Orders for fast archiving via partition switch\nCREATE PARTITION FUNCTION pf_OrderDate (DATE)\n    AS RANGE RIGHT FOR VALUES ('2022-01-01','2023-01-01','2024-01-01','2025-01-01');\nCREATE PARTITION SCHEME ps_OrderDate\n    AS PARTITION pf_OrderDate ALL TO ([PRIMARY]);\nCREATE TABLE Orders (\n    OrderId   BIGINT IDENTITY,\n    OrderDate DATE NOT NULL,\n    Total     DECIMAL(18,2)\n) ON ps_OrderDate(OrderDate);",
+          "note": "Partition switching archives a whole year of orders in milliseconds - it is a metadata operation with no data movement."
+        },
+        "analogy": "Design the database for the traffic you will have in two years, not the traffic you have today.",
+        "redFlags": [
+          "Using email, SSN, or any mutable business value as the clustered primary key",
+          "Not enforcing the natural key with a UNIQUE constraint when using a surrogate PK",
+          "Ignoring date partitioning and audit columns until the table has hundreds of millions of rows"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why is a wide natural key bad as a clustered PK?",
+            "a": "Every non-clustered index carries the clustered key as its row locator - a 256-byte email key bloats all other indexes and every FK column referencing the table."
+          },
+          {
+            "q": "What is partition elimination and why does it matter?",
+            "a": "When a query predicate matches the partition key, the optimizer skips all non-matching partitions entirely - turning a full table scan into a read of one or two partitions."
+          },
+          {
+            "q": "What is partition switching and how is it used for archiving?",
+            "a": "Partition switching reassigns a partition to another table in a single metadata operation with no data movement - so you can archive a full year of orders in milliseconds."
+          },
+          {
+            "q": "How do you design a multi-tenant Azure SQL database for scale?",
+            "a": "Add TenantId to every table, index it, and design so you can shard by tenant into separate databases or elastic pools as tenant count and data volume grow."
+          },
+          {
+            "q": "Why add ModifiedAt from day one rather than later?",
+            "a": "Retrofitting requires altering every table and updating all INSERT and UPDATE paths - much cheaper to add at creation, and it enables incremental sync, CDC, and event sourcing patterns from the start."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Surrogate versus natural key - what is your default and why?"
+          },
+          {
+            "role": "me",
+            "text": "Surrogate BIGINT IDENTITY as the clustered primary key - it is narrow, sequential, and has no business meaning that could ever change. I still enforce the natural key like ProductSKU or CustomerEmail with a separate UNIQUE constraint so the business rule is guaranteed at the database level."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the problem with using a customer email as the clustered PK?"
+          },
+          {
+            "role": "me",
+            "text": "Emails can change, they are wide up to 256 bytes, and every FK column and every non-clustered index on the table carries the clustered key as its row locator. A 256-byte email key bloats the entire index tree. An INT is 4 bytes."
+          },
+          {
+            "role": "interviewer",
+            "text": "The Orders table is growing to 800 million rows. How do you design for that?"
+          },
+          {
+            "role": "me",
+            "text": "Partition by OrderDate from the start - create a partition function and scheme, then build the table on that scheme. When you want to archive orders older than two years, a partition switch moves the whole partition to an archive table as a metadata-only operation - milliseconds instead of hours of DELETE."
+          },
+          {
+            "role": "interviewer",
+            "text": "What columns do you always add by default even when the team says they do not need them yet?"
+          },
+          {
+            "role": "me",
+            "text": "CreatedAt and ModifiedAt as DATETIME2 with SYSUTCDATETIME() defaults. Retrofitting them later means altering every table, updating all INSERT and UPDATE paths, and potentially breaking audit or sync pipelines. They cost almost nothing upfront and are invaluable for debugging, CDC, and incremental ETL."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you add multi-tenancy from day one in a SaaS product?"
+          },
+          {
+            "role": "me",
+            "text": "Add TenantId INT NOT NULL to every table, index it, and include it in every query's WHERE clause. From day one you can run tenants in a shared database with row-level isolation. As the product grows, sharding by TenantId lets you move large tenants to dedicated databases or elastic pools without redesigning the schema."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-transactions-008",
+      "q": "What is the difference between a primary key and a unique key in terms of NULL handling and index type?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["primary key", "unique key", "null", "clustered", "non-clustered"],
+      "answer": {
+        "oneLiner": "A primary key is NOT NULL and creates a clustered index by default, with one allowed per table. A unique key allows a single NULL and creates a non-clustered index by default, with many allowed per table.",
+        "detail": "Both constraints enforce uniqueness, but their NULL handling differs. A PK column is implicitly NOT NULL - SQL Server rejects any NULL insert. A unique constraint column allows exactly one NULL because SQL Server treats NULL as an unknown value. However SQL Server specifically rejects a second NULL as a duplicate - unlike some other databases that allow multiple NULLs in a unique column. Both constraints are implemented as indexes underneath. The PK creates a clustered index by default and the unique constraint creates a non-clustered index by default. You can override these defaults - for example creating a non-clustered primary key or a clustered unique constraint. Both can be composite across multiple columns. A unique index and a unique constraint are functionally identical at the storage level. Naming constraints explicitly makes error messages more readable and schema scripts easier to manage.",
+        "keyPoints": [
+          "PK: NOT NULL, one per table, clustered by default",
+          "UNIQUE: allows exactly one NULL, many per table, non-clustered by default",
+          "Both can be composite across multiple columns",
+          "A unique constraint and a unique index are functionally the same at the storage level",
+          "Always name constraints explicitly for readable error messages and easier schema management"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - unnamed constraints produce unreadable error messages like 'UQ__Users__ABC123'\nCREATE TABLE Users (\n    UserId   INT           IDENTITY PRIMARY KEY,\n    Email    NVARCHAR(256) NOT NULL UNIQUE,\n    Username NVARCHAR(100) NOT NULL UNIQUE\n);\n\n// ✅ GOOD - named constraints with explicit index types\nCREATE TABLE Users (\n    UserId   INT           IDENTITY\n                          CONSTRAINT PK_Users PRIMARY KEY CLUSTERED,\n    Email    NVARCHAR(256) NOT NULL\n                          CONSTRAINT UQ_Users_Email UNIQUE NONCLUSTERED,\n    Username NVARCHAR(100) NOT NULL\n                          CONSTRAINT UQ_Users_Username UNIQUE NONCLUSTERED\n);\n\n-- Test NULL behavior in a unique column\nINSERT INTO Users (Email, Username) VALUES (NULL, 'alice');  -- succeeds (first NULL)\nINSERT INTO Users (Email, Username) VALUES (NULL, 'bob');    -- fails  (second NULL = duplicate)",
+          "note": "Name constraints explicitly - SQL Server uses the constraint name in the violation error message."
+        },
+        "analogy": "PK is the employee badge number - mandatory, unique, never blank. UNIQUE is the parking permit - still one per person but can be left empty once.",
+        "redFlags": [
+          "Saying a unique constraint allows multiple NULLs - SQL Server treats two NULLs as duplicates",
+          "Saying a table can have multiple clustered indexes - only one clustered index is allowed per table",
+          "Not knowing the default index types created by PK and UNIQUE constraints"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can a foreign key reference a unique key instead of the primary key?",
+            "a": "Yes - a foreign key can target any column or set of columns covered by a primary key or unique constraint on the parent table."
+          },
+          {
+            "q": "What happens when you try to insert two NULLs into a unique column in SQL Server?",
+            "a": "The second insert fails with a unique constraint violation - SQL Server treats two NULLs as duplicates, unlike some other databases."
+          },
+          {
+            "q": "Is a unique constraint the same as a unique index?",
+            "a": "Functionally yes - a unique constraint is implemented as a unique index under the hood and they behave identically for queries and insert validation."
+          },
+          {
+            "q": "Can you create a non-clustered primary key?",
+            "a": "Yes - use CONSTRAINT PK_Name PRIMARY KEY NONCLUSTERED to override the default, which is useful when a different column makes a better clustered key for range scans."
+          },
+          {
+            "q": "Why name constraints explicitly rather than letting SQL Server auto-generate names?",
+            "a": "Auto-generated names like FK__Orders__CustomerId__3B75D760 make error messages and scripts hard to read and make dropping or altering specific constraints difficult to automate."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through the core differences between a primary key and a unique key."
+          },
+          {
+            "role": "me",
+            "text": "A primary key enforces uniqueness and NOT NULL, allows only one per table, and by default creates a clustered index. A unique key also enforces uniqueness but permits a single NULL value, allows many per table, and creates a non-clustered index by default."
+          },
+          {
+            "role": "interviewer",
+            "text": "If unique allows NULL, what happens if I insert two NULLs into that column?"
+          },
+          {
+            "role": "me",
+            "text": "SQL Server rejects the second NULL as a duplicate. SQL Server treats two NULLs as equal for uniqueness purposes, so only one NULL is permitted. Some other databases like PostgreSQL allow multiple NULLs in a unique column, but SQL Server does not."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the default index type for each constraint?"
+          },
+          {
+            "role": "me",
+            "text": "A primary key creates a clustered index by default and a unique constraint creates a non-clustered index by default. You can override both - PRIMARY KEY NONCLUSTERED is valid if a different column is a better clustered key for your query patterns."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there any difference between a unique constraint and a unique index?"
+          },
+          {
+            "role": "me",
+            "text": "Functionally no - a unique constraint is backed by a unique index under the hood and behaves identically for reads, inserts, and updates. The constraint is just a named metadata wrapper on top of the index."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why should you always name your constraints explicitly?"
+          },
+          {
+            "role": "me",
+            "text": "When a constraint violation happens, SQL Server uses the constraint name in the error message. An auto-generated name like FK__Orders__CustomerId__3B75D760 tells you nothing. An explicit name like FK_Orders_Customers tells you exactly what failed. It also makes DROP CONSTRAINT and ALTER TABLE scripts readable and automatable."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

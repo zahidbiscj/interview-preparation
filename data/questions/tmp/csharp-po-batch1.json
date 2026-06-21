@@ -1,0 +1,505 @@
+{
+  "subtopicId": "predict-output",
+  "questions": [
+    {
+      "id": "csharp-po-001",
+      "q": "Predict the output: struct copied on assignment.",
+      "level": "junior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["struct", "value-type", "copy"],
+      "answer": {
+        "oneLiner": "Prints 1 then 2. A struct is a value type, so assigning b = a makes a full copy. Changing b does not affect a at all.",
+        "detail": "When you write b = a for a struct, the runtime copies every field byte-for-byte into a new stack slot. After that, a and b are completely independent. Modifying b.X only changes b's copy. If Point were a class instead, b = a would copy only the reference (an 8-byte pointer), so both variables would point at the same heap object and changing b.X would show up through a as well.",
+        "keyPoints": [
+          "Structs are value types - assignment creates a full independent copy.",
+          "Classes are reference types - assignment copies only the pointer, not the object.",
+          "After b = a on a struct, the two variables share no memory.",
+          "This is called value semantics and is the core distinction between struct and class."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - assuming struct assignment shares state like a class\nstruct CartItem { public int Quantity; }\nCartItem original = new CartItem { Quantity = 3 };\nCartItem discount = original;\ndiscount.Quantity = 1;\nConsole.WriteLine(original.Quantity); // developer expects 1 but gets 3\n\n// ✅ GOOD - correct mental model: struct copy is independent\nCartItem a = new CartItem { Quantity = 3 };\nCartItem b = a;\nb.Quantity = 1;\nConsole.WriteLine(a.Quantity); // 3 - unchanged\nConsole.WriteLine(b.Quantity); // 1 - only b changed",
+          "note": "Struct assignment is a full value copy. Mutating the copy never touches the original."
+        },
+        "analogy": "Copying a struct is like photocopying a document - edits to the copy never change the original.",
+        "redFlags": [
+          "Saying struct and class assignment behave the same way.",
+          "Not knowing that b = a on a struct copies all fields independently.",
+          "Confusing reference semantics with value semantics when predicting output.",
+          "Saying the output is 2 and 2 instead of 1 and 2."
+        ],
+        "followUpsQA": [
+          { "q": "What would print if Point were a class?", "a": "Both a.X and b.X would print 2 because both variables reference the same heap object." },
+          { "q": "Where does a struct live in memory?", "a": "On the stack when declared as a local, or inline inside the containing object when it is a field of a class." },
+          { "q": "What is the default value of an uninitialized struct field?", "a": "The type default - 0 for numeric fields, null for reference-type fields." },
+          { "q": "Can a struct ever behave like a reference type?", "a": "When boxed into an object variable, a struct is wrapped in a heap allocation, but two separate boxes do not share state." },
+          { "q": "Why does Microsoft recommend keeping structs small?", "a": "Every assignment copies all fields, so a large struct causes expensive copies at every assignment and method call." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Here is a struct Point with a field X. I set b = a, then b.X = 2. What do a.X and b.X print?" },
+          { "role": "me", "text": "a.X prints 1 and b.X prints 2. A struct is a value type, so b = a copies every field into a fresh stack slot. After that, a and b are independent - mutating b.X has no effect on a." },
+          { "role": "interviewer", "text": "What if Point were a class instead of a struct?" },
+          { "role": "me", "text": "Both would print 2. A class is a reference type, so b = a copies only the reference pointer. Both variables point at the same heap object, so b.X = 2 is visible through a." },
+          { "role": "interviewer", "text": "In a real e-commerce cart, where would this difference bite you?" },
+          { "role": "me", "text": "If CartItem is a struct and you write CartItem temp = cart[0]; temp.Quantity = 5, the cart element never changes. Many developers expect the mutation to stick and spend hours debugging." },
+          { "role": "interviewer", "text": "How does this relate to List<struct> versus an array of structs?" },
+          { "role": "me", "text": "List<T>'s indexer returns a copy, so list[0].Quantity = 5 is even a compile error on a struct. Array element access is a direct memory location, so arr[0].Quantity = 5 works and modifies the element in place." },
+          { "role": "interviewer", "text": "What is the Microsoft guideline for choosing struct over class?" },
+          { "role": "me", "text": "Prefer struct when the type is small (16 bytes or less), logically immutable, and value-equality semantics make sense - such as a 2D point or a currency amount." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-002",
+      "q": "Predict the output: class shared by reference.",
+      "level": "junior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["class", "reference-type"],
+      "answer": {
+        "oneLiner": "Prints 2 then 2. A class is a reference type - b = a copies the pointer, so both variables point at the same object, and changing b.X is seen through a.",
+        "detail": "When you write b = a for a class instance, only the 8-byte reference (pointer to the heap object) is copied. No new object is created. Both a and b now alias the same heap allocation. Setting b.X = 2 writes to that shared object, so reading a.X also returns 2. To get an independent copy you must explicitly clone the object - using a copy constructor, a with expression on a record, or manual field assignment.",
+        "keyPoints": [
+          "Class assignment copies the reference, not the object - both variables alias the same heap object.",
+          "Any mutation through one reference is visible through all other references to the same object.",
+          "To get an independent copy, use a copy constructor, a record with expression, or deep clone.",
+          "This is called reference semantics and is the default for all class types in C#."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - editing a copied reference thinking it is an independent object\nclass Order { public decimal Total; }\nOrder invoice = new Order { Total = 100m };\nOrder draft = invoice; // copies only the reference\ndraft.Total = 0m;      // wipes the shared object\nConsole.WriteLine(invoice.Total); // 0 - original destroyed\n\n// ✅ GOOD - explicit copy when independence is required\nOrder invoice2 = new Order { Total = 100m };\nOrder draft2 = new Order { Total = invoice2.Total }; // new object\ndraft2.Total = 0m;\nConsole.WriteLine(invoice2.Total); // 100 - original safe",
+          "note": "Class reference assignment is an alias, not a clone. Always create a new object when you need independence."
+        },
+        "analogy": "Two people sharing one Google Doc - a change by either is immediately visible to both.",
+        "redFlags": [
+          "Saying both print 1 - shows confusion about reference semantics.",
+          "Not knowing that b = a on a class copies only the pointer.",
+          "Confusing this with struct copy behaviour.",
+          "Saying you need to use ref to share a class - classes are already shared by default."
+        ],
+        "followUpsQA": [
+          { "q": "How do you get a truly independent copy of a class instance?", "a": "Use a copy constructor, a record with expression, or manually assign each field to a new instance." },
+          { "q": "What does object.ReferenceEquals(a, b) return after b = a on a class?", "a": "True - both variables reference exactly the same heap object." },
+          { "q": "Does passing a class to a method also share the reference?", "a": "Yes. The method parameter receives a copy of the reference, so the method can mutate the object's fields and the caller sees the changes." },
+          { "q": "What keyword lets a method redirect the caller's variable to a different object?", "a": "ref - without it, reassigning the parameter inside the method does not affect the caller's variable." },
+          { "q": "What does record with expression do in terms of reference?", "a": "It creates a new object with all field values copied from the original, then applies the specified overrides - a shallow copy." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Same code but Point is now a class. I write b = a, then b.X = 2. What prints for a.X and b.X?" },
+          { "role": "me", "text": "Both print 2. A class is a reference type, so b = a copies only the reference pointer. Both variables point at the same heap object. Setting b.X = 2 changes that shared object, so a.X also returns 2." },
+          { "role": "interviewer", "text": "How would you prevent the original from being modified?" },
+          { "role": "me", "text": "Create a new object explicitly: Point b = new Point { X = a.X }. Or use a record with a with expression: Point b = a with {}. Either way, b gets its own heap allocation." },
+          { "role": "interviewer", "text": "What does object.ReferenceEquals tell you here?" },
+          { "role": "me", "text": "ReferenceEquals(a, b) returns true because both variables hold the same memory address. After an explicit copy, it returns false - they point to different objects even if the fields are identical." },
+          { "role": "interviewer", "text": "In a banking system, why is this important for a Transaction object?" },
+          { "role": "me", "text": "If you hand out the same Transaction reference to an audit log and a retry handler, either one modifying the object corrupts the other's view. You need copies at ownership boundaries." },
+          { "role": "interviewer", "text": "Does the same issue apply when passing a class to a method?" },
+          { "role": "me", "text": "Yes - the method receives a copy of the reference, so it can mutate the object's fields and the caller sees the changes. To prevent that, pass a read-only view or a defensive copy." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-003",
+      "q": "Predict the output: virtual method called from base constructor.",
+      "level": "senior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["virtual", "constructor", "nullreference", "polymorphism"],
+      "answer": {
+        "oneLiner": "Throws NullReferenceException. The base constructor runs first and dispatches the virtual call to B.Print, but B's field _str has not been initialized yet, so calling _str.ToLower() crashes.",
+        "detail": "Object construction in C# follows this order: base field initializers, base constructor body, derived field initializers, derived constructor body. When new B() is called, A's constructor runs first and calls Print(). Because the runtime type is already B, virtual dispatch routes Print() to B.Print(). But B's constructor has not run yet, so _str is still null. Calling _str.ToLower() throws a NullReferenceException. The rule is: never call a virtual method from a constructor.",
+        "keyPoints": [
+          "Construction order: base field inits, base ctor, derived field inits, derived ctor.",
+          "Virtual dispatch uses the runtime type even inside the base constructor.",
+          "Derived fields are not initialized when the base constructor runs.",
+          "Never call virtual methods from a constructor - it risks accessing uninitialized derived state."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - virtual call in constructor crashes when derived field is null\nclass PaymentProcessor {\n    public PaymentProcessor() { Validate(); }\n    public virtual void Validate() => Console.WriteLine(\"base ok\");\n}\nclass StripeProcessor : PaymentProcessor {\n    private string _apiKey;\n    public StripeProcessor() { _apiKey = \"sk_live_xxx\"; }\n    public override void Validate() => Console.WriteLine(_apiKey.Length); // NRE\n}\n\n// ✅ GOOD - call Initialize after construction is complete\nclass StripeProcessor2 : PaymentProcessor {\n    private string _apiKey = \"sk_live_xxx\";\n    public override void Validate() => Console.WriteLine(_apiKey.Length); // safe\n}",
+          "note": "Never call a virtual method from a constructor. Use a factory method or explicit Initialize() call instead."
+        },
+        "analogy": "Calling a virtual method in a constructor is like asking a new employee to follow a policy before they have been trained.",
+        "redFlags": [
+          "Saying it prints 'child' - shows no knowledge of construction order.",
+          "Not knowing that virtual dispatch uses the runtime type even during base construction.",
+          "Confusing field initializer order with constructor body order.",
+          "Saying the rule does not apply if the derived field has an inline initializer."
+        ],
+        "followUpsQA": [
+          { "q": "What is the exact construction order in C#?", "a": "Base field initializers, base constructor body, derived field initializers, derived constructor body - in that order every time." },
+          { "q": "Why does virtual dispatch already use the derived type during base construction?", "a": "The runtime type is determined when the object is allocated with new, before any constructor runs. The vtable slot is already set to the derived override." },
+          { "q": "How do you fix this pattern safely?", "a": "Use a factory method or a separate Initialize() called after construction is complete, ensuring all fields are set before any virtual call." },
+          { "q": "Does a field initializer in the derived class run before the base constructor?", "a": "No - base field initializers run first, then the base constructor body, then derived field initializers, then the derived constructor body." },
+          { "q": "Does making the method sealed in the derived class help?", "a": "No - the problem is that the base constructor calls the method before the derived constructor runs, regardless of whether it is sealed." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Class A's constructor calls a virtual method Print. Class B overrides Print and reads a private field _str. What happens when you call new B()?" },
+          { "role": "me", "text": "It throws NullReferenceException. A's constructor runs first, calls Print() which dispatches to B.Print() because the runtime type is already B - but B's constructor has not run yet, so _str is still null." },
+          { "role": "interviewer", "text": "Why does it dispatch to B.Print and not A.Print during A's constructor?" },
+          { "role": "me", "text": "The vtable is set to the derived overrides the moment the object is allocated, before any constructor runs. So Print() resolves to B.Print through the virtual method table even while A's constructor is executing." },
+          { "role": "interviewer", "text": "What is the safe pattern if you need initialization logic that derived classes can customize?" },
+          { "role": "me", "text": "Use a factory method or a virtual Initialize() that you call explicitly after construction: var p = new StripeProcessor(); p.Initialize(). That guarantees all constructors have completed before any virtual call." },
+          { "role": "interviewer", "text": "In a healthcare app with a base Validator class, how would this burn you?" },
+          { "role": "me", "text": "If base Validator calls virtual Validate() in its constructor and a derived PatientValidator reads _rules (loaded in its own constructor), you get a NRE on the first real use. The fix is to call Validate() from the derived constructor after _rules is initialized." },
+          { "role": "interviewer", "text": "Does adding a field initializer to _str in B fix the problem?" },
+          { "role": "me", "text": "Yes - private string _str = 'child' is a field initializer that runs before the base constructor body. So _str would be set when A's constructor calls B.Print(). But relying on this is fragile and the rule 'no virtual calls in constructors' still stands." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-004",
+      "q": "Predict the output: non-virtual method, base reference (static dispatch).",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["static-dispatch", "early-binding", "polymorphism"],
+      "answer": {
+        "oneLiner": "Prints 'animal speak'. Speak is not virtual, so the call binds to the declared type Animal at compile time, ignoring the fact that the runtime object is a Dog.",
+        "detail": "When a method is not marked virtual, C# uses static (early) binding. The compiler resolves the method at compile time based on the declared type of the variable, which is Animal. The runtime type of the object (Dog) is never consulted. This is different from virtual dispatch where the runtime type determines which override is called. To get Dog's version to print, you must mark Speak as virtual in Animal and use override in Dog.",
+        "keyPoints": [
+          "Non-virtual methods use static (early) binding - resolved by the declared type at compile time.",
+          "Virtual methods use dynamic (late) binding - resolved by the runtime type at call time.",
+          "Dog.Speak only runs when the variable is declared as Dog, or the method is virtual+overridden.",
+          "Declaring a method in a derived class without override hides it, it does not override it."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - non-virtual method, polymorphism does not work through base reference\nclass Notification { public void Send() => Console.WriteLine(\"base send\"); }\nclass EmailNotification : Notification { public void Send() => Console.WriteLine(\"email\"); }\n\nNotification n = new EmailNotification();\nn.Send(); // prints 'base send' - NOT 'email'\n\n// ✅ GOOD - virtual + override enables polymorphic dispatch\nclass Notification2 { public virtual void Send() => Console.WriteLine(\"base send\"); }\nclass EmailNotification2 : Notification2 { public override void Send() => Console.WriteLine(\"email\"); }\n\nNotification2 n2 = new EmailNotification2();\nn2.Send(); // prints 'email' - runtime type is used",
+          "note": "Without virtual and override, polymorphism does not apply - the declared type wins."
+        },
+        "analogy": "Static binding reads the label on the box, not what is inside it.",
+        "redFlags": [
+          "Saying it prints 'dog speak' - confusing non-virtual with virtual dispatch.",
+          "Not knowing the difference between hiding and overriding.",
+          "Saying you need new keyword to call the base version.",
+          "Confusing the declared type with the runtime type when predicting output."
+        ],
+        "followUpsQA": [
+          { "q": "What changes to make it print 'dog speak' through an Animal reference?", "a": "Mark Speak as virtual in Animal and use override in Dog. Then the runtime type Dog is used for dispatch." },
+          { "q": "What happens if Dog declares Speak without virtual and without new?", "a": "The compiler emits CS0108 warning that the method hides the base member. The behavior is the same as using new - static dispatch from the declared type." },
+          { "q": "What is the difference between hiding and overriding?", "a": "Hiding (new keyword) resolves by declared type. Overriding (virtual + override) resolves by runtime type through the vtable." },
+          { "q": "Are methods virtual by default in C#?", "a": "No. C# methods are non-virtual by default for performance. You must explicitly opt in with the virtual keyword." },
+          { "q": "Can you call Dog.Speak even through an Animal reference?", "a": "Only by casting: ((Dog)a).Speak() - that changes the declared type to Dog so static binding picks Dog.Speak." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Animal has a non-virtual Speak method. Dog declares its own Speak. Animal a = new Dog(). What does a.Speak() print?" },
+          { "role": "me", "text": "It prints 'animal speak'. Speak is not virtual, so the call binds at compile time to the declared type Animal. The runtime type Dog is never consulted - this is static dispatch." },
+          { "role": "interviewer", "text": "How do you fix it so 'dog speak' prints through an Animal reference?" },
+          { "role": "me", "text": "Mark Speak as virtual in Animal and override it in Dog. Now the compiler emits a virtual call instruction and the vtable routes to Dog.Speak at runtime." },
+          { "role": "interviewer", "text": "What is the difference between Dog hiding Speak with new versus overriding it?" },
+          { "role": "me", "text": "With new, the method is resolved by the declared type - an Animal reference calls Animal.Speak. With override, it is resolved by the runtime type - any reference to the Dog object calls Dog.Speak." },
+          { "role": "interviewer", "text": "In a logistics system with a ShippingProvider base class, when does this bite you?" },
+          { "role": "me", "text": "If CalculateCost is not virtual and you store DhlProvider in a ShippingProvider list, every call uses the base price formula even though each provider has different rates. You need virtual+override for correct rates." },
+          { "role": "interviewer", "text": "C# methods are non-virtual by default. Why did the language designers make that choice?" },
+          { "role": "me", "text": "Performance. Virtual calls require a vtable lookup at runtime. Non-virtual calls are direct function calls that the JIT can inline. Java does the opposite - everything is virtual unless you write final." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-005",
+      "q": "Predict the output: method hiding with `new`.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["method-hiding", "new-keyword", "polymorphism"],
+      "answer": {
+        "oneLiner": "Prints 'Base' then 'Derived'. The new keyword hides rather than overrides, so the call resolves by the reference's declared type, not the object's runtime type.",
+        "detail": "new on a method tells the compiler you intentionally introduce a new method that hides the base member. When called through a Base-typed variable, the compiler picks Base.Show even if the runtime object is Derived. When called through a Derived-typed variable, it picks Derived.Show. Contrast this with override where virtual dispatch always picks the most-derived override regardless of the reference type. Hiding is a compile-time decision; overriding is a runtime decision.",
+        "keyPoints": [
+          "new hides the base method - resolution is by declared type at compile time.",
+          "override replaces the base method in the vtable - resolution is by runtime type.",
+          "Through a Base reference, new Show always calls Base.Show even if the object is Derived.",
+          "Hiding is rarely the right choice - prefer virtual+override for polymorphism."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - new hides, causing surprising output through a base reference\nclass Report { public virtual void Generate() => Console.WriteLine(\"base report\"); }\nclass SalesReport : Report { public new void Generate() => Console.WriteLine(\"sales\"); }\n\nReport r = new SalesReport();\nr.Generate(); // prints 'base report' - not 'sales'\n\n// ✅ GOOD - override for true polymorphism\nclass Report2 { public virtual void Generate() => Console.WriteLine(\"base report\"); }\nclass SalesReport2 : Report2 { public override void Generate() => Console.WriteLine(\"sales\"); }\n\nReport2 r2 = new SalesReport2();\nr2.Generate(); // prints 'sales' - correct",
+          "note": "Use override for polymorphism. Use new only when you intentionally want a separate non-polymorphic method."
+        },
+        "analogy": "Hiding is like putting a sticker over a sign - the sign underneath still shows when someone looks from a distance.",
+        "redFlags": [
+          "Saying both print 'Derived' - confusing hiding with overriding.",
+          "Not knowing that new on a method is about hiding, not overriding.",
+          "Saying Base.Show is still virtual after the derived class uses new.",
+          "Confusing the new keyword for object creation with new for method hiding."
+        ],
+        "followUpsQA": [
+          { "q": "How do you make both references print 'Derived'?", "a": "Use virtual on Base.Show and override on Derived.Show instead of new. Then runtime dispatch picks Derived.Show through any reference type." },
+          { "q": "What compiler warning do you get if you hide a method without new?", "a": "CS0108: your method hides inherited member. Use the new keyword if hiding was intended." },
+          { "q": "When is hiding ever the right design choice?", "a": "When a library base class adds a method with the same name as your existing derived class method, and you cannot change either. new suppresses the warning and documents the intent." },
+          { "q": "Does new affect the base method's virtual status?", "a": "No. Base.Show remains virtual. Through a Base reference it calls Base.Show. The derived new method is simply a separate slot." },
+          { "q": "What does casting to Derived do?", "a": "((Derived)b).Show() picks the new Show on Derived because now the declared type is Derived. It still does not do virtual dispatch." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Base has a virtual Show method. Derived uses public new void Show. What prints when called through a Base reference and then through a Derived reference?" },
+          { "role": "me", "text": "It prints 'Base' then 'Derived'. new hides the method rather than overriding it. Resolution is by the declared type of the reference. The Base reference calls Base.Show; the Derived reference calls Derived.Show." },
+          { "role": "interviewer", "text": "If I intended 'Derived' to print through the Base reference, what should I change?" },
+          { "role": "me", "text": "Keep Base.Show as virtual and replace new with override in Derived. That puts Derived.Show in the vtable slot so any reference resolves to it at runtime." },
+          { "role": "interviewer", "text": "Is new hiding polymorphism?" },
+          { "role": "me", "text": "No. Polymorphism requires virtual dispatch through the vtable. new creates a separate method in the derived type's own method table. No vtable slot is updated, so the base reference never knows Derived.Show exists." },
+          { "role": "interviewer", "text": "In a SaaS platform with a base Subscription class that uses new GetFeatures(), what is the risk?" },
+          { "role": "me", "text": "If you store PremiumSubscription in a List<Subscription> and call GetFeatures() through the base reference, it calls Subscription.GetFeatures() and returns the wrong feature set. Users on the premium tier see basic features." },
+          { "role": "interviewer", "text": "What is the warning you get if you forget the new keyword?" },
+          { "role": "me", "text": "CS0108 - the compiler tells you that your method hides an inherited member and suggests adding new to make the intent explicit. Without new the code still compiles and behaves the same, but the warning flags a potential design problem." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-006",
+      "q": "Predict the output: property hiding via `new` through a base reference.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["property-hiding", "new-keyword"],
+      "answer": {
+        "oneLiner": "Prints 'aamir'. The variable is typed User and the new keyword hides rather than overrides, so the base property is read regardless of the runtime object type.",
+        "detail": "The same hiding rule that applies to methods also applies to properties. User.Username is the version that the compiler picks when the variable's declared type is User. Customer.Username is a completely separate property introduced with new. It only becomes visible when the declared type is Customer. If Username were virtual on User and overridden in Customer, the Customer value would print through a User-typed variable.",
+        "keyPoints": [
+          "Property hiding with new resolves by the declared type, just like method hiding.",
+          "The Customer value only appears when the variable is typed Customer.",
+          "virtual+override on properties enables polymorphic property access.",
+          "This is the same compile-time vs runtime dispatch distinction as for methods."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - hiding a property with new returns the wrong value through a base reference\nclass UserAccount { public string Role { get; set; } = \"viewer\"; }\nclass AdminAccount : UserAccount { public new string Role { get; set; } = \"admin\"; }\n\nUserAccount u = new AdminAccount();\nConsole.WriteLine(u.Role); // prints 'viewer' - security risk\n\n// ✅ GOOD - virtual+override for correct polymorphic property\nclass UserAccount2 { public virtual string Role { get; set; } = \"viewer\"; }\nclass AdminAccount2 : UserAccount2 { public override string Role { get; set; } = \"admin\"; }\n\nUserAccount2 u2 = new AdminAccount2();\nConsole.WriteLine(u2.Role); // prints 'admin' - correct",
+          "note": "Property hiding with new is especially dangerous in security contexts where the wrong role can be returned."
+        },
+        "analogy": "Hiding a property is like wearing a name badge that only shows your real title when you are in the right room.",
+        "redFlags": [
+          "Saying it prints 'zahid' - shows no understanding of how property hiding works.",
+          "Not knowing that new on properties behaves the same as new on methods.",
+          "Saying the Customer value would show because the runtime object is a Customer.",
+          "Confusing property hiding with property overriding."
+        ],
+        "followUpsQA": [
+          { "q": "How do you make the Customer value print through a User reference?", "a": "Mark Username as virtual in User and override it in Customer. Then virtual dispatch picks Customer.Username at runtime." },
+          { "q": "Are auto-properties virtual by default?", "a": "No. You must explicitly mark them virtual. Auto-properties generate getter and setter methods that are not virtual unless you say so." },
+          { "q": "Can you override a property with a different getter/setter combination?", "a": "No. If the base property has only a get, the override must also have only a get. You cannot add a set in the override." },
+          { "q": "Does new on a property create a separate backing field?", "a": "Yes. The new property has its own backing field. The base property backing field is still there and is accessed through a base-typed reference." },
+          { "q": "What is the real-world risk of accidental property hiding?", "a": "A security check reading u.Role through a base reference always gets the base value. An admin user could appear as a viewer, leading to authorization failures." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "User has a Username property defaulting to 'aamir'. Customer inherits from User and hides Username with new, defaulting to 'zahid'. User u = new Customer(). What does u.Username print?" },
+          { "role": "me", "text": "It prints 'aamir'. The declared type is User, and new hides rather than overrides, so the compiler picks User.Username. The runtime type Customer is ignored here." },
+          { "role": "interviewer", "text": "Why does hiding ignore the runtime type?" },
+          { "role": "me", "text": "Because new does not update the vtable. The derived class introduces a completely separate property slot. The base class's get accessor is not replaced - it is just shadowed behind a different declared type." },
+          { "role": "interviewer", "text": "In a role-based access system, where does this go wrong?" },
+          { "role": "me", "text": "If UserAccount.Role = 'viewer' and AdminAccount uses new to introduce Role = 'admin', any middleware that stores accounts as UserAccount and reads Role will always get 'viewer'. Admins would be denied access silently." },
+          { "role": "interviewer", "text": "What is the fix and what does it guarantee?" },
+          { "role": "me", "text": "Mark Role as virtual in UserAccount and override it in AdminAccount. Now any code holding a UserAccount reference to an AdminAccount object will get 'admin' through virtual dispatch - the vtable slot is replaced." },
+          { "role": "interviewer", "text": "Can you mark an auto-property virtual?" },
+          { "role": "me", "text": "Yes - public virtual string Role { get; set; } is valid. The compiler generates virtual getter and setter methods. You can then override them in a derived class with public override string Role { get; set; }." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-007",
+      "q": "Predict the output: closure capturing a `for` loop variable.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["closure", "capture", "loop"],
+      "answer": {
+        "oneLiner": "Prints 333. All three lambdas capture the same variable i. By the time they execute, the loop has finished and i equals 3.",
+        "detail": "A closure captures a variable, not a value. In a for loop, there is only one int i for the entire loop. All three lambdas close over that single shared variable. When the lambdas are invoked after the loop, i has already been incremented to 3, so all three print 3. The fix is to copy the loop variable into a loop-local variable inside the loop body: int copy = i. Each iteration creates a new copy variable, so each lambda captures a different storage location.",
+        "keyPoints": [
+          "Closures capture variables (storage locations), not the values at the time of creation.",
+          "A for loop uses one shared variable i for the entire loop body.",
+          "All lambdas closed over i see the final value after the loop completes.",
+          "Fix: copy i into a loop-local variable and capture the copy instead."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - all lambdas capture the same loop variable\nvar handlers = new List<Action>();\nfor (int i = 0; i < 3; i++)\n    handlers.Add(() => Console.Write(i + \" \")); // shared i\nforeach (var h in handlers) h(); // prints 3 3 3\n\n// ✅ GOOD - capture a per-iteration copy\nvar handlers2 = new List<Action>();\nfor (int i = 0; i < 3; i++) {\n    int step = i; // new variable per iteration\n    handlers2.Add(() => Console.Write(step + \" \"));\n}\nforeach (var h in handlers2) h(); // prints 0 1 2",
+          "note": "Closures capture variables not values. Always copy a loop variable before capturing it in a lambda."
+        },
+        "analogy": "All lambdas share a whiteboard with i written on it. By the time they read it, someone has already erased 0, 1, 2 and written 3.",
+        "redFlags": [
+          "Saying it prints 0 1 2 - shows no understanding of variable capture semantics.",
+          "Not knowing the difference between capturing a variable and capturing a value.",
+          "Saying the fix is to use a different lambda syntax rather than a loop-local copy.",
+          "Confusing foreach loop variable behavior with for loop behavior."
+        ],
+        "followUpsQA": [
+          { "q": "What would a foreach loop print instead of a for loop?", "a": "In C# 5 and later, the foreach iteration variable is a new variable per iteration, so the lambdas would capture independent copies and print 0 1 2." },
+          { "q": "Why does copying into a local fix the problem?", "a": "int copy = i inside the loop body creates a brand new variable each iteration. Each lambda captures its own distinct storage location rather than sharing the single i." },
+          { "q": "Does the same problem occur with Task.Run in a loop?", "a": "Yes and it is even harder to spot. All tasks may capture the final value of i. Always capture a local copy inside the loop." },
+          { "q": "How does LINQ Where avoid this problem?", "a": "The LINQ query receives the loop variable as a lambda parameter, not as a captured outer variable. Parameters are per-invocation, so there is no shared closure state." },
+          { "q": "What C# version changed foreach variable behavior?", "a": "C# 5 made the foreach iteration variable a new per-iteration variable, fixing the closure capture bug for foreach loops specifically." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "A for loop from 0 to 2 adds a lambda that captures i to a list. All three lambdas run after the loop. What prints?" },
+          { "role": "me", "text": "It prints 333. All three lambdas capture the same variable i - the single storage location for the loop counter. By the time the lambdas run, the loop has finished and i is 3." },
+          { "role": "interviewer", "text": "Why does the closure not snapshot the value of i at creation time?" },
+          { "role": "me", "text": "Closures capture a reference to the variable, not a copy of its value. The lambda holds a pointer to i's memory location. When it reads i later, it reads whatever is there at that moment." },
+          { "role": "interviewer", "text": "How do you fix it to print 012?" },
+          { "role": "me", "text": "Add int index = i inside the loop before the lambda. Each iteration allocates a fresh local, and each lambda captures a different variable: handlers.Add(() => Console.Write(index))." },
+          { "role": "interviewer", "text": "In an e-commerce checkout with 5 parallel item validations, how does this bug appear?" },
+          { "role": "me", "text": "for (int i = 0; i < items.Count; i++) Task.Run(() => Validate(items[i])) - all tasks read items[i] after the loop ends, accessing items[5] which throws IndexOutOfRangeException or validates the wrong item repeatedly." },
+          { "role": "interviewer", "text": "Would switching to a foreach loop fix it automatically?" },
+          { "role": "me", "text": "Yes, since C# 5. The foreach iteration variable is a new per-iteration variable, so each lambda captures its own copy. But for a for loop you must still copy manually." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-008",
+      "q": "Predict the output: LINQ deferred execution after the source changes.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["linq", "deferred-execution"],
+      "answer": {
+        "oneLiner": "Prints 2 4 6 8. The Select query is deferred and executes during the foreach, which runs after the 4 was added to the source list.",
+        "detail": "LINQ operators like Select, Where, and OrderBy build lazy iterator chains. They do not execute when called - they execute when enumerated. The query holds a reference to the source list, not a snapshot of it. When the foreach loop starts, it pulls elements from the query, which pulls from the list as it currently exists - including the 4 that was added after the query was defined. Calling .ToList() immediately after Select materializes results at that moment and fixes the snapshot.",
+        "keyPoints": [
+          "LINQ operators are deferred - they execute at enumeration, not at definition.",
+          "The query holds a live reference to the source, not a snapshot.",
+          "Items added to the source after the query is defined are included when the query runs.",
+          "Call .ToList() or .ToArray() to materialize results immediately and snapshot the state."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - deferred query sees later mutations to the source\nvar productIds = new List<int> { 101, 102 };\nvar doubled = productIds.Select(id => id * 2); // not executed yet\nproductIds.Add(103);\nforeach (var d in doubled) Console.Write(d + \" \"); // 202 204 206 - 103 included\n\n// ✅ GOOD - materialize immediately to snapshot the current state\nvar productIds2 = new List<int> { 101, 102 };\nvar doubled2 = productIds2.Select(id => id * 2).ToList(); // runs now\nproductIds2.Add(103);\nforeach (var d in doubled2) Console.Write(d + \" \"); // 202 204 - 103 excluded",
+          "note": "ToList() after the query forces immediate execution and snapshots the results at that point in time."
+        },
+        "analogy": "A deferred query is a recipe, not a meal. It uses whatever ingredients are in the fridge when you finally cook it.",
+        "redFlags": [
+          "Saying it prints 2 4 6 - missing that deferred execution includes the later-added 4.",
+          "Saying LINQ runs when you write the query, not when you iterate.",
+          "Not knowing which LINQ operators trigger immediate execution.",
+          "Confusing deferred execution with lazy evaluation of individual elements."
+        ],
+        "followUpsQA": [
+          { "q": "Which LINQ operators trigger immediate execution?", "a": "ToList, ToArray, ToDictionary, Count, First, Last, Single, Sum, Min, Max, Any, All - any operator that needs the full result set." },
+          { "q": "What is the risk of enumerating a deferred query twice?", "a": "The query re-executes each time. For database queries it means two round trips, which can return different rows if data changed." },
+          { "q": "Does deferred execution apply to Entity Framework LINQ queries?", "a": "Yes. An EF query only hits the database when enumerated. The final SQL is built and executed at ToList() time." },
+          { "q": "What is the difference between IEnumerable and IQueryable for deferred execution?", "a": "IEnumerable defers in memory. IQueryable defers to a provider like SQL Server - the expression tree is translated to SQL and run remotely." },
+          { "q": "Can you iterate a LINQ query multiple times safely?", "a": "For in-memory lists yes, though it is inefficient. For IQueryable queries it causes multiple database calls. Call ToList() once and iterate the list." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "You build a Select query on a list of 3 numbers, then add a 4th number, then foreach the query. What prints?" },
+          { "role": "me", "text": "It prints 2 4 6 8 - including the 4th element. Select is deferred. It does not run at definition time. The foreach triggers execution and at that point the list already has 4 elements." },
+          { "role": "interviewer", "text": "How do you exclude the later-added element?" },
+          { "role": "me", "text": "Add .ToList() right after Select. That forces immediate execution and materializes the 3-element result into a new list. The subsequent Add has no effect on the already-captured snapshot." },
+          { "role": "interviewer", "text": "In an Entity Framework context, why is deferred execution particularly important?" },
+          { "role": "me", "text": "An EF IQueryable query does not touch the database until ToList() or First() is called. You can chain Where and OrderBy after the initial query and the final SQL is built from the combined expression tree at enumeration time." },
+          { "role": "interviewer", "text": "What happens if you enumerate the same deferred query twice?" },
+          { "role": "me", "text": "The query re-executes from scratch each time. For in-memory lists this is just inefficient. For a database query it sends two SQL statements, which may return different rows if data changed between calls." },
+          { "role": "interviewer", "text": "Which LINQ method counts results without materializing the list?" },
+          { "role": "me", "text": "Count() triggers immediate execution and returns the count without creating a new collection. But if you need the count and the items, calling ToList() first and then .Count on the list is more efficient than calling Count() and then ToList() separately." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-009",
+      "q": "Predict the output: boxed value equality vs reference equality.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["boxing", "equality", "referenceequals"],
+      "answer": {
+        "oneLiner": "Both print False. Each boxing of 123 allocates a separate heap object. The == operator on object uses reference equality, so two different boxes are not equal even if their contents are identical.",
+        "detail": "When you write object a = 123, the integer 123 is boxed - a new heap object is allocated containing the value. Writing object b = 123 boxes again, allocating a second separate object. The == operator for object compares references (memory addresses), not values. Since a and b point to different heap objects, both a == b and ReferenceEquals(a, b) return false. To compare values, use a.Equals(b) which calls the boxed int's Equals method and returns true.",
+        "keyPoints": [
+          "Each boxing of an int creates a separate heap object, so a and b are different references.",
+          "The == operator on object operands is reference equality, not value equality.",
+          "a.Equals(b) returns true because it calls the value-based Equals on the boxed int.",
+          "ReferenceEquals always compares memory addresses and is never overridable."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - using == on boxed values expecting value comparison\nobject orderId1 = 1001;\nobject orderId2 = 1001;\nif (orderId1 == orderId2) // False - different boxes\n    Console.WriteLine(\"same order\"); // never prints\n\n// ✅ GOOD - use Equals for value comparison on boxed types\nobject orderId3 = 1001;\nobject orderId4 = 1001;\nif (orderId3.Equals(orderId4)) // True - value comparison\n    Console.WriteLine(\"same order\"); // prints correctly",
+          "note": "Never use == to compare boxed value types. Use Equals() or cast to the concrete type first."
+        },
+        "analogy": "Two envelopes containing the same letter - the envelopes are different objects even though the contents are identical.",
+        "redFlags": [
+          "Saying a == b returns True - confusing value equality with reference equality on object.",
+          "Not knowing that boxing creates a new heap object each time.",
+          "Saying Equals on object is the same as == on object.",
+          "Confusing int == int (value equality) with object == object (reference equality)."
+        ],
+        "followUpsQA": [
+          { "q": "What does a.Equals(b) return for two boxed integers with the same value?", "a": "True. The Equals method on a boxed int unboxes both sides and compares the integer values." },
+          { "q": "Why does == on int give value equality but == on object gives reference equality?", "a": "int defines a custom == operator that compares values. object's == operator compares references. When variables are declared as object, the object version is used." },
+          { "q": "Is string's == operator reference equality or value equality?", "a": "Value equality. string overloads == to compare content character by character, even though string is a reference type." },
+          { "q": "Does .NET cache boxed integers like Java does for -128 to 127?", "a": "No. C# does not cache boxed integers. Every boxing always allocates a new heap object." },
+          { "q": "How do you avoid boxing when comparing integers stored as object?", "a": "Cast both to int before comparing: (int)a == (int)b. Better yet, use generics or typed variables to avoid boxing entirely." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "object a = 123 and object b = 123. What do a == b and ReferenceEquals(a, b) print?" },
+          { "role": "me", "text": "Both print False. Each boxing statement allocates a new heap object. a and b hold different memory addresses. The == operator on object compares references, not contents, so both comparisons are false." },
+          { "role": "interviewer", "text": "How do you compare the actual integer values inside the boxes?" },
+          { "role": "me", "text": "Use a.Equals(b) - that calls the boxed int's Equals method, which unboxes both sides and compares the integer values. It returns true. Alternatively cast: (int)a == (int)b." },
+          { "role": "interviewer", "text": "Why does int == int work correctly without boxing?" },
+          { "role": "me", "text": "int defines a custom == operator that compares values. When the compiler sees two int operands, it calls that specific operator. When it sees two object operands, it uses object's reference-equality operator." },
+          { "role": "interviewer", "text": "In a legacy order management system that stores order IDs as object in a Hashtable, how does this cause bugs?" },
+          { "role": "me", "text": "Looking up a key by value fails. Hashtable.Contains(1001) boxes 1001 into a new object. The stored key is a different boxed object. Reference equality fails, so the key is not found even though 1001 is in the table. The fix is to use Dictionary<int, Order>." },
+          { "role": "interviewer", "text": "What about string - is it the same reference-equality trap?" },
+          { "role": "me", "text": "No. String overloads == to compare content. But if you store strings in object variables and compare with ==, you get reference equality again - so always use the typed variable." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-010",
+      "q": "Predict the output: string interning of compile-time constants.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["string", "interning", "referenceequals"],
+      "answer": {
+        "oneLiner": "Prints True. The compiler folds 'he' + 'llo' into the literal 'hello' at compile time, and both literals are interned to the same string pool entry.",
+        "detail": "The C# compiler performs constant folding on string literals: 'he' + 'llo' is evaluated at compile time and becomes 'hello' in the compiled assembly. All identical string literals in an assembly are interned - stored once in the CLR string intern pool. So both a and b point to the same interned object, making ReferenceEquals return true. If the concatenation happened at runtime (using a variable), a new string object would be allocated and ReferenceEquals would return false.",
+        "keyPoints": [
+          "The compiler folds constant string expressions like 'he' + 'llo' into a single literal at compile time.",
+          "Identical string literals in an assembly share one interned instance in the CLR intern pool.",
+          "ReferenceEquals is true only because both end up pointing to the same pooled object.",
+          "Runtime concatenation with variables creates a new non-interned string object."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - using ReferenceEquals assuming runtime concat is interned\nstring host = \"https://\";\nstring endpoint = host + \"api.\"; // runtime Concat - new object\nstring literal = \"https://api.\";\nConsole.WriteLine(object.ReferenceEquals(literal, endpoint)); // False - different objects\n\n// ✅ GOOD - constant-folded literals are interned and share one object\nstring endpoint1 = \"https://api.\";\nstring endpoint2 = \"https://\" + \"api.\"; // constant-folded at compile time\nConsole.WriteLine(object.ReferenceEquals(endpoint1, endpoint2)); // True",
+          "note": "Constant folding only happens with compile-time constant expressions. Any variable involvement means runtime allocation."
+        },
+        "analogy": "The compiler is like a printer that combines 'he' and 'llo' before printing - both labels come off the same print run.",
+        "redFlags": [
+          "Saying it prints False - not knowing about compile-time constant folding.",
+          "Confusing string interning with string equality via ==.",
+          "Not knowing that runtime concatenation creates a new non-interned string.",
+          "Saying string.Intern must be called explicitly for literals to be interned."
+        ],
+        "followUpsQA": [
+          { "q": "Would ReferenceEquals be true if you used a variable in the concatenation?", "a": "No. If any part of the concatenation is a variable, it runs at runtime via string.Concat and produces a new, non-interned string object." },
+          { "q": "How do you manually intern a runtime string?", "a": "Use string.Intern(str) - it adds the string to the pool if not already there and returns the pooled reference." },
+          { "q": "Does interning prevent garbage collection of the string?", "a": "Yes. Interned strings live in the CLR intern pool for the lifetime of the AppDomain and are never garbage collected." },
+          { "q": "Why should you use == instead of ReferenceEquals for string comparison?", "a": "String's == operator compares content, not references. It works correctly whether or not the strings are interned." },
+          { "q": "What is the difference between a const string and a readonly string field?", "a": "const strings are compile-time constants that participate in constant folding. readonly fields hold a value set at runtime and do not participate in constant folding." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "string a = 'hello' and string b = 'he' + 'llo'. Does ReferenceEquals(a, b) print True or False?" },
+          { "role": "me", "text": "True. The compiler performs constant folding - it evaluates 'he' + 'llo' to 'hello' at compile time. Both literals are then interned to the same entry in the CLR string pool, so a and b are the same object." },
+          { "role": "interviewer", "text": "What if I use a variable instead of a literal for the concatenation?" },
+          { "role": "me", "text": "Then it is False. string prefix = 'he'; string b = prefix + 'llo' runs at runtime via string.Concat, which allocates a new string object. That object is not interned, so it has a different address from a." },
+          { "role": "interviewer", "text": "Should you ever use ReferenceEquals to compare strings?" },
+          { "role": "me", "text": "Almost never. String's == operator compares content and is always correct. ReferenceEquals only makes sense when you explicitly care about identity, for example checking if two references point to the same interned instance for a performance optimization." },
+          { "role": "interviewer", "text": "In a high-throughput logging system parsing millions of log lines, when would you deliberately call string.Intern?" },
+          { "role": "me", "text": "If the same category or status strings appear millions of times, interning them means only one allocation per unique value. Later comparisons become pointer comparisons instead of character-by-character scans." },
+          { "role": "interviewer", "text": "What is the risk of over-using string.Intern?" },
+          { "role": "me", "text": "Interned strings are never garbage collected for the lifetime of the AppDomain. If you intern user-supplied data or unique IDs, the pool grows unboundedly, causing a memory leak." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    }
+  ]
+}

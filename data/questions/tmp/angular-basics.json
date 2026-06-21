@@ -1,0 +1,1121 @@
+{
+  "subtopicId": "basics",
+  "questions": [
+    {
+      "id": "angular-basics-001",
+      "q": "What is a Component in Angular?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["component", "decorator", "template", "basics"],
+      "answer": {
+        "oneLiner": "A Component is the basic UI building block in Angular. It is a TypeScript class decorated with @Component that bundles a template, styles, and logic into one reusable unit.",
+        "detail": "When Angular processes a component, it reads the @Component decorator, which contains three key pieces: the selector (a custom HTML tag name), the template (what to render), and optional styles. Angular registers the selector so you can drop it into any template like a native HTML element. Components form a tree starting at the root AppComponent. Each component manages its own view and communicates with others through @Input (data in) and @Output (events out). Since Angular 14, components can be standalone - they list their own imports directly in the decorator without needing an NgModule to declare them.",
+        "keyPoints": [
+          "Decorated with @Component({ selector, template, styles }) - all three are meaningful",
+          "The selector registers a custom HTML tag like <product-card> that other templates can use",
+          "Standalone components (default since v17) list their own imports in the decorator",
+          "Components form a tree rooted at AppComponent with data flowing down and events flowing up"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Logic dumped in constructor, no input, not reusable\nexport class ProductCard {\n  product: Product;\n  constructor() {\n    this.product = { id: 1, name: 'Laptop', price: 999 }; // hardcoded\n  }\n}\n\n// ✅ GOOD - Standalone component with @Input, reusable anywhere\nimport { Component, Input } from '@angular/core';\nimport { CurrencyPipe } from '@angular/common';\n\n@Component({\n  selector: 'product-card',\n  standalone: true,\n  imports: [CurrencyPipe],\n  template: `\n    <div class=\"card\">\n      <h2>{{ product.name }}</h2>\n      <p>{{ product.price | currency }}</p>\n    </div>\n  `\n})\nexport class ProductCardComponent {\n  @Input({ required: true }) product!: Product;\n}",
+          "note": "Standalone component with a required @Input - the selector lets a parent drop <product-card [product]=\"item\"> anywhere in its template."
+        },
+        "analogy": "A component is a LEGO brick: shape is the template, colour is the styles, connection points are @Input and @Output.",
+        "redFlags": [
+          "Confusing a component with a directive - a component has a template, a directive does not",
+          "Not knowing what the selector is for - it is the custom HTML tag name",
+          "Putting data fetching or business logic in the constructor instead of ngOnInit"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between a standalone component and one declared in an NgModule?",
+            "a": "A standalone component lists its own imports in the @Component decorator. An NgModule-based component is declared in a module which handles imports for all components in that module."
+          },
+          {
+            "q": "How does Angular pick the right component for a route?",
+            "a": "The router matches the URL to a route config entry and renders the component specified there inside a router-outlet element."
+          },
+          {
+            "q": "How would you share state between two sibling components?",
+            "a": "Lift the state into a shared service, often using a BehaviorSubject or a signal, that both siblings inject."
+          },
+          {
+            "q": "Is a component actually a directive?",
+            "a": "Yes - technically a component is a directive with a template attached to it."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "In your own words, what is an Angular component?"
+          },
+          {
+            "role": "you",
+            "text": "It is the basic UI building block - a TypeScript class decorated with @Component that bundles a template, styles, and logic into one reusable unit. The decorator tells Angular what HTML tag to use, what to render, and what styles to apply."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does the selector actually give you in practice?"
+          },
+          {
+            "role": "you",
+            "text": "It registers a custom HTML tag so I can drop the component anywhere in another template, like <product-card [product]=\"item\">. Angular sees that tag, finds the matching component, and renders it. Without a selector, the component can only be used in routes."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned standalone components - how do they differ from the old NgModule approach?"
+          },
+          {
+            "role": "you",
+            "text": "With NgModules, all components in a feature module shared the same imports list. With standalone, each component declares its own imports in the decorator, like imports: [CurrencyPipe, RouterLink]. This is the default since Angular 17 and removes a whole layer of boilerplate."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do components relate to each other in a real app?"
+          },
+          {
+            "role": "you",
+            "text": "They form a tree rooted at AppComponent. Data flows down through @Input bindings and events flow up through @Output EventEmitters. For communication between components that are not in a parent-child relationship, I use a shared service."
+          },
+          {
+            "role": "interviewer",
+            "text": "One last thing - is a component the same as a directive?"
+          },
+          {
+            "role": "you",
+            "text": "A component is technically a directive with a template. All components are directives but not all directives are components. A plain directive adds behaviour to an existing element without its own template, while a component owns and renders its own view."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-002",
+      "q": "What are Directives and what is the difference between structural and attribute directives?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["directives", "structural", "attribute", "ngIf", "ngFor", "ngClass"],
+      "answer": {
+        "oneLiner": "Directives add behaviour to elements. Structural directives change the DOM by adding or removing nodes. Attribute directives change the appearance or behaviour of an existing element without touching the DOM structure.",
+        "detail": "Angular has three directive types: components (directives with a template), structural directives, and attribute directives. Structural directives use the asterisk prefix as shorthand - *ngIf is syntactic sugar that wraps the element in an ng-template so Angular can stamp it into or remove it from the DOM. Only one structural directive is allowed per element; use ng-container to apply multiple. Since Angular 17, the built-in control flow blocks @if, @for, and @switch are the preferred replacement for the old structural directive syntax. Attribute directives like ngClass or ngStyle change an element's class list or inline styles without adding or removing DOM nodes. You can build custom attribute directives by creating a class decorated with @Directive and injecting ElementRef or Renderer2.",
+        "keyPoints": [
+          "*ngIf and *ngFor are structural - they add or remove DOM nodes, the * is sugar for ng-template",
+          "Angular 17+ control flow blocks @if, @for, @switch replace structural directives with less boilerplate",
+          "ngClass and ngStyle are attribute directives - they change look or behaviour, not DOM structure",
+          "Only one structural directive per element - use ng-container as a zero-DOM wrapper for multiple"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Two structural directives on one element causes a compile error\n// <tr *ngFor=\"let order of orders\" *ngIf=\"order.isPaid\">...</tr>\n\n// ✅ GOOD - ng-container for multiple directives + Angular 17 @if block\nimport { Component } from '@angular/core';\nimport { NgClass } from '@angular/common';\n\n@Component({\n  selector: 'order-list',\n  standalone: true,\n  imports: [NgClass],\n  template: `\n    @for (order of orders; track order.id) {\n      @if (order.isPaid) {\n        <tr [ngClass]=\"{ 'urgent': order.isLate }\">\n          <td>{{ order.reference }}</td>\n        </tr>\n      }\n    }\n  `\n})\nexport class OrderListComponent {\n  orders: Order[] = [];\n}",
+          "note": "Angular 17 @for and @if blocks replace *ngFor and *ngIf - no two-directive conflict and no ng-template boilerplate."
+        },
+        "analogy": "Structural directives are architects that add or demolish rooms; attribute directives are interior decorators that repaint existing rooms.",
+        "redFlags": [
+          "Saying *ngIf only hides elements - it actually removes them from the DOM completely",
+          "Not knowing that * in *ngIf expands to an ng-template wrapper",
+          "Not knowing about the Angular 17 @if and @for control flow blocks for a mid-level role"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How would you build a custom attribute directive to highlight a row on hover?",
+            "a": "Create a class with @Directive, inject ElementRef and Renderer2, and listen to HostListener events to add or remove a CSS class on the host element."
+          },
+          {
+            "q": "What is ng-container and why is it useful?",
+            "a": "It is a logical grouping element that renders nothing in the DOM, so you can apply structural directives or template variables without adding an extra HTML element."
+          },
+          {
+            "q": "What is the difference between ngClass and the [class.active] binding?",
+            "a": "[class.active] toggles one specific class based on a boolean. ngClass accepts an object, array, or string and handles multiple classes at once."
+          },
+          {
+            "q": "Can you put two structural directives on one element?",
+            "a": "No, Angular only allows one per element. Wrap the inner element in ng-container and put the second directive there, or use the nested @if/@for block syntax."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is a directive in Angular, and how do structural and attribute directives differ?"
+          },
+          {
+            "role": "you",
+            "text": "A directive adds behaviour to an element. Structural directives like *ngIf and *ngFor change the DOM by adding or removing nodes. Attribute directives like ngClass change the appearance or behaviour of an element that already exists in the DOM."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned *ngIf - what does that asterisk actually mean under the hood?"
+          },
+          {
+            "role": "you",
+            "text": "It is syntactic sugar. Angular expands *ngIf into an ng-template with a [ngIf] binding on it. So Angular can stamp the template content into the DOM when the condition is true, and remove it when false - the element is not just hidden, it is destroyed."
+          },
+          {
+            "role": "interviewer",
+            "text": "So *ngIf removes the element entirely? Not just hides it?"
+          },
+          {
+            "role": "you",
+            "text": "Exactly - it removes it from the DOM. If you need to hide but keep the element, use [hidden] or [style.display]. ngIf is better for security-sensitive content or heavy components you do not want initialised when not needed."
+          },
+          {
+            "role": "interviewer",
+            "text": "Are there any changes to directives in recent Angular versions?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - Angular 17 introduced built-in control flow blocks: @if, @for, and @switch. They replace *ngIf and *ngFor with a cleaner syntax, no ng-template needed, and they also improve type narrowing. The old syntax still works but these are now preferred."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if I accidentally put *ngFor and *ngIf on the same element?"
+          },
+          {
+            "role": "you",
+            "text": "Angular throws a compile-time error. Only one structural directive is allowed per element. The fix is to wrap the inner element in ng-container and put the second directive on that, or just use the nested @for { @if { } } block syntax which has no such restriction."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-003",
+      "q": "What does the Angular compiler do? Explain AOT vs JIT and the role of Ivy.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["compiler", "AOT", "JIT", "Ivy", "build", "performance"],
+      "answer": {
+        "oneLiner": "The Angular compiler converts templates and decorators into optimised JavaScript. AOT compiles at build time and is the production default. JIT compiles in the browser at runtime and is dev-only. Ivy is the current compile and render engine, default since Angular 9.",
+        "detail": "In JIT mode, the Angular compiler is shipped inside the production bundle and templates are compiled in the browser at startup. This is slow and means template errors only surface at runtime. In AOT mode, compilation happens during ng build. Templates are turned into TypeScript factory functions, the compiler is not included in the bundle, and template type errors surface at build time. AOT also enables tree-shaking of unused Angular features. Ivy is the engine underneath - it replaced the old View Engine in Angular 9. Ivy compiles each component independently (locality principle), which means incremental builds only recompile what changed. Ivy also enables standalone components, signals, and better tree-shaking. The compiled output is a static ɵcmp property on each component class. Simplified view: JIT ships the compiler to users and compiles in the browser; AOT compiles before shipping so users get pre-built code.",
+        "keyPoints": [
+          "JIT compiles in the browser at startup - the compiler is in the bundle, template errors appear at runtime",
+          "AOT compiles during ng build - no compiler in bundle, smaller output, template errors caught early",
+          "Ivy (default since v9) compiles each component independently enabling tree-shaking and standalone",
+          "ng build --configuration=production uses AOT by default and has done so since Angular 12"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - JIT-only approach: compiler shipped in bundle, error only at runtime\n// platformBrowserDynamic().bootstrapModule(AppModule);\n// This compiles templates lazily in the browser\n\n// ✅ GOOD - AOT standalone bootstrap: no compiler bundle, errors caught at build time\nimport { bootstrapApplication } from '@angular/platform-browser';\nimport { AppComponent } from './app/app.component';\nimport { provideRouter } from '@angular/router';\nimport { APP_ROUTES } from './app/app.routes';\n\nbootstrapApplication(AppComponent, {\n  providers: [provideRouter(APP_ROUTES)]\n});\n// Ivy ɵcmp factory is generated at build time:\n// AppComponent.ɵcmp = defineComponent({ ... })",
+          "note": "Standalone bootstrap using AOT - the component factory (ɵcmp) is generated at build time, not in the browser."
+        },
+        "analogy": "JIT is cooking in front of the customer; AOT is meal-prepping in the kitchen before service starts.",
+        "redFlags": [
+          "Saying JIT is used in production - it has not been for years, AOT is the default",
+          "Confusing Ivy with a specific Angular version number - Ivy is an engine, not a version",
+          "Not knowing that AOT catches template type errors at build time before deployment"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What does strictTemplates in tsconfig do?",
+            "a": "It enables full type-checking of template bindings, catching mismatched @Input types and property typos at build time instead of at runtime."
+          },
+          {
+            "q": "How does Ivy locality help in a large monorepo?",
+            "a": "Each component compiles independently to a self-contained factory, so incremental rebuilds only recompile the components whose files actually changed."
+          },
+          {
+            "q": "Is differential loading still relevant in Angular 17+?",
+            "a": "No - differential loading targeted older browsers. Modern Angular targets ES2022+ directly so the old dual-bundle approach was removed."
+          },
+          {
+            "q": "Is JIT ever used in production?",
+            "a": "No - production always uses AOT. JIT is only used in dev when you run ng serve without an explicit build configuration."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What does the Angular compiler do, and can you explain AOT versus JIT?"
+          },
+          {
+            "role": "you",
+            "text": "The compiler turns templates and decorators into optimised JavaScript. JIT compiles in the browser at runtime so the compiler ships in the bundle and errors only appear when the user opens the page. AOT compiles during ng build so the bundle is smaller and template errors surface before deployment."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why is AOT better for production specifically?"
+          },
+          {
+            "role": "you",
+            "text": "Three reasons: the compiler is not shipped to users so the bundle is smaller; startup is faster because templates are already compiled; and any type mismatch in a template is caught at build time. In a banking app for example, you want that safety net before code reaches production."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where does Ivy fit into all of this?"
+          },
+          {
+            "role": "you",
+            "text": "Ivy is the current compile and render engine, the default since Angular 9. It replaced the old View Engine. Ivy compiles each component independently so incremental builds are faster - only changed components are recompiled. It also enabled standalone components and the signals architecture."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does a compiled component actually look like after Ivy processes it?"
+          },
+          {
+            "role": "you",
+            "text": "The component class gets a static ɵcmp property assigned to it: something like ProductCardComponent.ɵcmp = defineComponent({ ... }). That factory contains the template instructions Angular executes at render time. No intermediate tree - just direct DOM instructions."
+          },
+          {
+            "role": "interviewer",
+            "text": "So AOT is on by default - do I need to do anything to enable it?"
+          },
+          {
+            "role": "you",
+            "text": "Nothing extra. AOT has been on by default for production builds since Angular 12, and ng serve also uses AOT now. The strictTemplates flag in tsconfig is the one worth switching on explicitly - it adds full template type-checking on top of AOT."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-004",
+      "q": "Describe Angular's component lifecycle hooks and when each fires.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["lifecycle", "ngOnInit", "ngOnChanges", "ngOnDestroy", "hooks"],
+      "answer": {
+        "oneLiner": "Angular runs hooks from creation to destruction. The four you must know are ngOnChanges (fires on every @Input change), ngOnInit (fires once after the first inputs are set), ngAfterViewInit (fires when the view is ready), and ngOnDestroy (fires before destruction for cleanup).",
+        "detail": "The full order is: constructor, ngOnChanges, ngOnInit, ngDoCheck, ngAfterContentInit, ngAfterContentChecked, ngAfterViewInit, ngAfterViewChecked, then ngOnDestroy. The constructor runs before any inputs are set, so it should only be used for dependency injection. Use ngOnInit for the initial data fetch since inputs are guaranteed to be set. @ViewChild queries are undefined in ngOnInit because the view has not rendered yet - they are only available from ngAfterViewInit onward. ngOnChanges gives you a SimpleChanges object with oldValue and currentValue so you can react to specific input changes after the component is live. ngOnDestroy is critical for cleanup - unsubscribe from observables and clear timers here, otherwise you will leak memory. With signals, effect() can replace many ngDoCheck patterns.",
+        "keyPoints": [
+          "ngOnChanges fires before ngOnInit and again on every @Input reference change - use SimpleChanges to inspect what changed",
+          "ngOnInit fires once after the first inputs are set - this is where HTTP calls belong, not the constructor",
+          "ngAfterViewInit is the earliest safe point to access @ViewChild - the view does not exist before this",
+          "ngOnDestroy must clean up subscriptions and timers - use takeUntilDestroyed() or a destroy$ Subject"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - HTTP call in constructor, no cleanup, ViewChild used too early\nexport class OrderDetailComponent {\n  @ViewChild('chart') chart!: ElementRef; // undefined here\n  constructor(private svc: OrderService) {\n    this.orders = svc.getOrders().subscribe(); // leaks, no cleanup\n  }\n}\n\n// ✅ GOOD - Correct hook usage with automatic cleanup\nimport { Component, OnInit, inject, DestroyRef } from '@angular/core';\nimport { takeUntilDestroyed } from '@angular/core/rxjs-interop';\n\n@Component({ selector: 'order-detail', standalone: true, template: '' })\nexport class OrderDetailComponent implements OnInit {\n  private orderSvc = inject(OrderService);\n  private destroyRef = inject(DestroyRef);\n  orders: Order[] = [];\n\n  ngOnInit() {\n    this.orderSvc.getOrders()\n      .pipe(takeUntilDestroyed(this.destroyRef))\n      .subscribe(data => this.orders = data);\n  }\n}",
+          "note": "takeUntilDestroyed(destroyRef) auto-unsubscribes when the component is destroyed - no manual ngOnDestroy needed."
+        },
+        "analogy": "Lifecycle hooks are like a restaurant shift: constructor is clocking in, ngOnInit is taking your first order, ngAfterViewInit is when the kitchen is open, ngOnDestroy is closing down and cleaning up.",
+        "redFlags": [
+          "Putting HTTP calls or business logic in the constructor - the constructor is for DI only",
+          "Accessing @ViewChild in ngOnInit - the view is not rendered yet, it will be undefined",
+          "Not cleaning up subscriptions in ngOnDestroy - this causes memory leaks in long-running SPAs"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between ngOnInit and the constructor?",
+            "a": "The constructor is for dependency injection and runs before any @Input values are set. ngOnInit runs after the first change detection cycle when all inputs are available."
+          },
+          {
+            "q": "Why is @ViewChild undefined in ngOnInit?",
+            "a": "The component's view has not been rendered yet in ngOnInit. ViewChild queries only resolve after ngAfterViewInit, when Angular has built the actual DOM."
+          },
+          {
+            "q": "What does takeUntilDestroyed() do and how is it different from the old destroy$ Subject pattern?",
+            "a": "takeUntilDestroyed() is the modern Angular 16+ approach - you inject DestroyRef and pass it in, and Angular auto-completes the subscription on destroy. The old pattern requires manually calling destroy$.next() in ngOnDestroy."
+          },
+          {
+            "q": "When does ngOnChanges fire relative to ngOnInit?",
+            "a": "ngOnChanges fires before the first ngOnInit with the initial input values, then again on every subsequent @Input change."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through the main Angular lifecycle hooks and when each fires."
+          },
+          {
+            "role": "you",
+            "text": "The key four are: ngOnChanges fires on every @Input change before ngOnInit; ngOnInit fires once after the first inputs are set; ngAfterViewInit fires when the view is rendered and @ViewChild queries are available; and ngOnDestroy fires just before the component is destroyed."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where would you put your initial HTTP call to load data for the component?"
+          },
+          {
+            "role": "you",
+            "text": "In ngOnInit, not the constructor. The constructor runs before inputs are set, so if the API call depends on an @Input like a customer ID, it would fail or use undefined. ngOnInit guarantees all inputs are available."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about accessing a DOM element via @ViewChild - where is the earliest safe place to do that?"
+          },
+          {
+            "role": "you",
+            "text": "ngAfterViewInit. The component's template is not rendered during ngOnInit, so any @ViewChild query returns undefined there. By ngAfterViewInit, Angular has completed the first render and the references are populated."
+          },
+          {
+            "role": "interviewer",
+            "text": "And what is the most common mistake developers make with ngOnDestroy?"
+          },
+          {
+            "role": "you",
+            "text": "Forgetting to unsubscribe from long-lived Observables. In an e-commerce SPA, if you subscribe to a real-time price stream in ngOnInit and never clean it up, every navigation away leaks a subscription. I use takeUntilDestroyed(this.destroyRef) from Angular 16 - it auto-cleans without needing manual ngOnDestroy at all."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does every Observable need cleanup? Even HttpClient calls?"
+          },
+          {
+            "role": "you",
+            "text": "HttpClient observables complete after one emission, so they self-clean and do not need explicit unsubscription. The ones that need cleanup are infinite streams like interval(), WebSocket connections, Router.events, or any BehaviorSubject from a service - those never complete on their own."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-005",
+      "q": "What type of DOM does Angular use, and how does it compare to React's virtual DOM?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["DOM", "virtual DOM", "incremental DOM", "Ivy", "React", "rendering"],
+      "answer": {
+        "oneLiner": "Angular uses the real DOM with an incremental DOM strategy via Ivy - there is no virtual DOM. React creates an in-memory virtual DOM tree, diffs it, and patches the real DOM. Angular's approach uses less memory because no shadow tree is built.",
+        "detail": "React's virtual DOM works by re-running the render function each time state changes, building a new in-memory tree, diffing it against the previous tree, and applying the minimum set of real DOM changes. Angular takes a different path: Ivy compiles templates into a series of instructions that are stored alongside the component. When change detection runs, those instructions execute only for the changed values - they reach directly into the real DOM and update only the affected nodes. No shadow tree is built and discarded. This is called incremental DOM. The practical difference is memory: React creates a full virtual DOM tree for diffing; Angular's instructions consume memory proportional to the size of the change, not the whole tree. Both approaches deliver fast rendering in practice. Where signals come in: they notify Angular of exactly which signal changed, so only the components reading that signal need updating - further reducing CD work without Zone.js.",
+        "keyPoints": [
+          "Angular uses the real DOM with Ivy's incremental DOM instructions - no virtual DOM shadow tree",
+          "React builds a full in-memory virtual DOM tree, diffs it, then patches the real DOM",
+          "Incremental DOM uses memory proportional to changes, not the whole component tree",
+          "Angular signals go further by targeting updates to only the components that read a changed signal"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - React-style mental model: assuming Angular diffs a virtual tree\n// Angular does NOT work like this internally\n\n// ✅ GOOD - Angular Ivy compiles to real DOM instructions\n// After Ivy compiles a component, the output looks like:\n// ProductListComponent.ɵcmp = defineComponent({\n//   template: function(rf, ctx) {\n//     if (rf & 1) { elementStart(0, 'ul'); element(1, 'li'); elementEnd(); }\n//     if (rf & 2) { advance(1); textInterpolate(ctx.productName); }\n//   }\n// });\n\n// The rf & 2 block only runs when a binding changed - not a full re-render\n@Component({\n  selector: 'product-list',\n  standalone: true,\n  changeDetection: ChangeDetectionStrategy.OnPush,\n  template: `<ul>@for (p of products; track p.id) { <li>{{ p.name }}</li> }</ul>`\n})\nexport class ProductListComponent {\n  products = input<Product[]>([]);\n}",
+          "note": "Ivy generates targeted DOM update instructions in the rf & 2 branch - only changed bindings are touched, no full tree diff."
+        },
+        "analogy": "React redraws the full blueprint and compares versions; Angular has a checklist that only touches the specific items that changed.",
+        "redFlags": [
+          "Claiming Angular uses a virtual DOM - it does not, and saying so shows you have not worked with Angular seriously",
+          "Not knowing what Ivy is or thinking it is just a minor version update",
+          "Saying one approach is always faster - both are fast in practice, the real difference is memory usage"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How does OnPush change detection strategy reduce DOM work?",
+            "a": "It skips change detection for a component unless its @Input reference changes, an event fires inside it, or an async pipe emits - so Angular does not check every binding in every cycle."
+          },
+          {
+            "q": "How do Angular signals eliminate Zone.js overhead?",
+            "a": "Signals track which components read them. When a signal value changes, Angular notifies only those exact components - no Zone.js is needed to trigger a full tree scan."
+          },
+          {
+            "q": "What is hydration in Angular SSR and how does it relate to the DOM strategy?",
+            "a": "Angular SSR renders HTML on the server. Hydration reuses those server-rendered DOM nodes on the client instead of destroying and re-rendering them, which avoids a flash of content and improves Time to Interactive."
+          },
+          {
+            "q": "Is incremental DOM always faster than a virtual DOM?",
+            "a": "Not always - both are fast in practice. The main advantage of incremental DOM is lower memory usage and better tree-shaking because instructions live with the component, not in a separate runtime."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Does Angular use a virtual DOM like React?"
+          },
+          {
+            "role": "you",
+            "text": "No. Angular works directly on the real DOM using what is called an incremental DOM strategy via the Ivy engine. There is no in-memory shadow tree. React builds a virtual DOM, diffs it, then patches the real DOM - Angular skips the intermediate tree entirely."
+          },
+          {
+            "role": "interviewer",
+            "text": "So how does Angular know which part of the DOM to update?"
+          },
+          {
+            "role": "you",
+            "text": "Ivy compiles templates into a set of instructions stored on the component class as ɵcmp. When change detection runs, those instructions execute and update only the DOM nodes whose bound values actually changed. It is targeted - not a full re-render."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the practical advantage of that over React's virtual DOM?"
+          },
+          {
+            "role": "you",
+            "text": "Lower memory usage. React builds a full virtual DOM tree in memory for every render cycle to diff against. Angular's instructions only consume memory proportional to what changed. In a large logistics dashboard with hundreds of table rows, that difference adds up."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does Angular signals change any of this?"
+          },
+          {
+            "role": "you",
+            "text": "Yes, signals make it even more granular. A signal tracks which components read it. When the signal value changes, only those specific components are scheduled for update - Angular does not need Zone.js to trigger a full tree scan at all."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is incremental DOM always faster than virtual DOM then?"
+          },
+          {
+            "role": "you",
+            "text": "Not necessarily faster in raw speed - both approaches are well-optimised. The main wins for incremental DOM are lower memory and better tree-shaking, because the update instructions live alongside each component and unused ones are removed at build time."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-006",
+      "q": "What architecture does Angular follow?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["architecture", "MVVM", "component-based", "NgModule", "standalone", "DI"],
+      "answer": {
+        "oneLiner": "Angular follows a component-based architecture with built-in hierarchical dependency injection. It maps loosely to MVVM - the component is the ViewModel, the template is the View, and services hold the Model and business logic.",
+        "detail": "Unlike React which is only a view library, Angular is a full opinionated framework. It ships with routing, forms, HTTP client, dependency injection, and a testing harness all built in. The app is structured as a tree of components starting at AppComponent. Services are injected through a hierarchical injector tree: platform injector at the top, then root injector for singletons, then environment injectors per lazy route, then component-level injectors for scoped instances. Historically, NgModules grouped components and handled imports, but since Angular 17 standalone components are the default. Each standalone component declares its own dependencies directly in the @Component decorator. A service registered with providedIn: root is a singleton for the whole app. A service provided in a component's providers array creates a fresh instance scoped to that component's subtree.",
+        "keyPoints": [
+          "Component-based architecture: the whole app is a tree of components rooted at AppComponent",
+          "Loosely MVVM: component is ViewModel, template is View, services are Model",
+          "Full opinionated framework: routing, forms, HTTP, DI all built in - unlike React which is just a library",
+          "Hierarchical DI: services can be app-wide singletons or scoped to a component subtree"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Service instantiated manually, no DI, can't be mocked or reused\nexport class CheckoutComponent {\n  private paymentSvc = new PaymentService(); // tight coupling, untestable\n}\n\n// ✅ GOOD - DI with hierarchical scoping\nimport { Injectable, Component, inject } from '@angular/core';\n\n@Injectable({ providedIn: 'root' }) // app-wide singleton\nexport class PaymentService {\n  processPayment(amount: number) { /* ... */ }\n}\n\n@Component({\n  selector: 'checkout',\n  standalone: true,\n  template: `<button (click)=\"pay()\">Pay Now</button>`\n})\nexport class CheckoutComponent {\n  private paymentSvc = inject(PaymentService); // DI resolves the singleton\n  pay() { this.paymentSvc.processPayment(this.total); }\n}",
+          "note": "inject() resolves from the hierarchical injector - the service is a singleton because providedIn: root registers it at the root injector."
+        },
+        "analogy": "Angular is a complete kitchen with all equipment included; React is just a cooktop and you source everything else yourself.",
+        "redFlags": [
+          "Calling Angular a library - it is a full framework with routing, forms, HTTP, and DI all built in",
+          "Not knowing what dependency injection is or why it matters for testability",
+          "Confusing the MVVM pattern with React's unidirectional data flow model"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How is Angular's DI different from creating services with the new keyword?",
+            "a": "DI creates and manages instances for you. This decouples the consumer from the concrete implementation, makes swapping implementations trivial, and lets you inject mocks in tests without changing any production code."
+          },
+          {
+            "q": "What are the advantages of standalone components over NgModules?",
+            "a": "Less boilerplate - no NgModule file to maintain. Dependencies are explicit per component. Lazy loading is simpler with loadComponent. This is the default approach since Angular 17."
+          },
+          {
+            "q": "How would you structure a large Angular e-commerce application?",
+            "a": "Feature-based folder structure with lazy-loaded routes per feature (catalogue, checkout, account). A core layer for app-wide singletons and a shared layer for reusable components. Smart container components call services; dumb presentational components handle only UI."
+          },
+          {
+            "q": "Is a root-provided service always a singleton?",
+            "a": "Yes - providedIn: root registers the service at the root injector, so every component that injects it gets the same instance."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What architecture does Angular follow?"
+          },
+          {
+            "role": "you",
+            "text": "A component-based architecture with built-in hierarchical dependency injection. It maps loosely to MVVM: the component is the ViewModel coordinating between the template as the View and services as the Model."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is Angular a library like React or something else?"
+          },
+          {
+            "role": "you",
+            "text": "It is a full opinionated framework. React is just a view library and you choose your own router, form library, HTTP client, and state manager. Angular ships all of those built in and opinionated. That makes the initial setup faster but also means you follow Angular's way of doing things."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does the dependency injection system work at a high level?"
+          },
+          {
+            "role": "you",
+            "text": "Angular has a hierarchical injector tree. At the top is the root injector for app-wide singletons. Below that are environment injectors for lazy-loaded routes. Below those are component-level injectors. When you inject a service, Angular walks up the tree to find the nearest provider. This means you can have one global PaymentService but a scoped CartService per checkout route."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where do NgModules fit in current Angular development?"
+          },
+          {
+            "role": "you",
+            "text": "They are still supported for legacy codebases but are no longer the default. Since Angular 17, standalone components are the default - each component declares its own imports directly in the @Component decorator. New projects no longer generate an AppModule at all."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why does architecture choice matter for a senior Angular developer?"
+          },
+          {
+            "role": "you",
+            "text": "It directly affects testability and maintainability. If you instantiate services with new instead of injecting them, you cannot swap in mocks for unit tests. If you skip the smart and dumb component split, presentational components become coupled to stores, making them hard to reuse. Architecture decisions compound over time in a large codebase."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-007",
+      "q": "What is lazy loading in Angular and what are its advantages?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["lazy loading", "routing", "performance", "code splitting", "bundle"],
+      "answer": {
+        "oneLiner": "Lazy loading defers downloading a route's JavaScript until the user actually navigates to it. This shrinks the initial bundle size and speeds up the first page load.",
+        "detail": "By default, Angular bundles all components into one main.js file. With lazy loading, the Angular CLI automatically splits each lazy route into a separate chunk file. That chunk is only downloaded by the browser when the user navigates to the route. In modern standalone apps you use loadComponent for a single component or loadChildren with a routes array for a group of routes. Lazy routes also get their own environment injector scope, so services provided there are isolated to that route and do not leak into the rest of the app. Preloading strategies let you background-download lazy chunks after the initial page loads: NoPreloading downloads nothing, PreloadAllModules downloads everything in the background, and custom strategies let you preload only high-probability routes. Combine lazy loading with route-level code splitting to target specific Time to Interactive improvements.",
+        "keyPoints": [
+          "loadComponent for a single standalone component, loadChildren for a sub-route array - both use dynamic import()",
+          "Each lazy route gets its own environment injector scope, so route-level services are isolated",
+          "The Angular CLI automatically code-splits each lazy route into a separate chunk at build time",
+          "Preloading strategies (PreloadAllModules or custom) let you background-load chunks after startup"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Eager import: everything lands in main.js regardless of route visited\nimport { CheckoutComponent } from './checkout/checkout.component';\nexport const routes: Routes = [\n  { path: 'checkout', component: CheckoutComponent } // always in the bundle\n];\n\n// ✅ GOOD - Lazy loading with loadComponent and loadChildren\nimport { Routes } from '@angular/router';\nexport const APP_ROUTES: Routes = [\n  {\n    path: 'checkout',\n    loadComponent: () =>\n      import('./checkout/checkout.component').then(m => m.CheckoutComponent)\n  },\n  {\n    path: 'admin',\n    loadChildren: () =>\n      import('./admin/admin.routes').then(m => m.ADMIN_ROUTES)\n  }\n];",
+          "note": "Eager imports always increase main.js size. loadComponent and loadChildren create separate chunk files downloaded only when needed."
+        },
+        "analogy": "Lazy loading is ordering food only when you are hungry, not buying a full week of groceries on day one.",
+        "redFlags": [
+          "Thinking lazy loading is a security feature that hides routes from users - it only defers the download",
+          "Not knowing that loadComponent is the modern standalone way - still using only loadChildren with modules",
+          "Confusing lazy loading with *ngIf show/hide - lazy loading affects code download, not DOM visibility"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you implement a custom preloading strategy?",
+            "a": "Extend PreloadingStrategy, implement the preload method to decide per-route whether to preload, then pass it to provideRouter using withPreloading(YourStrategy)."
+          },
+          {
+            "q": "What is the difference between loadChildren with a module versus a route array?",
+            "a": "Modern standalone apps return a Routes array directly from loadChildren. Legacy NgModule apps return a module class. The route array approach is simpler and is the current standard."
+          },
+          {
+            "q": "How does lazy loading interact with dependency injection scoping?",
+            "a": "Each lazy route creates its own environment injector. Services provided in that lazy route's providers array are scoped to that route subtree and not visible to the rest of the app."
+          },
+          {
+            "q": "Does lazy loading hide routes from users for security purposes?",
+            "a": "No - it only delays the code download. Route access must be secured with CanActivate guards on the server. The chunk file can still be downloaded directly."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is lazy loading in Angular and why would you use it?"
+          },
+          {
+            "role": "you",
+            "text": "Lazy loading defers downloading a route's JavaScript until the user navigates to it. By default everything is bundled into main.js. With lazy loading, the CLI splits each lazy route into its own chunk file. In a healthcare SaaS app where most users only visit the patient dashboard, there is no reason to download the admin module on every page load."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you set that up with modern standalone components?"
+          },
+          {
+            "role": "you",
+            "text": "In the route config I use loadComponent with a dynamic import for a single component, or loadChildren with a dynamic import of a routes array for a group. The syntax is: loadComponent: () => import('./checkout.component').then(m => m.CheckoutComponent). The CLI detects dynamic imports and creates separate chunk files automatically."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens to dependency injection in a lazy route?"
+          },
+          {
+            "role": "you",
+            "text": "Lazy routes get their own environment injector. Any services you provide in that route's providers array are scoped to that route's component tree. They do not pollute the root injector. When the user leaves the route, those instances are eligible for garbage collection."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can I make the user experience smoother so they do not notice the lazy load delay?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - with preloading strategies. After the initial page loads, PreloadAllModules background-downloads all lazy chunks. Or I can write a custom PreloadingStrategy that preloads only the most likely next routes based on the user's current position in the app."
+          },
+          {
+            "role": "interviewer",
+            "text": "One question - does lazy loading secure the route from unauthorized users?"
+          },
+          {
+            "role": "you",
+            "text": "No, that is a common misconception. Lazy loading only defers the download. The chunk file can still be fetched directly. Real security comes from CanActivate guards that check permissions before the route activates, combined with server-side authorization on the API endpoints."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-008",
+      "q": "What are standalone components and how do they differ from NgModule-based components?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["standalone", "NgModule", "Angular 14", "Angular 17", "imports"],
+      "answer": {
+        "oneLiner": "Standalone components declare their own imports directly in the @Component decorator instead of being declared in an NgModule. This removes the NgModule boilerplate layer and makes each component self-contained.",
+        "detail": "Before Angular 14, every component had to be declared inside an NgModule, which also managed what directives, pipes, and other modules that component could use. All components in a module shared the same imports. With standalone components, each component is its own island - it declares exactly what it needs in its own imports array. This makes components easier to understand in isolation, easier to share between projects, and simpler to lazy-load. Standalone components can still import NgModules, so migrating legacy libraries like ReactiveFormsModule is seamless. The app is bootstrapped with bootstrapApplication() instead of platformBrowserDynamic().bootstrapModule(). Global providers (router, HTTP client) are configured with functional providers like provideRouter() and provideHttpClient(). Since Angular 17, standalone is the default for all new components generated by the CLI. The ng generate @angular/core:standalone schematic helps migrate existing NgModule apps.",
+        "keyPoints": [
+          "standalone: true (default in Angular 17+) lets a component list its own imports in the @Component decorator",
+          "No @NgModule declaration needed - the component is self-contained and can be used or lazy-loaded directly",
+          "Bootstrapped with bootstrapApplication(AppComponent, { providers: [...] }) in main.ts",
+          "Standalone components can still import legacy NgModules like ReactiveFormsModule for backward compatibility"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - NgModule approach: must declare component AND manage shared imports in a module\n@NgModule({\n  declarations: [InvoiceListComponent],\n  imports: [CommonModule, RouterModule]\n})\nexport class InvoiceModule {}\n\n// ✅ GOOD - Standalone component owns its imports, no NgModule needed\nimport { Component } from '@angular/core';\nimport { RouterLink } from '@angular/router';\nimport { CurrencyPipe, DatePipe } from '@angular/common';\n\n@Component({\n  selector: 'invoice-list',\n  standalone: true,\n  imports: [RouterLink, CurrencyPipe, DatePipe],\n  template: `\n    @for (inv of invoices; track inv.id) {\n      <a [routerLink]=\"['/invoices', inv.id]\">{{ inv.total | currency }} - {{ inv.date | date }}</a>\n    }\n  `\n})\nexport class InvoiceListComponent { invoices: Invoice[] = []; }",
+          "note": "Each standalone component imports exactly what it needs - no shared NgModule that imports too much or too little."
+        },
+        "analogy": "NgModules are shared office supply rooms everyone uses; standalone components have their own desk drawer with exactly what they need.",
+        "redFlags": [
+          "Not knowing that standalone is the default since Angular 17 - for a mid-level role this is current baseline knowledge",
+          "Thinking standalone components cannot use NgModule-based libraries - they can, just add the NgModule to imports",
+          "Confusing standalone components with micro-frontends - standalone is a component authoring style, not a deployment strategy"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you provide a service to only a standalone component's subtree?",
+            "a": "Add it to the component's providers array in the @Component decorator. Angular creates a scoped instance for that component tree, isolated from the root injector."
+          },
+          {
+            "q": "Can a standalone component use a directive from an NgModule?",
+            "a": "Yes - add the NgModule that exports the directive to the standalone component's imports array. The component gets access to everything that NgModule exports."
+          },
+          {
+            "q": "Why use provideRouter() instead of RouterModule.forRoot()?",
+            "a": "provideRouter() is the tree-shakable, functional API designed for standalone apps. It composes features with withPreloading(), withRouterConfig(), etc. RouterModule.forRoot() is the NgModule-based equivalent."
+          },
+          {
+            "q": "Is standalone the default in new Angular projects?",
+            "a": "Yes - since Angular 17, ng new and ng generate component both produce standalone components without a module file by default."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What are standalone components and how do they change the Angular architecture?"
+          },
+          {
+            "role": "you",
+            "text": "Standalone components are self-contained - they declare their own imports in the @Component decorator instead of relying on an NgModule. This removes the NgModule layer entirely for new code. Each component says exactly what it needs: which pipes, directives, or other components it uses."
+          },
+          {
+            "role": "interviewer",
+            "text": "So how does the app bootstrap without an AppModule?"
+          },
+          {
+            "role": "you",
+            "text": "In main.ts I use bootstrapApplication(AppComponent, { providers: [...] }) instead of platformBrowserDynamic().bootstrapModule(AppModule). The providers array is where I configure app-wide things like the router using provideRouter(APP_ROUTES) and HTTP using provideHttpClient()."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if I have a third-party library that still uses NgModules?"
+          },
+          {
+            "role": "you",
+            "text": "No problem - standalone components can import NgModules. If I need ReactiveFormsModule from Angular or a charting library's module, I just add it to the component's imports array. Standalone and NgModule-based code interop cleanly."
+          },
+          {
+            "role": "interviewer",
+            "text": "What are the real advantages for a team working on a large codebase?"
+          },
+          {
+            "role": "you",
+            "text": "Three main ones: first, you can see a component's dependencies at a glance without hunting through multiple module files. Second, lazy-loading a single component is trivial with loadComponent. Third, there is no risk of accidentally exposing a component globally because it was declared in a shared module - each component is explicit about what it imports."
+          },
+          {
+            "role": "interviewer",
+            "text": "Do existing NgModule apps need to migrate immediately?"
+          },
+          {
+            "role": "you",
+            "text": "No - NgModules are still fully supported and there is no deprecation notice. Migration can be incremental using the ng generate @angular/core:standalone schematic. For a large legacy codebase I would migrate feature by feature rather than all at once."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-009",
+      "q": "What is an Angular Service and how does Dependency Injection work?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["service", "dependency injection", "DI", "providedIn", "singleton"],
+      "answer": {
+        "oneLiner": "A Service is a reusable @Injectable class for shared logic, HTTP calls, or state. Angular's DI system injects it automatically via the inject() function or constructor, so you never instantiate it yourself.",
+        "detail": "Angular's dependency injection works through an injector tree. When a component or service declares a dependency, Angular looks up the tree of injectors to find the nearest provider for that token. If the service is decorated with @Injectable({ providedIn: 'root' }), it is registered at the root injector as an app-wide singleton. If it is provided in a component's providers array, Angular creates a fresh instance scoped to that component's subtree. The inject() function is the modern approach and works anywhere inside an injection context - field initializers, constructors, factory functions. Constructor injection is the older approach and still works. DI enables testability because in tests you can provide a mock implementation in place of the real service without changing any production code. Multi-provider tokens let multiple providers register against the same token as an array, which is how HTTP interceptors work.",
+        "keyPoints": [
+          "@Injectable({ providedIn: 'root' }) registers the service as an app-wide singleton and makes it tree-shakable",
+          "inject() is the modern way to consume DI - works in field initializers and injection context functions, not just constructors",
+          "Hierarchical injector: provide in a component's providers array to scope a fresh instance to that component subtree",
+          "DI enables testing by letting you swap the real service for a mock without touching the consumer"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Manual instantiation: untestable, no scoping, no DI benefits\nexport class InvoiceListComponent {\n  private svc = new InvoiceService(); // hardcoded, impossible to mock in tests\n}\n\n// ✅ GOOD - DI via inject() with root singleton service\nimport { Injectable, Component, inject } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\n\n@Injectable({ providedIn: 'root' })\nexport class InvoiceService {\n  private http = inject(HttpClient);\n  getInvoices() {\n    return this.http.get<Invoice[]>('/api/invoices');\n  }\n}\n\n@Component({ selector: 'invoice-list', standalone: true, template: '' })\nexport class InvoiceListComponent {\n  private invoiceSvc = inject(InvoiceService);\n  invoices$ = this.invoiceSvc.getInvoices();\n}",
+          "note": "inject() resolves from the hierarchical injector tree. In tests, override with TestBed.configureTestingModule({ providers: [{ provide: InvoiceService, useClass: MockInvoiceService }] })."
+        },
+        "analogy": "DI is a hotel concierge: you say what you need and it is delivered to you - you never go to the warehouse yourself.",
+        "redFlags": [
+          "Not knowing what providedIn: root means - this is the most common way to register a service and its implications for singletons matter",
+          "Creating services with new instead of injecting them - this breaks testability and bypasses the injector tree",
+          "Not seeing the connection between DI and testability - this is the main reason the pattern exists"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between inject() and constructor injection?",
+            "a": "inject() works anywhere in an injection context including field initializers, making code more concise. Constructor injection only works in the constructor. Both resolve from the same injector tree."
+          },
+          {
+            "q": "How do you provide different implementations per environment?",
+            "a": "Define an injection token and use useClass or useFactory in the providers array, swapping the implementation in environment-specific app.config files."
+          },
+          {
+            "q": "What is a multi-provider token?",
+            "a": "A token registered with multi: true collects all providers registered against it into an array. HTTP interceptors use this pattern - each interceptor is added to the HTTP_INTERCEPTORS multi-token."
+          },
+          {
+            "q": "How does DI enable unit testing in Angular?",
+            "a": "In TestBed you override the real service with a mock class or a spy object. The component under test receives the mock through the same injection mechanism, so you test the component in isolation."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is an Angular service and how does dependency injection work?"
+          },
+          {
+            "role": "you",
+            "text": "A service is a reusable @Injectable class for shared logic, HTTP, or state. Angular's DI injects it automatically - you declare what you need using inject() or the constructor parameter, and Angular resolves and provides the instance from the injector tree."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does providedIn: root actually do?"
+          },
+          {
+            "role": "you",
+            "text": "It registers the service at the root injector, making it an app-wide singleton. Every component that injects it gets the same instance. It also makes the service tree-shakable - if nothing injects it, the bundler can remove it from the output."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if you want a separate instance of a service for a specific part of the app?"
+          },
+          {
+            "role": "you",
+            "text": "Provide it in that component's providers array. Angular creates a fresh instance scoped to that component's subtree. In a banking app for example, a TransactionService might be scoped to the account detail route so each account gets its own clean state."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned inject() - when would you choose that over constructor injection?"
+          },
+          {
+            "role": "you",
+            "text": "I prefer inject() in standalone apps because it works in field initializers - so I can write private invoiceSvc = inject(InvoiceService) at the class level without a constructor at all. It also works in factory functions passed to runInInjectionContext(), which constructor injection cannot do."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does DI actually help with testing?"
+          },
+          {
+            "role": "you",
+            "text": "In a unit test I configure TestBed with providers: [{ provide: InvoiceService, useClass: MockInvoiceService }]. The component being tested goes through the same injection mechanism and receives the mock. I can test all the component's logic without making real HTTP calls - the service interface is the contract, the implementation is swappable."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-010",
+      "q": "What is the Angular CLI and what are its most important commands?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["CLI", "ng", "generate", "build", "serve", "test"],
+      "answer": {
+        "oneLiner": "The Angular CLI is a command-line tool that scaffolds, builds, serves, tests, and updates Angular applications without any manual build configuration.",
+        "detail": "The CLI abstracts the build tooling. Before Angular 17, it used webpack under the hood. Since Angular 17, the default builder uses esbuild and Vite, making development server startup and production builds significantly faster. The most-used commands are ng new to create a project, ng serve for the development server with hot reload, ng generate (shortened ng g) to scaffold components, services, pipes, directives, and guards, ng build to create a production bundle, ng test to run unit tests with Jest or Karma, and ng update to safely upgrade Angular versions. ng add runs a library's schematic to install and auto-configure it. Environment-specific builds are handled through configurations in angular.json with file replacements. ng build --configuration=production enables AOT, minification, bundle budgets, and tree-shaking.",
+        "keyPoints": [
+          "ng new scaffolds a project; ng serve runs a hot-reload dev server; ng build --configuration=production creates an AOT-optimised bundle",
+          "ng generate (ng g c/s/p/d/g) scaffolds components, services, pipes, directives, and guards with correct boilerplate",
+          "Since Angular 17 the CLI uses an esbuild-based application builder by default - builds are much faster than the old webpack pipeline",
+          "ng update is the safe migration command for Angular version upgrades - it runs schematics to update code automatically"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Hand-writing component files and wiring them up manually\n// Missing spec files, wrong directory structure, no CLI schematics applied\n\n// ✅ GOOD - Use the CLI to scaffold with correct structure and standalone defaults\n// ng generate component invoice/invoice-list --standalone\n// Generates:\n// - invoice-list.component.ts (with @Component, standalone: true)\n// - invoice-list.component.html\n// - invoice-list.component.scss\n// - invoice-list.component.spec.ts\n\n// For a service scoped to a feature:\n// ng generate service invoice/invoice\n\n// Production build command:\n// ng build --configuration=production\n// Output: dist/ with AOT-compiled, minified, tree-shaken bundles",
+          "note": "ng generate handles file structure, naming conventions, and test file creation - hand-writing this is error-prone and slower."
+        },
+        "analogy": "The Angular CLI is a construction crew foreman - you say what you need and it builds it correctly according to the project blueprint.",
+        "redFlags": [
+          "Not knowing basic ng generate commands for a junior role - this is daily workflow knowledge",
+          "Editing the underlying webpack or esbuild config directly instead of using supported CLI options",
+          "Confusing ng update with npm update - ng update runs Angular schematics to automatically update code, not just package versions"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you configure environment-specific builds in Angular?",
+            "a": "Define configurations in angular.json with fileReplacements pointing to environment files like environment.production.ts. Run ng build --configuration=production to apply those replacements."
+          },
+          {
+            "q": "What is the difference between ng build and ng build --configuration=production?",
+            "a": "The production configuration enables AOT compilation, minification, dead code elimination, and bundle size budgets. The default build without a configuration is for development and includes source maps."
+          },
+          {
+            "q": "What is the Angular 17 application builder and how is it different from the old browser builder?",
+            "a": "The application builder uses esbuild and Vite instead of webpack. Build times are significantly faster, especially incremental dev server rebuilds. It also supports SSR and hydration out of the box."
+          },
+          {
+            "q": "What does ng add do?",
+            "a": "It installs a package and runs its Angular schematic to auto-configure it in the project - for example ng add @angular/material installs the package and adds theme, font, and animation setup."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the Angular CLI and what do you use it for day to day?"
+          },
+          {
+            "role": "you",
+            "text": "The CLI handles everything from scaffolding to building to upgrading. Day to day I use ng serve for the dev server, ng generate to scaffold components and services quickly, and ng build --configuration=production for release builds. It abstracts all the build tooling so I never touch esbuild config directly."
+          },
+          {
+            "role": "interviewer",
+            "text": "What exactly does ng generate save you from?"
+          },
+          {
+            "role": "you",
+            "text": "Hand-writing boilerplate. ng g component invoice/invoice-list creates the TypeScript class, template, stylesheet, and spec file with correct naming and standalone defaults in one command. It also avoids typos in decorator metadata that are easy to miss when writing manually."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned ng build - what does the production configuration actually do differently?"
+          },
+          {
+            "role": "you",
+            "text": "It enables AOT compilation, minification, dead code elimination, tree-shaking, and bundle size budgets. It also activates source map removal and sets the NODE_ENV to production for any third-party libraries that check for it. The output in dist/ is what goes to the CDN."
+          },
+          {
+            "role": "interviewer",
+            "text": "What changed in Angular 17 regarding the build tooling?"
+          },
+          {
+            "role": "you",
+            "text": "The CLI switched from webpack to an esbuild-Vite based application builder as the default. Dev server incremental builds went from seconds to milliseconds in most cases. Production builds are also significantly faster. It also adds first-class SSR support without needing a separate schematic."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you safely upgrade from Angular 16 to 17?"
+          },
+          {
+            "role": "you",
+            "text": "I use ng update @angular/core@17 @angular/cli@17. Unlike npm update, ng update runs Angular schematics that automatically migrate code - for example rewriting HttpClientModule usages to provideHttpClient(), or converting class-based guards to functional guards. Then I run ng build and check for any remaining errors."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-011",
+      "q": "What are smart (container) and dumb (presentational) components?",
+      "level": "mid",
+      "type": "design",
+      "freq": "medium",
+      "tags": ["smart components", "dumb components", "presentational", "container", "design pattern"],
+      "answer": {
+        "oneLiner": "Smart components (containers) manage state and inject services. Dumb components (presentational) only accept @Input data and emit @Output events with zero service dependencies. The split improves reusability and testability.",
+        "detail": "The pattern comes from React's container and presentational component split but applies equally well in Angular. A smart component like OrderListContainerComponent injects the OrderService, fetches orders, handles pagination, and passes the data down via @Input to a dumb OrderTableComponent. The dumb component renders whatever it receives and emits events like (rowClick) or (pageChange) up to the parent. The smart component listens and acts. The benefits: dumb components can be tested with just input values, no service mocks needed. They can be reused across different contexts. Paired with OnPush change detection, dumb components only re-render when their input references change, which is easy to guarantee with immutable data. The pattern maps to NgRx: smart components select from the store and dispatch actions, dumb components stay store-agnostic. It is a guideline, not a strict rule - some components legitimately need both roles.",
+        "keyPoints": [
+          "Smart (container): injects services, orchestrates state, passes data down via @Input to children",
+          "Dumb (presentational): no service dependencies, pure @Input/@Output interface, easy to unit test and reuse",
+          "Dumb components pair naturally with OnPush - inputs are the only change trigger and they are easy to keep immutable",
+          "In NgRx or signal store apps: smart components dispatch/select, dumb components never touch the store"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Presentational component injects a service directly\n@Component({ selector: 'order-table', standalone: true, template: '' })\nexport class OrderTableComponent {\n  private orderSvc = inject(OrderService); // tight coupling, hard to reuse\n  orders$ = this.orderSvc.getOrders();\n}\n\n// ✅ GOOD - Clear smart/dumb separation\n@Component({ selector: 'order-table', standalone: true,\n  changeDetection: ChangeDetectionStrategy.OnPush, template: '' })\nexport class OrderTableComponent {\n  orders = input.required<Order[]>();\n  rowClick = output<Order>();\n  onSelect(order: Order) { this.rowClick.emit(order); }\n}\n\n@Component({ selector: 'orders-page', standalone: true,\n  imports: [OrderTableComponent],\n  template: '<order-table [orders]=\"orders()\" (rowClick)=\"onOrderSelected($event)\" />'\n})\nexport class OrdersPageComponent {\n  private orderSvc = inject(OrderService);\n  orders = toSignal(this.orderSvc.getOrders(), { initialValue: [] });\n  onOrderSelected(order: Order) { /* navigate or open detail */ }\n}",
+          "note": "The dumb OrderTableComponent has no inject() calls - it is fully testable with just input data and an output spy."
+        },
+        "analogy": "Smart components are the manager who knows the business rules; dumb components are the display screen that shows whatever the manager sends.",
+        "redFlags": [
+          "Not knowing this pattern for a mid or senior role - it is fundamental to maintainable Angular architecture",
+          "Thinking dumb means low quality - presentational components are intentionally simple and that simplicity is the value",
+          "Injecting a data service into a presentational component - this couples the component to a specific data source and kills reusability"
+        ],
+        "followUpsQA": [
+          {
+            "q": "When is it acceptable to inject a service into a presentational component?",
+            "a": "For purely presentational concerns like a TranslateService or a router for navigation links - not for data fetching or state management services."
+          },
+          {
+            "q": "How does this pattern interact with NgRx or a signal store?",
+            "a": "Smart components select state from the store and dispatch actions. Dumb components receive data via @Input and emit events via @Output, remaining store-agnostic so they can be reused regardless of the state management approach."
+          },
+          {
+            "q": "How does OnPush benefit dumb components specifically?",
+            "a": "Dumb components only receive data through immutable inputs. OnPush detects changes only on reference changes, so Angular skips re-checking the component unless the parent passes a new object or array reference."
+          },
+          {
+            "q": "Is this pattern a strict rule?",
+            "a": "No - it is a guideline. Some components have complex enough UI with just enough local state that a strict split would create unnecessary indirection. Apply it where the reusability or testability benefit is clear."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain the smart and dumb component pattern in Angular."
+          },
+          {
+            "role": "you",
+            "text": "Smart or container components inject services, fetch or manage state, and pass data down. Dumb or presentational components only have @Input bindings and @Output events - zero service dependencies. The separation makes the dumb component fully reusable and trivially testable."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a concrete example from a real application."
+          },
+          {
+            "role": "you",
+            "text": "In a logistics app: OrdersPageComponent is smart - it injects OrderService, fetches the order list, and passes it down. OrderTableComponent is dumb - it receives orders as an input signal and emits a rowClick output. The table component works identically whether the data comes from a REST API, NgRx, or a mock in a unit test."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the testing benefit of keeping the table component dumb?"
+          },
+          {
+            "role": "you",
+            "text": "I can test it with zero mocks. I create the component in TestBed, pass in an array of test orders via the input, and assert the rendered rows. No HttpClientTestingModule, no service mock setup. The test is five lines and runs instantly."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does this interact with OnPush change detection?"
+          },
+          {
+            "role": "you",
+            "text": "Dumb components are the perfect case for OnPush because their data only arrives through inputs. If I use immutable data - replacing the array reference when items change rather than mutating - OnPush will pick up every change correctly and skip all unnecessary re-renders."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if a presentational component needs to translate text - does it need to inject a service?"
+          },
+          {
+            "role": "you",
+            "text": "That is the one exception I accept. A TranslateService or Angular's built-in i18n is a presentation concern, not a business data concern. I allow injecting services that are purely about rendering - translation, routing for navigation links. I draw the line at data services, store selectors, or anything that fetches or mutates application state."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-basics-012",
+      "q": "What are ViewChild and ContentChild decorators?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["ViewChild", "ContentChild", "template reference", "ng-content", "ElementRef"],
+      "answer": {
+        "oneLiner": "@ViewChild queries the component's own template. @ContentChild queries content projected into the component via ng-content. Both are only available after their respective AfterInit lifecycle hooks.",
+        "detail": "ViewChild and ContentChild are Angular's way of getting a reference to a child element, directive, or component from the parent. The distinction is about where the content comes from. ViewChild reaches into content defined in the component's own template file. ContentChild reaches into content that was projected in by the parent using ng-content slots. This matters because a component does not control its projected content - the parent does. Both queries resolve after the view is initialised: ViewChild is ready in ngAfterViewInit and ContentChild in ngAfterContentInit. Accessing them in ngOnInit returns undefined. The { static: true } option forces the query to resolve before ngOnInit but only works for elements that are always in the DOM (not wrapped in @if or *ngIf). ViewChildren and ContentChildren return a QueryList of all matches instead of just the first. Since Angular 17.1, the signal-based viewChild() and contentChild() functions provide reactive access without lifecycle hooks.",
+        "keyPoints": [
+          "@ViewChild queries the component's own template - available from ngAfterViewInit onward",
+          "@ContentChild queries projected content via ng-content - available from ngAfterContentInit onward",
+          "@ViewChildren and @ContentChildren return a QueryList of all matches",
+          "Signal-based viewChild() and contentChild() functions (Angular 17.1+) are reactive and do not require lifecycle hook coupling"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Accessing ViewChild in ngOnInit: the view has not rendered yet\n@Component({ selector: 'chart-container', standalone: true, template: '<canvas #salesChart></canvas>' })\nexport class ChartContainerComponent implements OnInit {\n  @ViewChild('salesChart') canvas!: ElementRef;\n  ngOnInit() {\n    this.canvas.nativeElement; // undefined here - view not rendered yet\n  }\n}\n\n// ✅ GOOD - Signal-based viewChild() - reactive, no lifecycle hook coupling\nimport { Component, viewChild, contentChild, ElementRef, AfterViewInit } from '@angular/core';\n\n@Component({\n  selector: 'chart-container',\n  standalone: true,\n  template: '<canvas #salesChart></canvas><ng-content />'\n})\nexport class ChartContainerComponent implements AfterViewInit {\n  canvas = viewChild<ElementRef>('salesChart');\n  legend = contentChild('legendSlot');\n\n  ngAfterViewInit() {\n    console.log(this.canvas()?.nativeElement); // available here\n  }\n}",
+          "note": "viewChild() signal is reactive - canvas() can be read in computed() or effect() without waiting for ngAfterViewInit."
+        },
+        "analogy": "ViewChild is finding furniture you placed in your own room; ContentChild is finding furniture a guest brought and placed in the guest slot.",
+        "redFlags": [
+          "Accessing @ViewChild in the constructor or ngOnInit without { static: true } - it will be undefined and cause a runtime error",
+          "Confusing ViewChild with ContentChild - they query different sources of content",
+          "Not knowing that @ViewChildren returns a QueryList, not a single element - this catches developers when there are multiple matches"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between @ViewChild and @ViewChildren?",
+            "a": "@ViewChild returns the first matching element or directive. @ViewChildren returns a QueryList containing all matches, which updates reactively when the DOM changes."
+          },
+          {
+            "q": "Why is @ViewChild undefined in ngOnInit?",
+            "a": "Angular has not rendered the component's template yet during ngOnInit. The view is built during the first change detection run, which completes just before ngAfterViewInit fires."
+          },
+          {
+            "q": "How do the signal-based viewChild() and contentChild() improve on the decorator approach?",
+            "a": "They return a signal that can be read anywhere in a reactive context - in computed(), effect(), or a template. You do not need to wait for a specific lifecycle hook or handle the undefined state manually."
+          },
+          {
+            "q": "What does { static: true } do on a @ViewChild query?",
+            "a": "It resolves the query before ngOnInit instead of after ngAfterViewInit, but only works for elements that are always present in the template and not wrapped in conditional rendering."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between @ViewChild and @ContentChild?"
+          },
+          {
+            "role": "you",
+            "text": "@ViewChild queries the component's own template - elements you define in its HTML file. @ContentChild queries content that a parent projects into the component through an ng-content slot. Both are undefined until their respective AfterInit hooks fire."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you give a concrete example of when you would use @ContentChild?"
+          },
+          {
+            "role": "you",
+            "text": "A custom tab component in a SaaS app. The parent writes something like: <my-tabs><tab-header>Overview</tab-header></my-tabs>. The TabHeaderComponent inside the tab definition is projected content. The parent MyTabsComponent uses @ContentChild(TabHeaderComponent) to find it and set up active state. The tab component does not own that content - the consumer does."
+          },
+          {
+            "role": "interviewer",
+            "text": "When exactly are these queries available in the lifecycle?"
+          },
+          {
+            "role": "you",
+            "text": "@ViewChild resolves after ngAfterViewInit because that fires when Angular has finished rendering the component's own template. @ContentChild resolves after ngAfterContentInit, which fires slightly earlier when projected content is initialised. Accessing either in ngOnInit returns undefined and throws a runtime error."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there a newer way to handle these queries?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - Angular 17.1 introduced the signal-based viewChild() and contentChild() functions. Instead of a decorator with a lifecycle coupling, I write canvas = viewChild(ElementRef) and then read canvas() anywhere including inside computed() or effect(). The signal automatically tracks the latest value and works reactively without needing to hook into ngAfterViewInit."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if you have multiple chart canvases in the template?"
+          },
+          {
+            "role": "you",
+            "text": "Then I use @ViewChildren or viewChildren() - they return a QueryList of all matching elements. The QueryList has a changes Observable that emits whenever the list updates, for example when @if toggles elements in or out. The signal version is viewChildren() and it returns a signal wrapping an array."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

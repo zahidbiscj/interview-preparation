@@ -1,0 +1,505 @@
+{
+  "subtopicId": "predict-output",
+  "questions": [
+    {
+      "id": "csharp-po-011",
+      "q": "Predict the output: integer overflow in unchecked context.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["overflow", "int", "unchecked"],
+      "answer": {
+        "oneLiner": "Prints -2147483648 (int.MinValue). Default arithmetic is unchecked, so adding 1 to int.MaxValue silently wraps around to the most negative value.",
+        "detail": "C# integer arithmetic is unchecked by default for performance reasons. When int.MaxValue + 1 overflows, the CPU wraps the bit pattern around and the result is int.MinValue (-2147483648). No exception is thrown unless you explicitly wrap the operation in a checked block or compile with the checked compiler option. The checked block converts overflow into an OverflowException at runtime.",
+        "keyPoints": [
+          "C# arithmetic is unchecked by default - overflow silently wraps around.",
+          "int.MaxValue + 1 wraps to int.MinValue due to two's complement bit arithmetic.",
+          "Wrap in a checked block to throw OverflowException on overflow instead.",
+          "Use long or decimal for values that may exceed int.MaxValue in business calculations."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - unchecked overflow produces wrong balance silently\nint accountBalance = int.MaxValue;\nint deposit = 1;\nint newBalance = accountBalance + deposit; // wraps to int.MinValue\nConsole.WriteLine(newBalance); // -2147483648 - account looks overdrawn\n\n// ✅ GOOD - detect overflow with checked or use a larger type\nlong safeBalance = (long)int.MaxValue + 1;\nConsole.WriteLine(safeBalance); // 2147483648 - correct",
+          "note": "For financial calculations always use decimal or long to avoid overflow surprises."
+        },
+        "analogy": "An odometer that rolls from 999999 to 000000 - it does not stop, it wraps around silently.",
+        "redFlags": [
+          "Saying it throws an exception by default - overflow is silent unless checked.",
+          "Not knowing what int.MinValue is (-2147483648).",
+          "Saying the result is 0 or undefined.",
+          "Confusing checked arithmetic with overflow prevention via a larger type."
+        ],
+        "followUpsQA": [
+          { "q": "How do you throw an exception on overflow instead of wrapping?", "a": "Wrap the operation in a checked block: checked { int b = a + 1; } - this throws OverflowException if the result overflows." },
+          { "q": "What is unchecked used for?", "a": "Inside a checked context, the unchecked keyword creates a nested region where overflow wraps silently again - useful for hash code calculations where wrapping is intentional." },
+          { "q": "Why is arithmetic unchecked by default?", "a": "Performance. Overflow checks add a branch after every arithmetic operation. Unchecked arithmetic maps directly to CPU instructions with no extra cost." },
+          { "q": "What types handle larger values without overflow risk?", "a": "long handles up to 9.2 * 10^18. decimal handles up to 7.9 * 10^28 with 28 significant digits. BigInteger has no fixed limit." },
+          { "q": "Does checked apply to floating-point types?", "a": "No. Float and double follow IEEE 754 which uses infinity and NaN for overflow and undefined operations, not OverflowException." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "int a = int.MaxValue; int b = a + 1. What prints?" },
+          { "role": "me", "text": "-2147483648, which is int.MinValue. C# arithmetic is unchecked by default, so the result wraps around silently using two's complement bit arithmetic." },
+          { "role": "interviewer", "text": "How do you make it throw an exception instead?" },
+          { "role": "me", "text": "Wrap it in a checked block: checked { b = a + 1; }. That throws OverflowException. You can also compile the whole project with checked arithmetic using the /checked compiler flag." },
+          { "role": "interviewer", "text": "In a payment processing system, why is silent overflow dangerous?" },
+          { "role": "me", "text": "If an account balance is stored as int and a large deposit causes overflow, the balance could wrap to a huge negative number. The customer appears to owe millions when they should have a large positive balance." },
+          { "role": "interviewer", "text": "What is the better data type choice for financial values?" },
+          { "role": "me", "text": "decimal for money - it has 28-29 significant digits, no floating-point rounding errors, and is the standard choice for currency in .NET. long works for integer-based currencies like cents." },
+          { "role": "interviewer", "text": "When would you intentionally use unchecked?" },
+          { "role": "me", "text": "In GetHashCode implementations. Hash codes combine multiple values with XOR and bit shifts and deliberate wrapping is correct behavior. Writing unchecked(x * 31 + y) is the idiomatic pattern there." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-012",
+      "q": "Predict the output: multicast delegate return value.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["delegate", "multicast", "func"],
+      "answer": {
+        "oneLiner": "Prints 8. All three handlers run in order, but for a multicast Func only the last subscriber's return value is kept. The earlier results are discarded.",
+        "detail": "When you combine multiple Func delegates with +=, you create a multicast delegate. All subscribers are called in subscription order. However, the invocation mechanism only surfaces the return value of the final delegate in the chain. The return values of the earlier delegates (6 and 7) are computed but immediately discarded. If you need all return values, use GetInvocationList() and invoke each delegate individually.",
+        "keyPoints": [
+          "All handlers in a multicast delegate run in subscription order.",
+          "Only the last handler's return value is returned from the combined invocation.",
+          "Earlier return values are computed but silently discarded.",
+          "Use GetInvocationList() to collect all return values individually."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - expecting all return values from a multicast Func\nFunc<decimal, decimal> applyTax = p => p * 1.1m; // returns 110\napplyTax += p => p * 1.2m;                         // returns 120\napplyTax += p => p * 1.3m;                         // returns 130\ndecimal price = applyTax(100m);\nConsole.WriteLine(price); // 130 - only last result kept, 110 and 120 lost\n\n// ✅ GOOD - use GetInvocationList to collect all results\nvar results = applyTax.GetInvocationList()\n    .Select(d => ((Func<decimal, decimal>)d)(100m));\nforeach (var r in results) Console.Write(r + \" \"); // 110 120 130",
+          "note": "Multicast Func silently discards all but the last return value. Use GetInvocationList for multiple results."
+        },
+        "analogy": "Asking three colleagues for a price estimate and only writing down the last person's answer.",
+        "redFlags": [
+          "Saying it prints 6 - only seeing the first handler's result.",
+          "Not knowing that all three handlers still execute even though only the last return is kept.",
+          "Saying multicast only works with Action (void) - it works with Func too, but return values are discarded.",
+          "Confusing the order of execution with which value is returned."
+        ],
+        "followUpsQA": [
+          { "q": "Do all three handlers still execute?", "a": "Yes. All three run in subscription order. Only the return value collection differs - just the final one is surfaced." },
+          { "q": "How do you collect all three return values?", "a": "Call GetInvocationList() to get each delegate separately, then invoke each one individually and collect the results." },
+          { "q": "What happens if one handler throws in a multicast delegate?", "a": "The exception propagates immediately and remaining handlers in the chain are not called. Use GetInvocationList with try/catch per handler to guarantee all run." },
+          { "q": "Why would you use a multicast Func if the extra returns are discarded?", "a": "Usually you would not. Multicast is mainly useful for Action (void return) to fan out notifications. For multiple results, use a list of Func delegates invoked separately." },
+          { "q": "What is the subscription order for multicast delegates?", "a": "In the order they were added with +=. Removal with -= removes the last added match." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "A multicast Func<int,int> has three handlers added with +=. I call d(5). What is returned?" },
+          { "role": "me", "text": "8, which is 5 + 3 from the last handler. All three run in order (returning 6, 7, 8), but the multicast mechanism discards everything except the final return value." },
+          { "role": "interviewer", "text": "Do the first two handlers actually execute?" },
+          { "role": "me", "text": "Yes, all three execute. The results of the first two are computed but immediately thrown away. If those handlers had side effects like logging, those side effects still happen." },
+          { "role": "interviewer", "text": "How do you get all three results?" },
+          { "role": "me", "text": "Call d.GetInvocationList() to get an array of delegates, then invoke each one separately: d.GetInvocationList().Select(f => ((Func<int,int>)f)(5)) gives 6, 7, 8." },
+          { "role": "interviewer", "text": "In a pricing pipeline for a SaaS product, where does this matter?" },
+          { "role": "me", "text": "If each pricing rule is a Func<decimal, decimal> in a multicast chain, only the last rule's price is applied. The correct design is a list of functions composed sequentially, where each rule transforms the output of the previous one." },
+          { "role": "interviewer", "text": "When is multicast the right pattern?" },
+          { "role": "me", "text": "For Action delegates where return values don't matter. Event handlers are the canonical example - multiple subscribers handle an event and none return values. That is why events use EventHandler (void return) by convention." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-013",
+      "q": "Predict the output: explicit double-to-int cast.",
+      "level": "junior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["cast", "truncation", "double"],
+      "answer": {
+        "oneLiner": "Prints 10. An explicit (int) cast truncates toward zero - it drops the decimal part without rounding.",
+        "detail": "Casting a double to int in C# truncates the fractional part toward zero. 10.9 becomes 10, not 11. This is not rounding - it is truncation. The same rule applies to negative values: (int)-10.9 gives -10, not -11, because truncation always moves toward zero. To round correctly, use Math.Round before casting. To always round down (floor) use Math.Floor. To always round up (ceiling) use Math.Ceiling.",
+        "keyPoints": [
+          "Explicit (int) cast truncates toward zero - it does not round.",
+          "(int)10.9 is 10, not 11.",
+          "(int)-10.9 is -10, not -11 - truncation toward zero, not toward negative infinity.",
+          "Use Math.Round for rounding, Math.Floor for floor, Math.Ceiling for ceiling."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - using (int) cast expecting rounding behavior\ndouble itemPrice = 9.99;\nint displayPrice = (int)itemPrice; // 9, not 10\nConsole.WriteLine(\"Price: \" + displayPrice); // Price: 9 - wrong\n\n// ✅ GOOD - use Math.Round when rounding is intended\nint roundedPrice = (int)Math.Round(itemPrice); // 10\nConsole.WriteLine(\"Price: \" + roundedPrice); // Price: 10 - correct",
+          "note": "The (int) cast drops the decimal part. Use Math.Round explicitly when you need rounding behavior."
+        },
+        "analogy": "Casting to int is like cutting off everything after the decimal point with scissors - no rounding, just chopping.",
+        "redFlags": [
+          "Saying (int)10.9 prints 11 - confusing truncation with rounding.",
+          "Not knowing that (int)-10.9 is -10 and not -11.",
+          "Saying truncation always rounds down toward negative infinity.",
+          "Not knowing which Math method to use for proper rounding."
+        ],
+        "followUpsQA": [
+          { "q": "What does Math.Round(10.5) return in C#?", "a": "10, not 11. C# uses banker's rounding (MidpointRounding.ToEven) by default - it rounds to the nearest even number when exactly at the midpoint." },
+          { "q": "How do you always round down regardless of the decimal?", "a": "Math.Floor(10.9) returns 10. Math.Floor(-10.9) returns -11 - floor always goes toward negative infinity." },
+          { "q": "How do you always round up?", "a": "Math.Ceiling(10.1) returns 11. Math.Ceiling(-10.9) returns -10 - ceiling always goes toward positive infinity." },
+          { "q": "What is the difference between truncation and floor for negative numbers?", "a": "Truncation toward zero: (int)-10.9 = -10. Floor toward negative infinity: Math.Floor(-10.9) = -11. They differ only for negative values." },
+          { "q": "Does Convert.ToInt32 round or truncate?", "a": "It rounds using banker's rounding - the same as Math.Round. Convert.ToInt32(10.9) returns 11, not 10." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "double d = 10.9; int i = (int)d. What prints?" },
+          { "role": "me", "text": "10. An explicit (int) cast truncates toward zero - it drops the decimal part without rounding. 10.9 becomes 10, not 11." },
+          { "role": "interviewer", "text": "What about (int)-10.9?" },
+          { "role": "me", "text": "-10. Truncation always moves toward zero. For negative numbers that means toward zero as well - not toward negative infinity. So -10.9 truncated is -10, not -11." },
+          { "role": "interviewer", "text": "How does Math.Floor differ from truncation for negative values?" },
+          { "role": "me", "text": "Math.Floor always goes toward negative infinity. Math.Floor(-10.9) is -11. Truncation goes toward zero, giving -10. For positive values they produce the same result." },
+          { "role": "interviewer", "text": "In a retail discount system calculating 15% off a price of 9.99, how does this matter?" },
+          { "role": "me", "text": "9.99 * 0.85 = 8.4915. Casting to int gives 8, not 8.49 or 9. You lose nearly a full unit of currency. For prices, always work in decimal and only round at display time using Math.Round with the right MidpointRounding option." },
+          { "role": "interviewer", "text": "What does Math.Round(10.5) return by default in C#?" },
+          { "role": "me", "text": "10, not 11. C# uses banker's rounding - it rounds to the nearest even number when exactly at the midpoint. Math.Round(10.5) = 10, Math.Round(11.5) = 12. You can override this with MidpointRounding.AwayFromZero." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-014",
+      "q": "Predict the output: null-coalescing chain.",
+      "level": "junior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["null-coalescing", "nullable"],
+      "answer": {
+        "oneLiner": "Prints 99. The ?? operator is right-associative - it evaluates left to right and returns the first non-null value, falling back to 99 when both x and y are null.",
+        "detail": "The ?? operator evaluates the left operand. If it is null, it evaluates the right operand. When chained as x ?? y ?? 99, this is right-associative: it first checks x (null), then checks y (null), then returns 99. The result is a non-null int, so assigning to int z succeeds without exception. If y were 5, z would be 5 because the chain stops at the first non-null value.",
+        "keyPoints": [
+          "?? returns the left operand if non-null, otherwise the right operand.",
+          "The chain x ?? y ?? 99 stops at the first non-null value.",
+          "?? is right-associative - evaluated from left to right.",
+          "?? does not react to 0 or false - only null triggers the fallback."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - assuming ?? also handles empty string or 0\nstring userId = null;\nstring displayName = null;\nstring label = userId ?? displayName ?? \"Guest\";\nConsole.WriteLine(label); // Guest - correct for null\n// But: string empty = \"\" ?? \"Guest\" => \"\" (empty string is not null)\n\n// ✅ GOOD - use ?? for null fallback, separate check for empty\nstring name = null;\nstring result = (string.IsNullOrEmpty(name) ? null : name) ?? \"Guest\";\nConsole.WriteLine(result); // Guest - handles both null and empty",
+          "note": "?? only reacts to null. For empty string fallback, combine with IsNullOrEmpty or use the conditional operator."
+        },
+        "analogy": "?? is like a contact list - try the first person, if unavailable try the second, if unavailable use the backup.",
+        "redFlags": [
+          "Saying it throws because z is int (not int?) - the final fallback 99 is non-null so the assignment succeeds.",
+          "Saying ?? is left-associative.",
+          "Saying ?? also falls back for 0 or false.",
+          "Not knowing the output is 99 when both nullable operands are null."
+        ],
+        "followUpsQA": [
+          { "q": "What is the ??= operator?", "a": "It assigns the right-hand value to the variable only if the variable is currently null. userId ??= 'guest' sets userId to 'guest' if it was null." },
+          { "q": "What if y were 5 in x ?? y ?? 99?", "a": "z would be 5. The chain stops at the first non-null value, so y = 5 is returned before the fallback 99 is considered." },
+          { "q": "Does ?? work for reference types too?", "a": "Yes. string name = firstName ?? lastName ?? 'Unknown' works the same way - returns the first non-null string reference." },
+          { "q": "Is null-coalescing the same as the ternary in all cases?", "a": "x ?? y is equivalent to x != null ? x : y for value types. For reference types with side effects, x is evaluated once in x ?? y but could be evaluated twice in the equivalent ternary." },
+          { "q": "How do you null-coalesce a method return value?", "a": "GetUser(id) ?? defaultUser - the method is called once and if it returns null, defaultUser is used instead." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "int? x = null; int? y = null; int z = x ?? y ?? 99. What prints?" },
+          { "role": "me", "text": "99. The ?? operator evaluates left to right. x is null, so it moves to y. y is null, so it uses 99. The final non-null value 99 is assigned to z successfully." },
+          { "role": "interviewer", "text": "Why does assigning to int z not throw even though x and y are nullable?" },
+          { "role": "me", "text": "Because the whole expression x ?? y ?? 99 resolves to 99, which is a non-null int value. The nullable conversions are handled by the operator before the assignment happens." },
+          { "role": "interviewer", "text": "What would z be if y were 5?" },
+          { "role": "me", "text": "z would be 5. The ?? chain stops at the first non-null value. x is null so we check y, y is 5 (non-null), so we return 5 immediately without evaluating 99." },
+          { "role": "interviewer", "text": "In a user profile system, show me a real use of a ?? chain." },
+          { "role": "me", "text": "string displayName = user.DisplayName ?? user.Email ?? user.UserId.ToString() - try the display name first, fall back to email, fall back to the ID. The first non-null string wins." },
+          { "role": "interviewer", "text": "What is ??= and how does it differ from ???" },
+          { "role": "me", "text": "??= is null-coalescing assignment. settings.Theme ??= 'dark' sets the theme to 'dark' only if it is currently null. It is shorthand for if (settings.Theme == null) settings.Theme = 'dark'." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-015",
+      "q": "Predict the output: try/catch/finally with a handled exception.",
+      "level": "junior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["exception", "finally"],
+      "answer": {
+        "oneLiner": "Prints B then C. The divide-by-zero is caught and prints B, and finally always runs and prints C. A never executes because the exception is thrown before that line.",
+        "detail": "The try block starts executing. The divide-by-zero throws DivideByZeroException before Console.WriteLine('A') is reached. Control jumps to the matching catch block, which prints B. After the catch block completes, the finally block always runs regardless of whether an exception occurred, printing C. The finally block runs on every path: normal completion, handled exception, and even partially handled exceptions.",
+        "keyPoints": [
+          "When an exception is thrown, the remaining code in try is skipped immediately.",
+          "The matching catch block runs next, printing B.",
+          "finally always runs after try+catch, on every code path.",
+          "A never prints because the exception is thrown before that line is reached."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - assuming code after the exception still runs in the try block\ntry {\n    decimal rate = GetExchangeRate(); // throws if service is down\n    decimal converted = amount * rate; // this line is skipped on exception\n    Console.WriteLine(converted);      // this too - never reached\n} catch (HttpRequestException) {\n    Console.WriteLine(\"Service unavailable\"); // runs\n} finally {\n    CloseConnection(); // always runs whether or not exception occurred\n}\n\n// ✅ GOOD - understand what runs and what is skipped\n// Only lines before the throw execute in try. Finally is your cleanup guarantee.",
+          "note": "Code after the throwing line in try is always skipped. Finally is the only guaranteed cleanup point."
+        },
+        "analogy": "The try block is a road trip. If the car breaks down, you skip the rest of the route but you still pull over safely - that is the finally block.",
+        "redFlags": [
+          "Saying A prints because it is in the try block - it is skipped once the exception is thrown.",
+          "Saying finally only runs when no exception occurs.",
+          "Not knowing the order: try throws, catch handles, finally runs.",
+          "Saying B prints twice or A prints after the catch."
+        ],
+        "followUpsQA": [
+          { "q": "Does finally run if there is no exception?", "a": "Yes. Finally runs on every path including normal completion. That is its entire purpose - guaranteed cleanup." },
+          { "q": "Does finally run if the exception is unhandled?", "a": "Yes, it runs during stack unwinding before the exception propagates to the caller. This is why finally is used for resource cleanup." },
+          { "q": "Can finally prevent an exception from propagating?", "a": "Not directly. If you throw from inside finally, it replaces the original exception. Otherwise the original exception continues propagating after finally completes." },
+          { "q": "What is the difference between finally and using statement for cleanup?", "a": "A using statement is syntactic sugar for a try/finally that calls Dispose. It is cleaner for IDisposable resources. Finally is more general and handles any cleanup code." },
+          { "q": "What happens if catch also throws?", "a": "The new exception from catch replaces the original. Finally still runs, but it sees the new exception if it re-throws." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Try divides by zero, catch handles it and prints B, finally prints C. What is the output and in what order?" },
+          { "role": "me", "text": "B then C. The divide-by-zero throws before the Console.WriteLine('A') line, so A is never reached. The catch prints B. Then finally always runs and prints C." },
+          { "role": "interviewer", "text": "Why does A never print?" },
+          { "role": "me", "text": "Because the exception is thrown before that line. When an exception occurs, execution immediately jumps to the matching catch block, skipping all remaining statements in the try block." },
+          { "role": "interviewer", "text": "Does finally run even when there is no exception?" },
+          { "role": "me", "text": "Yes, always. Finally runs on every exit path from the try/catch - normal completion, handled exception, unhandled exception, even return statements inside try." },
+          { "role": "interviewer", "text": "In a database transaction, why is finally critical?" },
+          { "role": "me", "text": "Connection.Close() in finally guarantees the connection is always returned to the pool. If it were only in the happy-path code after try, any exception would leak the connection and exhaust the connection pool under load." },
+          { "role": "interviewer", "text": "What happens if both catch and finally throw?" },
+          { "role": "me", "text": "The finally exception replaces the original catch exception. The original exception is lost. This is why you should never throw from finally - it swallows the original error that caused the problem." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-016",
+      "q": "Predict the output: nested try - inner finally vs outer catch order.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["exception", "finally", "nested"],
+      "answer": {
+        "oneLiner": "Prints 'Inner Finally' then 'Outer Catch'. The inner finally runs during stack unwinding before the exception reaches the outer catch.",
+        "detail": "When an exception is thrown in the inner try, the runtime looks for a matching catch. The inner try has no catch, so the exception must propagate. Before it propagates, the inner finally runs as part of the unwinding process. Only after the inner finally completes does the exception move to the outer try/catch, which now handles it and prints 'Outer Catch'. This ordering is guaranteed: finally always runs during unwinding, before the exception reaches any outer handler.",
+        "keyPoints": [
+          "Inner finally runs before the exception propagates to the outer catch.",
+          "Stack unwinding executes each finally in the call stack before reaching the matching catch.",
+          "If the inner try had its own catch, the outer catch would not fire at all.",
+          "This ordering is guaranteed by the CLR exception handling mechanism."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - assuming outer catch runs before inner finally\ntry {\n    try {\n        decimal result = 100m / 0; // throws DivideByZeroException\n    } finally {\n        Console.WriteLine(\"Release database lock\"); // runs FIRST during unwinding\n    }\n} catch {\n    Console.WriteLine(\"Log to error tracking\"); // runs SECOND\n}\n// Output: 'Release database lock' then 'Log to error tracking'\n\n// ✅ GOOD - rely on this order for nested resource cleanup\n// Inner finally = innermost resource cleanup first (LIFO order)",
+          "note": "Nested finally blocks run in LIFO order during unwinding - innermost first, then outer ones, before any matching catch."
+        },
+        "analogy": "Exiting a building through locked doors - you unlock each door as you pass through it on the way out before reaching the security desk outside.",
+        "redFlags": [
+          "Saying outer catch runs before inner finally.",
+          "Saying inner finally only runs if the inner try had its own catch.",
+          "Not knowing that finally runs during stack unwinding on the way to the catch.",
+          "Saying the output is 'Outer Catch' then 'Inner Finally'."
+        ],
+        "followUpsQA": [
+          { "q": "What order do nested finally blocks run?", "a": "LIFO - innermost finally first, working outward. Each finally completes before the exception propagates to the next outer scope." },
+          { "q": "If the inner try had its own catch, what would change?", "a": "The inner catch would handle the exception. The exception would not propagate. The outer catch would not fire." },
+          { "q": "Does this order matter for using statements?", "a": "Yes. using statements translate to try/finally. Nested using statements follow the same LIFO cleanup order when exceptions occur." },
+          { "q": "Can you suppress an exception in a finally block?", "a": "Not directly. If you add a try/catch inside the finally block, you can catch and swallow exceptions from the original code, but the outer exception still propagates unless you explicitly clear it." },
+          { "q": "What happens if the inner finally itself throws?", "a": "The inner finally's exception replaces the original exception. The outer catch now receives the finally's exception, not the original one." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Inner try has a finally, outer try has a catch. An exception is thrown inside the inner try. What order do things print?" },
+          { "role": "me", "text": "'Inner Finally' then 'Outer Catch'. When the exception propagates out of the inner try, its finally runs first as part of stack unwinding. Only after that does the exception reach the outer catch." },
+          { "role": "interviewer", "text": "Why does inner finally run before outer catch?" },
+          { "role": "me", "text": "Stack unwinding executes each finally block in the call chain on the way to the matching handler. Think of it as the runtime cleaning up each scope before handing the exception off to the next enclosing scope." },
+          { "role": "interviewer", "text": "What changes if the inner try had its own matching catch?" },
+          { "role": "me", "text": "The inner catch handles it locally. The exception stops propagating. The outer catch never fires. You'd just see 'Inner Finally' after the inner catch prints." },
+          { "role": "interviewer", "text": "In a microservices call chain where each service has a try/finally for distributed tracing, what order do spans close?" },
+          { "role": "me", "text": "LIFO - innermost span closes first. The span for the database call closes before the span for the service call closes, which closes before the span for the API handler closes. This mirrors the actual call depth." },
+          { "role": "interviewer", "text": "What if the inner finally throws an exception of its own?" },
+          { "role": "me", "text": "The inner finally's exception replaces the original exception. The outer catch receives the new exception. The original exception from the inner try is lost - this is why throwing from finally is dangerous." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-017",
+      "q": "Predict the output: async ordering with await.",
+      "level": "senior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["async", "await", "ordering"],
+      "answer": {
+        "oneLiner": "Prints 1, 2, 4 then 3. Code runs synchronously up to the first real await suspension point. The caller gets control back (prints 4), and 3 prints only after the awaited delay completes.",
+        "detail": "When Run() is called, it executes synchronously until the first real suspension. It prints 1, then calls Work(). Work() prints 2 synchronously, then hits await Task.Delay(100) which returns an incomplete Task. At this point Run() also suspends and returns an incomplete Task to its caller. The caller prints 4. After 100ms, the continuation resumes inside Work(), then Run() continues and prints 3. The output is 1, 2, 4, then 3.",
+        "keyPoints": [
+          "Code in an async method runs synchronously up to the first real await suspension.",
+          "await yields control back to the caller when the awaited Task is not yet complete.",
+          "The continuation (code after await) resumes only after the awaited work finishes.",
+          "If the awaited task completes synchronously, no suspension occurs and the caller does not get control back."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - assuming async runs all statements before the caller continues\nasync Task ProcessOrder(Order o) {\n    Console.WriteLine(\"Validating\"); // runs synchronously\n    await SendEmailAsync(o);          // suspends here\n    Console.WriteLine(\"Email sent\"); // runs AFTER suspension resumes\n}\nvar task = ProcessOrder(order);\nConsole.WriteLine(\"Order queued\"); // runs WHILE email is being sent\n// Output: Validating, Order queued, Email sent\n\n// ✅ GOOD - use await or task.Wait() when you need the full sequence to complete\nawait ProcessOrder(order);\nConsole.WriteLine(\"Order queued\"); // now runs AFTER email is sent",
+          "note": "async does not make code run in parallel. It yields the thread at await and resumes the continuation later."
+        },
+        "analogy": "Ordering food in a restaurant - the waiter takes your order (prints 1, 2), goes to the kitchen (suspends), comes back to another table (prints 4), then delivers your food (prints 3) when it is ready.",
+        "redFlags": [
+          "Saying the output is 1, 2, 3, 4 - not knowing that await suspends and returns to the caller.",
+          "Saying async means the code runs on a background thread.",
+          "Not knowing that synchronous code before the first await runs on the calling thread.",
+          "Saying 4 never prints because the caller awaits the task."
+        ],
+        "followUpsQA": [
+          { "q": "When would 3 print before 4?", "a": "If the awaited task is already complete (returns Task.CompletedTask or synchronously completed), no suspension occurs and execution continues inline past the await." },
+          { "q": "Does async always create a new thread?", "a": "No. async/await is about suspending and resuming a state machine, not threading. The continuation may resume on the same thread, a thread pool thread, or the original context depending on SynchronizationContext." },
+          { "q": "What is ConfigureAwait(false)?", "a": "It tells the runtime not to capture the current SynchronizationContext. The continuation may run on any thread pool thread, which is more efficient in library code." },
+          { "q": "What does the compiler generate for an async method?", "a": "A state machine - a class with fields for captured variables and a MoveNext method that contains the code split at each await point. Each await maps to a state in that machine." },
+          { "q": "What is the difference between async void and async Task?", "a": "async Task lets the caller await, observe exceptions, and cancel. async void fires and forgets - exceptions are unobserved and crash the process. Only use async void for event handlers." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Run() prints 1 and calls Work(). Work() prints 2 and awaits Task.Delay. Run() then prints 3. The caller prints 4. What is the output order?" },
+          { "role": "me", "text": "1, 2, 4, 3. Code runs synchronously until the first real suspension. Run() and Work() execute synchronously through 1 and 2. When Task.Delay returns an incomplete Task, both methods suspend. Control returns to the caller which prints 4. After 100ms, the continuation resumes and 3 prints." },
+          { "role": "interviewer", "text": "Why does 4 print before 3?" },
+          { "role": "me", "text": "Because at await Task.Delay, the current Task is not yet complete so the async method yields back to its caller. The caller keeps running - printing 4 - while the async work is pending in the background." },
+          { "role": "interviewer", "text": "When would 3 print before 4?" },
+          { "role": "me", "text": "If the awaited work completes synchronously - for example Task.CompletedTask or an already-completed Task from a fast cache hit. No suspension occurs, so execution flows through 3 before returning to the caller." },
+          { "role": "interviewer", "text": "In a web API controller, how does this affect throughput?" },
+          { "role": "me", "text": "When an async controller action hits await on a database call, the thread is released back to the ASP.NET thread pool. Another request can use that thread while the database responds. This is why async controllers dramatically increase concurrent request capacity on I/O-bound workloads." },
+          { "role": "interviewer", "text": "What does the compiler actually generate for an async method?" },
+          { "role": "me", "text": "A state machine struct with a MoveNext method. Each await point is a state transition. Local variables become fields on the struct so they survive the suspension. When the awaited Task completes, MoveNext is called again to resume from the right state." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-018",
+      "q": "Predict the output: static field initializer vs static constructor order.",
+      "level": "senior",
+      "type": "code",
+      "freq": "low",
+      "tags": ["static", "initialization-order"],
+      "answer": {
+        "oneLiner": "Prints 'Field' then 'Constructor'. Static field initializers run in textual order before the static constructor body executes.",
+        "detail": "When a type is first used, the CLR initializes it by running static field initializers in the order they appear in the source, then running the static constructor body. So if a field initializer calls a method that prints 'Field', that print happens before the static constructor body prints 'Constructor'. This initialization happens exactly once per type per AppDomain and is thread-safe - the CLR guarantees no two threads can race on type initialization.",
+        "keyPoints": [
+          "Static field initializers run in textual order before the static constructor body.",
+          "Type initialization is triggered on first use of the type.",
+          "The CLR guarantees static initialization runs exactly once and is thread-safe.",
+          "If there are no static field initializers and no static constructor, the type initializes lazily with no custom logic."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - assuming static ctor body runs before field initializers\n// Many developers think 'Constructor' prints first\n\n// ✅ GOOD - correct order: field initializer first, then static ctor body\nclass PaymentGateway {\n    static string _provider = InitProvider(); // runs FIRST\n    static PaymentGateway() {\n        Console.WriteLine(\"Gateway ready\"); // runs SECOND\n    }\n    static string InitProvider() {\n        Console.WriteLine(\"Provider loaded\");\n        return \"Stripe\";\n    }\n}\nstring p = PaymentGateway._provider;\n// Output: 'Provider loaded' then 'Gateway ready'",
+          "note": "Field initializers always run before the static constructor body, regardless of the order they appear in code."
+        },
+        "analogy": "Setting the table before the chef arrives to cook - field setup (table) happens before the constructor body (chef).",
+        "redFlags": [
+          "Saying 'Constructor' prints before 'Field' - reversing the order.",
+          "Not knowing that static initialization is thread-safe and runs once.",
+          "Saying static field initializers and the static constructor run in parallel.",
+          "Confusing when type initialization is triggered."
+        ],
+        "followUpsQA": [
+          { "q": "What triggers static type initialization?", "a": "First access to any static member of the type - a field, method, property, or nested type. After that, re-access does not re-run initialization." },
+          { "q": "Is static initialization thread-safe?", "a": "Yes. The CLR uses a locking mechanism to ensure type initialization runs exactly once even if multiple threads access the type simultaneously for the first time." },
+          { "q": "What happens if the static constructor throws?", "a": "The type is marked as failed and a TypeInitializationException is thrown on every subsequent access. The static constructor never retries." },
+          { "q": "How does the Singleton pattern relate to static initialization?", "a": "A common thread-safe Singleton uses a static field: static readonly Singleton _instance = new Singleton(). The CLR's thread-safe initialization guarantee makes this pattern safe without explicit locking." },
+          { "q": "Can you have multiple static constructors?", "a": "No. C# allows only one static constructor per class and it takes no parameters. You can have multiple static field initializers though." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "A class has a static field initializer that prints 'Field' and a static constructor that prints 'Constructor'. Which prints first?" },
+          { "role": "me", "text": "'Field' then 'Constructor'. Static field initializers run in textual order before the static constructor body. So the field's print call completes before the static constructor body begins." },
+          { "role": "interviewer", "text": "What triggers this initialization to run?" },
+          { "role": "me", "text": "First access to any static member of the type. Accessing Example.x, calling a static method, or instantiating the class - any of these triggers type initialization. It runs exactly once after that." },
+          { "role": "interviewer", "text": "Is this initialization thread-safe?" },
+          { "role": "me", "text": "Yes. The CLR guarantees that static initialization runs exactly once even if two threads access the type simultaneously for the first time. One thread runs the initialization while the other waits." },
+          { "role": "interviewer", "text": "In a Singleton implementation, why does this thread-safety guarantee matter?" },
+          { "role": "me", "text": "static readonly PaymentGateway _instance = new PaymentGateway() is initialized by the CLR's thread-safe type initialization. No explicit lock is needed. This is the safest and simplest Singleton pattern in C#." },
+          { "role": "interviewer", "text": "What happens if the static constructor throws?" },
+          { "role": "me", "text": "The type is permanently marked as failed and a TypeInitializationException is thrown on every subsequent access to that type. The static constructor never retries. This is why initialization failures are particularly serious." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-019",
+      "q": "Predict the output: passing null to a params array.",
+      "level": "mid",
+      "type": "code",
+      "freq": "low",
+      "tags": ["params", "null", "nullreference"],
+      "answer": {
+        "oneLiner": "Print() prints 0. Print(null) throws NullReferenceException. No args causes an empty array to be synthesized; explicit null passes null as the array reference itself.",
+        "detail": "When you call Print() with no arguments, the compiler synthesizes an empty int[] and passes it, so n.Length is 0. When you call Print(null), you are explicitly passing null as the params array reference itself. The method receives a null n reference and calling n.Length on null throws NullReferenceException. The fix is to null-check n at the start of the method or use n?.Length ?? 0.",
+        "keyPoints": [
+          "Print() with no args: compiler synthesizes Array.Empty<int>(), so Length is 0.",
+          "Print(null): null is passed as the array reference itself - calling n.Length throws NRE.",
+          "These are two different call sites - one is a convenience sugar, the other is explicit null.",
+          "Guard against null with a null check or null-coalescing: n?.Length ?? 0."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no null guard on params array\nvoid SendAlerts(params string[] recipients) {\n    Console.WriteLine(recipients.Length); // NRE if null is passed\n}\nSendAlerts();       // 0 - safe (empty array)\nSendAlerts(null);   // NullReferenceException\n\n// ✅ GOOD - guard against null\nvoid SendAlerts2(params string[] recipients) {\n    int count = recipients?.Length ?? 0;\n    Console.WriteLine(count); // 0 for both no-args and null\n}",
+          "note": "Always null-check a params array parameter when null could be passed explicitly by the caller."
+        },
+        "analogy": "Calling with no arguments hands you an empty box. Calling with null hands you nothing at all - opening it crashes.",
+        "redFlags": [
+          "Saying both print 0 - not knowing that explicit null passes a null reference.",
+          "Saying Print(null) creates an empty array.",
+          "Not knowing that the compiler synthesizes an empty array only for the no-argument call site.",
+          "Not knowing how to guard against null in a params method."
+        ],
+        "followUpsQA": [
+          { "q": "How does the compiler decide between synthesizing an empty array and passing null?", "a": "If you provide no arguments at all, the compiler generates Array.Empty<T>(). If you explicitly write null, it passes null as the array itself. The distinction is in the source code." },
+          { "q": "How do you null-check a params parameter cleanly?", "a": "n ??= Array.Empty<int>() at the start of the method, or use n?.Length ?? 0 where you need the length." },
+          { "q": "What is the difference between params int[] and IEnumerable<int>?", "a": "params allows call-site convenience with individual arguments. IEnumerable<int> requires the caller to pass a collection. They can coexist as overloads." },
+          { "q": "Can you pass a pre-built array to a params method?", "a": "Yes. SendAlerts(new[] { 'a@b.com', 'c@d.com' }) passes the array directly. The params keyword is just call-site sugar." },
+          { "q": "What is Array.Empty<T>() and why use it?", "a": "It returns a singleton empty array of that type, avoiding a new allocation for an array with zero elements. Using it is a micro-optimization for frequently called methods with no arguments." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "void Print(params int[] n) prints n.Length. What does Print() print? What does Print(null) print?" },
+          { "role": "me", "text": "Print() prints 0 - the compiler synthesizes an empty array for the no-argument call. Print(null) throws NullReferenceException - null is passed as the array reference and n.Length on null crashes." },
+          { "role": "interviewer", "text": "Why does the compiler synthesize an array for Print() but not for Print(null)?" },
+          { "role": "me", "text": "They are different call sites. No-argument call: the compiler inserts Array.Empty<int>(). Explicit null: you are telling the compiler 'the array is null', so it passes exactly what you wrote." },
+          { "role": "interviewer", "text": "How do you guard against both cases returning 0?" },
+          { "role": "me", "text": "At the start of the method: n ??= Array.Empty<int>(). Now both a no-arg call and a null call result in an empty array, so n.Length is 0 safely for both." },
+          { "role": "interviewer", "text": "In an email notification service, how does this manifest?" },
+          { "role": "me", "text": "SendEmail(recipients: null) passes null. If SendEmail has params string[] recipients and no null guard, the for-each loop crashes. The silent bug is that the developer who passes null expects no emails to be sent, not an exception." },
+          { "role": "interviewer", "text": "Can you pass an existing array to a params method?" },
+          { "role": "me", "text": "Yes. string[] team = GetTeamEmails(); SendEmail(team) works fine. params is call-site sugar. Passing a full array skips the compiler synthesis entirely and passes the array directly." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-020",
+      "q": "Predict the output: covariant assignment of IEnumerable<T>.",
+      "level": "senior",
+      "type": "code",
+      "freq": "low",
+      "tags": ["covariance", "generics"],
+      "answer": {
+        "oneLiner": "Prints 1. IEnumerable<out T> is covariant, so IEnumerable<Dog> is assignable to IEnumerable<Animal>. The same sequence is enumerated, no copy is made.",
+        "detail": "IEnumerable<T> is declared with the out keyword on T, making it covariant. Covariance means you can use a more derived type where a less derived type is expected - so IEnumerable<Dog> is assignable to IEnumerable<Animal>. Both variables refer to the same underlying sequence. Count() on animals returns 1 because it enumerates the same single-element list. List<Dog> is NOT directly assignable to List<Animal> because List<T> is invariant (no in or out on T).",
+        "keyPoints": [
+          "IEnumerable<out T> is covariant - IEnumerable<Dog> is assignable to IEnumerable<Animal>.",
+          "Covariance is safe because T is only produced (output position) by IEnumerable, never consumed.",
+          "The assignment is a reference copy - the same sequence is enumerated, no new list is created.",
+          "List<T> is invariant - List<Dog> cannot be assigned to List<Animal>."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - trying to use List<Dog> where List<Animal> expected\nclass Animal {} class Dog : Animal {}\nList<Dog> dogs = new List<Dog> { new Dog() };\n// List<Animal> animals = dogs; // compile error - List is invariant\n\n// ✅ GOOD - IEnumerable is covariant, so this works\nIEnumerable<Dog> dogSeq = new List<Dog> { new Dog() };\nIEnumerable<Animal> animalSeq = dogSeq; // covariance - OK\nConsole.WriteLine(animalSeq.Count()); // 1 - same sequence enumerated",
+          "note": "Covariance works only on interfaces and delegates with the out modifier. Collections like List are invariant."
+        },
+        "analogy": "A bag of apples is a bag of fruit - you can read apples as fruit, but you cannot add a banana to a bag of apples.",
+        "redFlags": [
+          "Saying it is a compile error - not knowing IEnumerable is covariant.",
+          "Saying it prints 0 because the assignment copies the sequence.",
+          "Confusing List<T> invariance with IEnumerable covariance.",
+          "Not knowing what the out keyword on a generic type parameter means."
+        ],
+        "followUpsQA": [
+          { "q": "Why is IEnumerable covariant but List is not?", "a": "IEnumerable only has output (you read from it). List has both output (indexer get) and input (Add, indexer set). Input positions require the same or more general type, preventing covariance." },
+          { "q": "What is contravariance and what is an example?", "a": "Contravariance is the in keyword - a more general type can be used where a more specific type is expected. Action<in T> is contravariant: Action<Animal> can be assigned to Action<Dog>." },
+          { "q": "Can you add an element to animals after the covariant assignment?", "a": "IEnumerable<Animal> has no Add method, so you cannot. That is precisely what makes the covariance safe - you can only read, never write." },
+          { "q": "What would happen if you added an element through the underlying dogs list?", "a": "The added element would appear when you enumerate animals, because both reference the same List<Dog>. This is deferred execution in action." },
+          { "q": "Does covariance work with arrays?", "a": "Yes, but dangerously. Dog[] can be assigned to Animal[] (array covariance), but trying to store a non-Dog Animal in the array throws ArrayTypeMismatchException at runtime." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "IEnumerable<Dog> assigned to IEnumerable<Animal>, then Count(). What prints and why is it allowed?" },
+          { "role": "me", "text": "1. IEnumerable<T> is declared with out T, making it covariant. Covariant means IEnumerable<Dog> is assignable to IEnumerable<Animal>. Both variables reference the same underlying sequence - no copy is made." },
+          { "role": "interviewer", "text": "Why is covariance safe here but not for List<T>?" },
+          { "role": "me", "text": "IEnumerable is read-only - T appears only in output position (Current property). If you could write (Add), you could put a Cat into a IEnumerable<Animal> that was originally IEnumerable<Dog>. List has Add, so it cannot be covariant safely." },
+          { "role": "interviewer", "text": "What is contravariance and when does it appear?" },
+          { "role": "me", "text": "Contravariance uses the in keyword - a less derived type substitutes for a more derived one. Action<Animal> can be used as Action<Dog> because a method that handles any Animal can certainly handle a Dog. IComparer<Animal> is another example." },
+          { "role": "interviewer", "text": "In a product catalog where products inherit from a base Product class, how is covariance useful?" },
+          { "role": "me", "text": "A method returning IEnumerable<DigitalProduct> can be used wherever IEnumerable<Product> is expected - for display, export, or search. No casting required. This lets you write generic UI components that work with any product subtype." },
+          { "role": "interviewer", "text": "What about array covariance - is it safe?" },
+          { "role": "me", "text": "Arrays are covariantly assignable in C# (Dog[] to Animal[]), but it is not type-safe. Writing a Cat into an Animal[] that is really a Dog[] throws ArrayTypeMismatchException at runtime. This is a known historical design flaw in C# arrays." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    }
+  ]
+}

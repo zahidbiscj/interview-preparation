@@ -1,0 +1,257 @@
+[
+    {
+      "id": "csharp-advanced-021",
+      "q": "What causes a NullReferenceException and how do you avoid it?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["nullreferenceexception", "null", "null-safety"],
+      "answer": {
+        "oneLiner": "A NullReferenceException is thrown when you call a member on a reference that is null. Avoid it with null checks, `?.`, `??`, and nullable reference types that warn you at compile time.",
+        "detail": "Every reference type variable can hold null. When you call a method or access a property on null, the CLR cannot find the object and throws NullReferenceException. Common sources: method results like `FirstOrDefault()` that return null when nothing matches, uninitialized fields, and deserialization of JSON with missing properties. The null-conditional operator `?.` short-circuits to null without throwing. `??` supplies a fallback value if the left side is null. `??=` assigns the fallback only if the left side is null. Enabling nullable reference types moves null warnings to compile time. Never catch NullReferenceException - fix the root cause instead.",
+        "keyPoints": [
+          "Cause: calling any member on a null reference - property access, method call, or indexer.",
+          "`?.` (null-conditional) short-circuits to null instead of throwing: `user?.Address?.City`.",
+          "`??` (null-coalescing) provides a fallback: `name ?? \"Anonymous\"`.",
+          "`??=` (null-coalescing assignment) assigns only if the left side is null: `cache ??= LoadData()`.",
+          "Enable nullable reference types to get compile-time warnings before null reaches runtime."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no null check; crashes if user is null or has no address\npublic string GetCity(int userId) {\n    var user = _db.Users.FirstOrDefault(u => u.Id == userId);\n    return user.Address.City; // NullReferenceException if user is null\n}\n\n// ✅ GOOD - null-conditional chain; safe and readable\npublic string GetCity(int userId) {\n    var user = _db.Users.FirstOrDefault(u => u.Id == userId);\n    return user?.Address?.City ?? \"Unknown\";\n}\n// With nullable reference types enabled, compiler flags user.Address.City without guard",
+          "note": "Chained `?.` stops at the first null and returns null; `??` supplies the fallback in one expression."
+        },
+        "analogy": "A null reference is a door that is not there. `?.` checks if the door exists before trying to open it.",
+        "redFlags": [
+          "Catching NullReferenceException to swallow it - this hides the bug instead of fixing it.",
+          "Sprinkling `!` (null-forgiving operator) everywhere to silence NRT warnings without fixing the null.",
+          "Not knowing that `?.` short-circuits the entire chain - `a?.B?.C` returns null if A or B is null.",
+          "Not enabling nullable reference types and relying on runtime crashes to find null issues."
+        ],
+        "followUpsQA": [
+          { "q": "What is the null-conditional operator?", "a": "`?.` - it accesses the member only if the left side is not null; otherwise returns null for the whole expression." },
+          { "q": "What does ?? do?", "a": "Returns the left side if it is not null; otherwise returns the right side. `name ?? \"default\"` returns name unless it is null." },
+          { "q": "Should you catch NullReferenceException?", "a": "No - catching it hides the bug. Find and fix the null at its source." },
+          { "q": "How do nullable reference types help?", "a": "The compiler uses flow analysis to warn you at build time when you might dereference a nullable reference without checking it first." },
+          { "q": "What is the null-forgiving operator?", "a": "`name!` suppresses the NRT warning and tells the compiler you know the value is not null. Use it sparingly only when you have external knowledge the compiler lacks." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What causes a NullReferenceException and how do you avoid it?" },
+          { "role": "you", "text": "You get a NRE when you call any member - method, property, or indexer - on a reference that is null. Common sources are `FirstOrDefault` returning null when nothing matches, uninitialized fields, and missing JSON properties during deserialization." },
+          { "role": "interviewer", "text": "What is the most useful operator for avoiding it?" },
+          { "role": "you", "text": "The null-conditional `?.`. Instead of `user.Address.City` throwing if user is null, `user?.Address?.City` returns null without throwing. Chain `??` to provide a fallback: `user?.Address?.City ?? \"Unknown\"`." },
+          { "role": "interviewer", "text": "What is the difference between ?? and ??=?" },
+          { "role": "you", "text": "`??` returns a fallback value inline. `??=` assigns the fallback to the variable itself only if it is null: `cache ??= LoadFromDatabase()`. This is the lazy initialisation pattern without a full if block." },
+          { "role": "interviewer", "text": "What about nullable reference types?" },
+          { "role": "you", "text": "Enabling NRT with `<Nullable>enable</Nullable>` moves the problem from runtime to compile time. The compiler uses flow analysis to warn when you access a member on a potentially null reference. On a brownfield project I enabled it file by file and caught three real null-dereference bugs in the first day." },
+          { "role": "interviewer", "text": "What is the wrong way to handle NRE?" },
+          { "role": "you", "text": "Catching it and swallowing it. That hides the bug and the code continues in an unknown state. Also using the null-forgiving `!` to silence compiler warnings - that is just deferring the crash to runtime. Fix the null at its source." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-022",
+      "q": "Are null and an empty string the same thing in C#?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["string", "null", "empty"],
+      "answer": {
+        "oneLiner": "No. `null` means there is no string object at all. `\"\"` (the same as `string.Empty`) is a valid zero-length string object. They are different values and behave differently.",
+        "detail": "A null string has no object reference - calling `.Length` on it throws NullReferenceException. An empty string `\"\"` is a valid string object with `Length == 0`. `\"\"` and `string.Empty` are the same interned instance. `string.IsNullOrEmpty(s)` returns true for both null and empty. `string.IsNullOrWhiteSpace(s)` additionally returns true for strings that contain only whitespace, which is usually what you want for user input validation. When comparing strings to empty, prefer `string.IsNullOrEmpty` over `s == ""` because it handles the null case without a NullReferenceException.",
+        "keyPoints": [
+          "`null` means no string object exists - `s.Length` throws NRE; `\"\".Length` is 0.",
+          "`\"\"` and `string.Empty` are the same interned empty string instance - they are equal by value and reference.",
+          "`string.IsNullOrEmpty(s)` is true for both null and `\"\"`.",
+          "`string.IsNullOrWhiteSpace(s)` is also true for `\" \"`, `\"\\t\"`, and `\"\\n\"` - use this for user input.",
+          "Comparing `s == \"\"` is safe (string overloads `==`) but `s.Length == 0` crashes if s is null."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - checking .Length without a null guard\npublic bool IsEmptyEmail(string email) =>\n    email.Length == 0; // NullReferenceException if email is null\n\n// ✅ GOOD - IsNullOrWhiteSpace handles null, empty, and whitespace\npublic bool IsEmptyEmail(string? email) =>\n    string.IsNullOrWhiteSpace(email);\n\nstring? a = null;\nstring b = \"\";\nConsole.WriteLine(a == b);                       // False\nConsole.WriteLine(string.IsNullOrEmpty(a));      // True\nConsole.WriteLine(string.IsNullOrEmpty(b));      // True\nConsole.WriteLine(b == string.Empty);            // True",
+          "note": "Always use IsNullOrWhiteSpace for user-facing input validation - it handles the invisible whitespace case too."
+        },
+        "analogy": "null is an empty envelope slot. An empty string is a slot with an empty envelope inside.",
+        "redFlags": [
+          "Treating null and empty string as interchangeable - they are distinct values with different behaviour.",
+          "Calling `.Length` or any method on a string without checking for null first.",
+          "Using `s.Equals(\"\")` instead of `string.IsNullOrEmpty(s)` - the Equals call throws if s is null.",
+          "Not knowing that `string.IsNullOrWhiteSpace` also handles strings with only spaces and tabs."
+        ],
+        "followUpsQA": [
+          { "q": "What does calling .Length on a null string do?", "a": "Throws NullReferenceException - there is no object to call a method on." },
+          { "q": "Is string.Empty the same object as \"\"?", "a": "Yes - both are the same interned empty string instance; `object.ReferenceEquals(\"\", string.Empty)` is true." },
+          { "q": "What does IsNullOrWhiteSpace check that IsNullOrEmpty does not?", "a": "It also returns true for strings that contain only whitespace characters like spaces, tabs, and newlines." },
+          { "q": "Is comparing a string to null with == safe?", "a": "Yes - string overloads `==` to use value comparison. `s == null` is safe even if s is null." },
+          { "q": "What is the difference between null and default for a string?", "a": "They are the same - `default(string)` is null because string is a reference type." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Are null and an empty string the same in C#?" },
+          { "role": "you", "text": "No - they are completely different. Null means no string object exists at all. An empty string is a valid object with Length zero. Calling `.Length` on null throws NullReferenceException; calling it on `\"\"` returns 0." },
+          { "role": "interviewer", "text": "How do you check for both safely?" },
+          { "role": "you", "text": "`string.IsNullOrEmpty(s)` returns true for both null and empty string. For user input I use `string.IsNullOrWhiteSpace(s)` which also catches strings with only spaces and tabs - common in form submissions." },
+          { "role": "interviewer", "text": "Is string.Empty the same object as the empty string literal?" },
+          { "role": "you", "text": "Yes - both are the same interned instance. The CLR interns common strings. `ReferenceEquals(\"\", string.Empty)` returns true. There is no performance benefit to preferring one over the other." },
+          { "role": "interviewer", "text": "Is it safe to write s == null?" },
+          { "role": "you", "text": "Yes - the string type overloads `==` to use value comparison so `null == null` returns true and no NRE is thrown. `s.Equals(null)` is different - if s is null, `Equals` throws NRE, so always prefer `s == null` or `s is null`." },
+          { "role": "interviewer", "text": "Give me a practical scenario where the difference matters." },
+          { "role": "you", "text": "In a SaaS app, a user submits a registration form with no email address. The controller may receive null (field not submitted) or empty string (field submitted blank). Both mean the email is missing, so `IsNullOrWhiteSpace` handles both cases with one check. Treating them differently causes bugs where one path validates and the other does not." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-023",
+      "q": "Can an enum use inheritance in C#?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["enum", "inheritance"],
+      "answer": {
+        "oneLiner": "No. Every enum implicitly derives from `System.Enum` and is sealed. You cannot inherit from an enum or extend it with more values through inheritance.",
+        "detail": "Enums are value types that implicitly derive from `System.Enum`. They are sealed so subclassing is impossible. The only 'inheritance' allowed is specifying the underlying numeric type: `enum Priority : byte` tells the runtime to store the value as a byte. The `[Flags]` attribute allows bitwise combination of enum values but is not inheritance. To add behaviour to an enum, use extension methods. For richer enum-like types that carry behaviour, use the smart-enum pattern - a class with static readonly instances that each have their own behaviour methods.",
+        "keyPoints": [
+          "Enums are sealed value types that derive from `System.Enum` - no subclassing from another enum.",
+          "The only type specification allowed is the underlying integral type: `enum Status : byte`.",
+          "`[Flags]` enables bitwise combination of values but is not inheritance.",
+          "To add behaviour, use extension methods on the enum type.",
+          "For richer enum-like types with methods and polymorphism, use the smart-enum class pattern."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - trying to inherit from an enum; compile error\npublic enum BaseStatus { Active, Inactive }\npublic enum ExtendedStatus : BaseStatus { Suspended } // compile error\n\n// ✅ GOOD - extension methods add behaviour; smart-enum adds polymorphism\npublic enum OrderStatus { Pending, Shipped, Cancelled }\npublic static class OrderStatusExtensions {\n    public static bool IsTerminal(this OrderStatus s) =>\n        s == OrderStatus.Shipped || s == OrderStatus.Cancelled;\n}\n// Usage: if (order.Status.IsTerminal()) { ... }",
+          "note": "Extension methods are the idiomatic way to add behaviour to enums without a smart-enum pattern."
+        },
+        "analogy": "An enum is a set of named exits on a motorway - you can label them but you cannot add a new exit by renaming the motorway.",
+        "redFlags": [
+          "Thinking you can inherit from an enum to add more values - enums are sealed.",
+          "Confusing `enum Status : byte` (underlying type) with inheritance from another enum.",
+          "Not knowing the `[Flags]` attribute exists for bitwise enum combinations.",
+          "Not knowing extension methods are the idiomatic way to add behaviour to enums."
+        ],
+        "followUpsQA": [
+          { "q": "What does `enum E : byte` mean?", "a": "It sets the underlying storage type to byte (0-255) instead of the default int. Useful for compact enums in serialisation or protocols." },
+          { "q": "What does [Flags] add?", "a": "`[Flags]` marks an enum as a bit field where values can be combined with bitwise OR. Values must be powers of 2 for this to work correctly." },
+          { "q": "How do you add behaviour to an enum?", "a": "Extension methods - define a static method in a static class with `this EnumType` as the first parameter." },
+          { "q": "What is the smart-enum pattern?", "a": "A class with private constructor and static readonly instances, each carrying custom behaviour. Used when enum values need methods that vary per value." },
+          { "q": "Can you combine two enums of different types?", "a": "No - you cannot combine or inherit between enum types. You can convert between the underlying numeric types explicitly." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Can an enum use inheritance in C#?" },
+          { "role": "you", "text": "No. Enums are sealed value types that implicitly derive from `System.Enum`. You cannot inherit from another enum or add values by subclassing. The only customisation is specifying the underlying integral type like `enum Priority : byte`." },
+          { "role": "interviewer", "text": "What can you do with the underlying type?" },
+          { "role": "you", "text": "You can set it to any integral type: byte, short, int (default), long, and their unsigned equivalents. For a status code sent in a network protocol we used `enum PacketType : ushort` to map directly to the wire format and save space." },
+          { "role": "interviewer", "text": "What is the [Flags] attribute?" },
+          { "role": "you", "text": "`[Flags]` tells the runtime the enum is a bit field - values can be combined with bitwise OR. `Permission.Read | Permission.Write` gives a combined value. Values must be powers of 2 for it to work correctly, and you add a `None = 0` member as the empty state." },
+          { "role": "interviewer", "text": "How do you add behaviour to an enum?" },
+          { "role": "you", "text": "Extension methods. `public static bool IsTerminal(this OrderStatus s) => s is Shipped or Cancelled;` reads naturally at the call site: `order.Status.IsTerminal()`. For richer polymorphism where each value needs different logic, I use the smart-enum pattern - a class with static readonly instances." },
+          { "role": "interviewer", "text": "Give me a real case for smart enums." },
+          { "role": "you", "text": "In a logistics app, each shipment carrier had a different tracking URL format. An enum cannot hold that logic. A `Carrier` smart-enum class with a virtual `GetTrackingUrl(string trackingNumber)` method let each carrier override it. `carrier.GetTrackingUrl(\"1Z999\")` returned the correct URL per carrier without a switch statement." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-024",
+      "q": "Explain the ternary operator and the null-coalescing operators (?? and ??=).",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["ternary", "null-coalescing", "operators"],
+      "answer": {
+        "oneLiner": "`cond ? a : b` picks one of two values based on a boolean condition. `a ?? b` returns `a` unless it is null, then returns `b`. `a ??= b` assigns `b` to `a` only if `a` is currently null.",
+        "detail": "`?:` is the ternary conditional operator - it evaluates the condition and returns one of two expressions. It is not null-specific. `??` is the null-coalescing operator - it only reacts to null, not to false or zero. It is right-associative so you can chain: `x ?? y ?? z` returns the first non-null. `??=` is the compound assignment form: it assigns the right side to the left variable only if the left is currently null. Together with `?.`, these form a concise null-handling idiom: `user?.Name ?? \"Guest\"`.",
+        "keyPoints": [
+          "`condition ? valueIfTrue : valueIfFalse` - evaluates condition, returns one of two expressions.",
+          "`a ?? b` returns `a` if it is not null; otherwise returns `b`. Does not react to false or empty.",
+          "`a ??= b` assigns `b` to `a` only when `a` is null - the lazy initialisation pattern in one operator.",
+          "`??` is right-associative: `x ?? y ?? z` is `x ?? (y ?? z)` and returns the first non-null.",
+          "Pairs naturally with `?.`: `order?.Customer?.Name ?? \"Anonymous\"`."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// Ternary: condition-based value selection\nstring label = stock > 0 ? \"In Stock\" : \"Out of Stock\";\n\n// ?? null-coalescing: fallback when null\nstring displayName = user?.Name ?? \"Anonymous\";\n\n// ??= null-coalescing assignment: assign only if null (lazy init)\nprivate List<Order>? _cache;\npublic List<Order> GetOrders() {\n    _cache ??= _db.Orders.ToList(); // loads once, reuses on subsequent calls\n    return _cache;\n}",
+          "note": "`??` and `?.` compose cleanly; `??=` is the concise lazy initialisation pattern without a full if block."
+        },
+        "analogy": "?? is a safety net - it only catches you when you fall (are null), not when you stumble (are false).",
+        "redFlags": [
+          "Confusing `??` (reacts to null only) with `||` (reacts to any falsy value like false, 0, empty string).",
+          "Not knowing `??` is right-associative and can be chained: `x ?? y ?? z`.",
+          "Using a full if statement for lazy initialisation when `??=` makes it one line.",
+          "Not knowing `?.` and `??` compose: `a?.B ?? fallback` is a single safe null-chain expression."
+        ],
+        "followUpsQA": [
+          { "q": "Does ?? react to false or 0?", "a": "No - `??` only reacts to null. A bool value of false passes through as false, not as the fallback." },
+          { "q": "What does ??= do?", "a": "Assigns the right side to the left variable only if the left side is currently null - one-line lazy initialisation." },
+          { "q": "Is ?? chainable?", "a": "Yes - it is right-associative. `a ?? b ?? c` returns a if not null, else b if not null, else c." },
+          { "q": "Can you use ?? with value types?", "a": "Only with nullable value types like `int?`. `int? x = null; int y = x ?? 0;` returns 0." },
+          { "q": "How does ternary differ from an if statement?", "a": "Ternary is an expression that returns a value and can be used inline. An if statement is a statement and cannot be used where a value is expected." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Explain the ternary operator and the null-coalescing operators." },
+          { "role": "you", "text": "`cond ? a : b` picks one of two values based on a boolean - it is not null-specific. `a ?? b` returns `a` unless it is null, then returns `b`. `a ??= b` assigns `b` to `a` only if `a` is currently null - that is the lazy initialisation pattern in one operator." },
+          { "role": "interviewer", "text": "How is ?? different from using || in JavaScript or Python?" },
+          { "role": "you", "text": "In JavaScript `||` is falsy-based: `0 || 'default'` gives `'default'` because 0 is falsy. C# `??` is strictly null-based: `0 ?? fallback` gives `0` because 0 is not null. This is important - a zero price or false flag should not fall through to a default." },
+          { "role": "interviewer", "text": "Can you chain ???" },
+          { "role": "you", "text": "Yes - `??` is right-associative. `primaryCity ?? secondaryCity ?? \"Unknown\"` returns the first non-null. It is clean for fallback chains where multiple sources might have the value." },
+          { "role": "interviewer", "text": "Give me a real use of ??=." },
+          { "role": "you", "text": "Lazy cache initialisation: `private List<Product>? _cache; _cache ??= _db.Products.ToList();`. On the first call it loads from the database and assigns to `_cache`. On subsequent calls `_cache` is not null so it is returned immediately. One line instead of a full if-null-assign block." },
+          { "role": "interviewer", "text": "How do ?. and ?? compose?" },
+          { "role": "you", "text": "`order?.Customer?.Name ?? \"Guest\"` - the `?.` chain evaluates to null if any step is null; `??` then provides the fallback. It is null-safe from object to property to nested property in one expression, which is far cleaner than nested if checks." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-025",
+      "q": "What is the difference between early binding and late binding?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["early-binding", "late-binding", "dynamic", "reflection"],
+      "answer": {
+        "oneLiner": "Early (static) binding resolves member calls at compile time with full type checking. Late binding resolves them at runtime via `dynamic` or reflection - no compile-time verification.",
+        "detail": "With early binding, the compiler knows the exact type and verifies that the called member exists, which gives IntelliSense, compile-time errors for typos, and faster execution. With late binding, the type or member is resolved at runtime. In C# this happens via the `dynamic` keyword (uses the DLR) or via reflection (`Type.GetMethod`, `MethodInfo.Invoke`). Late binding is slower because the lookup happens at runtime and errors only surface as exceptions. Virtual dispatch (calling an overridden method through a base type reference) is still early binding - the compiler knows the signature, only the concrete implementation is chosen at runtime by the vtable.",
+        "keyPoints": [
+          "Early binding: compiler resolves member at compile time; IntelliSense and type-checking work.",
+          "Late binding: member resolved at runtime via `dynamic` or reflection; errors surface at runtime.",
+          "Virtual dispatch is NOT late binding - the signature is compile-time known; only the implementation is runtime-selected.",
+          "Late binding is slower: DLR or reflection resolution adds overhead that compile-time dispatch avoids.",
+          "Use late binding only when the type or member is genuinely unknown at compile time: plugins, COM, scripting."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - late binding for a known type; loses safety and IntelliSense\ndynamic product = GetProduct();\nvar price = product.Priec; // typo - compiles, throws RuntimeBinderException at runtime\n\n// ✅ GOOD - early binding: compile-time checked, IntelliSense works\nProduct product = GetProduct();\nvar price = product.Price; // compiler verifies this property exists\n\n// Late binding is justified for plugin loading where type is unknown at compile time\nvar pluginType = Assembly.LoadFrom(pluginPath).GetType(\"PaymentPlugin.GatewayProvider\");\nvar instance = Activator.CreateInstance(pluginType);\nvar result = pluginType.GetMethod(\"ProcessPayment\")!.Invoke(instance, new object[] { amount });",
+          "note": "Late binding via reflection is the right tool for unknown-at-compile-time types in plugin systems; for known types always use early binding."
+        },
+        "analogy": "Early binding is a GPS with a fixed map. Late binding is asking for directions at each junction - slower and you might get lost.",
+        "redFlags": [
+          "Saying virtual dispatch is late binding - the compiler knows the signature; only the vtable lookup is runtime.",
+          "Using `dynamic` for a type you know at compile time - you lose all safety for no benefit.",
+          "Not knowing that reflection errors only surface at runtime as `TargetInvocationException` or `NullReferenceException`.",
+          "Not knowing that `dynamic` uses the DLR which is different from raw reflection."
+        ],
+        "followUpsQA": [
+          { "q": "Is virtual method dispatch late binding?", "a": "No - the method signature is known at compile time. Only the concrete override is chosen at runtime via the vtable. The compiler verifies the call." },
+          { "q": "What runtime exceptions does late binding produce?", "a": "`RuntimeBinderException` for dynamic; `TargetInvocationException` wrapping the actual error for reflection." },
+          { "q": "When is late binding necessary?", "a": "When the type or member is not known until runtime - plugin architectures, COM interop, scripting engines, and dynamic data sources." },
+          { "q": "Is dynamic faster than reflection?", "a": "Dynamic uses the DLR which caches call-site binders after the first resolution, making repeated calls faster than raw reflection. But both are slower than static dispatch." },
+          { "q": "How do you make late binding safer?", "a": "Define an interface or base class that the late-bound type must implement, then cast to that interface after loading. This gives you early-bound access to the agreed API surface." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What is the difference between early binding and late binding?" },
+          { "role": "you", "text": "Early binding resolves member calls at compile time. The compiler checks that the method or property exists, IntelliSense works, and a typo is a build error. Late binding resolves at runtime via `dynamic` or reflection - no compile-time verification, errors are runtime exceptions." },
+          { "role": "interviewer", "text": "Is virtual dispatch late binding?" },
+          { "role": "you", "text": "No. The compiler knows the method signature at compile time and verifies the call. At runtime the vtable selects the concrete override. The signature is fixed early; only the implementation varies. Late binding means the compiler does not know the method exists at all." },
+          { "role": "interviewer", "text": "When would late binding be the right choice?" },
+          { "role": "you", "text": "Plugin architectures - loading a payment gateway DLL at runtime where the type is unknown at compile time. Or COM interop. Or a scripting engine where method names come from user input. In all these cases the type cannot be referenced in code, so reflection or dynamic is the only option." },
+          { "role": "interviewer", "text": "How do you make a late-bound plugin safe?" },
+          { "role": "you", "text": "Define an interface the plugin must implement - `IPaymentGateway`. Load the assembly at runtime, find the type, create an instance, and cast to `IPaymentGateway`. From that point all calls are early-bound through the interface. You use late binding only to discover and instantiate the type, not to call its methods." },
+          { "role": "interviewer", "text": "What is the performance difference?" },
+          { "role": "you", "text": "Dynamic uses the DLR which caches binders after the first call so repeated calls on the same type are fast but still slower than a static dispatch. Raw reflection has no such cache. A static virtual call is a vtable lookup - nanoseconds. A DLR call is microseconds. In a hot path processing millions of records, that matters." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    }
+]

@@ -1,0 +1,990 @@
+{
+  "subtopicId": "web",
+  "questions": [
+    {
+      "id": "security-web-001",
+      "q": "How would you secure a public-facing Web API?",
+      "level": "senior",
+      "type": "scenario",
+      "freq": "high",
+      "tags": ["api", "hardening", "checklist"],
+      "answer": {
+        "oneLiner": "Layer your defenses: every endpoint must authenticate and authorize, all traffic must use HTTPS with HSTS, every input must be validated server-side, and you need CORS whitelists, rate limiting, security headers, and a WAF at the edge.",
+        "detail": "Think of it as concentric rings. The outermost ring is the network edge: force HTTPS so traffic is encrypted in transit, enable HSTS so browsers never try plain HTTP, and put a WAF in front to filter known attack patterns like SQLi and XSS. The next ring is identity: every endpoint must authenticate the caller (deny by default) and authorize them before doing any work. The next ring is input: validate everything server-side with an allow-list mindset - reject anything that does not match the expected format, length, and type. CORS must whitelist only the specific origins that need access. Rate limiting should sit at both the gateway (coarse, to shed volume) and in the app (fine-grained, per identity). Security response headers - CSP, X-Content-Type-Options, X-Frame-Options - add a final browser-side layer. Secrets stay out of code and in Key Vault. DB accounts use least-privilege so a breach does not hand the attacker everything.",
+        "keyPoints": [
+          "Deny by default on every endpoint - a missing [Authorize] must fail closed, never open",
+          "HTTPS plus HSTS removes the risk of plain HTTP connections being downgraded",
+          "Server-side input validation with an allow-list is mandatory - client validation is only UX",
+          "Rate limiting at two levels: coarse at the gateway, fine-grained per identity in the app",
+          "WAF at the edge filters known attack patterns but never replaces secure code"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - open endpoint, no rate limit, wildcard CORS\napp.UseCors(p => p.AllowAnyOrigin().AllowAnyMethod());\n[HttpPost(\"/orders\")]\npublic IActionResult PlaceOrder(Order order) { ... }\n\n// ✅ GOOD - named CORS policy, authorized, rate limited\nbuilder.Services.AddCors(o => o.AddPolicy(\"storefront\", p =>\n    p.WithOrigins(\"https://shop.contoso.com\")\n     .AllowAnyHeader().AllowAnyMethod()));\n\n[Authorize]\n[EnableRateLimiting(\"per-user\")]\n[HttpPost(\"/orders\")]\npublic IActionResult PlaceOrder(CreateOrderDto dto) { ... }",
+          "note": "The good version ties together authorization, rate limiting, and a strict CORS policy on a single endpoint."
+        },
+        "analogy": "A secure API is a nightclub: ID at the door, wristband for the VIP section.",
+        "redFlags": [
+          "Saying HTTPS alone is enough - it only protects transit, not identity or input",
+          "Trusting client-side validation as a security control instead of only a UX improvement",
+          "Not knowing the difference between coarse gateway rate limits and fine per-user app limits",
+          "Confusing CORS with authorization - CORS is a browser mechanism, not a server access control"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Where do you put rate limiting - app or gateway?",
+            "a": "Both: coarse limits at the gateway to shed load early, and fine-grained per-identity limits in the app where you know who is calling."
+          },
+          {
+            "q": "Why deny by default on every endpoint?",
+            "a": "A forgotten [Authorize] attribute then fails closed, meaning no access, instead of accidentally exposing an unprotected endpoint."
+          },
+          {
+            "q": "Is HTTPS enough on its own to secure an API?",
+            "a": "No - HTTPS only encrypts data in transit; you still need authentication, authorization, input validation, and security headers."
+          },
+          {
+            "q": "What does a WAF add that the app itself cannot do?",
+            "a": "It filters known attack patterns like SQLi and XSS at the edge before malicious requests ever reach your app, acting as an extra defense-in-depth layer."
+          },
+          {
+            "q": "How does least-privilege on the DB account help here?",
+            "a": "If an attacker does get through, a DB account with only the needed CRUD permissions limits how much damage they can do - they cannot drop tables or read other schemas."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "We are exposing an internal Web API to the public internet for the first time. Walk me through how you would secure it."
+          },
+          {
+            "role": "you",
+            "text": "I think about it as concentric rings. The outermost is the network edge: force HTTPS with HSTS and put a WAF in front to filter known attack patterns. The next ring is identity: every endpoint authenticates and authorizes the caller with deny-by-default, so a missing attribute fails closed. The innermost ring is input: validate everything server-side with an allow-list and add rate limiting at both the gateway and per identity in the app."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned deny by default - what does that look like in ASP.NET Core?"
+          },
+          {
+            "role": "you",
+            "text": "I set a global authorization policy in middleware so every endpoint requires authentication unless I explicitly mark it with [AllowAnonymous]. That way a forgotten [Authorize] does not silently expose an endpoint - it defaults to protected. In code: builder.Services.AddAuthorizationBuilder().SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())."
+          },
+          {
+            "role": "interviewer",
+            "text": "One endpoint is slow and a single client starts hammering it. Where do you handle that - app or gateway?"
+          },
+          {
+            "role": "you",
+            "text": "Both, at different levels. The gateway applies a coarse limit to shed raw volume before it reaches the app. The app then applies a finer per-identity limit using ASP.NET Core rate limiting middleware with a fixed or sliding window policy, because at the app level I know who the caller actually is."
+          },
+          {
+            "role": "interviewer",
+            "text": "You set AllowAnyOrigin on CORS for speed during development and a teammate checks it into production. What is the risk?"
+          },
+          {
+            "role": "you",
+            "text": "Any origin can call the API from a browser, which matters most when the API uses cookie-based auth - a malicious site could use the user's cookies to make requests. I would fix it by switching to a named CORS policy with WithOrigins listing only specific production frontend domains. AllowAnyOrigin combined with AllowCredentials is actually blocked by ASP.NET Core at runtime for this exact reason."
+          },
+          {
+            "role": "interviewer",
+            "text": "What security response headers would you add and why do they matter for an API?"
+          },
+          {
+            "role": "you",
+            "text": "For a pure JSON API the most important are X-Content-Type-Options: nosniff to stop browsers misinterpreting the response type, and Strict-Transport-Security to pin HTTPS. If the API also serves HTML like an error page, I add Content-Security-Policy and X-Frame-Options. These are cheap to add via a middleware step and give meaningful browser-side protection."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-002",
+      "q": "What is CORS and how do you configure it securely in ASP.NET Core?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["cors", "browser", "config"],
+      "answer": {
+        "oneLiner": "CORS is a browser rule that controls which origins can call your API using specific HTTP response headers - configure it with a strict named policy that whitelists only the origins you actually need.",
+        "detail": "Browsers enforce the same-origin policy: a script from https://shop.contoso.com cannot call https://api.contoso.com by default. CORS is the mechanism that lets your server tell the browser it is okay to relax that rule for specific origins. When the browser sees a cross-origin request it either sends a preflight OPTIONS request (for non-simple requests like POST with JSON) or checks the response headers directly. Your server must respond with Access-Control-Allow-Origin matching the caller's origin, or the browser blocks the response. Note the request still reaches the server - only the browser hides the response from the calling script. In ASP.NET Core you register a named policy with AddCors and apply it with UseCors. The policy specifies exactly which origins, methods, and headers are allowed. The critical rule: you can never combine AllowAnyOrigin() with AllowCredentials() - ASP.NET Core throws an invalid operation exception at startup because that combination would allow any website to make credentialed requests using the user's cookies.",
+        "keyPoints": [
+          "CORS is browser-enforced only - a non-browser client like curl or Postman ignores it completely",
+          "The request always reaches the server; CORS only controls whether the browser exposes the response to the calling script",
+          "Use a named policy with WithOrigins listing specific domains - never AllowAnyOrigin in production",
+          "AllowAnyOrigin combined with AllowCredentials is illegal in ASP.NET Core and throws at startup"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - wildcard origin with credentials causes runtime exception\nbuilder.Services.AddCors(o => o.AddPolicy(\"open\", p =>\n    p.AllowAnyOrigin().AllowAnyMethod().AllowCredentials()));\n\n// ✅ GOOD - named policy with explicit origins only\nbuilder.Services.AddCors(o => o.AddPolicy(\"storefront\", p =>\n    p.WithOrigins(\"https://shop.contoso.com\", \"https://admin.contoso.com\")\n     .AllowAnyHeader()\n     .AllowAnyMethod()\n     .AllowCredentials()));\n\napp.UseCors(\"storefront\");",
+          "note": "The bad version crashes at startup in ASP.NET Core because AllowAnyOrigin and AllowCredentials cannot be combined."
+        },
+        "analogy": "CORS is the bouncer's clipboard - the browser checks the list before letting your script see the response.",
+        "redFlags": [
+          "Saying CORS is a server-side security control - it is browser-enforced and a non-browser client bypasses it entirely",
+          "Using AllowAnyOrigin in a production API that serves authenticated users",
+          "Confusing CORS with authorization - passing CORS does not mean the user is allowed to perform the action",
+          "Not knowing that the request still reaches the server even when CORS blocks the browser from reading the response"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Does CORS protect the server from unauthorized requests?",
+            "a": "No - CORS is browser-enforced only. A non-browser client like curl sends the request and reads the response without any CORS check at all."
+          },
+          {
+            "q": "Why does ASP.NET Core block AllowAnyOrigin with AllowCredentials?",
+            "a": "That combination would allow any website to make credentialed requests using the user's cookies or auth headers, which is a major security hole, so the spec and ASP.NET Core both forbid it."
+          },
+          {
+            "q": "What is a preflight request?",
+            "a": "An OPTIONS request the browser sends automatically before a non-simple cross-origin request to check whether the server allows it - the server must respond with the correct Allow headers."
+          },
+          {
+            "q": "Is CORS a substitute for authorization on the server?",
+            "a": "No - CORS only controls which origins can read the response in a browser. You still need full authentication and authorization logic on the server for every request."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What problem does CORS actually solve, and how does it work?"
+          },
+          {
+            "role": "you",
+            "text": "Browsers enforce a same-origin policy that blocks scripts from reading responses from a different origin. CORS lets your server tell the browser it is okay to relax that for specific origins by returning Access-Control-Allow-Origin headers. The important thing is the request still reaches your server - CORS only controls whether the browser lets the calling script see the response."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you set it up in ASP.NET Core so it is both functional and secure?"
+          },
+          {
+            "role": "you",
+            "text": "I create a named policy with AddCors, listing only the actual frontend origins with WithOrigins, and apply it with app.UseCors before the authorization middleware. For a SaaS product I might have separate policies for the customer-facing app and the admin dashboard, each with different allowed origins."
+          },
+          {
+            "role": "interviewer",
+            "text": "A developer sets AllowAnyOrigin together with AllowCredentials to stop getting CORS errors in dev. What happens?"
+          },
+          {
+            "role": "you",
+            "text": "ASP.NET Core throws an InvalidOperationException at startup and refuses to run. That combination is illegal because it would allow any website on the internet to make authenticated requests using the user's session cookies. The fix is to always name the specific allowed origins."
+          },
+          {
+            "role": "interviewer",
+            "text": "The frontend team tells you their Postman tests all work fine even though CORS is misconfigured. Why?"
+          },
+          {
+            "role": "you",
+            "text": "Because CORS is browser-enforced only. Postman is not a browser so it does not check or send CORS headers at all - it just makes the HTTP request and reads the response. The misconfiguration would only be visible when a browser-based client makes the same cross-origin request."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where in the ASP.NET Core pipeline does UseCors need to go, and why does order matter?"
+          },
+          {
+            "role": "you",
+            "text": "UseCors must come after UseRouting but before UseAuthorization. If it comes after authorization, preflight OPTIONS requests get rejected with a 401 before CORS headers are added, and the browser interprets that as a CORS error. The correct order is routing, CORS, then authentication and authorization."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-003",
+      "q": "What is XSS and how do you prevent it?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["xss", "owasp", "injection"],
+      "answer": {
+        "oneLiner": "XSS is injecting malicious script into a page so it runs in another user's browser on your domain - prevent it with context-aware output encoding, a Content-Security-Policy header, and HttpOnly cookies.",
+        "detail": "Cross-Site Scripting has three main variants. Stored XSS: attacker saves malicious script in your database (like a product review), and it runs in every user's browser that views that page. Reflected XSS: attacker crafts a URL with script in a query parameter, and the server reflects it back in the response without encoding. DOM-based XSS: script builds the page from URL fragments or local storage on the client side without the data ever reaching the server, so server-side encoding cannot catch it. The root fix is context-aware output encoding: HTML-encode data placed in HTML, attribute-encode data in attributes, JavaScript-encode data injected into script blocks, and URL-encode data in URLs. Razor automatically HTML-encodes by default - the danger is bypassing it with Html.Raw() on untrusted data. A Content-Security-Policy header adds a second layer by telling the browser which script sources are allowed to run, blocking injected scripts even if encoding is missed. HttpOnly cookies limit damage by making session cookies invisible to JavaScript, so even a successful XSS cannot steal the session.",
+        "keyPoints": [
+          "Three variants: stored (in DB), reflected (in URL), DOM-based (purely client-side)",
+          "Razor auto-encodes HTML by default - avoid Html.Raw on any untrusted data",
+          "Output encoding must match the context: HTML, attribute, JavaScript, or URL",
+          "Content-Security-Policy restricts which scripts can run, reducing XSS blast radius",
+          "HttpOnly cookies stop injected scripts from stealing session tokens"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - raw HTML from user-supplied product review bypasses encoding\n@Html.Raw(Model.ReviewText)\n\n// ✅ GOOD - Razor auto-encodes; CSP header added in middleware\n@Model.ReviewText\n\n// In pipeline middleware:\napp.Use(async (ctx, next) => {\n    ctx.Response.Headers[\"Content-Security-Policy\"] =\n        \"default-src 'self'; script-src 'self'\";\n    await next();\n});",
+          "note": "Html.Raw bypasses Razor's auto-encoding and is safe only for known-trusted HTML like CMS content you own and control."
+        },
+        "analogy": "XSS is a forged note slipped into your mailbox - encode the envelope and CSP checks who signed it.",
+        "redFlags": [
+          "Saying you prevent XSS by blocking the word script - there are dozens of encoding tricks that bypass blacklists",
+          "Not knowing that Razor auto-encodes and that Html.Raw is the dangerous exception",
+          "Confusing stored XSS with reflected XSS - they have different entry points and attack vectors",
+          "Not knowing what DOM-based XSS is or that server-side encoding does not prevent it"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is DOM-based XSS and why is it different?",
+            "a": "DOM-based XSS uses attacker-controlled data - like a URL fragment - in a client-side JavaScript sink like innerHTML without the data ever reaching the server, so server-side encoding cannot help. You must sanitize on the client side too."
+          },
+          {
+            "q": "How does a Content-Security-Policy reduce XSS impact?",
+            "a": "CSP tells the browser which script sources are trusted. Even if an attacker injects a script tag, the browser refuses to run it if it does not match the policy's allowed sources."
+          },
+          {
+            "q": "Why does HttpOnly on cookies help with XSS?",
+            "a": "An HttpOnly cookie cannot be read by JavaScript at all, so even if an XSS payload runs it cannot steal the session token - the attacker can make requests but cannot exfiltrate the cookie value."
+          },
+          {
+            "q": "When is Html.Raw safe to use in Razor?",
+            "a": "Only when the HTML comes from a trusted source you own and control - like pre-sanitized CMS content - never from user input or a third-party data source."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain XSS to me and how you would prevent it in a .NET web app."
+          },
+          {
+            "role": "you",
+            "text": "XSS is getting attacker-controlled script to run in another user's browser in the context of your site, giving the attacker access to that user's session and DOM. In a .NET Razor app the main protection is automatic HTML encoding - Razor encodes output by default so angle brackets become harmless entities. The danger is Html.Raw, which bypasses that encoding and is only safe for HTML you own."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about a stored XSS attack - a user submits a malicious product review?"
+          },
+          {
+            "role": "you",
+            "text": "Razor encoding handles it if I render the review with @Model.ReviewText - the script tags are encoded before hitting the browser. I also add a Content-Security-Policy header so even if encoding is missed, the browser will not execute inline scripts from unknown sources. And I make session cookies HttpOnly so the worst case is limited."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about DOM-based XSS - the attacker puts the payload in the URL hash that JavaScript reads directly?"
+          },
+          {
+            "role": "you",
+            "text": "Server-side encoding cannot catch that because the data never reaches the server. I need to sanitize the data on the client side before inserting it into the DOM - using textContent instead of innerHTML when possible, or a library like DOMPurify for rich content. The hash value is readable by script but never sent to the server."
+          },
+          {
+            "role": "interviewer",
+            "text": "You set CSP to default-src 'self' but your app embeds third-party analytics. The analytics break. How do you fix it without using unsafe-inline?"
+          },
+          {
+            "role": "you",
+            "text": "I add the analytics domain to the CSP script-src directive. If the analytics inject inline scripts I would use a CSP nonce - generate a random value per request, add it to the CSP header as 'nonce-abc123', and include it in the script tag so only that specific script is allowed. That is far safer than unsafe-inline which defeats CSP entirely."
+          },
+          {
+            "role": "interviewer",
+            "text": "A junior says blacklisting the word script in user input prevents XSS. What is wrong?"
+          },
+          {
+            "role": "you",
+            "text": "Attackers have dozens of bypass techniques: event handlers like onerror on an img tag, encoded versions of the characters, SVG elements with script content, or CSS expressions. Blacklisting is a game you cannot win. Context-aware output encoding is the real fix because it renders user input harmless regardless of what characters the input contains."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-004",
+      "q": "What is CSRF and how do you prevent it?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["csrf", "antiforgery", "cookies"],
+      "answer": {
+        "oneLiner": "CSRF tricks a logged-in user's browser into sending an authenticated request to your site that the user never intended - prevent it with antiforgery tokens and SameSite cookies.",
+        "detail": "The attack exploits the fact that browsers automatically attach cookies to every request to a domain, even when the request is triggered by a malicious third-party website. So if a user is logged in to your banking app at bank.com using cookies and they visit evil.com, evil.com can embed a form that silently submits to bank.com. The browser dutifully attaches the session cookie and the server sees an authenticated request it cannot distinguish from a legitimate one. Antiforgery tokens break this by embedding a secret value in the form that only your own pages can read and send back - a third-party site cannot access the value because of same-origin restrictions. In ASP.NET Core, [ValidateAntiForgeryToken] on POST/PUT/DELETE endpoints checks this token. SameSite=Lax or Strict cookie attributes add a second layer: Lax blocks the cookie from being sent on cross-site sub-resource requests like form POSTs, Strict blocks it even on top-level navigations. For APIs using Bearer tokens in the Authorization header, CSRF is generally not a concern because browsers do not automatically attach custom headers cross-site.",
+        "keyPoints": [
+          "CSRF only works when the browser auto-sends credentials - cookies are the classic case",
+          "Antiforgery tokens must be validated on every state-changing request: POST, PUT, DELETE",
+          "SameSite=Lax blocks most CSRF; SameSite=Strict is stronger but can break incoming links from emails",
+          "APIs using Bearer tokens in Authorization headers are largely immune to CSRF"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - state-changing endpoint with no antiforgery protection\n[HttpPost(\"/account/transfer\")]\npublic IActionResult Transfer(TransferDto dto) { ... }\n\n// ✅ GOOD - antiforgery validated; SameSite cookie configured\n[HttpPost(\"/account/transfer\")]\n[ValidateAntiForgeryToken]\npublic IActionResult Transfer(TransferDto dto) { ... }\n\n// In Program.cs:\nbuilder.Services.AddAntiforgery();\nbuilder.Services.ConfigureApplicationCookie(o =>\n    o.Cookie.SameSite = SameSiteMode.Lax);",
+          "note": "The antiforgery token must be included in forms via @Html.AntiForgeryToken() or the asp-antiforgery tag helper."
+        },
+        "analogy": "CSRF is a forged signature on a letter - the antiforgery token is the wax seal only you can make.",
+        "redFlags": [
+          "Saying HTTPS prevents CSRF - it only encrypts the forged request, it does not stop the browser attaching the cookie",
+          "Validating antiforgery tokens only on GET requests - GET must be safe and idempotent; tokens go on POST/PUT/DELETE",
+          "Not knowing that Bearer token APIs are largely CSRF-immune because browsers do not auto-send Authorization headers",
+          "Confusing CSRF with XSS - CSRF forges requests using the browser, XSS injects malicious scripts into pages"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why are APIs using Bearer tokens in the Authorization header largely immune to CSRF?",
+            "a": "Browsers do not automatically attach custom headers like Authorization on cross-site requests, so a malicious page cannot forge a request with a valid Bearer token without stealing it via XSS first."
+          },
+          {
+            "q": "What is the difference between SameSite=Lax and SameSite=Strict?",
+            "a": "Lax allows the cookie on top-level navigation GET requests from other sites but blocks it on cross-site sub-resource requests like form POSTs. Strict blocks the cookie on all cross-site requests including navigations, which is more secure but can break links from emails or external referrals."
+          },
+          {
+            "q": "Does HTTPS prevent CSRF?",
+            "a": "No - HTTPS encrypts the data in transit but the forged request still has the correct session cookie attached. HTTPS does not stop the browser from including the cookie on a cross-site request."
+          },
+          {
+            "q": "Where does the antiforgery token need to go?",
+            "a": "On every state-changing endpoint - POST, PUT, PATCH, DELETE. It is embedded in the HTML form by Razor tag helpers and validated server-side by [ValidateAntiForgeryToken]."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain CSRF to me - what is happening under the hood?"
+          },
+          {
+            "role": "you",
+            "text": "CSRF exploits the fact that browsers automatically attach cookies to every request to a domain. If a user is logged in to your app with a session cookie and they visit a malicious site, that site can submit a form to your domain. The browser attaches the session cookie and your server sees what looks like a legitimate authenticated request - it cannot tell the form came from evil.com."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do antiforgery tokens break that attack?"
+          },
+          {
+            "role": "you",
+            "text": "You embed a secret value in the form that only pages served by your server can know. When the form is submitted, the server checks that the token in the form body matches the expected value. A third-party site cannot read that token due to same-origin restrictions on HTTP responses, so it cannot forge a request that includes a valid token."
+          },
+          {
+            "role": "interviewer",
+            "text": "Our SPA calls the API using a Bearer token in the Authorization header. Do we still need antiforgery tokens?"
+          },
+          {
+            "role": "you",
+            "text": "Generally not. Browsers do not automatically attach custom headers like Authorization on cross-site requests, so a malicious page cannot forge a request that includes the Bearer token. CSRF is fundamentally a cookie problem. If you switch to cookie-based auth for the SPA then you do need tokens again."
+          },
+          {
+            "role": "interviewer",
+            "text": "You set SameSite=Strict on the session cookie and users complain they get logged out when clicking links in marketing emails. Why?"
+          },
+          {
+            "role": "you",
+            "text": "SameSite=Strict blocks the cookie on all cross-site requests including top-level navigations, so clicking a link from an email opens your app but the browser does not send the session cookie - the user appears unauthenticated. I would switch to SameSite=Lax, which allows the cookie on top-level navigations but still blocks it on cross-site form POSTs. That covers most CSRF scenarios without breaking legitimate traffic."
+          },
+          {
+            "role": "interviewer",
+            "text": "A developer on the team says enabling HTTPS stops CSRF. How do you correct that?"
+          },
+          {
+            "role": "you",
+            "text": "HTTPS encrypts the request in transit but it does not stop the browser from attaching the session cookie to a forged cross-site request. The forged POST from evil.com still arrives at your server with a valid encrypted session cookie. HTTPS and CSRF protection solve different threats - HTTPS is confidentiality in transit, CSRF protection is about verifying the origin of the request."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-005",
+      "q": "How do you prevent SQL injection?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["sql-injection", "parameterization", "ef"],
+      "answer": {
+        "oneLiner": "Never concatenate user input into SQL queries - use parameterized queries or an ORM that parameterizes automatically, and run DB accounts with least privilege to limit damage if something slips through.",
+        "detail": "SQL injection happens when user-supplied text is glued directly into a SQL string and that text contains SQL syntax. For example, a login form that builds SELECT * FROM Users WHERE Email = '' + email + '' can be attacked by entering anything' OR '1'='1, which turns the query into one that returns all users. The fix is parameterization: the query string contains named placeholders like @email and the database driver sends the SQL and the parameter values separately. The driver never treats the parameter value as SQL syntax, so injection is impossible. In Entity Framework Core, all LINQ queries are parameterized automatically. The only danger is using FromSqlRaw with string concatenation, which manually bypasses that protection. The safe EF alternative is FromSqlInterpolated, which looks like C# string interpolation but actually parameterizes each placeholder. On top of parameterization, a least-privilege DB account limits blast radius: if injection does succeed despite everything, an account with only SELECT/INSERT/UPDATE on specific tables cannot drop tables or read sensitive schemas.",
+        "keyPoints": [
+          "Parameterization sends SQL and values separately - the DB driver never treats user input as SQL syntax",
+          "EF LINQ is parameterized automatically - the risk is FromSqlRaw with concatenated strings",
+          "FromSqlInterpolated looks like interpolation but is actually parameterized - use it over FromSqlRaw",
+          "Least-privilege DB accounts limit the blast radius if injection does somehow succeed"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - string concat in raw SQL, injectable\nvar users = ctx.Users\n    .FromSqlRaw(\"SELECT * FROM Users WHERE Email = '\" + email + \"'\");\n\n// ✅ GOOD - EF LINQ (auto-parameterized) or FromSqlInterpolated\nvar userByLinq = ctx.Users\n    .Where(u => u.Email == email)\n    .FirstOrDefault();\n\nvar userByRaw = ctx.Users\n    .FromSqlInterpolated(\n        $\"SELECT * FROM Users WHERE Email = {email}\");",
+          "note": "FromSqlInterpolated uses C# interpolation syntax but passes values as SQL parameters, not as string concatenation."
+        },
+        "analogy": "Parameterization is a sealed envelope - the database reads the address label, not the letter inside.",
+        "redFlags": [
+          "Saying input validation prevents SQL injection - it is defense-in-depth, not the primary fix; parameterization is the fix",
+          "Confusing FromSqlInterpolated with FromSqlRaw - they look similar but only the former parameterizes",
+          "Not knowing that EF LINQ queries are parameterized automatically - only raw SQL helpers are dangerous",
+          "Not mentioning least-privilege DB accounts as a way to limit damage if injection succeeds"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Is Entity Framework immune to SQL injection?",
+            "a": "LINQ queries are parameterized automatically and are safe. The vulnerability comes back with FromSqlRaw when you concatenate user input into the string - use FromSqlInterpolated instead."
+          },
+          {
+            "q": "Why is input validation not enough to prevent SQL injection?",
+            "a": "Input validation helps but it is defense-in-depth, not the fix. Blacklists miss edge cases and encoding variants. Parameterization is the actual fix because it structurally separates code from data."
+          },
+          {
+            "q": "What does a least-privilege DB account add?",
+            "a": "If injection succeeds despite parameterization, a narrowly-scoped account with only SELECT/INSERT/UPDATE on specific tables cannot drop the database or read other schemas - it limits the blast radius."
+          },
+          {
+            "q": "What is the difference between FromSqlRaw and FromSqlInterpolated in EF Core?",
+            "a": "FromSqlRaw takes a plain string - if you concatenate user input you get injection. FromSqlInterpolated takes a FormattableString and converts each interpolated value into a SQL parameter automatically."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do you prevent SQL injection in a .NET application?"
+          },
+          {
+            "role": "you",
+            "text": "The core fix is parameterization: never concatenate user input into SQL strings. You give the database driver a query with named placeholders and the values separately, so the driver treats the values as data, never as SQL syntax. In EF Core, LINQ queries do this automatically. The danger is calling FromSqlRaw with a concatenated string, which manually breaks that protection."
+          },
+          {
+            "role": "interviewer",
+            "text": "You need to run a custom query in EF Core. What is the safe way to do it?"
+          },
+          {
+            "role": "you",
+            "text": "I use FromSqlInterpolated, which looks like a C# interpolated string but actually passes each interpolated value as a SQL parameter. For example: ctx.Orders.FromSqlInterpolated($\"SELECT * FROM Orders WHERE CustomerId = {customerId}\"). Never use FromSqlRaw with a string built from user input - that is identical to old-style string concatenation."
+          },
+          {
+            "role": "interviewer",
+            "text": "A penetration tester finds an injection point you missed. What limits the damage?"
+          },
+          {
+            "role": "you",
+            "text": "A least-privilege database account. The application's DB user should only have SELECT, INSERT, and UPDATE on the specific tables it needs - no db_owner, no xp_cmdshell, no ability to drop tables or read other schemas. If the injector can only read the Orders table, that is a breach but not a full database compromise."
+          },
+          {
+            "role": "interviewer",
+            "text": "A junior dev says they prevent injection by stripping single quotes from user input. What is wrong with that?"
+          },
+          {
+            "role": "you",
+            "text": "Blacklisting specific characters is a losing game. Attackers use encoded characters, different quoting styles, comment sequences, or multi-byte encoding tricks that bypass filters. Parameterization is the fix because it structurally prevents the database from ever parsing user input as SQL - it does not matter what characters the input contains."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-006",
+      "q": "What is over-posting / mass assignment and how do you prevent it?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["mass-assignment", "over-posting", "dto"],
+      "answer": {
+        "oneLiner": "Over-posting happens when a client sends fields you did not intend to accept - like IsAdmin - and model binding quietly sets them on your entity; prevent it by binding to purpose-built DTOs that only expose the allowed fields.",
+        "detail": "ASP.NET Core model binding takes incoming JSON and maps each property by name to the target type. If your action parameter is the EF entity User which has Email, Name, and IsAdmin properties, and a client posts {Email: 'a@b.com', IsAdmin: true}, model binding will set IsAdmin just as readily as Email. The user just promoted themselves to admin. The fix is a DTO - a separate input model that only has the properties you intend to accept. If UpdateProfileDto only has Name and Email, it is impossible to post IsAdmin because the type does not have that property. You then map the DTO to the entity explicitly in the controller or service. An alternative is the [Bind] attribute on the entity to list which fields are allowed, but this is fragile: when someone adds a privileged property to the entity later, the [Bind] list does not automatically exclude it, whereas the DTO does by construction. [BindNever] on a property tells model binding to never populate it regardless of what the client sends.",
+        "keyPoints": [
+          "Model binding maps JSON properties to the target type by name - any matching property gets set",
+          "Use a purpose-built input DTO with only the fields the client is allowed to send",
+          "Map DTO to entity explicitly server-side, copying only the intended fields",
+          "DTOs are safer than [Bind] because a new privileged property on the entity does not automatically appear in the DTO"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - binding directly to entity; client can post IsAdmin=true\n[HttpPut(\"/users/{id}/profile\")]\npublic IActionResult Update(User user) { ... }\n\n// ✅ GOOD - DTO exposes only allowed fields\npublic record UpdateProfileDto(string Name, string Email);\n\n[HttpPut(\"/users/{id}/profile\")]\npublic IActionResult Update(int id, UpdateProfileDto dto)\n{\n    var user = _repo.GetById(id);\n    user.Name = dto.Name;\n    user.Email = dto.Email;\n    _repo.Save(user);\n    return Ok();\n}",
+          "note": "The DTO has no IsAdmin property so it is structurally impossible for a client to set it through this endpoint."
+        },
+        "analogy": "A DTO is a counter window - the customer can only pass through the slot you designed, nothing else fits.",
+        "redFlags": [
+          "Binding request bodies directly to EF entities on any endpoint that accepts user input",
+          "Relying on [Bind] on the entity without understanding that it can drift as the entity grows",
+          "Not knowing that model binding sets any property by name match - it does not skip unknown fields, it sets them",
+          "Confusing over-posting with XSS or CSRF - over-posting is a model binding trust issue, not a script injection or request forgery"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What does [BindNever] do?",
+            "a": "[BindNever] on a property tells ASP.NET Core model binding to never populate that property from a request, regardless of what the client sends - it is a property-level safety net on the entity itself."
+          },
+          {
+            "q": "Why are DTOs better than [Bind] attributes on the entity?",
+            "a": "A DTO is an allow-list by construction - only properties that exist on it can be bound. The [Bind] list is maintained manually and can drift out of sync when the entity gains new privileged properties."
+          },
+          {
+            "q": "Where do you map the DTO to the entity?",
+            "a": "In the controller or a dedicated service layer, explicitly copying only the intended fields from the DTO to the entity before saving. Never use AutoMapper blindly between a DTO and an entity that has privileged fields."
+          },
+          {
+            "q": "What is the classic over-posting exploit example?",
+            "a": "A user-profile update endpoint that binds directly to the User entity - a client posts IsAdmin=true or AccountBalance=99999 and model binding sets those fields because they exist on the entity by name."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is over-posting, also called mass assignment, and why is it a security risk?"
+          },
+          {
+            "role": "you",
+            "text": "Over-posting is when a client sends extra fields in the request body that you did not intend to accept, and ASP.NET Core model binding happily maps them by name to your target type. If that type is your EF entity with an IsAdmin property, the client just set IsAdmin=true on their own account. It is a trust violation - you trusted the type system to protect you but the type had too many properties."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you fix it?"
+          },
+          {
+            "role": "you",
+            "text": "Use a purpose-built input DTO that only contains the fields you want the client to be able to send. If UpdateProfileDto only has Name and Email, it is structurally impossible to post IsAdmin through it because the property does not exist on the type. I then map the DTO to the entity explicitly in the controller, copying only those two fields."
+          },
+          {
+            "role": "interviewer",
+            "text": "A teammate prefers using the [Bind] attribute on the entity to list allowed fields instead of creating a separate DTO. What is the trade-off?"
+          },
+          {
+            "role": "you",
+            "text": "[Bind] works, but it is fragile. When someone adds a privileged property like IsSubscribedToPremium to the User entity six months later, the [Bind] list does not automatically exclude it - whoever adds the property has to remember to update the [Bind] attribute too. A DTO is allow-list by construction, so any new property added to the entity is simply not present on the DTO and cannot be posted."
+          },
+          {
+            "role": "interviewer",
+            "text": "You see a PR where AutoMapper maps the request body directly to the User entity. What is your concern?"
+          },
+          {
+            "role": "you",
+            "text": "AutoMapper maps all matching properties by name by default, which means if the User entity has IsAdmin or PasswordHash, those could be mapped from client input if the source has matching property names. I would make sure the AutoMapper profile explicitly ignores privileged fields with ForMember and Ignore, or better yet, map from a DTO that does not have those properties at all."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-007",
+      "q": "Which security response headers matter and what do they do?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["headers", "csp", "hsts"],
+      "answer": {
+        "oneLiner": "A small set of response headers instructs the browser to enforce security rules: CSP restricts script sources, HSTS forces HTTPS, X-Content-Type-Options stops MIME sniffing, X-Frame-Options prevents clickjacking, and Referrer-Policy controls information leakage.",
+        "detail": "Each header targets a specific browser-level attack. Content-Security-Policy (CSP) is the most powerful: it tells the browser which origins are allowed to load scripts, styles, images, and frames. A well-configured CSP blocks injected inline scripts even if XSS encoding is missed somewhere. It requires tuning because modern apps load resources from many origins and inline scripts are common. Strict-Transport-Security (HSTS) tells the browser to always use HTTPS for your domain for a set period, even if the user types http://. This prevents SSL stripping attacks. HSTS should only be sent over HTTPS - never in development over HTTP or the browser caches it and your local dev breaks. X-Content-Type-Options: nosniff stops the browser from guessing the content type - without it, a server returning a file as text/plain but with script content might still be executed if the browser sniffs it as JavaScript. X-Frame-Options: DENY or SAMEORIGIN stops your page from being embedded in an iframe. The modern equivalent in CSP is frame-ancestors. Referrer-Policy controls how much of the referring URL is sent when a user navigates to another site, reducing the risk of leaking internal URLs or tokens. Permissions-Policy limits which browser features like camera or geolocation a page can use.",
+        "keyPoints": [
+          "CSP restricts allowed script and resource sources - the strongest XSS mitigation after encoding",
+          "HSTS forces HTTPS for a set duration - never enable it on localhost or in development",
+          "X-Content-Type-Options: nosniff prevents browsers from MIME-sniffing responses and executing misidentified scripts",
+          "X-Frame-Options: DENY prevents clickjacking; modern alternative is CSP frame-ancestors",
+          "Referrer-Policy and Permissions-Policy limit information leakage and browser feature abuse"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no security headers; browser has no instructions\napp.UseStaticFiles();\napp.MapControllers();\n\n// ✅ GOOD - middleware adds headers before every response\napp.Use(async (ctx, next) => {\n    ctx.Response.Headers[\"X-Content-Type-Options\"] = \"nosniff\";\n    ctx.Response.Headers[\"X-Frame-Options\"] = \"DENY\";\n    ctx.Response.Headers[\"Referrer-Policy\"] =\n        \"strict-origin-when-cross-origin\";\n    ctx.Response.Headers[\"Content-Security-Policy\"] =\n        \"default-src 'self'; script-src 'self'\";\n    await next();\n});\napp.UseHsts(); // Production HTTPS only",
+          "note": "HSTS is a separate middleware call and must only run in production HTTPS environments - wrap it in env.IsProduction()."
+        },
+        "analogy": "Security headers are house rules posted on the door - the browser reads them and enforces them on your behalf.",
+        "redFlags": [
+          "Setting CSP to include unsafe-inline everywhere - that defeats the main purpose of CSP by re-allowing inline scripts",
+          "Enabling HSTS in development over HTTP - the browser caches it and your local environment breaks",
+          "Not knowing that X-Frame-Options is superseded by CSP frame-ancestors in modern browsers",
+          "Confusing these headers with server-side access controls - they are browser-side instructions, not server security"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Which CSP directive replaces X-Frame-Options in modern browsers?",
+            "a": "The frame-ancestors directive in Content-Security-Policy. For example, frame-ancestors 'none' is equivalent to X-Frame-Options: DENY. Both should be set for broad browser coverage."
+          },
+          {
+            "q": "What happens if you enable HSTS in a local development environment?",
+            "a": "The browser caches the HSTS directive and will refuse to connect to your domain over HTTP for the entire max-age period. Your local dev environment breaks until the cache expires or you manually clear HSTS in the browser."
+          },
+          {
+            "q": "What does X-Content-Type-Options: nosniff prevent?",
+            "a": "It stops the browser from guessing the MIME type of a response. Without it, a browser might execute a file served as text/plain if it looks like JavaScript - nosniff forces the browser to trust the declared Content-Type."
+          },
+          {
+            "q": "Why is unsafe-inline in CSP a problem?",
+            "a": "CSP's main job is to block injected inline scripts from running. If you allow unsafe-inline, any injected script is also allowed, effectively disabling the XSS protection that CSP is meant to provide."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through the security response headers you would add to a production web app and what each one does."
+          },
+          {
+            "role": "you",
+            "text": "I start with the biggest impact ones. Content-Security-Policy restricts which script and resource sources the browser will load - it is the strongest XSS mitigation after output encoding. Strict-Transport-Security tells the browser to always use HTTPS for your domain and should have a long max-age. X-Content-Type-Options: nosniff stops browsers from guessing content types and accidentally executing a misidentified file as a script."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about clickjacking specifically?"
+          },
+          {
+            "role": "you",
+            "text": "X-Frame-Options: DENY tells the browser not to embed the page in any iframe. The modern equivalent is CSP frame-ancestors 'none', which I set alongside X-Frame-Options for backward compatibility. If the app has pages that legitimately embed their own content in iframes, I use SAMEORIGIN or frame-ancestors 'self' instead."
+          },
+          {
+            "role": "interviewer",
+            "text": "You enable HSTS and suddenly your dev team cannot reach the app on localhost. What happened?"
+          },
+          {
+            "role": "you",
+            "text": "HSTS gets cached in the browser and forces HTTPS even for localhost for the entire max-age duration. The fix is to only call app.UseHsts() in the production environment. The development profile serves over HTTP and should never send HSTS."
+          },
+          {
+            "role": "interviewer",
+            "text": "Your team sets CSP to include unsafe-inline so that inline scripts work. What is the problem?"
+          },
+          {
+            "role": "you",
+            "text": "unsafe-inline defeats the primary purpose of CSP. CSP is meant to block injected inline scripts from XSS attacks - allowing unsafe-inline means those injected scripts are also allowed. The better fix is to move inline scripts to external files, or use a CSP nonce - a random per-request value in the header and on the script tag that the browser checks - so only your specific known scripts are allowed."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-008",
+      "q": "What is clickjacking and how do you defend against it?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["clickjacking", "headers", "iframe"],
+      "answer": {
+        "oneLiner": "Clickjacking tricks a user into clicking on your site loaded invisibly inside an attacker's iframe - defend against it by refusing to be embedded in frames using X-Frame-Options or CSP frame-ancestors.",
+        "detail": "The attack works like this: an attacker creates a page that loads your site - for example, a payment confirmation page or a settings change form - inside an invisible or transparent iframe positioned over a fake button. The user thinks they are clicking the attacker's button but their click actually hits your button inside the invisible iframe. Because the user is already logged in to your site, that click executes a real authenticated action. The defense is to instruct the browser not to embed your page in any iframe. The classic header is X-Frame-Options: DENY (no framing allowed) or SAMEORIGIN (only your own origin can frame it). The modern, more flexible equivalent is the CSP frame-ancestors directive: frame-ancestors 'none' is the same as DENY, frame-ancestors 'self' is the same as SAMEORIGIN. The advantage of frame-ancestors is that you can whitelist specific trusted origins. Both headers should be sent for broad browser compatibility. JavaScript frame-busting code that checks if window.top !== window.self is not reliable - it can be bypassed with the sandbox attribute on the iframe.",
+        "keyPoints": [
+          "Attacker overlays your page in an invisible iframe so the user's click hits your site unintentionally",
+          "Defense is to refuse framing: X-Frame-Options: DENY or SAMEORIGIN",
+          "Modern equivalent: CSP frame-ancestors 'none' - supports whitelisting specific trusted origins",
+          "JavaScript frame-busting is not reliable - headers are the real defense"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no framing protection; any site can embed the payment page\napp.MapGet(\"/checkout/confirm\",\n    () => Results.Ok());\n\n// ✅ GOOD - headers prevent the page being framed by any origin\napp.Use(async (ctx, next) => {\n    ctx.Response.Headers[\"X-Frame-Options\"] = \"DENY\";\n    ctx.Response.Headers[\"Content-Security-Policy\"] =\n        \"frame-ancestors 'none'\";\n    await next();\n});",
+          "note": "Set both headers for compatibility - older browsers use X-Frame-Options and modern browsers prefer CSP frame-ancestors."
+        },
+        "analogy": "Refusing to be framed is like printing 'do not photocopy' on a document - the page cannot be overlaid.",
+        "redFlags": [
+          "Relying on JavaScript frame-busting code instead of headers - it can be bypassed with the iframe sandbox attribute",
+          "Not knowing the difference between DENY and SAMEORIGIN - DENY allows no framing at all, SAMEORIGIN allows your own origin",
+          "Not knowing that CSP frame-ancestors is the modern replacement for X-Frame-Options",
+          "Not applying anti-framing headers to sensitive state-changing pages like payment, settings, and delete confirmations"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between X-Frame-Options: DENY and SAMEORIGIN?",
+            "a": "DENY prevents the page from being embedded in any iframe from any origin. SAMEORIGIN allows the page to be embedded in iframes only if the framing page is from the same origin as your app."
+          },
+          {
+            "q": "Why is JavaScript frame-busting not a reliable defense?",
+            "a": "The iframe sandbox attribute can block JavaScript execution inside the frame, disabling the frame-busting script. Headers are enforced by the browser at the rendering level and cannot be bypassed this way."
+          },
+          {
+            "q": "When would you use SAMEORIGIN instead of DENY?",
+            "a": "When your own application legitimately embeds its own pages in iframes - for example, a dashboard that loads a report page inside an iframe from the same domain."
+          },
+          {
+            "q": "Which pages most need clickjacking protection?",
+            "a": "Any page with a state-changing action the attacker might want to trigger: payments, account settings, delete or transfer operations, and admin actions."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is clickjacking? Explain the attack mechanism."
+          },
+          {
+            "role": "you",
+            "text": "An attacker creates a page with an invisible or transparent iframe that loads your site - for example, a payment confirmation page. They position a fake button directly under the iframe. The user thinks they are clicking the attacker's button but they are actually clicking a real button on your site through the invisible iframe. Because the user is logged in, that click executes a real authenticated action."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you defend against it?"
+          },
+          {
+            "role": "you",
+            "text": "By refusing to be embedded in iframes. I add X-Frame-Options: DENY to prevent any origin from framing the page, and I also add CSP frame-ancestors 'none' as the modern equivalent. Both should be set for compatibility - older browsers rely on X-Frame-Options, modern ones prefer CSP. Sensitive pages like checkout confirmation and settings changes get these headers unconditionally."
+          },
+          {
+            "role": "interviewer",
+            "text": "Your app has a dashboard that legitimately embeds one of its own report pages in an iframe. Does DENY break that?"
+          },
+          {
+            "role": "you",
+            "text": "Yes, DENY blocks all framing including from the same origin. I would switch the report page to X-Frame-Options: SAMEORIGIN and CSP frame-ancestors 'self', which allows framing only from pages that share the same origin. External attackers still cannot frame it, but the dashboard's embedded iframe works normally."
+          },
+          {
+            "role": "interviewer",
+            "text": "A dev adds JavaScript code to detect if the page is in an iframe and redirects away if it is. Is that enough?"
+          },
+          {
+            "role": "you",
+            "text": "No. An attacker can use the sandbox attribute on the iframe element to disable JavaScript execution inside the frame, which kills the frame-busting script. The user never gets redirected and the attack proceeds. HTTP headers like X-Frame-Options are enforced by the browser at the rendering level and cannot be bypassed with iframe attributes."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-009",
+      "q": "What is a WAF and what does it protect against?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["waf", "defense-in-depth", "gateway"],
+      "answer": {
+        "oneLiner": "A Web Application Firewall inspects HTTP traffic at the edge and blocks known attack patterns like SQLi, XSS, and bad bots - it is a defense-in-depth layer, not a replacement for secure application code.",
+        "detail": "A WAF sits between the internet and your application server - in Azure this is Azure Front Door or Application Gateway with WAF rules, or a third-party service like Cloudflare. It inspects the content of every HTTP request against a ruleset. The most commonly used ruleset is the OWASP Core Rule Set (CRS), which covers the most common attack classes: SQL injection patterns, XSS payloads, path traversal, protocol violations, and scanner fingerprints. A WAF can also enforce rate limits, block traffic from known malicious IP ranges, apply geo-blocking, and detect automated bot traffic. It adds meaningful protection in two ways: it blocks known attack patterns before they reach the app, and it buys time when a zero-day exploit appears - the WAF rule can be updated faster than a patched deployment. The critical limitation is that a WAF recognizes malicious patterns, not business logic. A request to your checkout endpoint that drains coupon codes by calling the API thousands of times with valid input looks completely legitimate to a WAF - each individual request is well-formed and uses correct syntax. Business logic flaws must be fixed in the application code.",
+        "keyPoints": [
+          "WAF sits at the network edge and filters HTTP traffic using rulesets like the OWASP Core Rule Set",
+          "Blocks known attack patterns - SQLi, XSS, path traversal, bot traffic, and scanner fingerprints",
+          "Defense-in-depth only - a WAF never replaces secure application code",
+          "Cannot detect business-logic abuse because those requests look syntactically valid"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - WAF in detection-only mode; attacks logged but not blocked\n// Azure App Gateway WAF policy: mode = Detection\n\n// ✅ GOOD - WAF in prevention mode; app adds per-user rate limit too\n// Azure WAF policy: mode = Prevention, OWASP CRS 3.2\n\n// ASP.NET Core app-level rate limit for critical endpoint:\nbuilder.Services.AddRateLimiter(o =>\n    o.AddFixedWindowLimiter(\"checkout\", p => {\n        p.Window = TimeSpan.FromMinutes(1);\n        p.PermitLimit = 20;\n    }));\n\n[EnableRateLimiting(\"checkout\")]\n[HttpPost(\"/checkout/apply-coupon\")]\npublic IActionResult ApplyCoupon(CouponDto dto) { ... }",
+          "note": "The WAF handles coarse traffic filtering at the edge; the app adds fine-grained per-identity rate limits for business-critical endpoints."
+        },
+        "analogy": "A WAF is airport security - it catches known threats at the gate, but you still need locks on the cockpit.",
+        "redFlags": [
+          "Saying a WAF makes the application secure on its own - it is one layer, not a complete solution",
+          "Leaving the WAF in detection-only mode - it logs attacks but does not block them",
+          "Not knowing that business-logic attacks bypass a WAF because the requests are syntactically valid",
+          "Confusing a WAF with a network firewall - a network firewall filters at the IP/port level, a WAF inspects HTTP content"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can a WAF stop business-logic abuse like coupon draining?",
+            "a": "No. Each coupon request is a valid, well-formed HTTP request with correct syntax. The WAF sees normal syntax and lets it through. Business-logic flaws must be fixed with application-level controls like per-user rate limiting and server-side rule enforcement."
+          },
+          {
+            "q": "What is the OWASP Core Rule Set?",
+            "a": "A standard, community-maintained set of generic WAF rules that cover the most common web attack classes - SQLi, XSS, path traversal, protocol violations, and scanners. It is the default ruleset for most WAF products."
+          },
+          {
+            "q": "Why not leave the WAF in detection-only mode long-term?",
+            "a": "Detection mode logs attacks but does not block them - your app is still hit by every attack. Prevention mode is the actual protection goal; use detection mode briefly to tune rules before switching to prevention."
+          },
+          {
+            "q": "What is the difference between a WAF and a network firewall?",
+            "a": "A network firewall filters traffic at the IP address and port level. A WAF operates at the HTTP application layer and inspects the actual content of requests and responses to detect attack patterns."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is a WAF, where does it sit in the architecture, and what does it protect you from?"
+          },
+          {
+            "role": "you",
+            "text": "A Web Application Firewall sits at the network edge, between the internet and your application servers. In Azure this is Azure Front Door or Application Gateway with WAF rules enabled. It inspects each HTTP request against a ruleset - most commonly the OWASP Core Rule Set - and blocks requests that match known attack patterns like SQL injection strings, XSS payloads, path traversal sequences, and scanner fingerprints."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can we rely on the WAF and skip fixing security issues in the code itself?"
+          },
+          {
+            "role": "you",
+            "text": "No - a WAF is defense-in-depth, not a code substitute. It is particularly valuable when a zero-day appears in a library you depend on: you can deploy a WAF rule within hours while a patched version takes days. But the WAF complements secure code, it never replaces it. If the code uses parameterized queries everywhere, an injection attack fails even if the WAF rule misses it."
+          },
+          {
+            "role": "interviewer",
+            "text": "A legitimate user is abusing your checkout endpoint to drain promotional coupon codes by calling it thousands of times. Does the WAF catch that?"
+          },
+          {
+            "role": "you",
+            "text": "No. Each coupon request is a valid, well-formed HTTP request with correct syntax and a real authentication token. The WAF looks for malicious patterns, not business-logic violations. That kind of abuse needs application-level controls: rate limiting per authenticated user on the endpoint and a server-side rule limiting coupon claims per account per day."
+          },
+          {
+            "role": "interviewer",
+            "text": "You review the WAF configuration and see it is set to detection-only mode. What is the problem?"
+          },
+          {
+            "role": "you",
+            "text": "Detection mode logs matching requests but does not block them - every attack still hits the application server. The WAF is essentially a passive observer. Prevention mode is the actual protection goal. Detection mode is useful for a short tuning period after first deployment to identify false positives, but it should not be the permanent state in production."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-010",
+      "q": "How do you handle input validation in a Web API?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["validation", "modelstate", "api"],
+      "answer": {
+        "oneLiner": "Validate every input on the server with an allow-list mindset - define what is acceptable and reject everything else; client-side validation is only a UX convenience, never a security control.",
+        "detail": "Input validation is about ensuring data entering your system conforms to what you expect before it can do any harm. The allow-list approach means you define the exact expected shape: a product quantity must be an integer between 1 and 100, a customer email must match an email pattern, a zip code must be 5 or 9 digits. Anything outside those rules is rejected with a 400 Bad Request before it reaches business logic. The deny-list approach - blocking strings that look like SQL or script - is fundamentally weak because it tries to guess every possible bad input pattern, which attackers always find ways around. In ASP.NET Core, the [ApiController] attribute automatically checks ModelState and returns a 400 with a validation error body when a request violates data annotations on the DTO. For complex rules, FluentValidation offers a richer syntax and keeps validation logic out of the DTO class. Never relax server-side validation because the caller is authenticated or internal - internal services get bugs and get compromised too, and validation is cheap insurance against corrupt data.",
+        "keyPoints": [
+          "[ApiController] auto-validates ModelState and returns 400 on failure - you do not need to check ModelState manually",
+          "Allow-list mindset: define what is valid and reject anything outside it - do not try to blacklist bad patterns",
+          "Client-side validation is UX only - it can be bypassed by any HTTP client in seconds",
+          "Validate authenticated and internal callers too - authentication proves identity, not that the payload is well-formed"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no validation; any quantity including -9999 is accepted\n[HttpPost(\"/orders\")]\npublic IActionResult PlaceOrder(OrderDto dto) { ... }\n\n// ✅ GOOD - DTO with annotations; [ApiController] auto-validates\npublic record OrderDto(\n    [Required] Guid ProductId,\n    [Range(1, 100)] int Quantity,\n    [Required, MaxLength(200)] string DeliveryAddress);\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class OrdersController : ControllerBase\n{\n    [HttpPost]\n    public IActionResult PlaceOrder(OrderDto dto) { ... }\n}",
+          "note": "[ApiController] intercepts invalid ModelState before the action runs and returns a structured 400 response automatically."
+        },
+        "analogy": "Server-side validation is the border checkpoint - the client form is just a suggestion box.",
+        "redFlags": [
+          "Trusting client-side validation as a security measure - any HTTP tool bypasses browser-side checks trivially",
+          "Using deny-list filtering to block bad characters - attackers always find encoding or syntax variations that bypass it",
+          "Skipping validation for authenticated users or internal callers - authentication proves who you are, not that your data is safe",
+          "Not knowing that [ApiController] auto-returns 400 on ModelState failure - manually checking ModelState.IsValid is redundant"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why is client-side validation not a security control?",
+            "a": "Client-side validation runs in the browser which the user fully controls. Any HTTP client - curl, Postman, a custom script - can send a request directly to your API endpoint with any payload, bypassing all browser-side checks entirely."
+          },
+          {
+            "q": "What is the difference between an allow-list and a deny-list approach to validation?",
+            "a": "Allow-list accepts only inputs that match a known-good pattern - everything else is rejected. Deny-list tries to block known-bad patterns, which always misses new attack variations. Allow-list is always stronger."
+          },
+          {
+            "q": "What does [ApiController] do for validation automatically?",
+            "a": "[ApiController] checks ModelState before the action executes, and if any data annotation is violated, it automatically returns a 400 Bad Request with a structured validation error body - you do not need to check ModelState.IsValid manually."
+          },
+          {
+            "q": "Why should you validate calls from internal authenticated services?",
+            "a": "Authentication proves who is calling, not that the data is correct or safe. Internal services can have bugs, get compromised, or send stale data. Validation is cheap and ensures data integrity regardless of the caller's identity."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through how you handle input validation in a Web API."
+          },
+          {
+            "role": "you",
+            "text": "I validate everything server-side with an allow-list mindset: define the exact acceptable shape for each input and reject anything outside it with a 400. In ASP.NET Core I use data annotations on DTOs combined with the [ApiController] attribute, which automatically intercepts invalid ModelState before my action even runs. For complex cross-field rules or domain-specific constraints I add FluentValidation."
+          },
+          {
+            "role": "interviewer",
+            "text": "The frontend already validates inputs in the browser before sending the request. Can you rely on that?"
+          },
+          {
+            "role": "you",
+            "text": "No. Client-side validation is purely a UX improvement - it reduces unnecessary round trips for genuine users. Any HTTP tool like curl or Postman can send a request directly to the API endpoint with any payload at all, bypassing the browser and all its validation. Server-side validation is the real control."
+          },
+          {
+            "role": "interviewer",
+            "text": "An internal microservice calls your API with an authenticated service token. Do you still validate its request body?"
+          },
+          {
+            "role": "you",
+            "text": "Yes. Authentication confirms the caller's identity, not that the payload is well-formed or safe. Internal services can have bugs that send malformed data, or they can be compromised and send malicious payloads. Validation is cheap and ensures data integrity regardless of who is calling."
+          },
+          {
+            "role": "interviewer",
+            "text": "Your team uses a deny-list to strip certain characters like angle brackets and single quotes from inputs. What is the problem?"
+          },
+          {
+            "role": "you",
+            "text": "Deny-lists are brittle - attackers use Unicode variants, HTML entity encoding, double-encoding, or SQL-specific comment sequences to bypass character filters. You cannot enumerate all possible bad inputs. Allow-lists are the opposite: you define exactly what is valid - an integer between 1 and 100, an email matching a specific regex - and reject everything else. The logic is reversed and far more robust."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-web-011",
+      "q": "Walk me through the OWASP Top 10 at a high level.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["owasp", "top10", "overview"],
+      "answer": {
+        "oneLiner": "The OWASP Top 10 is a prioritized list of the most critical web application security risks - currently led by Broken Access Control, Cryptographic Failures, and Injection - used as a baseline awareness and prioritization guide.",
+        "detail": "The list is produced by OWASP (Open Web Application Security Project) and is updated periodically based on real-world vulnerability data. The 2021 edition lists: A01 Broken Access Control - users reaching data or actions beyond their permissions, including IDOR and missing role checks. A02 Cryptographic Failures - weak encryption, transmitting sensitive data in cleartext, using MD5 for passwords. A03 Injection - SQL, LDAP, OS command injection where user input reaches an interpreter. A04 Insecure Design - architecture-level flaws not fixable by patching code. A05 Security Misconfiguration - default credentials, overly permissive CORS, verbose error messages in production. A06 Vulnerable and Outdated Components - running libraries with known CVEs. A07 Identification and Authentication Failures - weak passwords, missing multi-factor, broken session management. A08 Software and Data Integrity Failures - CI/CD pipeline attacks, insecure deserialization. A09 Security Logging and Monitoring Failures - not detecting or responding to attacks. A10 Server-Side Request Forgery (SSRF) - the server fetches a URL the attacker controls, often reaching internal services or cloud metadata endpoints. The list is not exhaustive - it is an awareness tool to help teams prioritize their security efforts.",
+        "keyPoints": [
+          "A01 Broken Access Control is number one - users accessing data or actions beyond their permission level, including IDOR",
+          "A03 Injection covers SQL, LDAP, and OS command injection - all cases where user input reaches an interpreter",
+          "A10 SSRF - the server fetches an attacker-controlled URL, often exposing internal services or cloud metadata",
+          "The list is prioritization and awareness, not a complete security checklist"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - A01 Broken Access Control: no ownership check on resource\n[HttpGet(\"/invoices/{id}\")]\n[Authorize]\npublic IActionResult GetInvoice(int id)\n    => Ok(_repo.GetById(id));\n\n// ✅ GOOD - resource-level check: verify the caller owns it\n[HttpGet(\"/invoices/{id}\")]\n[Authorize]\npublic IActionResult GetInvoice(int id)\n{\n    var invoice = _repo.GetById(id);\n    if (invoice == null) return NotFound();\n    if (invoice.CustomerId != CurrentUserId) return Forbid();\n    return Ok(invoice);\n}",
+          "note": "A01 is the most common real-world finding: being authenticated does not mean you own the resource you are requesting."
+        },
+        "analogy": "The OWASP Top 10 is a fire safety checklist - it does not list every hazard, but missing any one item is serious.",
+        "redFlags": [
+          "Only naming injection or XSS and not mentioning Broken Access Control as the number one risk",
+          "Not knowing what SSRF is or why it made the top 10 in cloud-heavy architectures",
+          "Treating the list as a complete security checklist rather than a prioritization guide",
+          "Not knowing that Broken Access Control includes IDOR - object-level authorization checks are commonly missing"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why is Broken Access Control ranked number one?",
+            "a": "It is the most prevalent and high-impact vulnerability in real-world applications. It includes IDOR (accessing other users' resources by changing an ID), missing role checks, and privilege escalation - all very common and easy to miss."
+          },
+          {
+            "q": "What is SSRF and why does it appear in modern cloud architectures?",
+            "a": "Server-Side Request Forgery tricks the server into fetching an attacker-controlled URL. In cloud environments this often means reaching the cloud metadata endpoint to steal IAM credentials - a critical risk in modern microservice and cloud deployments."
+          },
+          {
+            "q": "Is the OWASP Top 10 a complete security checklist?",
+            "a": "No - it is an awareness and prioritization guide covering the most prevalent risk categories. A real security program covers many more areas like rate limiting, logging, key management, and supply chain security."
+          },
+          {
+            "q": "What is A05 Security Misconfiguration and what are common examples?",
+            "a": "Using default credentials, leaving error stack traces visible in production, overly permissive CORS, unnecessary open ports or services, and missing security headers - gaps in how the application or infrastructure is configured rather than code bugs."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Give me a tour of the OWASP Top 10 - what is in it and why does it matter?"
+          },
+          {
+            "role": "you",
+            "text": "The OWASP Top 10 is a prioritized list of the most critical web application risk categories based on real-world vulnerability data. The current edition puts Broken Access Control at number one - that is users reaching data or actions beyond their permission level, including IDOR and missing role checks. Then Cryptographic Failures, Injection, Insecure Design, Security Misconfiguration, Vulnerable Components, Auth Failures, Software Integrity Failures, Logging Failures, and SSRF at ten."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why did Broken Access Control move to number one?"
+          },
+          {
+            "role": "you",
+            "text": "Because it is the most common and highest-impact finding in real applications. Being authenticated does not mean you are authorized to access a specific resource. A typical example is GET /invoices/42 that checks the user is logged in but never checks whether invoice 42 belongs to that user - that is IDOR, and it falls squarely under broken access control."
+          },
+          {
+            "role": "interviewer",
+            "text": "SSRF is number ten. What is it and why did it make the list?"
+          },
+          {
+            "role": "you",
+            "text": "Server-Side Request Forgery is where the server is tricked into making an HTTP request to a URL the attacker controls. In cloud environments this is particularly dangerous because that URL can be the cloud metadata endpoint, which returns IAM credentials that give the attacker access to cloud resources. It made the list because modern microservice and cloud architectures have servers making outbound HTTP requests constantly, and that surface area is easy to abuse."
+          },
+          {
+            "role": "interviewer",
+            "text": "A consultant says that once you cover the OWASP Top 10 your application is secure. How do you respond?"
+          },
+          {
+            "role": "you",
+            "text": "The Top 10 is a prioritization guide, not a complete checklist. It covers the most prevalent categories but a real security program goes further: rate limiting, key management, supply chain security, CI/CD pipeline hardening, secrets scanning, dependency CVE scanning, penetration testing, and threat modeling. The Top 10 is where to start because it covers the most common issues - not where to stop."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

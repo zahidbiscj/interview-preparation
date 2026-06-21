@@ -1,0 +1,797 @@
+{
+  "subtopicId": "loading",
+  "questions": [
+    {
+      "id": "efcore-loading-001",
+      "q": "What are the three loading strategies in EF Core -- lazy, eager, and explicit -- and when do you use each?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["lazy loading", "eager loading", "explicit loading", "Include", "navigation"],
+      "answer": {
+        "oneLiner": "Eager loading uses Include() to fetch related data in one SQL query. Lazy loading fetches it automatically on first access. Explicit loading fetches it on demand when you call Load() manually.",
+        "detail": "Eager loading calls Include() or ThenInclude() and EF Core generates a JOIN or split query to pull all related data in one round-trip. This is the safest and most predictable option. Lazy loading requires virtual navigation properties and UseLazyLoadingProxies() - EF Core generates a proxy class that fires a SELECT the first time you access a navigation property. This is convenient but triggers one query per navigation access in a loop, causing N+1 problems. Explicit loading uses ctx.Entry(entity).Collection(...).LoadAsync() or .Reference(...).LoadAsync() to load a specific navigation on demand. This is ideal when you conditionally need related data based on business logic - you control exactly when the load happens and avoid loading data you may not need.",
+        "keyPoints": [
+          "Eager loading with Include() is the default choice - one query, predictable, no surprises.",
+          "Lazy loading needs UseLazyLoadingProxies() plus virtual navigation properties - it is not on by default.",
+          "Lazy loading in ASP.NET Core APIs causes N+1 queries and fails when the context is disposed during serialization.",
+          "Explicit loading with Entry(e).Collection(...).LoadAsync() gives you conditional control without proxies.",
+          "Prefer projections with Select() over any loading strategy when you only need a few columns."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - lazy loading fires one SELECT per order in the loop, causing N+1\nforeach (var order in ctx.Orders.ToList())\n    Console.WriteLine(order.Customer.Name); // SELECT Customer WHERE Id=? each time\n\n// ✅ GOOD - eager loading fetches everything in one JOIN query\nvar orders = await ctx.Orders\n    .Include(o => o.Customer)\n    .Include(o => o.Items)\n    .AsNoTracking()\n    .ToListAsync();\n\n// Explicit loading for conditional case\nvar invoice = await ctx.Invoices.FindAsync(invoiceId);\nif (needLineItems)\n    await ctx.Entry(invoice!).Collection(i => i.LineItems).LoadAsync();",
+          "note": "Include() generates a SQL JOIN and avoids the N+1 problem that lazy loading creates in loops."
+        },
+        "analogy": "Eager is one shopping trip with a full list; lazy is running back per item.",
+        "redFlags": [
+          "Recommending lazy loading for ASP.NET Core APIs without mentioning N+1 and context disposal risks.",
+          "Not knowing lazy loading requires UseLazyLoadingProxies() and virtual navigation properties to work.",
+          "Confusing explicit loading with lazy loading - explicit loading is intentional, lazy loading is automatic.",
+          "Saying Include() always causes Cartesian explosion without mentioning AsSplitQuery() as the fix."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you enable lazy loading in EF Core?",
+            "a": "Call UseLazyLoadingProxies() in the DbContext options and make all navigation properties virtual so EF can generate proxy classes."
+          },
+          {
+            "q": "Why does lazy loading break during JSON serialization in ASP.NET Core?",
+            "a": "The serializer accesses navigation properties after the request-scoped DbContext is disposed, so the proxy tries to fire a SELECT on a closed connection and throws."
+          },
+          {
+            "q": "When would you choose explicit loading over eager loading?",
+            "a": "When related data is only needed conditionally - for example, loading order line items only if the caller requests a full receipt, not just a summary."
+          },
+          {
+            "q": "How do you load a reference navigation explicitly versus a collection?",
+            "a": "Use Entry(entity).Reference(e => e.Customer).LoadAsync() for a single reference and Entry(entity).Collection(e => e.Items).LoadAsync() for a collection."
+          },
+          {
+            "q": "Can you filter the results of an explicit load?",
+            "a": "Yes - Entry(entity).Collection(e => e.Items).Query().Where(i => i.IsActive).LoadAsync() lets you apply LINQ before execution."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What are the three loading strategies in EF Core and when would you use each?"
+          },
+          {
+            "role": "me",
+            "text": "Eager loading uses Include() to get related data in one SQL query with a JOIN. Lazy loading fires a SELECT automatically the first time you access a navigation property. Explicit loading calls Entry(entity).Collection(...).LoadAsync() to load a navigation on demand. My default is always eager loading - it is predictable and one round-trip."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if you use lazy loading in an ASP.NET Core API?"
+          },
+          {
+            "role": "me",
+            "text": "Two big risks. First, if you loop over entities and access a navigation each time, you get N+1 queries - one per entity instead of one JOIN. Second, the JSON serializer can access navigation properties after the request-scoped DbContext is disposed, which throws an ObjectDisposedException because the proxy tries to open a new connection."
+          },
+          {
+            "role": "interviewer",
+            "text": "So when would lazy loading ever be acceptable?"
+          },
+          {
+            "role": "me",
+            "text": "In desktop or Blazor Server apps where contexts live longer and you navigate data interactively. Even then I prefer explicit loading - ctx.Entry(order).Collection(o => o.Items).LoadAsync() - because I control exactly when the query fires rather than relying on property access."
+          },
+          {
+            "role": "interviewer",
+            "text": "You use Include() with three collections and the row count explodes. What is happening and how do you fix it?"
+          },
+          {
+            "role": "me",
+            "text": "That is Cartesian explosion - multiple collection JOINs multiply the row count. An order with 10 items and 10 payments comes back as 100 rows. I fix it with AsSplitQuery(), which issues one SELECT per Include and stitches results in memory. The trade-off is extra round-trips and possible consistency gaps between reads."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you filter what explicit loading returns?"
+          },
+          {
+            "role": "me",
+            "text": "Yes. I chain .Query() after the Collection call - ctx.Entry(customer).Collection(c => c.Orders).Query().Where(o => o.Total > 500).LoadAsync() - which pushes the filter down to SQL. Only matching rows come back, not the full collection."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-loading-002",
+      "q": "What is the DbContext lifecycle and how should it be managed in an ASP.NET Core application?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["DbContext", "lifecycle", "scoped", "DI", "unit of work"],
+      "answer": {
+        "oneLiner": "DbContext should be registered as Scoped so each HTTP request gets exactly one instance that acts as a unit of work and is disposed when the request ends.",
+        "detail": "AddDbContext<T>() registers the context with Scoped lifetime by default. The DI container creates one instance at the start of each HTTP request and disposes it when the request scope ends. This means all repositories and services within that request share the same context, which is correct - they participate in the same unit of work. A Singleton lifetime is dangerous because DbContext holds mutable state (ChangeTracker, identity map, database connection) that is not thread-safe. Multiple concurrent requests would corrupt each other's tracked entities and connection state. A Transient lifetime creates a new context per injection point, which breaks the unit-of-work pattern - different services in the same request would have separate contexts and could not share a transaction. For background services (which are singletons), you must not inject DbContext directly. Instead, inject IServiceScopeFactory and create a new scope per work item, resolving the context from the scope. For Blazor Server or parallel work, use AddDbContextFactory<T> to get an IDbContextFactory<T> that creates short-lived independent contexts on demand.",
+        "keyPoints": [
+          "AddDbContext<T>() registers DbContext as Scoped - one per HTTP request - which is correct for ASP.NET Core.",
+          "Singleton lifetime causes thread corruption and growing ChangeTracker memory - never do this.",
+          "Background services are singletons; use IServiceScopeFactory.CreateAsyncScope() to get a short-lived context per work item.",
+          "AddDbContextFactory<T> is designed for Blazor Server and parallel scenarios needing independent contexts.",
+          "One DbContext per request = one unit of work - all SaveChanges calls within the request share one transaction boundary."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - Singleton causes thread corruption and stale data across requests\nbuilder.Services.AddSingleton<AppDbContext>();\n\n// ✅ GOOD - Scoped (default): one context per request, disposed after\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseSqlServer(builder.Configuration.GetConnectionString(\"Default\")));\n\n// Background service pattern - create a scope per work item\npublic class OrderSyncWorker(IServiceScopeFactory factory) : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken ct)\n    {\n        await using var scope = factory.CreateAsyncScope();\n        var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();\n        await ctx.SaveChangesAsync(ct);\n    }\n}",
+          "note": "IServiceScopeFactory.CreateAsyncScope() is the only safe way to use a scoped DbContext inside a singleton background service."
+        },
+        "analogy": "One cashier per customer transaction; never share a till between customers.",
+        "redFlags": [
+          "Registering DbContext as Singleton to save connection overhead - this causes thread corruption in concurrent requests.",
+          "Injecting DbContext directly into a BackgroundService or IHostedService - it will be captured as a singleton.",
+          "Not knowing the difference between AddDbContext and AddDbContextFactory and when each is appropriate.",
+          "Saying Transient is safe for DbContext - it breaks the unit-of-work pattern since services get separate contexts."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What goes wrong if you register DbContext as Singleton?",
+            "a": "Multiple HTTP requests share one instance concurrently, corrupting the ChangeTracker and potentially reading stale cached entities from the identity map."
+          },
+          {
+            "q": "How do you get a DbContext inside a BackgroundService?",
+            "a": "Inject IServiceScopeFactory, call CreateAsyncScope() per work item, and resolve DbContext from the scope - it stays short-lived and is disposed after the work item completes."
+          },
+          {
+            "q": "What is AddDbContextFactory and when do you use it?",
+            "a": "It registers IDbContextFactory<T> which creates independent short-lived contexts on demand - use it in Blazor Server components or services that need parallel DB operations."
+          },
+          {
+            "q": "Why is Transient lifetime wrong for DbContext?",
+            "a": "Each injection point gets a different context instance, so a repository and a service in the same request cannot share a transaction or see each other's tracked changes."
+          },
+          {
+            "q": "What does it mean for DbContext to be a unit of work?",
+            "a": "All Add, Remove, and property changes tracked within one context are flushed atomically in one SaveChanges call, so the whole business operation succeeds or fails together."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the correct lifetime for a DbContext in ASP.NET Core and why?"
+          },
+          {
+            "role": "me",
+            "text": "Scoped - AddDbContext registers it that way by default. Each HTTP request gets one instance that acts as a unit of work, and DI disposes it when the request ends. All services in the same request share the same context, which is what you want for a shared transaction boundary."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why would Singleton be wrong?"
+          },
+          {
+            "role": "me",
+            "text": "DbContext is not thread-safe. The ChangeTracker and identity map are mutable state designed for single-threaded use. With a Singleton, concurrent requests corrupt each other's tracked entities, you get stale cached data from a previous request, and the ChangeTracker grows unbounded over the app lifetime."
+          },
+          {
+            "role": "interviewer",
+            "text": "You have a BackgroundService that needs to write to the database on a schedule. How do you get a DbContext?"
+          },
+          {
+            "role": "me",
+            "text": "BackgroundService is a singleton, so I cannot inject DbContext directly - that would capture a scoped service in a singleton. I inject IServiceScopeFactory, call factory.CreateAsyncScope() at the start of each work item, and resolve AppDbContext from that scope. The scope and context are disposed after the work item finishes."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if you need to run two database queries in parallel within one request?"
+          },
+          {
+            "role": "me",
+            "text": "You cannot run parallel queries on one context - it throws 'A second operation was started before a previous one completed.' For parallel reads I use IDbContextFactory<AppDbContext> to create two independent contexts, run a query on each with Task.WhenAll, then dispose both."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you use AddDbContextFactory instead of AddDbContext?"
+          },
+          {
+            "role": "me",
+            "text": "In Blazor Server, because each component has its own render cycle that is not tied to a single HTTP request scope. Also in any service that needs short-lived independent contexts - for example a report service that fans out multiple parallel queries. AddDbContextFactory registers IDbContextFactory<T> as a Singleton which creates a new context instance per CreateDbContext() call."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-loading-003",
+      "q": "How does EF Core's change tracker detect modifications to entities?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["change tracker", "snapshot", "DetectChanges", "EntityEntry", "SaveChanges"],
+      "answer": {
+        "oneLiner": "EF Core snapshots the original property values when an entity is loaded, then compares current values to that snapshot during SaveChanges to figure out which UPDATE statements to emit.",
+        "detail": "When EF Core materializes a tracked entity, it stores a copy of every property value in an EntityEntry as OriginalValues. This is the snapshot. Before SaveChanges commits to the database, EF Core runs DetectChanges(). DetectChanges iterates every tracked entity, compares current property values to the OriginalValues snapshot, and marks changed properties as Modified. EF Core then generates SQL UPDATE statements that only SET the modified columns - not the entire row. This is efficient because a single price change produces UPDATE Products SET Price=X WHERE Id=Y, not a full row update. Entity state transitions are: Detached (not tracked), Unchanged (loaded, nothing changed), Modified (properties changed), Added (new entity to INSERT), Deleted (marked for DELETE). DetectChanges is O(n) over the number of tracked entities. If you track thousands of entities in a batch loop, DetectChanges runs slowly on each SaveChanges. For bulk operations, either disable AutoDetectChangesEnabled and call DetectChanges manually, or use ExecuteUpdateAsync (EF Core 7+) which bypasses the change tracker entirely and issues a set-based SQL UPDATE.",
+        "keyPoints": [
+          "EF Core snapshots OriginalValues on load and DetectChanges compares current values before SaveChanges.",
+          "Only modified columns appear in the SET clause - EF never issues a full-row UPDATE by default.",
+          "Entity states are: Detached, Unchanged, Added, Modified, Deleted.",
+          "DetectChanges is O(n) - in batch processing with thousands of tracked entities it becomes a bottleneck.",
+          "ExecuteUpdateAsync (EF Core 7+) bypasses the tracker and issues a set-based SQL UPDATE directly."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - tracking 10,000 products makes DetectChanges O(n) per SaveChanges call\nforeach (var product in ctx.Products.Where(p => p.CategoryId == 5).ToList())\n    product.IsActive = false;\nawait ctx.SaveChangesAsync(); // DetectChanges scans all 10,000 tracked entities\n\n// ✅ GOOD - set-based update bypasses the change tracker entirely\nawait ctx.Products\n    .Where(p => p.CategoryId == 5)\n    .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, false));\n// Emits: UPDATE Products SET IsActive=0 WHERE CategoryId=5",
+          "note": "ExecuteUpdateAsync issues one SQL UPDATE without loading or tracking any entities, making bulk changes dramatically faster."
+        },
+        "analogy": "A proofreader who marks only changed words, not retyping the whole document.",
+        "redFlags": [
+          "Saying EF Core always updates all columns in a row - it only updates columns that changed in the snapshot comparison.",
+          "Not knowing AutoDetectChangesEnabled can be turned off for bulk operations to avoid O(n) overhead.",
+          "Confusing DetectChanges with SaveChanges - DetectChanges runs before the SQL is generated.",
+          "Not knowing ExecuteUpdateAsync exists as a tracker-free alternative for bulk updates in EF Core 7+."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you inspect which properties will be included in the UPDATE before saving?",
+            "a": "Use ctx.Entry(entity).Properties.Where(p => p.IsModified) to iterate only the modified properties and see their OriginalValue and CurrentValue."
+          },
+          {
+            "q": "How do you disable automatic change detection for a bulk operation?",
+            "a": "Set ctx.ChangeTracker.AutoDetectChangesEnabled = false before the loop, call ctx.ChangeTracker.DetectChanges() manually when needed, then re-enable it after."
+          },
+          {
+            "q": "What is the difference between ExecuteUpdateAsync and SaveChangesAsync for updates?",
+            "a": "ExecuteUpdateAsync issues one set-based SQL UPDATE without loading or tracking entities; SaveChangesAsync emits individual UPDATE statements for each tracked modified entity."
+          },
+          {
+            "q": "Can you mark a single property as modified without changing its value?",
+            "a": "Yes - ctx.Entry(entity).Property(e => e.UpdatedAt).IsModified = true forces that column into the UPDATE even if the value did not change."
+          },
+          {
+            "q": "What happens to the snapshot after SaveChanges succeeds?",
+            "a": "EF Core resets OriginalValues to match the current values and sets the entity state back to Unchanged, ready for the next change cycle."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through how EF Core's change tracker detects what has changed."
+          },
+          {
+            "role": "me",
+            "text": "When EF Core loads a tracked entity it stores a snapshot of all property values as OriginalValues inside an EntityEntry. Before SaveChanges writes to the database, DetectChanges runs and compares every tracked entity's current property values to that snapshot. Properties that differ get marked Modified, and EF generates UPDATE statements with only those columns in the SET clause."
+          },
+          {
+            "role": "interviewer",
+            "text": "So if I load an order and only change the Status, does EF update the whole row?"
+          },
+          {
+            "role": "me",
+            "text": "No - only the Status column appears in the SET clause. The generated SQL is UPDATE Orders SET Status=X WHERE Id=Y. This is one of the performance benefits of change tracking - EF is surgical about what it writes."
+          },
+          {
+            "role": "interviewer",
+            "text": "You need to mark 50,000 products inactive. You load them all and update in a loop. What performance issue do you hit?"
+          },
+          {
+            "role": "me",
+            "text": "DetectChanges is O(n) over all tracked entities and runs before each SaveChanges. With 50,000 tracked products, each DetectChanges pass is slow. The right fix is ExecuteUpdateAsync - ctx.Products.Where(...).ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, false)) - which emits one SQL UPDATE without loading or tracking anything."
+          },
+          {
+            "role": "interviewer",
+            "text": "If ExecuteUpdateAsync bypasses the tracker, what are the trade-offs?"
+          },
+          {
+            "role": "me",
+            "text": "You lose interceptors and soft-delete filters that run through SaveChanges. You also do not get the audit trail if you track changes via ISaveChangesInterceptor. For pure bulk data corrections it is worth it, but for business logic that needs audit logging or domain events I still use the tracked path with AutoDetectChangesEnabled turned off during the batch."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you verify which columns will be updated before you call SaveChanges?"
+          },
+          {
+            "role": "me",
+            "text": "I iterate ctx.Entry(entity).Properties.Where(p => p.IsModified) and log each property's Metadata.Name, OriginalValue, and CurrentValue. This is useful in integration tests to assert only the expected columns are dirty before the commit."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-loading-004",
+      "q": "What is the difference between Attach, Add, and Update on a DbContext?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["Attach", "Add", "Update", "EntityState", "disconnected"],
+      "answer": {
+        "oneLiner": "Add sets the entity state to Added so SaveChanges issues an INSERT. Attach sets it to Unchanged so no SQL runs until you change a property. Update sets every property to Modified so SaveChanges issues a full UPDATE.",
+        "detail": "These three methods control how EF Core transitions a disconnected entity into the change tracker. Add is for new entities that do not exist in the database yet - EF assigns the EntityState.Added state and generates an INSERT on SaveChanges. Attach is for existing entities you already know are in the database and have not changed - EF marks them EntityState.Unchanged and will only generate SQL if you later modify a property. Update is for existing entities where you want to update all columns - EF marks every property as Modified, so SaveChanges generates a full UPDATE with all columns in the SET clause. This is dangerous with partial DTOs: if your DTO only has 3 of 10 columns and you call Update, the other 7 columns get written back as zero or null, silently corrupting data. The safe pattern for partial updates is to Attach the entity by key, then set only the properties you intend to change - EF will mark only those as Modified. Alternatively, use the load-modify-save pattern: load the entity from the DB, apply changes, then SaveChanges. The identity map ensures FindAsync does not hit the DB if already tracked.",
+        "keyPoints": [
+          "Add = EntityState.Added = INSERT. Use for new records that do not exist in the database.",
+          "Attach = EntityState.Unchanged = no SQL. Use for existing entities you are going to modify selectively.",
+          "Update = all properties EntityState.Modified = full UPDATE. Dangerous with partial DTOs.",
+          "Partial update pattern: Attach by key, then set only the changed properties so EF marks only those as Modified.",
+          "Load-modify-save is the safest pattern when you need concurrency checks or domain validation."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - Update marks all columns Modified; missing DTO fields wipe existing data\nvar product = new Product { Id = productId, Price = newPrice }; // other fields are default\nctx.Update(product); // Name, Stock, Category etc. will be overwritten with defaults\nawait ctx.SaveChangesAsync();\n\n// ✅ GOOD - Attach + set only changed properties for a surgical UPDATE\nvar product = new Product { Id = productId };\nctx.Attach(product);\nproduct.Price = newPrice;\nproduct.LastModifiedAt = DateTime.UtcNow;\nawait ctx.SaveChangesAsync();\n// SQL: UPDATE Products SET Price=X, LastModifiedAt=Y WHERE Id=Z",
+          "note": "Attach starts tracking with EntityState.Unchanged, so only the properties you touch after attaching appear in the UPDATE."
+        },
+        "analogy": "Add builds a new shelf; Attach finds an existing shelf; Update repaints every shelf regardless.",
+        "redFlags": [
+          "Using ctx.Update with a partial DTO without realising all unmapped properties will be written as default values.",
+          "Not knowing the difference between Attach and Add for entities that have a primary key set.",
+          "Confusing Attach with Entry(entity).State = EntityState.Unchanged - they are equivalent but Attach also recurses into navigations.",
+          "Saying Update is always safe for edits without mentioning the partial-DTO data loss risk."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you mark only one specific property as Modified without changing others?",
+            "a": "Attach the entity, then set ctx.Entry(entity).Property(e => e.Price).IsModified = true - EF will include only that column in the UPDATE statement."
+          },
+          {
+            "q": "What state does a newly constructed entity get when you call ctx.Add()?",
+            "a": "EntityState.Added - EF will generate an INSERT and populate auto-generated keys like IDENTITY columns after SaveChanges."
+          },
+          {
+            "q": "How does EF handle navigation properties when you call Update on a graph?",
+            "a": "EF walks the entire graph - entities with a key value set are marked Modified, entities without a key are marked Added - this is TrackGraph behavior."
+          },
+          {
+            "q": "Why is the load-modify-save pattern safer than Attach for updates?",
+            "a": "Loading the entity from the DB gives you the current values for optimistic concurrency, domain validation, and correct handling of any columns your DTO does not include."
+          },
+          {
+            "q": "When would you deliberately use ctx.Update instead of Attach?",
+            "a": "On a full-entity PUT endpoint where the DTO contains all columns and the API contract guarantees completeness - even then load-modify-save is safer for concurrency."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between Add, Attach, and Update on a DbContext?"
+          },
+          {
+            "role": "me",
+            "text": "Add marks the entity as Added and SaveChanges inserts it. Attach marks it as Unchanged - no SQL runs until you modify a property. Update marks every property as Modified so SaveChanges does a full UPDATE of all columns."
+          },
+          {
+            "role": "interviewer",
+            "text": "A PATCH endpoint receives a DTO with only 3 of the 10 product fields. Which method do you use?"
+          },
+          {
+            "role": "me",
+            "text": "I use Attach, not Update. I create a stub entity with just the primary key, attach it, then set only the 3 properties from the DTO. EF marks those 3 as Modified and the UPDATE only touches those columns. If I used Update, the 7 missing fields would be written back as zero or null and corrupt the existing data."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if you need to validate the current state of the entity before saving - for example to check a business rule?"
+          },
+          {
+            "role": "me",
+            "text": "Then I use load-modify-save: FindAsync to get the current entity from the DB, apply and validate changes, then SaveChanges. The identity map means FindAsync checks the tracker first, so no extra DB hit if it is already loaded. This pattern also gives you optimistic concurrency via a RowVersion timestamp."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does Attach behave if the entity already has navigations populated?"
+          },
+          {
+            "role": "me",
+            "text": "Attach recurses into the navigation graph. Child entities with a key value set get Unchanged state; child entities with no key get Added state. This is TrackGraph behavior. ctx.Entry(entity).State = EntityState.Unchanged only sets the root entity's state without touching navigations."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you deliberately use ctx.Update instead of Attach?"
+          },
+          {
+            "role": "me",
+            "text": "On a full-entity PUT endpoint where the DTO contains all columns and the API contract guarantees completeness. For example, a product admin form that shows every field and the user submits all of them. Even then I prefer load-modify-save for concurrency safety, but Update is acceptable when you fully control the payload."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-loading-005",
+      "q": "Why is DbContext not thread-safe and what problems does sharing it cause?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["thread safety", "DbContext", "concurrency", "scoped", "singleton"],
+      "answer": {
+        "oneLiner": "DbContext holds mutable single-threaded state in the ChangeTracker, identity map, and database connection. Concurrent access from multiple threads corrupts that state and causes data errors or exceptions.",
+        "detail": "The ChangeTracker maintains a dictionary of EntityEntry objects keyed by entity type and primary key. This dictionary is not a concurrent collection. If two threads add entities simultaneously, they can corrupt each other's entries or cause key conflicts. The database connection is also stateful - it can be in the middle of reading a result set when a second thread tries to use it, which throws. EF Core itself has an explicit concurrency guard: if you start a second async operation before the first completes on the same context, it throws 'A second operation was started on this context instance before a previous asynchronous operation completed.' This guard catches the most obvious mistakes but does not make the context thread-safe in general. The identity map can also return stale data if another thread updates an entity while the first thread holds the cached version. The correct architecture is: register DbContext as Scoped so each request gets its own instance. For parallel work within one request, use IDbContextFactory<T> to create independent context instances - each has its own connection and ChangeTracker.",
+        "keyPoints": [
+          "The ChangeTracker dictionary and the database connection are not thread-safe for concurrent access.",
+          "EF Core throws 'A second operation was started before a previous one completed' to catch concurrent async usage on one context.",
+          "Register DbContext as Scoped - one context per request eliminates cross-request concurrency.",
+          "For parallel queries within one request, use IDbContextFactory<T> to create independent context instances.",
+          "Singleton DbContext causes stale identity-map reads across requests in addition to corruption risks."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - parallel Task.WhenAll on one context throws at runtime\nvar t1 = ctx.Orders.CountAsync();\nvar t2 = ctx.Customers.CountAsync();\nawait Task.WhenAll(t1, t2); // throws: second operation started before first completed\n\n// ✅ GOOD - IDbContextFactory creates independent contexts for parallel work\npublic class DashboardService(IDbContextFactory<AppDbContext> factory)\n{\n    public async Task<(int orders, int customers)> GetCountsAsync()\n    {\n        await using var ctx1 = await factory.CreateDbContextAsync();\n        await using var ctx2 = await factory.CreateDbContextAsync();\n        var t1 = ctx1.Orders.CountAsync();\n        var t2 = ctx2.Customers.CountAsync();\n        await Task.WhenAll(t1, t2);\n        return (t1.Result, t2.Result);\n    }\n}",
+          "note": "Each context from IDbContextFactory has its own connection and ChangeTracker, making parallel queries safe."
+        },
+        "analogy": "One bank teller window cannot serve two customers simultaneously without errors.",
+        "redFlags": [
+          "Registering DbContext as Singleton to avoid connection overhead - this guarantees corruption under concurrent load.",
+          "Firing multiple async queries with Task.WhenAll against a single DbContext instance.",
+          "Not knowing EF Core has an explicit concurrency guard that throws on second operations.",
+          "Confusing thread-safety with connection pooling - the connection pool is thread-safe but the DbContext wrapping it is not."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What exact error does EF Core throw when two operations run concurrently on one context?",
+            "a": "InvalidOperationException: 'A second operation was started on this context instance before a previous asynchronous operation completed.' This is EF Core's built-in concurrency guard."
+          },
+          {
+            "q": "What is the difference between the ADO.NET connection pool and DbContext thread safety?",
+            "a": "The connection pool is thread-safe and reuses physical connections across requests, but each DbContext wraps a logical connection and its ChangeTracker state is single-threaded."
+          },
+          {
+            "q": "How do you register IDbContextFactory in ASP.NET Core?",
+            "a": "Call builder.Services.AddDbContextFactory<AppDbContext>(opt => opt.UseSqlServer(...)) - the factory is a Singleton and each CreateDbContextAsync() call returns a new independent instance."
+          },
+          {
+            "q": "Can you run two sequential awaited queries on one context safely?",
+            "a": "Yes - sequential use on one thread is fine. The problem only occurs when two operations overlap concurrently, which is what Task.WhenAll does."
+          },
+          {
+            "q": "How does a Singleton DbContext cause stale data in addition to corruption?",
+            "a": "The identity map caches entities by primary key. A Singleton context keeps this cache forever, so requests can read entities that were updated by another request without seeing the new values."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Why is DbContext not thread-safe and what goes wrong if you share it?"
+          },
+          {
+            "role": "me",
+            "text": "DbContext holds mutable single-threaded state: the ChangeTracker dictionary, the identity map, and the database connection. These are not designed for concurrent access. If two threads use the same context at the same time they corrupt the ChangeTracker or race on the connection."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does EF Core actually throw when this happens?"
+          },
+          {
+            "role": "me",
+            "text": "If you start a second async operation before the first completes on the same context, EF Core throws InvalidOperationException: 'A second operation was started on this context instance before a previous asynchronous operation completed.' This is a built-in guard but it does not make the context generally thread-safe."
+          },
+          {
+            "role": "interviewer",
+            "text": "You need to load order count and customer count in parallel for a dashboard. How do you do it safely?"
+          },
+          {
+            "role": "me",
+            "text": "I inject IDbContextFactory<AppDbContext> and call CreateDbContextAsync() twice to get two independent context instances. I run CountAsync on each, then Task.WhenAll both tasks. Each context has its own connection and ChangeTracker, so there is no conflict."
+          },
+          {
+            "role": "interviewer",
+            "text": "What specifically breaks with a Singleton DbContext beyond the threading issue?"
+          },
+          {
+            "role": "me",
+            "text": "The identity map caches entities forever. A product updated by one request is still in the cache for the next request, which reads the stale version without hitting the DB. Over time the ChangeTracker also accumulates every entity ever touched, consuming memory and slowing DetectChanges."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you register IDbContextFactory so it is available for parallel work?"
+          },
+          {
+            "role": "me",
+            "text": "AddDbContextFactory<AppDbContext>() registers the factory as a Singleton with the same connection string options. Each call to factory.CreateDbContextAsync() returns a brand new context that you dispose when done. You can use it alongside AddDbContext if some services need the scoped version and others need the factory."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-loading-006",
+      "q": "What is identity resolution in EF Core and how does it relate to the change tracker?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["identity resolution", "change tracker", "identity map", "AsNoTrackingWithIdentityResolution"],
+      "answer": {
+        "oneLiner": "Identity resolution means EF Core guarantees that the same database row is always represented by one .NET object instance within a context, preventing duplicate objects for the same primary key.",
+        "detail": "The change tracker maintains an identity map - a dictionary keyed by entity type and primary key value. When EF Core materializes a row, it first checks the identity map. If a matching key is already tracked, it returns the existing object instead of creating a new one. This has several benefits. First, it prevents inconsistency: if Customer with Id=1 is loaded twice through different queries or navigations, both references point to the same object. Changing customer.Name in one place is immediately visible through all other references. Second, navigation fix-up works correctly: when orders and customers are loaded separately, EF wires order.Customer to the correct Customer instance from the identity map. Third, FindAsync is efficient: it checks the identity map first and only queries the database on a cache miss. With AsNoTracking(), identity resolution is disabled by default - each row materializes as a new object. This means if the same customer appears in 10 order rows, you get 10 separate Customer objects. AsNoTrackingWithIdentityResolution() gives you the best of both: no change-tracking snapshots but identity deduplication still happens, so shared navigations point to one instance.",
+        "keyPoints": [
+          "The identity map is a dictionary in the ChangeTracker keyed by entity type and primary key.",
+          "FindAsync checks the identity map first and skips the database if the entity is already tracked.",
+          "Identity resolution enables navigation fix-up - related entities loaded separately get wired to the same instance.",
+          "AsNoTracking() disables identity resolution; the same row can materialise as multiple objects.",
+          "AsNoTrackingWithIdentityResolution() deduplicates without tracking snapshots - the middle ground."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - AsNoTracking with Include can create duplicate Product instances per OrderItem\nvar items = await ctx.OrderItems\n    .Include(i => i.Product)\n    .AsNoTracking()\n    .ToListAsync(); // same Product row = multiple Product objects in memory\n\n// ✅ GOOD - AsNoTrackingWithIdentityResolution deduplicates without change tracking\nvar items = await ctx.OrderItems\n    .Include(i => i.Product)\n    .AsNoTrackingWithIdentityResolution()\n    .ToListAsync(); // same Product row = one Product object shared across items\n\n// Identity map in action: second FindAsync does NOT hit the database\nvar p1 = await ctx.Products.FindAsync(101);\nvar p2 = await ctx.Products.FindAsync(101);\nConsole.WriteLine(ReferenceEquals(p1, p2)); // True",
+          "note": "AsNoTrackingWithIdentityResolution is the right choice for read-only queries with Include that share navigations."
+        },
+        "analogy": "One passport per person in the system - no duplicates, no confusion about who is who.",
+        "redFlags": [
+          "Not knowing FindAsync checks the identity map before hitting the database - this is important for performance.",
+          "Using plain AsNoTracking() with multiple Includes without realising the same row materialises as duplicate objects.",
+          "Confusing the identity map first-level cache with a second-level distributed cache like Redis.",
+          "Not knowing AsNoTrackingWithIdentityResolution() exists as the middle-ground option."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Does FindAsync always hit the database?",
+            "a": "No - FindAsync checks the ChangeTracker identity map first. If the entity is already tracked, it returns it immediately without a SQL query."
+          },
+          {
+            "q": "What is navigation fix-up and how does it use the identity map?",
+            "a": "When EF Core loads related entities separately, it wires navigation properties to the correct tracked instances from the identity map, so order.Customer points to the same Customer object already in the tracker."
+          },
+          {
+            "q": "What problem does AsNoTracking() cause with Include queries that share navigations?",
+            "a": "The same parent row appearing in multiple child rows materialises as multiple separate objects, wasting memory and making in-memory manipulation inconsistent."
+          },
+          {
+            "q": "How does the identity map behave in large batch reads?",
+            "a": "It grows with every tracked entity, consuming memory and slowing DetectChanges. For large reads use AsNoTracking or periodically call ChangeTracker.Clear() to release tracked entities."
+          },
+          {
+            "q": "Can you manually look up an entity in the identity map without querying the database?",
+            "a": "Yes - ctx.ChangeTracker.Entries<Product>().FirstOrDefault(e => e.Entity.Id == 101) returns the EntityEntry if tracked, or null if not."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is identity resolution in EF Core?"
+          },
+          {
+            "role": "me",
+            "text": "It is the guarantee that a given database row maps to exactly one .NET object instance within a context. EF Core uses an identity map - a dictionary keyed by entity type and primary key - stored in the ChangeTracker. When it materialises a row, it checks the map first and returns the existing instance if already tracked."
+          },
+          {
+            "role": "interviewer",
+            "text": "What practical benefit does that give you?"
+          },
+          {
+            "role": "me",
+            "text": "Two things. First, navigation fix-up works correctly - when orders and customers are loaded through separate queries, EF wires order.Customer to the single Customer instance in the identity map. Second, FindAsync is a cache hit if the entity was already queried in the same request - no extra SQL round-trip."
+          },
+          {
+            "role": "interviewer",
+            "text": "You use AsNoTracking() with Include and later notice the same product appears as 100 different objects in memory. Why?"
+          },
+          {
+            "role": "me",
+            "text": "AsNoTracking() disables the identity map. Each materialized row creates a new object even if it has the same primary key as a previous one. A product appearing in 100 order items comes back as 100 separate Product instances. The fix is AsNoTrackingWithIdentityResolution() - it deduplicates without creating change-tracking snapshots."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does the identity map behave in a batch import that processes 100,000 rows?"
+          },
+          {
+            "role": "me",
+            "text": "If tracking is on, the identity map grows to 100,000 entries and stays there until the context is disposed. This consumes significant memory and makes DetectChanges increasingly slow. For batch imports I either use AsNoTracking or call ctx.ChangeTracker.Clear() periodically to release tracked entities and keep memory flat."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you query the identity map directly without hitting the database?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - ctx.ChangeTracker.Entries<Product>() returns all tracked Product entries. I can check .Entity.Id to find a specific one. FindAsync does this automatically under the hood: it checks tracked entries first and only issues SELECT if there is a miss."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-loading-007",
+      "q": "How does SaveChanges work and what is the unit-of-work pattern in EF Core?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["SaveChanges", "unit of work", "transaction", "DbContext"],
+      "answer": {
+        "oneLiner": "SaveChanges inspects the ChangeTracker, generates the minimum SQL needed for all pending changes, and executes it inside one database transaction so all changes succeed or all are rolled back.",
+        "detail": "When you call SaveChanges or SaveChangesAsync, EF Core runs through these steps. First it calls DetectChanges to compare current property values against snapshots and mark Modified properties. Then it generates SQL: INSERT for Added entities, UPDATE with only modified columns for Modified entities, and DELETE for Deleted entities. All generated SQL is executed inside a single database transaction that EF Core opens automatically. If any statement fails, the transaction rolls back and EF re-throws the exception. No partial commits are left in the database. This makes DbContext a natural unit-of-work: you accumulate operations against repositories or DbSets within a request, then call SaveChanges once to commit them atomically. If you need two separate SaveChanges calls to be atomic - for example, inserting a payment record and updating account balance in separate operations - you wrap them in an explicit transaction using ctx.Database.BeginTransactionAsync(). ISaveChangesInterceptor is the hook for cross-cutting concerns: audit logging, soft deletes, and domain event dispatch can all be wired into SaveChanges without modifying business code.",
+        "keyPoints": [
+          "SaveChanges runs DetectChanges, generates minimal SQL, and executes it in one automatic transaction.",
+          "All changes succeed or all roll back - there are no partial commits within one SaveChanges call.",
+          "DbContext is a unit of work: accumulate multiple Add/Update/Delete operations, commit once.",
+          "For multiple SaveChanges to be atomic, wrap them in an explicit BeginTransactionAsync.",
+          "ISaveChangesInterceptor is the hook for audit logging, soft deletes, and domain events."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - SaveChanges inside a loop causes one transaction per item and is slow\nforeach (var shipment in pendingShipments)\n{\n    shipment.Status = ShipmentStatus.Dispatched;\n    await ctx.SaveChangesAsync(); // separate transaction per shipment\n}\n\n// ✅ GOOD - accumulate all changes then save once in one transaction\nforeach (var shipment in pendingShipments)\n    shipment.Status = ShipmentStatus.Dispatched;\nawait ctx.SaveChangesAsync(); // one transaction for all shipments\n\n// Explicit transaction spanning two SaveChanges\nawait using var tx = await ctx.Database.BeginTransactionAsync();\nawait ctx.SaveChangesAsync();\nawait ctx.SaveChangesAsync();\nawait tx.CommitAsync();",
+          "note": "Accumulating changes before one SaveChanges call is faster and atomically consistent - EF batches the SQL statements."
+        },
+        "analogy": "One bank transfer: debit and credit commit together or neither happens.",
+        "redFlags": [
+          "Calling SaveChanges inside a loop - one transaction per item is slow and each failure leaves partial data.",
+          "Not knowing SaveChanges is transactional by default for all pending changes in one call.",
+          "Thinking you always need explicit transactions - a single SaveChanges is already atomic.",
+          "Not knowing about ISaveChangesInterceptor for audit logging or soft deletes around SaveChanges."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you make two SaveChanges calls atomic together?",
+            "a": "Open an explicit transaction with ctx.Database.BeginTransactionAsync(), call SaveChanges twice inside it, then CommitAsync - or roll back on any exception."
+          },
+          {
+            "q": "What is ISaveChangesInterceptor and how do you use it?",
+            "a": "It is a hook that runs before and after SaveChanges. Register it via options.AddInterceptors() to add audit timestamps, soft-delete logic, or dispatch domain events without changing business code."
+          },
+          {
+            "q": "Does EF Core batch multiple SQL statements in one SaveChanges?",
+            "a": "Yes - EF Core sends multiple INSERT/UPDATE/DELETE statements in one round-trip using command batching, reducing network overhead compared to one statement per call."
+          },
+          {
+            "q": "What happens to the ChangeTracker state after a successful SaveChanges?",
+            "a": "All Modified entities revert to Unchanged, Added entities become Unchanged with their generated keys, and Deleted entities move to Detached."
+          },
+          {
+            "q": "How do you handle a concurrency conflict during SaveChanges?",
+            "a": "EF Core throws DbUpdateConcurrencyException when a RowVersion or ConcurrencyToken does not match. Catch it, reload the entity with fresh values, reapply your changes, and retry or surface a conflict to the user."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through what happens when you call SaveChanges in EF Core."
+          },
+          {
+            "role": "me",
+            "text": "EF Core first runs DetectChanges to compare current property values against the snapshot and mark modified properties. Then it generates the minimal SQL: INSERT for Added entities, UPDATE with only changed columns for Modified, DELETE for Deleted. All of it executes in one automatic database transaction. If any statement fails, the transaction rolls back and the exception propagates."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does that make DbContext a unit of work?"
+          },
+          {
+            "role": "me",
+            "text": "You build up multiple operations across the request - add an order, update inventory, log an audit entry - all against one context. Then one SaveChanges commits them atomically. Any failure rolls back the entire batch. The caller never has to manage a transaction manually for a single save."
+          },
+          {
+            "role": "interviewer",
+            "text": "You need to insert a payment record and update the account balance as two separate SaveChanges calls that must both succeed or both fail. How?"
+          },
+          {
+            "role": "me",
+            "text": "I open an explicit transaction with await ctx.Database.BeginTransactionAsync(). I call SaveChanges for the payment, SaveChanges for the balance update, then await tx.CommitAsync(). Any exception triggers a rollback in the catch block. Both operations share the same database transaction."
+          },
+          {
+            "role": "interviewer",
+            "text": "You see SaveChanges called inside a loop that processes 500 shipments. What is wrong?"
+          },
+          {
+            "role": "me",
+            "text": "Each SaveChanges opens and closes a separate transaction - 500 transactions instead of one. It is slow due to round-trips and if the process crashes midway, some shipments are saved and others are not. The fix is to update all 500 entities in the loop and call SaveChanges once after the loop, committing them in one transaction."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you add audit timestamps to every save without changing every repository?"
+          },
+          {
+            "role": "me",
+            "text": "I implement ISaveChangesInterceptor and register it via options.AddInterceptors(). In SavingChangesAsync I iterate ctx.ChangeTracker.Entries<IAuditableEntity>() and set CreatedAt for Added state and UpdatedAt for Modified state. This runs automatically before every SaveChanges across the entire app without touching business code."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-loading-008",
+      "q": "What is the difference between tracking and no-tracking queries in terms of identity resolution and performance?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["tracking", "no-tracking", "identity resolution", "performance", "ChangeTracker"],
+      "answer": {
+        "oneLiner": "Tracking queries register every returned entity in the ChangeTracker with a snapshot, enabling SaveChanges and identity resolution but costing memory and CPU. No-tracking queries skip all that, returning faster disconnected objects for read-only use.",
+        "detail": "When EF Core runs a tracking query, it checks the identity map for each materialized row. If not present, it creates an EntityEntry with an OriginalValues snapshot and adds it to the identity map. This enables two things: SaveChanges can detect and commit changes to these entities, and identity resolution ensures the same row always returns the same .NET instance. The overhead is roughly 40% slower on read-heavy paths and significant GC pressure from allocating EntityEntry and snapshot objects per row. When EF Core runs a no-tracking query (AsNoTracking()), it skips the identity map lookup and snapshot allocation entirely. Returned objects are plain POCOs with no EF state attached. They cannot be saved via SaveChanges without first being Attached or Updated. By default, no-tracking also disables identity resolution, so the same row can appear as multiple objects if it shows up in multiple Include branches. AsNoTrackingWithIdentityResolution() is the middle ground: it deduplicates rows using a temporary identity map but does not create ChangeTracker snapshots or entries, so you get consistent object graphs for reads without the tracking overhead. For production ASP.NET Core APIs, set QueryTrackingBehavior.NoTracking as the context default and opt into tracking with AsTracking() only on queries where you will call SaveChanges.",
+        "keyPoints": [
+          "Tracking creates an EntityEntry with OriginalValues snapshot per row - roughly 40% slower, more GC pressure.",
+          "No-tracking returns plain POCOs with no EF state - faster, less memory, cannot SaveChanges without Attach.",
+          "Tracking gives full identity resolution; plain no-tracking does not.",
+          "AsNoTrackingWithIdentityResolution() deduplicates without change-tracking overhead - best for read queries with Include.",
+          "Set QueryTrackingBehavior.NoTracking as the context default and opt in with AsTracking() at write boundaries."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - tracking query on a read-only endpoint wastes memory on snapshots\nvar invoices = await ctx.Invoices\n    .Include(i => i.LineItems)\n    .ToListAsync(); // all entities tracked with snapshots - never saved\n\n// ✅ GOOD - no-tracking with identity resolution for read queries with Include\nvar invoices = await ctx.Invoices\n    .Include(i => i.LineItems)\n    .AsNoTrackingWithIdentityResolution()\n    .ToListAsync();\n\n// Write path: opt into tracking explicitly\nvar invoice = await ctx.Invoices.AsTracking().FirstAsync(i => i.Id == invoiceId);\ninvoice.Status = InvoiceStatus.Paid;\nawait ctx.SaveChangesAsync();",
+          "note": "AsNoTrackingWithIdentityResolution is the correct choice for read queries with Include - it avoids duplicate objects without snapshot overhead."
+        },
+        "analogy": "Tracking is a receipt that lets you return items; no-tracking is a cash sale with no receipt.",
+        "redFlags": [
+          "Using tracking queries on all endpoints in a high-throughput read-heavy API, wasting memory on snapshots that are never used.",
+          "Not knowing AsNoTrackingWithIdentityResolution() exists and using plain AsNoTracking() with Include queries that share navigations.",
+          "Saving a no-tracking entity without Attach or Update and wondering why SaveChanges does nothing.",
+          "Confusing no-tracking with AsNoTrackingWithIdentityResolution - they differ in whether the same row returns one or multiple objects."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you set no-tracking as the default for the entire context?",
+            "a": "Pass UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking) in the DbContext options, then override per query with AsTracking() or AsNoTracking() where needed."
+          },
+          {
+            "q": "Can you mix tracked and no-tracked entities in one SaveChanges?",
+            "a": "Only tracked entities are included in SaveChanges. No-tracked entities are invisible to the ChangeTracker unless you explicitly Attach or Update them first."
+          },
+          {
+            "q": "Why is no-tracking roughly 40% faster?",
+            "a": "It skips allocating EntityEntry objects and OriginalValues snapshots for every materialized row, reducing CPU time and GC pressure - especially noticeable when returning hundreds of rows."
+          },
+          {
+            "q": "When should you choose AsNoTrackingWithIdentityResolution over plain AsNoTracking?",
+            "a": "Use it when Include queries load the same parent entity through multiple paths - for example OrderItems with Include(i => i.Product) where many items share the same product row."
+          },
+          {
+            "q": "Does AsNoTracking affect the SQL generated by EF Core?",
+            "a": "No - the SQL is identical. AsNoTracking only changes what EF does after the rows arrive: it skips the identity map lookup and EntityEntry allocation."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Compare tracking and no-tracking queries in EF Core."
+          },
+          {
+            "role": "me",
+            "text": "Tracking registers every materialized row in the ChangeTracker with an OriginalValues snapshot. This enables SaveChanges to detect and commit changes and gives identity resolution - the same row always returns the same object. No-tracking skips all that, returning plain POCOs without EF state. It is roughly 40% faster and uses less memory."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you decide which to use in practice?"
+          },
+          {
+            "role": "me",
+            "text": "I set QueryTrackingBehavior.NoTracking as the context default so all queries are no-tracking by default. On write paths where I call SaveChanges - like a status update or payment processing - I add AsTracking() to that specific query. This way I only pay the snapshot cost when I actually need to save."
+          },
+          {
+            "role": "interviewer",
+            "text": "You use AsNoTracking with Include on a query returning 500 order items that share 20 products. What might go wrong?"
+          },
+          {
+            "role": "me",
+            "text": "Plain AsNoTracking creates 500 separate Product objects - no identity resolution. Updating product.Name in memory only affects one of those 500 objects. I would use AsNoTrackingWithIdentityResolution() instead, which deduplicates to 20 Product instances while still skipping change-tracking snapshots."
+          },
+          {
+            "role": "interviewer",
+            "text": "A developer loads an invoice with AsNoTracking, edits some fields, and calls SaveChanges - but nothing is saved. Why?"
+          },
+          {
+            "role": "me",
+            "text": "No-tracking returns entities in EntityState.Detached from EF's perspective. The ChangeTracker does not know they exist, so SaveChanges ignores them. To save a no-tracking entity you must Attach it first - which marks it Unchanged - then set the changed properties, and SaveChanges will include those modified columns."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does switching to no-tracking change the SQL EF Core generates?"
+          },
+          {
+            "role": "me",
+            "text": "No - the SQL is identical. The difference is entirely in what EF does after the rows come back from the database. Tracking allocates EntityEntry objects and snapshots in the identity map; no-tracking just materializes the objects and hands them back with no ChangeTracker involvement."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,1338 @@
+{
+  "subtopicId": "queries",
+  "questions": [
+    {
+      "id": "sql-queries-001",
+      "q": "What is the difference between DELETE, TRUNCATE, and DROP?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["delete", "truncate", "drop", "ddl", "dml"],
+      "answer": {
+        "oneLiner": "DELETE removes rows one at a time and logs each one. TRUNCATE clears all rows fast by deallocating pages. DROP removes the entire table object from the database.",
+        "detail": "DELETE is DML - it removes rows one by one, logs each deletion, fires triggers, and supports a WHERE clause. Because each row is logged, it is slower on large tables. TRUNCATE is DDL - it deallocates the data pages with minimal logging, which makes it much faster. It does not support WHERE, fires no triggers, and resets the IDENTITY seed. Both DELETE and TRUNCATE are fully transactional and roll back inside an explicit BEGIN TRANSACTION. DROP is different - it removes the table definition, all data, all indexes, and all constraints. There is no coming back without a backup. A common mistake is thinking TRUNCATE cannot be rolled back. It can, if you wrap it in an explicit transaction before executing.",
+        "keyPoints": [
+          "DELETE is DML: supports WHERE, fires triggers, per-row logging, slower on large tables",
+          "TRUNCATE is DDL: no WHERE clause, no triggers, minimal logging, resets IDENTITY seed",
+          "DROP removes the table structure entirely including indexes and constraints",
+          "Both DELETE and TRUNCATE roll back inside an explicit transaction"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - using DELETE to clear a 10-million-row staging table before a nightly load\nDELETE FROM StagingOrders;\n-- Logs every single row deletion, fires any triggers, takes minutes\n\n// ✅ GOOD - use TRUNCATE for fast full-table clear before a reload\nTRUNCATE TABLE StagingOrders;\n-- Deallocates pages, minimal log, resets identity, no triggers, takes seconds\n\n-- Use DELETE only when you need a WHERE filter\nDELETE FROM Orders WHERE OrderDate < '2020-01-01';\n\n-- Use DROP only when the table is no longer needed at all\nDROP TABLE IF EXISTS StagingOrders;",
+          "note": "TRUNCATE is the right choice for clearing a staging table before a bulk reload - it is orders of magnitude faster than DELETE on large datasets."
+        },
+        "analogy": "DELETE tears pages out one by one; TRUNCATE clears the book in one move.",
+        "redFlags": [
+          "Saying TRUNCATE can never be rolled back - it can inside an explicit transaction",
+          "Confusing TRUNCATE with DROP - TRUNCATE keeps the table, DROP removes it",
+          "Not knowing that DELETE fires triggers but TRUNCATE does not",
+          "Using DELETE to clear large staging tables without considering TRUNCATE"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can TRUNCATE be rolled back?",
+            "a": "Yes - if TRUNCATE is inside an explicit BEGIN TRANSACTION it rolls back just like any DML statement."
+          },
+          {
+            "q": "Why does TRUNCATE not fire triggers?",
+            "a": "Triggers fire per-row or per-statement on DML operations. TRUNCATE deallocates pages at the storage level so individual rows are never seen by triggers."
+          },
+          {
+            "q": "What happens to the IDENTITY column after each operation?",
+            "a": "TRUNCATE resets the IDENTITY seed to the original value. DELETE keeps the current seed. DROP removes the column entirely."
+          },
+          {
+            "q": "Why does TRUNCATE fail when a foreign key references the table?",
+            "a": "SQL Server cannot validate referential integrity page-by-page, so it blocks TRUNCATE on any table referenced by an active foreign key constraint."
+          },
+          {
+            "q": "In what situation would you choose DELETE over TRUNCATE even on a large table?",
+            "a": "When you only want to remove a subset of rows using a WHERE clause - TRUNCATE is all-or-nothing with no filtering capability."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "We reload a 50-million-row staging table every night. What would you use to clear it before each load?"
+          },
+          {
+            "role": "me",
+            "text": "TRUNCATE TABLE - it deallocates the data pages with minimal logging instead of logging each row, so it clears 50 million rows in seconds rather than minutes. It also resets the IDENTITY seed automatically."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if the staging table has a trigger on it - does that change your answer?"
+          },
+          {
+            "role": "me",
+            "text": "Good catch - TRUNCATE does not fire triggers, so if the trigger is doing something important like writing to an audit log, I would need to either disable the trigger before TRUNCATE or switch to a DELETE. Usually for a staging table the trigger should not be there."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you roll back a TRUNCATE if something goes wrong in the same batch?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - TRUNCATE is fully transactional. If I wrap it in BEGIN TRANSACTION and something fails after it, ROLLBACK undoes the TRUNCATE. The common myth that it cannot be rolled back only applies when there is no explicit transaction."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does DROP do differently from TRUNCATE?"
+          },
+          {
+            "role": "me",
+            "text": "DROP removes the entire table object - the definition, all rows, all indexes, and all constraints. TRUNCATE only removes the data and keeps the table structure intact and ready for new rows."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you use DELETE instead of TRUNCATE on a large table?"
+          },
+          {
+            "role": "me",
+            "text": "When I need a WHERE clause to remove only specific rows - like archiving orders older than 2020. TRUNCATE has no filtering capability, it is always the full table."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-002",
+      "q": "Explain INNER JOIN, LEFT JOIN, RIGHT JOIN, and FULL OUTER JOIN with examples.",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["joins", "inner join", "left join", "right join", "full outer join"],
+      "answer": {
+        "oneLiner": "INNER JOIN returns only rows that match on both sides. LEFT JOIN returns all rows from the left table and fills NULLs where there is no match on the right. RIGHT JOIN is the mirror. FULL OUTER JOIN returns all rows from both sides with NULLs wherever there is no match.",
+        "detail": "Think of two tables as two sets of data. INNER JOIN finds the intersection - only rows where the ON condition is true in both tables. LEFT JOIN starts with every row from the left table and attaches matching right rows. Where no match exists, right-side columns come back as NULL. RIGHT JOIN does the same but from the right side. FULL OUTER JOIN returns all rows from both sides - matched rows get all columns filled in, unmatched rows from either side get NULLs for the other side columns. A very useful pattern built on LEFT JOIN is the anti-join: add WHERE right.key IS NULL to find rows in the left table that have no match at all on the right side - for example, customers who have never placed an order.",
+        "keyPoints": [
+          "INNER JOIN: only rows where the ON condition matches in both tables",
+          "LEFT JOIN: all rows from left, NULLs on right side where no match exists",
+          "FULL OUTER JOIN: all rows from both sides, NULLs filling gaps on either side",
+          "Anti-join pattern: LEFT JOIN with WHERE right.key IS NULL finds unmatched left rows",
+          "CROSS JOIN produces a Cartesian product - every left row combined with every right row"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - using INNER JOIN when the requirement is 'all customers even without orders'\nSELECT c.Name, o.Total\nFROM Customers c\nINNER JOIN Orders o ON c.CustomerId = o.CustomerId;\n-- Customers with no orders disappear silently from the results\n\n// ✅ GOOD - LEFT JOIN keeps all customers, NULLs for customers with no orders\nSELECT c.Name, ISNULL(o.Total, 0) AS TotalSpent\nFROM Customers c\nLEFT JOIN Orders o ON c.CustomerId = o.CustomerId;\n\n-- Anti-join: customers who have NEVER placed an order\nSELECT c.Name\nFROM Customers c\nLEFT JOIN Orders o ON c.CustomerId = o.CustomerId\nWHERE o.CustomerId IS NULL;\n\n-- FULL OUTER: all customers and all orphan orders\nSELECT c.Name, o.OrderId\nFROM Customers c\nFULL OUTER JOIN Orders o ON c.CustomerId = o.CustomerId;",
+          "note": "The anti-join pattern (LEFT JOIN + WHERE right.key IS NULL) is one of the most common follow-up questions interviewers ask after explaining LEFT JOIN."
+        },
+        "analogy": "INNER is the overlap of two circles. LEFT is the full left circle. FULL OUTER is both circles combined.",
+        "redFlags": [
+          "Confusing LEFT and RIGHT - always think LEFT as the driving table",
+          "Not knowing the anti-join pattern using WHERE IS NULL on the right side",
+          "Thinking FULL OUTER JOIN duplicates rows - it does not, it shows all unmatched rows",
+          "Using RIGHT JOIN - most teams rewrite it as a LEFT JOIN for consistency"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you find customers who have never placed an order?",
+            "a": "LEFT JOIN Orders on CustomerId, then WHERE Orders.CustomerId IS NULL - this is the anti-join pattern."
+          },
+          {
+            "q": "What is a CROSS JOIN and when would you use it?",
+            "a": "It returns every combination of rows from both tables - useful for generating a grid like all products against all store locations."
+          },
+          {
+            "q": "What is a self-join?",
+            "a": "Joining a table to itself using aliases - the classic example is an Employees table where each row has a ManagerId that points back to another row in the same table."
+          },
+          {
+            "q": "Is a JOIN always faster than a subquery?",
+            "a": "Not necessarily - the optimizer often rewrites them to the same plan. Readability and correctness should guide the choice."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "I need a report that shows every customer and their total orders, including customers who have never ordered. Which join type?"
+          },
+          {
+            "role": "me",
+            "text": "LEFT JOIN from Customers to Orders - that keeps all customer rows and gives NULL for the order columns where no order exists. I would wrap the Total in ISNULL to show zero instead of NULL."
+          },
+          {
+            "role": "interviewer",
+            "text": "Now I only want the customers who have NEVER ordered. How do you get just those?"
+          },
+          {
+            "role": "me",
+            "text": "Same LEFT JOIN, then add WHERE Orders.CustomerId IS NULL - that is the anti-join pattern. The NULL on the right side means no matching order row was found."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does FULL OUTER JOIN give me that those two queries do not?"
+          },
+          {
+            "role": "me",
+            "text": "It returns unmatched rows from both sides in one result set - so both customers with no orders AND any orphan order rows with no matching customer, all at once."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would INNER JOIN be the wrong choice by mistake?"
+          },
+          {
+            "role": "me",
+            "text": "Whenever the requirement says all records from X - INNER silently drops rows with no match, which is a data accuracy bug that can be hard to notice if the result set looks reasonable."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about CROSS JOIN - when is that actually useful?"
+          },
+          {
+            "role": "me",
+            "text": "For generating combinations - like all products paired with all store locations to seed an inventory table, or all dates paired with all regions for a reporting grid. It produces M times N rows so you use it intentionally, not by accident."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-003",
+      "q": "How do you optimize a slow SQL query, and how do you read an execution plan?",
+      "level": "senior",
+      "type": "scenario",
+      "freq": "high",
+      "tags": ["performance", "execution plan", "optimization", "index", "statistics"],
+      "answer": {
+        "oneLiner": "Get a baseline with SET STATISTICS IO, pull the actual execution plan, read it right to left looking for scans, thick arrows, and Key Lookups, then fix with SARGable predicates, covering indexes, and fresh statistics.",
+        "detail": "Step one is always to measure before changing anything. SET STATISTICS IO ON shows logical reads which directly measure I/O cost. Then get the actual execution plan in SSMS by pressing Ctrl+M before running the query. Read the plan right to left - data flows from the rightmost operators into the left. Thick arrows mean a large number of rows flowing between operators, which is often the root cause of slowness. Look for Table Scans instead of Index Seeks, Key Lookups where an index seek must then go back to the clustered index for extra columns, and Sort operators which can spill to tempdb. Green warnings signal implicit type conversions that defeat indexes. After fixing, run SET STATISTICS IO again to confirm fewer logical reads - this number is the gold standard for improvement. Never just add indexes blindly without reading the plan first.",
+        "keyPoints": [
+          "Baseline with SET STATISTICS IO ON before and after - logical reads measure I/O cost",
+          "Read the execution plan right to left - thick arrows mean too many rows flowing",
+          "Key Lookup means the index lacks columns the query needs - fix with a covering INCLUDE index",
+          "Non-SARGable predicates like YEAR(OrderDate) block index seeks - rewrite as a date range",
+          "Stale statistics mislead the optimizer - update them and recheck the plan"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - non-SARGable predicate, full table scan even with an index on OrderDate\nSELECT OrderId, CustomerId, Total\nFROM Orders\nWHERE YEAR(OrderDate) = 2024;\n\n// ✅ GOOD - SARGable date range, allows index seek on OrderDate\nSELECT OrderId, CustomerId, Total\nFROM Orders\nWHERE OrderDate >= '2024-01-01' AND OrderDate < '2025-01-01';\n\n-- Measure I/O before and after any change\nSET STATISTICS IO ON;\nSET STATISTICS TIME ON;\n\n-- Covering index to eliminate Key Lookup for a common customer order query\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId_Cover\n    ON Orders (CustomerId)\n    INCLUDE (OrderDate, Total);",
+          "note": "Always measure logical reads with SET STATISTICS IO before and after a change to confirm the fix actually reduced I/O - do not rely on elapsed time alone."
+        },
+        "analogy": "Optimizing a query is like a doctor diagnosing a patient - measure first, then treat.",
+        "redFlags": [
+          "Adding indexes without reading the execution plan first",
+          "Using NOLOCK as a default performance fix - it risks dirty reads and phantom rows",
+          "Not knowing what a Key Lookup is or how to eliminate it",
+          "Saying it runs fast on my machine without measuring logical reads"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is parameter sniffing?",
+            "a": "The optimizer builds a plan using the first parameter values it sees and caches that plan. Later calls with very different values get a plan that fits the first call badly."
+          },
+          {
+            "q": "When would you use OPTION (RECOMPILE)?",
+            "a": "When parameter values vary widely between calls and a single cached plan hurts some executions - RECOMPILE builds a fresh plan every time at the cost of compile overhead."
+          },
+          {
+            "q": "What is a Key Lookup and how do you fix it?",
+            "a": "After an index seek the engine goes back to the clustered index to fetch columns not in the non-clustered index - add those columns to INCLUDE on the non-clustered index to eliminate it."
+          },
+          {
+            "q": "What makes a predicate non-SARGable?",
+            "a": "Wrapping the indexed column in a function like YEAR() or UPPER(), or causing an implicit type conversion by passing the wrong data type."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "A monthly sales report that used to run in 2 seconds now takes 45 seconds. Walk me through your approach."
+          },
+          {
+            "role": "me",
+            "text": "First I turn on SET STATISTICS IO and TIME to get a baseline on logical reads, then I run the query with actual execution plan enabled in SSMS. I want to see the numbers before I touch anything."
+          },
+          {
+            "role": "interviewer",
+            "text": "You open the plan. What catches your eye first?"
+          },
+          {
+            "role": "me",
+            "text": "Thick arrows flowing between operators - that means far more rows than expected. Then I look for Table Scans instead of Index Seeks, any Key Lookups, and green warning triangles which usually mean an implicit type conversion is blocking a seek."
+          },
+          {
+            "role": "interviewer",
+            "text": "You see an Index Seek followed by thousands of Key Lookups. What do you do?"
+          },
+          {
+            "role": "me",
+            "text": "I look at which columns the Key Lookup is fetching and add them to the non-clustered index using INCLUDE. That makes the index covering and eliminates the round trip to the clustered index for each row."
+          },
+          {
+            "role": "interviewer",
+            "text": "After adding the index, how do you confirm the fix actually worked?"
+          },
+          {
+            "role": "me",
+            "text": "Run the query again with SET STATISTICS IO ON and compare the logical reads to the baseline. If reads dropped significantly, the fix is real - elapsed time alone can be misleading due to caching."
+          },
+          {
+            "role": "interviewer",
+            "text": "The fix works today but degrades again next month. Why might that happen?"
+          },
+          {
+            "role": "me",
+            "text": "Stale statistics - the optimizer makes decisions based on statistics that no longer reflect the current data distribution. I would check when statistics were last updated with DBCC SHOW_STATISTICS and schedule UPDATE STATISTICS WITH FULLSCAN."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-004",
+      "q": "What is a CTE (Common Table Expression) and when would you use one?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["cte", "with", "recursive", "readability", "subquery"],
+      "answer": {
+        "oneLiner": "A CTE is a named temporary result set defined with the WITH keyword that exists only for the single statement that follows it. It makes complex queries readable and enables recursion for tree-shaped data like org charts.",
+        "detail": "A CTE starts with WITH, gives the result set a name, and the name is available in the SELECT, INSERT, UPDATE, or DELETE that immediately follows. It is scoped to just that one statement - it does not exist afterward. Non-recursive CTEs are usually inlined by the optimizer, meaning SQL Server treats them like a view or subquery and may re-execute the CTE body each time it is referenced. This means if you reference the same CTE multiple times in a query, the work could run twice. For expensive intermediate results that are reused, a temp table materializes once and gets statistics. Recursive CTEs have an anchor member (the starting rows), UNION ALL, and a recursive member that references the CTE itself. The recursion stops when no new rows are produced or when MAXRECURSION is hit (default 100).",
+        "keyPoints": [
+          "CTE syntax: WITH Name AS (...) followed immediately by a single SELECT/INSERT/UPDATE/DELETE",
+          "Non-recursive CTEs are usually inlined by the optimizer - not stored like a temp table",
+          "Recursive CTEs need an anchor member, UNION ALL, and a recursive member - not UNION",
+          "Default MAXRECURSION is 100 - override with OPTION (MAXRECURSION n) at the end of the query",
+          "If a CTE is referenced multiple times in one query, it may execute multiple times"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - deeply nested subqueries that are hard to read and impossible to reuse\nSELECT c.Name, sub.TotalSpent\nFROM Customers c\nJOIN (SELECT CustomerId, SUM(Total) AS TotalSpent FROM Orders GROUP BY CustomerId) sub\n    ON c.CustomerId = sub.CustomerId\nORDER BY sub.TotalSpent DESC;\n\n// ✅ GOOD - CTE names the intermediate result clearly\nWITH CustomerTotals AS (\n    SELECT CustomerId, SUM(Total) AS TotalSpent\n    FROM Orders\n    GROUP BY CustomerId\n)\nSELECT c.Name, ct.TotalSpent\nFROM CustomerTotals ct\nJOIN Customers c ON c.CustomerId = ct.CustomerId\nORDER BY ct.TotalSpent DESC;\n\n-- Recursive CTE: org chart from CEO down\nWITH OrgChart AS (\n    SELECT EmployeeId, Name, ManagerId, 0 AS Level\n    FROM Employees WHERE ManagerId IS NULL\n    UNION ALL\n    SELECT e.EmployeeId, e.Name, e.ManagerId, oc.Level + 1\n    FROM Employees e\n    INNER JOIN OrgChart oc ON e.ManagerId = oc.EmployeeId\n)\nSELECT * FROM OrgChart\nOPTION (MAXRECURSION 50);",
+          "note": "The recursive member must use UNION ALL - UNION is not allowed because removing duplicates during recursion is not supported."
+        },
+        "analogy": "A CTE is like writing a calculation on a whiteboard to refer to during a meeting - it disappears when the meeting ends.",
+        "redFlags": [
+          "Thinking a CTE is persisted like a temp table - it is not a physical object",
+          "Not knowing about recursive CTEs or when to use them for tree data",
+          "Claiming CTEs always improve performance - re-referenced CTEs can re-execute",
+          "Using UNION instead of UNION ALL in the recursive member"
+        ],
+        "followUpsQA": [
+          {
+            "q": "When would you choose a temp table over a CTE?",
+            "a": "When the intermediate result is expensive to compute and reused multiple times - a temp table materializes once in tempdb and SQL Server builds statistics on it."
+          },
+          {
+            "q": "Can you create an index on a CTE?",
+            "a": "No - a CTE is not a physical object. Index the underlying table or use a temp table if you need an index on the intermediate data."
+          },
+          {
+            "q": "What happens when a recursive CTE has a cycle in the data?",
+            "a": "It keeps recursing until it hits the MAXRECURSION limit and throws an error - you need to guard against cycles in the data or set a safe MAXRECURSION value."
+          },
+          {
+            "q": "Can a CTE be used in an INSERT, UPDATE, or DELETE?",
+            "a": "Yes - the CTE is defined with WITH and the DML statement immediately follows, which makes complex update conditions much more readable."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "When do you reach for a CTE instead of a nested subquery?"
+          },
+          {
+            "role": "me",
+            "text": "Mostly when the intermediate logic is complex enough that I want to name it and read the final query top to bottom instead of inside out. It also unlocks recursion for hierarchical data like an org chart or a category tree."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is a CTE materialized like a temp table?"
+          },
+          {
+            "role": "me",
+            "text": "No - a non-recursive CTE is usually inlined by the optimizer, so if I reference it twice in one query it could execute twice. That is important to know on expensive CTEs."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you switch to a temp table?"
+          },
+          {
+            "role": "me",
+            "text": "When that intermediate result is costly to compute and I reference it multiple times - a temp table materializes once in tempdb and gets statistics, so the optimizer can plan around it better."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through a recursive CTE for an employee org chart."
+          },
+          {
+            "role": "me",
+            "text": "The anchor selects the CEO where ManagerId IS NULL. Then UNION ALL with the recursive member joins back to OrgChart on ManagerId equals EmployeeId, incrementing Level each step. SQL Server keeps recursing until no new rows match, or until MAXRECURSION is hit."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why UNION ALL and not UNION in the recursive part?"
+          },
+          {
+            "role": "me",
+            "text": "UNION would try to remove duplicates during recursion which SQL Server does not support in recursive members - it raises an error. UNION ALL is required and the recursion terminates naturally when the join finds no new children."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-005",
+      "q": "What is a temporary table? What is the difference between #temp, ##temp, and a table variable (@table)?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["temp table", "table variable", "tempdb", "scope", "local temp", "global temp"],
+      "answer": {
+        "oneLiner": "A #temp table is session-scoped in tempdb and gets real statistics. A ##temp table is global and visible to all sessions until the creator disconnects. A @table variable is batch-scoped, immune to rollback, but has no statistics so the optimizer assumes it contains one row.",
+        "detail": "Local temp tables (#temp) live in tempdb and are only visible to the session that created them, plus any nested stored procedure calls from that session. They support indexes added after creation and have real statistics, so the optimizer can build accurate plans. Global temp tables (##temp) are also in tempdb but every session can see them until the creating session drops them or disconnects. Table variables (@table) are scoped to the batch or procedure. The critical difference is that table variables have no statistics - SQL Server estimates they contain exactly one row regardless of actual size. On small sets this does not matter, but on thousands of rows the optimizer picks bad plans like nested loops when hash join would be better. The unique upside of table variables is they are not rolled back when the surrounding transaction rolls back, which is useful for audit logging inside TRY/CATCH.",
+        "keyPoints": [
+          "#temp: session-scoped in tempdb, supports added indexes, has real statistics, rolls back",
+          "##temp: global across all sessions, visible until creating session disconnects",
+          "@table variable: batch-scoped, no statistics (optimizer assumes 1 row), immune to transaction rollback",
+          "For large datasets always prefer #temp over @table - the statistics difference matters",
+          "Table variable rollback immunity is useful for audit logging inside TRY/CATCH"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - table variable for 100k rows, optimizer guesses 1 row, picks wrong join type\nDECLARE @RecentOrders TABLE (OrderId INT, CustomerId INT, Total DECIMAL(18,2));\nINSERT INTO @RecentOrders\n    SELECT OrderId, CustomerId, Total FROM Orders\n    WHERE OrderDate > DATEADD(MONTH, -3, GETDATE());\n-- Optimizer assumes @RecentOrders has 1 row -> nested loop on 100k rows -> slow\n\n// ✅ GOOD - temp table for large intermediate sets, real statistics, accurate plans\nCREATE TABLE #RecentOrders (OrderId INT, CustomerId INT, Total DECIMAL(18,2));\nINSERT INTO #RecentOrders\n    SELECT OrderId, CustomerId, Total FROM Orders\n    WHERE OrderDate > DATEADD(MONTH, -3, GETDATE());\nCREATE INDEX IX_RecentOrders_Customer ON #RecentOrders (CustomerId);\nSELECT * FROM #RecentOrders;\nDROP TABLE IF EXISTS #RecentOrders;",
+          "note": "The statistics gap is the most important difference - use #temp tables when row count is large enough to affect join strategy."
+        },
+        "analogy": "A table variable is a sticky note on your desk; a temp table is a proper notebook with an index.",
+        "redFlags": [
+          "Saying table variables behave the same as temp tables - the no-statistics issue is critical",
+          "Not knowing ##temp is visible to all sessions, not just the creating one",
+          "Claiming table variables are always faster - they are not for large data sets",
+          "Not knowing table variables survive a ROLLBACK while temp tables do not"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can a table variable have indexes?",
+            "a": "Only a PRIMARY KEY or UNIQUE constraint declared at creation time - you cannot run CREATE INDEX on a table variable after the DECLARE."
+          },
+          {
+            "q": "Why is the one-row estimate so dangerous for table variables?",
+            "a": "The optimizer picks nested loops which is optimal for one row but catastrophic for 100k rows - a temp table with real statistics would trigger a hash or merge join instead."
+          },
+          {
+            "q": "When is the rollback immunity of @table actually useful?",
+            "a": "For audit logging inside TRY/CATCH - you want to record that an error occurred even when the main transaction rolls back, so you write the audit to a @table and insert it into the audit table after the ROLLBACK."
+          },
+          {
+            "q": "Can a #temp table be accessed from a nested stored procedure?",
+            "a": "Yes - a local temp table created in a session is visible to any stored procedure called from that same session."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the main difference between a temp table and a table variable?"
+          },
+          {
+            "role": "me",
+            "text": "The biggest difference is statistics. A temp table in tempdb gets real statistics so the optimizer knows how many rows it contains. A table variable has no statistics - the optimizer always guesses one row, which leads to bad join choices on large data sets."
+          },
+          {
+            "role": "interviewer",
+            "text": "So when would you ever choose a table variable?"
+          },
+          {
+            "role": "me",
+            "text": "For small sets where the one-row estimate does not matter, and specifically when I need the data to survive a ROLLBACK - a table variable is not affected by transaction rollback, which is useful for audit logging inside TRY/CATCH."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is a global temp table and what is the danger?"
+          },
+          {
+            "role": "me",
+            "text": "A ##temp table is visible to all sessions, not just the one that created it. The danger is that another session can accidentally read or modify your temporary data - in production I avoid them entirely and use #temp with proper scoping."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you add an index to a table variable after declaring it?"
+          },
+          {
+            "role": "me",
+            "text": "No - the only indexes a table variable can have are PRIMARY KEY and UNIQUE constraints declared inside the DECLARE statement itself. A temp table supports CREATE INDEX added at any time after creation."
+          },
+          {
+            "role": "interviewer",
+            "text": "You have an ETL that loads 2 million rows into an intermediate set and then joins it to three other tables. Which do you use?"
+          },
+          {
+            "role": "me",
+            "text": "A #temp table without question - 2 million rows means the statistics matter enormously. I would also add an index on the join column after loading to help the optimizer pick efficient join strategies."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-006",
+      "q": "What is a trigger? How do you create and use one in SQL Server?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["trigger", "dml trigger", "ddl trigger", "inserted", "deleted", "after", "instead of"],
+      "answer": {
+        "oneLiner": "A trigger is a stored procedure that fires automatically when a DML event (INSERT, UPDATE, DELETE) happens on a table. It uses virtual INSERTED and DELETED tables to see the new and old row states.",
+        "detail": "SQL Server creates two virtual tables for every DML trigger: INSERTED contains the new row values (available on INSERT and UPDATE), and DELETED contains the old row values (available on DELETE and UPDATE). Both tables are set-based - they hold all affected rows, not just one. This is the most common trigger bug: treating INSERTED or DELETED as single-row variables when a bulk update could affect thousands of rows at once. AFTER triggers run after the DML statement completes and the constraint checks pass. You can still ROLLBACK from inside an AFTER trigger which rolls back the calling transaction too. INSTEAD OF triggers replace the DML operation entirely - most commonly used to make updatable views work when the underlying logic spans multiple tables. Keep triggers lean and always write set-based logic that handles multiple rows.",
+        "keyPoints": [
+          "INSERTED holds new/updated rows, DELETED holds old/deleted rows - both are tables, not single rows",
+          "AFTER triggers run after the DML and constraint checks - a ROLLBACK inside aborts the caller",
+          "INSTEAD OF triggers replace the DML operation, commonly used to make views updatable",
+          "Always write set-based logic in triggers - bulk DML sends multiple rows to INSERTED/DELETED",
+          "Triggers are invisible to application developers and hard to debug - keep them minimal"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - scalar logic assumes INSERTED has exactly one row, breaks on bulk insert\nCREATE TRIGGER trg_Orders_BadInsert ON Orders AFTER INSERT\nAS BEGIN\n    DECLARE @OrderId INT = (SELECT OrderId FROM INSERTED);\n    INSERT INTO OrderAudit VALUES (@OrderId, GETUTCDATE());\nEND;\n-- Fails or returns wrong data if more than one row is inserted\n\n// ✅ GOOD - set-based logic handles any number of rows\nCREATE OR ALTER TRIGGER trg_Orders_AfterInsert\nON Orders\nAFTER INSERT\nAS\nBEGIN\n    SET NOCOUNT ON;\n    INSERT INTO OrderAudit (OrderId, CustomerId, Total, AuditAction, AuditDate)\n    SELECT i.OrderId, i.CustomerId, i.Total, 'INSERT', GETUTCDATE()\n    FROM INSERTED i;\nEND;",
+          "note": "INSERTED and DELETED are tables, not variables - always write a set-based INSERT/UPDATE that joins them rather than selecting a single scalar value."
+        },
+        "analogy": "A trigger is a smoke alarm - it reacts automatically when something happens, without anyone calling it.",
+        "redFlags": [
+          "Assuming INSERTED and DELETED hold exactly one row - this breaks on any bulk operation",
+          "Not knowing that ROLLBACK inside a trigger aborts the entire calling transaction",
+          "Using INSTEAD OF and AFTER interchangeably - they have fundamentally different behaviors",
+          "Putting complex business logic in triggers - they are invisible to developers and slow to debug"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between AFTER and INSTEAD OF triggers?",
+            "a": "AFTER runs after the DML completes and constraints are checked. INSTEAD OF replaces the DML entirely and is the only type that works on views."
+          },
+          {
+            "q": "Can a trigger cause an infinite loop?",
+            "a": "Yes if it fires a DML on the same table and recursive triggers are enabled - controlled by the server option RECURSIVE_TRIGGERS."
+          },
+          {
+            "q": "How do you capture both the old and new values of an updated row in a trigger?",
+            "a": "Join INSERTED and DELETED on the primary key - INSERTED has the new values and DELETED has the old values for the same rows."
+          },
+          {
+            "q": "How would you audit table changes without triggers?",
+            "a": "Temporal tables (system-versioned) automatically track row history. Change Data Capture (CDC) captures changes from the transaction log without any trigger code."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How would you automatically log every change to an Orders table?"
+          },
+          {
+            "role": "me",
+            "text": "An AFTER trigger on the Orders table that reads from the INSERTED and DELETED virtual tables and writes a record into an OrderAudit table with the old and new values, the action type, and a timestamp."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the single most common mistake developers make with triggers?"
+          },
+          {
+            "role": "me",
+            "text": "Treating INSERTED like a single-row variable. If a batch UPDATE changes 10,000 rows, INSERTED is a table with 10,000 rows. Writing SELECT @var = OrderId FROM INSERTED will either error or return a random row - the logic must be set-based."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you use INSTEAD OF instead of AFTER?"
+          },
+          {
+            "role": "me",
+            "text": "To make a view updatable when it spans multiple base tables. An INSTEAD OF UPDATE trigger intercepts the UPDATE on the view and manually applies the changes to each underlying table."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if I throw an error inside an AFTER trigger?"
+          },
+          {
+            "role": "me",
+            "text": "A ROLLBACK inside the trigger rolls back the entire calling transaction, not just the trigger work. That is a powerful tool for validation but also a dangerous one - any caller needs to be ready for that rollback."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there a modern alternative to triggers for auditing?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - system-versioned temporal tables automatically maintain a full history of row changes in a paired history table. Change Data Capture reads the transaction log directly. Both approaches avoid the trigger overhead and the hidden side-effect problem."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-007",
+      "q": "What is an index? Explain the difference between a clustered and a non-clustered index.",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["index", "clustered index", "non-clustered index", "b-tree", "performance"],
+      "answer": {
+        "oneLiner": "An index is a B-tree structure that lets SQL Server find rows fast without scanning every row. A clustered index physically orders the table by its key and there can only be one. A non-clustered index is a separate structure pointing back to the rows and you can have up to 999.",
+        "detail": "Both index types are B-trees. SQL Server navigates from the root page down through intermediate pages to find the matching leaf pages. The difference is what is stored at the leaf level. For a clustered index the leaf level IS the data rows themselves, stored in key order on disk. There is only one clustered index per table because there is only one physical ordering of the data. A table with no clustered index is called a heap - rows are stored in no particular order and located by a Row ID (RID). For a non-clustered index the leaf level stores the index key columns plus a row locator. If the table has a clustered index the locator is the clustered key. If the table is a heap the locator is the RID. When a non-clustered index seek finds a matching key but the query needs additional columns not in the index, the engine must do a Key Lookup - a round trip to the clustered index for each matched row. Key Lookups on large result sets are expensive. A covering index with INCLUDE columns eliminates them.",
+        "keyPoints": [
+          "Clustered index leaf level IS the data rows - one per table - table is physically ordered by the key",
+          "Non-clustered index leaf holds the key plus a locator (clustered key or RID for heaps)",
+          "A table with no clustered index is a heap - rows are unordered, located by RID",
+          "Key Lookup happens when a non-clustered seek needs columns not in the index - fix with INCLUDE",
+          "Indexes speed up reads but slow down every INSERT, UPDATE, and DELETE on that table"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - non-clustered index on CustomerId but query selects OrderDate and Total\n-- Execution plan shows: Index Seek -> Key Lookup (once per matching row)\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId\n    ON Orders (CustomerId);\nSELECT OrderId, OrderDate, Total FROM Orders WHERE CustomerId = 42;\n\n// ✅ GOOD - covering index eliminates Key Lookup\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId_Cover\n    ON Orders (CustomerId)\n    INCLUDE (OrderDate, Total);\nSELECT OrderId, OrderDate, Total FROM Orders WHERE CustomerId = 42;",
+          "note": "Add columns to INCLUDE when they only appear in the SELECT list - key columns handle the seek, INCLUDE columns provide coverage at the leaf level only."
+        },
+        "analogy": "Clustered index is a phone book sorted by last name - the data itself is the order. Non-clustered is the index at the back of a textbook pointing to page numbers.",
+        "redFlags": [
+          "Saying a table can have multiple clustered indexes - only one is allowed",
+          "Not knowing what a Key Lookup is or why it is expensive on large result sets",
+          "Ignoring the write overhead of indexes on INSERT-heavy tables",
+          "Putting frequently queried columns in INCLUDE when they should be key columns for range scans"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is a covering index?",
+            "a": "A non-clustered index that contains all columns a query needs - key columns for seeking plus INCLUDE columns for coverage - so no Key Lookup back to the clustered index is needed."
+          },
+          {
+            "q": "Why are GUIDs poor clustered index keys?",
+            "a": "Random GUIDs cause new rows to insert in the middle of existing pages, triggering page splits and index fragmentation on every insert."
+          },
+          {
+            "q": "What is index fragmentation and how do you fix it?",
+            "a": "Out-of-order or partly-empty pages caused by inserts and deletes. Reorganize for fragmentation between 5 and 30 percent, Rebuild above 30 percent."
+          },
+          {
+            "q": "What is a heap?",
+            "a": "A table with no clustered index - rows are stored in insertion order and located by Row ID. Non-clustered indexes on a heap use RID locators instead of the clustered key."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain the core difference between a clustered and a non-clustered index."
+          },
+          {
+            "role": "me",
+            "text": "A clustered index IS the table - the leaf level holds the actual data rows in key order, and only one can exist per table. A non-clustered index is a separate B-tree structure that stores the key columns plus a locator pointing back to the row."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is a heap?"
+          },
+          {
+            "role": "me",
+            "text": "A table with no clustered index - rows are stored in no particular order and located by Row ID. Non-clustered indexes on a heap store the RID instead of the clustered key, which makes them slightly less efficient."
+          },
+          {
+            "role": "interviewer",
+            "text": "A query does an index seek but the plan shows a Key Lookup. What is happening?"
+          },
+          {
+            "role": "me",
+            "text": "The non-clustered index found the matching rows by key but the query needs columns that are not in the index, so the engine does a round trip to the clustered index for each matched row to fetch them. On 10,000 matches that is 10,000 extra page reads."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you fix that Key Lookup?"
+          },
+          {
+            "role": "me",
+            "text": "Add the missing columns to the non-clustered index using INCLUDE. Those columns live at the leaf level only so they do not increase the depth of the B-tree, but they eliminate the lookup back to the clustered index entirely."
+          },
+          {
+            "role": "interviewer",
+            "text": "If indexes make reads faster, why not index every column?"
+          },
+          {
+            "role": "me",
+            "text": "Every index must be maintained on every INSERT, UPDATE, and DELETE. Too many indexes on a write-heavy table makes write operations slow and increases storage and memory pressure on the buffer pool."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-008",
+      "q": "Write a query to find the Nth highest salary from an Employees table.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["nth highest", "row_number", "dense_rank", "window functions", "salary"],
+      "answer": {
+        "oneLiner": "Use DENSE_RANK() ordered by salary descending inside a CTE, then filter WHERE rank = N. DENSE_RANK handles ties correctly - multiple employees at the same salary get the same rank with no gaps.",
+        "detail": "The key decision is which ranking function to use. ROW_NUMBER always gives every row a unique sequential number regardless of ties. If two employees both earn 90,000 and you want the 2nd highest, ROW_NUMBER gives them 1 and 2 arbitrarily - one gets skipped. RANK also assigns unique numbers but skips after ties, so if two share rank 1 the next rank is 3 not 2. DENSE_RANK gives tied rows the same rank and does not skip, so the next rank after two shared rank-1 rows is rank 2. For finding the Nth highest salary where the business means the Nth distinct level, DENSE_RANK is almost always correct. None of these can appear in a WHERE clause directly because window functions are evaluated after WHERE in the logical query order. You must wrap the result in a CTE or subquery to filter on the rank value.",
+        "keyPoints": [
+          "DENSE_RANK is the correct choice - ties get the same rank with no gaps after them",
+          "ROW_NUMBER gives unique numbers so it skips people at the same salary - wrong for Nth highest",
+          "RANK skips numbers after ties so rank 3 may not exist if two people tie at rank 2",
+          "Window functions cannot appear in WHERE - wrap in a CTE or subquery first",
+          "Add PARTITION BY DepartmentId to the OVER clause for Nth highest per department"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - ROW_NUMBER skips employees who tie, gives wrong result for Nth highest\nWITH Ranked AS (\n    SELECT EmployeeId, Name, Salary,\n           ROW_NUMBER() OVER (ORDER BY Salary DESC) AS RowNum\n    FROM Employees\n)\nSELECT * FROM Ranked WHERE RowNum = 3;\n-- If two people both earn the 2nd highest salary, one randomly becomes rank 3\n\n// ✅ GOOD - DENSE_RANK handles ties, finds the true 3rd distinct salary level\nWITH RankedSalaries AS (\n    SELECT\n        EmployeeId,\n        Name,\n        Department,\n        Salary,\n        DENSE_RANK() OVER (ORDER BY Salary DESC) AS SalaryRank\n    FROM Employees\n)\nSELECT EmployeeId, Name, Department, Salary\nFROM RankedSalaries\nWHERE SalaryRank = 3;",
+          "note": "DENSE_RANK is the correct default for Nth highest salary - it returns all employees at that pay level and does not skip ranks after ties."
+        },
+        "analogy": "DENSE_RANK is a medal podium - two gold medalists both get gold, and the next is silver, not bronze.",
+        "redFlags": [
+          "Using ROW_NUMBER without explaining that it breaks when salaries tie",
+          "Not knowing window functions cannot be used in the WHERE clause",
+          "Unable to extend the solution to Nth highest per department using PARTITION BY",
+          "Not clarifying tie-handling with the interviewer before writing the query"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between ROW_NUMBER, RANK, and DENSE_RANK?",
+            "a": "ROW_NUMBER always unique; RANK ties get the same number then the next number skips; DENSE_RANK ties get the same number and the next number is always consecutive."
+          },
+          {
+            "q": "How do you find the Nth highest salary per department?",
+            "a": "Add PARTITION BY Department to the OVER clause - DENSE_RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) resets the ranking for each department."
+          },
+          {
+            "q": "Why can window functions not go in a WHERE clause?",
+            "a": "Window functions are evaluated in the SELECT phase, which runs after WHERE in the logical query order. You cannot filter on something that has not been computed yet."
+          },
+          {
+            "q": "How would you solve this without window functions for an older database?",
+            "a": "SELECT MIN(Salary) FROM (SELECT DISTINCT TOP 3 Salary FROM Employees ORDER BY Salary DESC) AS Top3 - but this is slower and harder to read."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Write me a query to find the 3rd highest salary in the Employees table."
+          },
+          {
+            "role": "me",
+            "text": "I would use DENSE_RANK() OVER (ORDER BY Salary DESC) in a CTE and then filter WHERE SalaryRank = 3. Before writing I would ask: does the 3rd highest mean the 3rd distinct salary level, or the 3rd row if sorted? That changes the approach."
+          },
+          {
+            "role": "interviewer",
+            "text": "Good question. Third distinct salary level. Now why not ROW_NUMBER?"
+          },
+          {
+            "role": "me",
+            "text": "ROW_NUMBER gives every employee a unique number so if two people tie at the second highest salary they get 2 and 3. The person at rank 3 by ROW_NUMBER might actually be at the second salary level. DENSE_RANK gives both tied employees rank 2 and the person at the next lower salary gets rank 3."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why wrap it in a CTE at all? Why not put DENSE_RANK in the WHERE clause directly?"
+          },
+          {
+            "role": "me",
+            "text": "Window functions are evaluated in the SELECT phase which runs after WHERE in the logical order - they do not exist yet when WHERE is processed. I need the CTE or a derived table to make the ranked result available for filtering."
+          },
+          {
+            "role": "interviewer",
+            "text": "Now find the 3rd highest salary per department."
+          },
+          {
+            "role": "me",
+            "text": "Add PARTITION BY Department to the OVER clause: DENSE_RANK() OVER (PARTITION BY Department ORDER BY Salary DESC). The ranking now resets for each department group independently."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if two people tie at the 3rd highest level? How many rows come back?"
+          },
+          {
+            "role": "me",
+            "text": "Both rows come back - that is the correct behavior of DENSE_RANK. Both employees earn the same salary which is the 3rd distinct pay level, so both should appear in the result. If I used ROW_NUMBER I would lose one of them."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-009",
+      "q": "What is the difference between WHERE and HAVING, and when do you use GROUP BY?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["where", "having", "group by", "aggregation", "filter"],
+      "answer": {
+        "oneLiner": "WHERE filters individual rows before grouping. HAVING filters the aggregated groups after GROUP BY runs. GROUP BY collapses rows that share the same key values so aggregate functions like SUM and COUNT can be applied.",
+        "detail": "SQL Server processes a query in a specific logical order: FROM first, then WHERE which cuts rows before any grouping, then GROUP BY which collapses the remaining rows into groups, then HAVING which filters those groups based on aggregate results, then SELECT which computes the output columns, and finally ORDER BY. This order has real consequences. You cannot use a column alias defined in SELECT inside WHERE because WHERE runs before SELECT - the alias does not exist yet. You cannot use aggregate functions like SUM() or COUNT() inside WHERE because the aggregates have not been computed yet - those go in HAVING. Always push filters into WHERE rather than HAVING when possible - reducing rows before grouping means the GROUP BY has less work to do.",
+        "keyPoints": [
+          "WHERE runs before GROUP BY - no aggregate functions allowed in WHERE",
+          "HAVING runs after GROUP BY - aggregate functions like COUNT and SUM are allowed",
+          "Logical processing order: FROM - WHERE - GROUP BY - HAVING - SELECT - ORDER BY",
+          "Filter as much as possible in WHERE to reduce rows before the GROUP BY step",
+          "A column alias from SELECT cannot be used in WHERE because SELECT runs after WHERE"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - trying to filter on an aggregate in WHERE, will fail with an error\nSELECT CustomerId, COUNT(OrderId) AS OrderCount\nFROM Orders\nWHERE COUNT(OrderId) > 5\nGROUP BY CustomerId;\n-- Error: aggregate functions are not allowed in WHERE\n\n// ✅ GOOD - WHERE cuts rows early, HAVING filters the aggregated groups\nSELECT\n    c.Name,\n    COUNT(o.OrderId)   AS OrderCount,\n    SUM(o.Total)       AS TotalSpent\nFROM Customers c\nINNER JOIN Orders o ON c.CustomerId = o.CustomerId\nWHERE o.OrderDate >= '2023-01-01'\nGROUP BY c.CustomerId, c.Name\nHAVING COUNT(o.OrderId) > 5\n   AND SUM(o.Total) > 1000\nORDER BY TotalSpent DESC;",
+          "note": "WHERE reduces the row count before GROUP BY processes it - the more you filter in WHERE, the less work the GROUP BY phase has to do."
+        },
+        "analogy": "WHERE is the bouncer at the door. HAVING is the judge inside deciding which groups make the final cut.",
+        "redFlags": [
+          "Trying to put aggregate functions like COUNT or SUM inside a WHERE clause",
+          "Not knowing the logical query processing order and why SELECT aliases cannot be used in WHERE",
+          "Filtering by aggregates in HAVING when the filter could be applied earlier in WHERE",
+          "Forgetting to include all non-aggregated SELECT columns in the GROUP BY"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can you use a SELECT alias in a HAVING clause?",
+            "a": "In standard SQL no - HAVING runs before SELECT in logical order. SQL Server sometimes allows it but it is safer to repeat the aggregate expression."
+          },
+          {
+            "q": "What does HAVING without GROUP BY do?",
+            "a": "It treats the entire result set as a single group and applies the HAVING filter to the aggregate over all rows."
+          },
+          {
+            "q": "What is the difference between COUNT(*) and COUNT(column)?",
+            "a": "COUNT(*) counts every row including those with NULLs. COUNT(column) counts only rows where that column is not NULL."
+          },
+          {
+            "q": "Why must every non-aggregated column in SELECT appear in GROUP BY?",
+            "a": "GROUP BY collapses many rows into one - each output row must have a single value for every column. Non-aggregated columns must be in GROUP BY to guarantee that single value."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "WHERE versus HAVING - quick explanation of each."
+          },
+          {
+            "role": "me",
+            "text": "WHERE filters individual rows before any grouping happens. HAVING filters the resulting groups after GROUP BY - it is the only place where aggregate functions like COUNT or SUM can be used as filters."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why can you not put SUM(Total) > 1000 inside the WHERE clause?"
+          },
+          {
+            "role": "me",
+            "text": "Because WHERE runs before GROUP BY in the logical processing order. The SUM has not been calculated yet when WHERE is evaluated - there are no groups yet, just individual rows."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does it matter whether I filter in WHERE or HAVING if the result is the same?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - filtering in WHERE removes rows before GROUP BY processes them. If I filter a date range in HAVING instead of WHERE, the GROUP BY has to aggregate every historical row first, then discard them. WHERE cuts the work earlier and is more efficient."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the full logical processing order?"
+          },
+          {
+            "role": "me",
+            "text": "FROM, then WHERE, GROUP BY, HAVING, SELECT, then ORDER BY. This is why you cannot use a SELECT alias in WHERE or HAVING - the alias is defined in SELECT which comes after both of them."
+          },
+          {
+            "role": "interviewer",
+            "text": "I add a calculated alias in SELECT and try to use it in WHERE. What happens?"
+          },
+          {
+            "role": "me",
+            "text": "SQL Server raises an error saying the column name is invalid because WHERE runs before SELECT processes the alias. I need to either repeat the expression in WHERE or use a CTE to expose the alias for filtering."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-010",
+      "q": "Explain window functions - ROW_NUMBER, RANK, and DENSE_RANK - with examples.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["window functions", "row_number", "rank", "dense_rank", "over", "partition by"],
+      "answer": {
+        "oneLiner": "Window functions compute a value across a set of related rows without collapsing them. ROW_NUMBER always gives unique sequential numbers. RANK gives tied rows the same number then skips. DENSE_RANK gives tied rows the same number and never skips.",
+        "detail": "Unlike GROUP BY which collapses many rows into one, window functions keep all rows in the output and add a computed value alongside each one. The OVER clause defines the window: PARTITION BY divides rows into groups and resets the calculation for each group, ORDER BY determines the order within each group. The most common window functions in interviews are: ROW_NUMBER (always unique, 1 2 3 even for ties), RANK (ties share a number but the next number skips - 1 1 3), DENSE_RANK (ties share a number and the next number is consecutive - 1 1 2). LAG and LEAD access the prior or next row in the ordered window - replacing self-joins for period-over-period comparisons. SUM OVER and AVG OVER compute running totals or moving averages. NTILE divides rows into N buckets. The single most common real-world use is de-duplication: ROW_NUMBER() OVER (PARTITION BY key ORDER BY date DESC) to number rows per group and then keep only rn = 1.",
+        "keyPoints": [
+          "Window functions keep all rows unlike GROUP BY which collapses them to one per group",
+          "OVER defines the window: PARTITION BY resets per group, ORDER BY sorts within the group",
+          "ROW_NUMBER: always unique; RANK: skips after ties; DENSE_RANK: no skips after ties",
+          "Window functions cannot be used in WHERE - wrap in a CTE or subquery to filter on them",
+          "De-duplication with ROW_NUMBER (PARTITION BY key ORDER BY date DESC) is the most common real use"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - filtering on a window function directly in WHERE, causes error\nSELECT EmployeeId, Name, Salary,\n       DENSE_RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS Rnk\nFROM Employees\nWHERE Rnk = 1;\n-- Error: Rnk does not exist yet at WHERE processing time\n\n// ✅ GOOD - wrap in CTE to filter on the window function result\nWITH RankedEmployees AS (\n    SELECT\n        EmployeeId, Name, Department, Salary,\n        ROW_NUMBER()  OVER (PARTITION BY Department ORDER BY Salary DESC) AS RowNum,\n        RANK()        OVER (PARTITION BY Department ORDER BY Salary DESC) AS Rnk,\n        DENSE_RANK()  OVER (PARTITION BY Department ORDER BY Salary DESC) AS DenseRnk\n    FROM Employees\n)\nSELECT * FROM RankedEmployees WHERE DenseRnk = 1;",
+          "note": "De-duplication is the most common real-world window function use: ROW_NUMBER() OVER (PARTITION BY key ORDER BY date DESC) then filter WHERE rn = 1 to keep one row per group."
+        },
+        "analogy": "Window functions are like adding a calculated column to a spreadsheet without collapsing any rows.",
+        "redFlags": [
+          "Confusing RANK and DENSE_RANK - RANK skips numbers after ties, DENSE_RANK does not",
+          "Thinking window functions collapse rows like GROUP BY does",
+          "Trying to put window functions directly in a WHERE clause",
+          "Not knowing the de-duplication pattern which comes up in almost every SQL interview"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between ROWS and RANGE in a window frame?",
+            "a": "ROWS counts physical rows in the window. RANGE groups together rows with equal ORDER BY values as peers. ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW is the most common running total frame."
+          },
+          {
+            "q": "What is LAG and when do you use it?",
+            "a": "LAG accesses the value from a previous row in the ordered window without a self-join - useful for comparing today's sales to yesterday's in one query."
+          },
+          {
+            "q": "What does PARTITION BY do in an OVER clause?",
+            "a": "It divides the rows into groups and resets the window function calculation for each group - like running the same ranking independently per department."
+          },
+          {
+            "q": "How do you write a running total of order amounts by date?",
+            "a": "SUM(Total) OVER (ORDER BY OrderDate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) - this adds each row's Total to the cumulative sum of all prior rows."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What problem do window functions solve that GROUP BY cannot?"
+          },
+          {
+            "role": "me",
+            "text": "GROUP BY collapses many rows into one aggregated row per group. Window functions compute across related rows and return the result alongside every individual row - I can rank every employee while keeping all their detail columns visible."
+          },
+          {
+            "role": "interviewer",
+            "text": "Explain the difference between ROW_NUMBER, RANK, and DENSE_RANK on a concrete example."
+          },
+          {
+            "role": "me",
+            "text": "Say the Engineering team has salaries: 90k, 85k, 85k, 70k. ROW_NUMBER gives 1 2 3 4. RANK gives 1 2 2 4 - skips 3 because two people tied at 2. DENSE_RANK gives 1 2 2 3 - same tie handling but no gap after."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is your most common real-world use for window functions?"
+          },
+          {
+            "role": "me",
+            "text": "De-duplication. ROW_NUMBER() OVER (PARTITION BY CustomerId ORDER BY UpdatedAt DESC) then WHERE rn = 1 - that picks the latest record per customer from a table that has duplicates. It comes up all the time in ETL and data cleanup."
+          },
+          {
+            "role": "interviewer",
+            "text": "You try to write WHERE DenseRnk = 1 in the same SELECT. What happens?"
+          },
+          {
+            "role": "me",
+            "text": "SQL Server raises an error because window functions are evaluated in the SELECT phase which runs after WHERE. I have to wrap it in a CTE or derived table so the ranked result exists before filtering on it."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you write a running total of daily sales across an entire month?"
+          },
+          {
+            "role": "me",
+            "text": "SUM(DailySales) OVER (ORDER BY SaleDate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) - the ROWS frame accumulates from the first row to the current row in the ordered window, producing a true running total per day."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-011",
+      "q": "What is a covering index and how does it eliminate a Key Lookup?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["covering index", "include", "key lookup", "non-clustered", "performance"],
+      "answer": {
+        "oneLiner": "A covering index contains every column a specific query needs - key columns for the seek plus INCLUDE columns for coverage - so the query is answered entirely from the index with no trip back to the base table.",
+        "detail": "When a non-clustered index seek finds the matching rows but the query needs columns that are not in the index, SQL Server must do a Key Lookup for each matched row - an extra read back to the clustered index leaf to fetch the missing columns. If the seek matches 5,000 rows, that is 5,000 individual Key Lookups which each require traversing the clustered B-tree. A covering index eliminates this by storing the extra columns at the leaf level using the INCLUDE clause. The key columns in the index handle the seek, range scan, and sort. The INCLUDE columns live only at the leaf level and do not affect the B-tree depth, but they make every needed column available at the leaf so no lookup is needed. Put a column in the key if queries seek, range-scan, or sort on it. Put it in INCLUDE if it only appears in the SELECT list. You can find missing index hints in the execution plan green tooltip and in the sys.dm_db_missing_index_details DMV, but always validate against your real workload before applying.",
+        "keyPoints": [
+          "Key Lookup = one round trip to the clustered index per matched row to fetch missing columns",
+          "INCLUDE columns live at the leaf level only - they provide coverage without increasing B-tree depth",
+          "Key columns: used for seek, range scan, or sort; INCLUDE columns: only needed in SELECT",
+          "A covering index eliminates Key Lookups when thousands of matches make each lookup expensive",
+          "Missing index DMVs suggest candidates but validate against real workload before applying"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - index on CustomerId only, query needs OrderDate and Total\n-- Execution plan: Index Seek -> Key Lookup per matched row\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId\n    ON Orders (CustomerId);\nSELECT OrderId, OrderDate, Total FROM Orders WHERE CustomerId = 42;\n\n// ✅ GOOD - covering index, OrderDate and Total in INCLUDE, no Key Lookup\nCREATE NONCLUSTERED INDEX IX_Orders_CustomerId_Cover\n    ON Orders (CustomerId)\n    INCLUDE (OrderDate, Total);\nSELECT OrderId, OrderDate, Total FROM Orders WHERE CustomerId = 42;\n\n-- Find missing index suggestions from the plan cache\nSELECT mid.statement, mid.equality_columns, mid.include_columns,\n       migs.avg_user_impact\nFROM sys.dm_db_missing_index_details mid\nJOIN sys.dm_db_missing_index_groups mig ON mid.index_handle = mig.index_handle\nJOIN sys.dm_db_missing_index_group_stats migs ON mig.index_group_handle = migs.group_handle\nORDER BY migs.avg_user_impact DESC;",
+          "note": "INCLUDE columns are stored only at the index leaf - they do not deepen the B-tree but they remove the need for a Key Lookup when those columns appear in the SELECT list."
+        },
+        "analogy": "A covering index is a complete cheat sheet for one specific exam - you need nothing else in the room.",
+        "redFlags": [
+          "Not knowing what a Key Lookup is or why it becomes expensive at scale",
+          "Putting columns in the key when they only appear in SELECT - they should go in INCLUDE",
+          "Blindly applying every missing index suggestion from the DMV without checking the workload",
+          "Not measuring logical reads before and after adding the covering index"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between a key column and an INCLUDE column in an index?",
+            "a": "Key columns affect the B-tree structure and are used for seeking, range scanning, and sorting. INCLUDE columns live only at the leaf level and purely provide coverage to avoid Key Lookups."
+          },
+          {
+            "q": "Can you over-index a table with covering indexes?",
+            "a": "Yes - each covering index with wide INCLUDE columns adds significant storage and write overhead. Index every query individually and you can end up with indexes larger than the table itself."
+          },
+          {
+            "q": "What is index intersection?",
+            "a": "When the optimizer combines two non-covering indexes to satisfy a query - it seeks in one index and seeks in another, then intersects the matching row IDs. Usually a single covering index is faster."
+          },
+          {
+            "q": "How do you identify which columns to include in the covering index?",
+            "a": "Look at the Key Lookup tooltip in the execution plan - it lists exactly which columns it is fetching from the clustered index. Add those to INCLUDE on the non-clustered index."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is a covering index?"
+          },
+          {
+            "role": "me",
+            "text": "An index that contains every column a specific query needs - key columns for the seek plus INCLUDE columns for coverage - so the query can be satisfied entirely from the index without any lookup back to the base table."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is a Key Lookup and why does it matter at scale?"
+          },
+          {
+            "role": "me",
+            "text": "When a non-clustered seek matches rows but the query needs columns not in the index, SQL Server does a Key Lookup - a round trip to the clustered index per matched row. At 5 matches it is fine. At 50,000 matches it is 50,000 individual B-tree traversals."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you decide which columns go in the key versus INCLUDE?"
+          },
+          {
+            "role": "me",
+            "text": "Key columns if the query seeks, range-scans, or sorts on them. INCLUDE if they only appear in the SELECT list - they live at the leaf only and do not deepen the B-tree, but they eliminate the lookup."
+          },
+          {
+            "role": "interviewer",
+            "text": "The missing index DMV is suggesting 20 indexes. Do you just add them all?"
+          },
+          {
+            "role": "me",
+            "text": "No - the DMV reflects the worst-case impact per query but does not consider write overhead, storage, or overlapping indexes. I would look at the top few by avg_user_impact, consolidate overlapping suggestions, test on a staging server, and measure reads before and after."
+          },
+          {
+            "role": "interviewer",
+            "text": "You added the covering index but the plan still shows a Key Lookup. Why?"
+          },
+          {
+            "role": "me",
+            "text": "The query might be selecting a column I forgot to INCLUDE, or it might be using SELECT * which pulls columns not in the index. I would check the Key Lookup tooltip in the plan which shows exactly which columns it is still fetching and add those to INCLUDE."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-012",
+      "q": "What causes a table scan vs an index seek? When does the optimizer choose one over the other?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["table scan", "index seek", "optimizer", "statistics", "selectivity", "sargable"],
+      "answer": {
+        "oneLiner": "The optimizer seeks when a suitable index exists and the predicate is SARGable with high selectivity. It scans when there is no index, the predicate wraps the column in a function, selectivity is low, or statistics are stale.",
+        "detail": "An index seek navigates the B-tree directly to the matching leaf pages - it is fast when few rows match because it reads only those pages. A table scan reads every page in the table from start to finish - expensive for large tables but sometimes the right choice when a large fraction of rows matches because scanning is sequential I/O. The optimizer estimates which is cheaper using statistics. A predicate is SARGable (Search ARGument Able) if the optimizer can use an index range scan to find matches - this means the indexed column appears alone on one side of the comparison. Non-SARGable predicates wrap the column in a function like YEAR(OrderDate) = 2024, use a leading wildcard like LIKE '%invoice', or cause an implicit type conversion like comparing a VARCHAR column to an NVARCHAR parameter. Each of these forces SQL Server to evaluate the expression for every row and cannot use the index. Past roughly 1-3 percent of rows returned, a scan often beats a seek plus Key Lookups because the Key Lookup cost grows linearly with matched rows.",
+        "keyPoints": [
+          "Index seek: navigates B-tree to leaf - efficient when few rows match (high selectivity)",
+          "Table scan: reads every page - chosen for low selectivity or when no usable index exists",
+          "SARGable means the indexed column appears alone on one side - functions, LIKE '%x', type mismatches break it",
+          "Stale statistics mislead the optimizer into wrong row count estimates and wrong plan choices",
+          "Past roughly 1-3 percent of rows the optimizer may choose a scan over seek plus Key Lookups"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - non-SARGable: YEAR() wraps the column, forces full table scan\nSELECT * FROM Orders WHERE YEAR(OrderDate) = 2024;\n\n// ✅ GOOD - SARGable: range comparison on the column, allows index seek\nSELECT OrderId, CustomerId, Total\nFROM Orders\nWHERE OrderDate >= '2024-01-01' AND OrderDate < '2025-01-01';\n\n-- Implicit type conversion when column is VARCHAR but parameter is NVARCHAR\nDECLARE @Email NVARCHAR(200) = N'alice@company.com';\nSELECT * FROM Customers WHERE Email = @Email;\n-- If Email column is VARCHAR, SQL Server converts every row -> scan\n-- Fix: match the parameter type to the column type\n\n-- Check and update statistics\nDBCC SHOW_STATISTICS ('Orders', 'IX_Orders_OrderDate');\nUPDATE STATISTICS Orders WITH FULLSCAN;",
+          "note": "Implicit type conversion is a silent performance killer - it shows as a yellow warning triangle in the execution plan and forces a scan on every affected query."
+        },
+        "analogy": "An index seek is looking up a word in a dictionary. A table scan is reading the whole dictionary looking for that word.",
+        "redFlags": [
+          "Not knowing what SARGable means or being unable to give a non-SARGable example",
+          "Thinking having an index on a column always means the optimizer will use it",
+          "Ignoring stale statistics as a root cause of unexpected table scans",
+          "Not knowing that a leading wildcard in LIKE prevents an index seek"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is an implicit type conversion and how does it cause a scan?",
+            "a": "When a query parameter type does not match the column type, SQL Server converts each column value to the parameter type before comparing, which defeats the index and forces a scan of every row."
+          },
+          {
+            "q": "How can a LIKE predicate be SARGable?",
+            "a": "LIKE 'invoice%' with a trailing wildcard is SARGable - the optimizer can seek to the first matching entry. LIKE '%invoice' with a leading wildcard is not - every row must be checked."
+          },
+          {
+            "q": "What is a filtered index?",
+            "a": "A non-clustered index with a WHERE clause that indexes only a subset of rows - for example WHERE IsActive = 1 on a Customers table where most rows are active."
+          },
+          {
+            "q": "When should you force an index with a hint?",
+            "a": "Rarely and as a last resort - index hints bypass the optimizer and can backfire when data distribution changes. Use Query Store to force a good plan instead."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "When does the optimizer choose a scan instead of a seek?"
+          },
+          {
+            "role": "me",
+            "text": "Four main reasons: no suitable index exists, the predicate is non-SARGable so the index cannot be used, selectivity is low meaning a large fraction of rows match making a scan cheaper than many Key Lookups, or statistics are stale and the optimizer underestimates how selective the index really is."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a concrete non-SARGable example and how you would fix it."
+          },
+          {
+            "role": "me",
+            "text": "WHERE YEAR(OrderDate) = 2024 wraps the indexed column in a function so the optimizer cannot use the index. I rewrite it as OrderDate >= '2024-01-01' AND OrderDate < '2025-01-01' - the column is now alone on the left side and the seek can happen."
+          },
+          {
+            "role": "interviewer",
+            "text": "You have an index but the plan still shows a scan. What else could cause that?"
+          },
+          {
+            "role": "me",
+            "text": "An implicit type conversion - if the column is VARCHAR and my parameter is NVARCHAR, SQL Server converts every row to NVARCHAR to compare, defeating the index. The execution plan shows a yellow warning triangle on the scan operator for exactly this."
+          },
+          {
+            "role": "interviewer",
+            "text": "Even with a good index and a SARGable predicate, sometimes the optimizer scans. When is that correct behavior?"
+          },
+          {
+            "role": "me",
+            "text": "When the query returns a large fraction of the table - past roughly 1 to 3 percent of rows, a sequential scan is often faster than an index seek plus thousands of Key Lookups because the seek jumps around randomly in storage while the scan reads sequentially."
+          },
+          {
+            "role": "interviewer",
+            "text": "A query ran fast last week and now scans the table even though nothing changed in the code. What is your first suspect?"
+          },
+          {
+            "role": "me",
+            "text": "Stale statistics - a large data load or delete may have changed the distribution so the statistics no longer reflect reality. I would run DBCC SHOW_STATISTICS to check the last update time and run UPDATE STATISTICS WITH FULLSCAN to refresh them."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-013",
+      "q": "What is the difference between UNION and UNION ALL?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["union", "union all", "distinct", "duplicates", "set operations"],
+      "answer": {
+        "oneLiner": "UNION removes duplicate rows using a sort or hash step, which costs extra time. UNION ALL keeps all rows including duplicates and has no deduplication overhead. Default to UNION ALL unless you specifically need deduplication.",
+        "detail": "Both UNION and UNION ALL combine the result sets of two or more SELECT statements by stacking rows vertically. The column count and compatible data types must match across all SELECT statements. UNION adds an implicit DISTINCT operation after combining the rows - the engine sorts or hashes the entire combined set to find and remove duplicates. This is a blocking operation that cannot return any rows until all input rows are processed. UNION ALL skips this entirely and streams all rows through in the order they arrive. When the two result sets are known to be disjoint - for example orders from an OnlineOrders table and orders from a StoreOrders table where no order can appear in both - UNION ALL is both correct and faster. ORDER BY can only appear once, at the very end of the last SELECT, and it applies to the combined result.",
+        "keyPoints": [
+          "UNION removes duplicate rows using an implicit DISTINCT - an extra blocking sort or hash step",
+          "UNION ALL keeps all rows with no deduplication - always faster when sets are disjoint",
+          "Both require matching column count and compatible data types",
+          "ORDER BY goes only at the very end of the final SELECT, applies to the full combined result",
+          "Use UNION only when duplicate removal is actually needed - otherwise UNION ALL is correct"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - using UNION when sets are already disjoint, paying for unnecessary deduplication\nSELECT OrderId, Total, 'Online' AS Channel FROM OnlineOrders\nUNION\nSELECT OrderId, Total, 'Store'  AS Channel FROM StoreOrders;\n-- Sorts or hashes millions of rows to find duplicates that cannot exist\n\n// ✅ GOOD - UNION ALL when sets are disjoint, no deduplication overhead\nSELECT OrderId, Total, 'Online' AS Channel FROM OnlineOrders\nUNION ALL\nSELECT OrderId, Total, 'Store'  AS Channel FROM StoreOrders\nORDER BY Total DESC;\n\n-- UNION is correct when deduplication is genuinely needed\nSELECT CustomerId FROM ActiveCustomers\nUNION\nSELECT CustomerId FROM ArchivedCustomers;\n-- A customer may exist in both tables - UNION removes that duplicate",
+          "note": "Default to UNION ALL. Use plain UNION only when a row could genuinely appear in both result sets and you want to eliminate that duplicate."
+        },
+        "analogy": "UNION ALL stacks two piles of papers together. UNION stacks them and then removes any duplicate pages.",
+        "redFlags": [
+          "Defaulting to UNION when the sets are disjoint - paying for deduplication you do not need",
+          "Not knowing UNION is slower because of the implicit DISTINCT step",
+          "Putting ORDER BY inside one of the SELECT statements instead of at the very end",
+          "Confusing UNION (stacks rows) with JOIN (combines columns)"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between UNION and JOIN?",
+            "a": "UNION combines rows vertically - it stacks rows from two result sets. JOIN combines columns horizontally by matching rows from two tables on a key."
+          },
+          {
+            "q": "How do INTERSECT and EXCEPT work?",
+            "a": "INTERSECT returns only rows that appear in both result sets. EXCEPT returns rows from the first set that do not appear in the second set."
+          },
+          {
+            "q": "Why is UNION a blocking operation?",
+            "a": "The deduplication step must process all rows from both inputs before it can return any output - it cannot stream results while still reading inputs."
+          },
+          {
+            "q": "Can you ORDER BY a column that is not in the SELECT list with UNION?",
+            "a": "No - ORDER BY in a UNION query must reference a column from the SELECT list since the combined result has no other columns to sort on."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "UNION versus UNION ALL - what is the difference?"
+          },
+          {
+            "role": "me",
+            "text": "UNION adds an implicit DISTINCT step after combining the rows - it sorts or hashes the entire combined set to remove duplicates, which blocks output until all rows are processed. UNION ALL skips that entirely and returns all rows immediately, including duplicates."
+          },
+          {
+            "role": "interviewer",
+            "text": "Which should be your default?"
+          },
+          {
+            "role": "me",
+            "text": "UNION ALL - I use plain UNION only when a row can genuinely exist in both result sets and I need to eliminate that duplicate. If the sets are disjoint, like online orders and store orders, there are no duplicates to remove and UNION just wastes time."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where does ORDER BY go in a UNION query?"
+          },
+          {
+            "role": "me",
+            "text": "Only once, at the very end after the last SELECT. It applies to the full combined result. Putting ORDER BY inside one of the individual SELECTs is a syntax error in SQL Server."
+          },
+          {
+            "role": "interviewer",
+            "text": "When is UNION the correct choice?"
+          },
+          {
+            "role": "me",
+            "text": "When a customer or record might exist in both tables and I want exactly one row - for example merging active and archived customer IDs where the same person could appear in both. That is when UNION deduplication is genuinely needed and worth the cost."
+          },
+          {
+            "role": "interviewer",
+            "text": "What other set operations does SQL Server support beyond UNION?"
+          },
+          {
+            "role": "me",
+            "text": "INTERSECT returns only rows that appear in both result sets. EXCEPT returns rows from the first set that do not appear in the second. Both behave like UNION in that they deduplicate and require matching column counts and types."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-queries-014",
+      "q": "What is the difference between a stored procedure and inline (ad-hoc) SQL?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["stored procedure", "inline sql", "sql injection", "plan caching", "security"],
+      "answer": {
+        "oneLiner": "Stored procedures are named T-SQL objects stored in the database with their own permissions and cached plans. Parameterized inline SQL via sp_executesql gets the same plan caching and injection safety. Only string-concatenated SQL is the real injection risk.",
+        "detail": "The plan caching story: SQL Server compiles a query plan the first time a stored procedure or parameterized sp_executesql call runs, then caches it and reuses it. Both are equally cached. Raw string concatenation like 'SELECT * FROM Orders WHERE Id = ' + @id is not parameterized - each different value creates a new cache entry and is vulnerable to SQL injection. The security story: stored procedures let you GRANT EXECUTE without giving the caller direct table access. The caller can only do what the procedure does, and the procedure owner's permissions apply. This is the ownership chain. The injection story: parameterized calls - whether stored proc or sp_executesql - pass values as typed parameters, never as part of the SQL string. String concatenation embeds untrusted values into the SQL text. Both stored procedures and sp_executesql share one important caveat: parameter sniffing. The first execution's parameters shape the cached plan, and that plan may be wrong for later calls with very different parameters.",
+        "keyPoints": [
+          "Stored procedures and parameterized sp_executesql get the same plan caching - neither is inherently faster",
+          "Only string-concatenated SQL is the injection risk, not parameterized inline SQL",
+          "GRANT EXECUTE on a proc without granting table access is the key security boundary",
+          "Both stored procs and sp_executesql are subject to parameter sniffing",
+          "Stored procedures are easier to version, monitor, and permission-manage than inline SQL"
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - string concatenation: SQL injection risk and no plan reuse\nDECLARE @sql NVARCHAR(500);\nSET @sql = 'SELECT * FROM Orders WHERE CustomerId = ' + CAST(@CustomerId AS VARCHAR);\nEXEC(@sql);\n-- Risk: attacker controls @CustomerId and can inject SQL\n\n// ✅ GOOD - stored procedure with parameters: safe, cached, permissioned\nCREATE OR ALTER PROCEDURE usp_GetCustomerOrders\n    @CustomerId INT,\n    @StartDate  DATE = NULL\nAS\nBEGIN\n    SET NOCOUNT ON;\n    SELECT o.OrderId, o.Total, o.OrderDate\n    FROM Orders o\n    WHERE o.CustomerId = @CustomerId\n      AND (@StartDate IS NULL OR o.OrderDate >= @StartDate)\n    ORDER BY o.OrderDate DESC;\nEND;\n\n-- Parameterized inline SQL is equally safe and cached\nEXEC sp_executesql\n    N'SELECT OrderId, Total FROM Orders WHERE CustomerId = @cid AND OrderDate >= @dt',\n    N'@cid INT, @dt DATE',\n    @cid = 42, @dt = '2024-01-01';",
+          "note": "sp_executesql with named parameters is as safe as a stored procedure from an injection perspective - the values are never embedded in the SQL text."
+        },
+        "analogy": "A stored procedure is a pre-approved form with labeled fields. String concatenation is letting a stranger write their own form.",
+        "redFlags": [
+          "Claiming stored procedures are always faster than parameterized inline SQL - caching is equal",
+          "Not knowing that stored procs can still be injection-vulnerable if they concatenate strings internally",
+          "Not knowing about parameter sniffing which affects both stored procs and sp_executesql equally",
+          "Thinking any use of inline SQL is automatically an injection risk"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is parameter sniffing and how do you handle it?",
+            "a": "The optimizer builds the cached plan using the first execution's parameter values. If those values are atypical, later calls with different values get a bad plan. Fix with OPTION (RECOMPILE), OPTIMIZE FOR UNKNOWN, or Query Store plan forcing."
+          },
+          {
+            "q": "What security advantage do stored procedures have over inline SQL?",
+            "a": "You can GRANT EXECUTE on the procedure without granting SELECT or UPDATE on the underlying tables - the caller can only do what the procedure allows, not arbitrary table access."
+          },
+          {
+            "q": "What is an inline table-valued function and when is it better than a stored procedure?",
+            "a": "An inline TVF returns a table and is composable inside a SELECT or JOIN - it can be filtered, joined, and aggregated by the caller in one query. A stored procedure cannot be used inside a SELECT."
+          },
+          {
+            "q": "How does EF Core handle SQL injection prevention?",
+            "a": "EF Core generates parameterized SQL automatically for all LINQ queries. Raw SQL methods like FromSqlRaw still require you to pass parameters separately using FromSqlInterpolated or explicit SqlParameter objects."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Are stored procedures faster than inline SQL?"
+          },
+          {
+            "role": "me",
+            "text": "Not inherently - parameterized inline SQL via sp_executesql gets the same plan caching as a stored procedure. The plan is compiled on the first call and reused on subsequent calls. The speed difference between them is negligible."
+          },
+          {
+            "role": "interviewer",
+            "text": "So where does inline SQL become a problem?"
+          },
+          {
+            "role": "me",
+            "text": "String concatenation is the problem - if I build the SQL text by concatenating user input I get SQL injection vulnerability and no plan reuse. Parameterized SQL with typed parameters avoids both issues."
+          },
+          {
+            "role": "interviewer",
+            "text": "What security benefit does a stored procedure give that sp_executesql does not?"
+          },
+          {
+            "role": "me",
+            "text": "Permission management. I can GRANT EXECUTE on the stored procedure without giving the caller any direct table permissions. The proc runs under the ownership chain, so the caller can only do exactly what the procedure allows."
+          },
+          {
+            "role": "interviewer",
+            "text": "Do stored procedures have any caching downsides?"
+          },
+          {
+            "role": "me",
+            "text": "Parameter sniffing - the plan is compiled from the first call's parameters. If a call with a highly selective parameter builds the plan, later calls with very different parameters reuse that plan and get poor performance. Fix with OPTION (RECOMPILE) or OPTIMIZE FOR UNKNOWN."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you choose inline SQL over a stored procedure?"
+          },
+          {
+            "role": "me",
+            "text": "When using an ORM like EF Core that generates safe parameterized queries automatically, or when the query is dynamically constructed based on optional filters where a single stored procedure with many optional parameters becomes unwieldy. The key is always to parameterize, not concatenate."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

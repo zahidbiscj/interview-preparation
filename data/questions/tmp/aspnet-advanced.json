@@ -1,0 +1,887 @@
+{
+  "subtopicId": "advanced",
+  "questions": [
+    {
+      "id": "aspnet-advanced-001",
+      "q": "Minimal APIs vs Controller-based APIs — when do you use each?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["minimal-api", "controllers", "mvc"],
+      "answer": {
+        "oneLiner": "Minimal APIs are lightweight endpoint mapping with less code, ideal for small services and microservices. Controllers bring the full MVC feature set - filters, conventions, and organised routing - for large, complex APIs.",
+        "detail": "Minimal APIs use app.MapGet/Post/Put/Delete to wire up handlers directly, with dependencies injected as parameters. No base class, no attributes, no ceremony. Controllers inherit from ControllerBase, get [ApiController] conventions, support MVC action/resource/exception filters, and organise well at scale. In .NET 7 endpoint filters and route groups closed the gap - minimal APIs can now do per-endpoint cross-cutting logic and share configuration across groups. The decision is mainly about team size, API surface area, and how much shared cross-cutting behaviour you need.",
+        "keyPoints": [
+          "Minimal APIs use app.MapGet/Post, no base class required, very fast to write",
+          "Controllers give you MVC filters, [ApiController] auto-validation, and better organisation at scale",
+          ".NET 7 added endpoint filters and MapGroup to bring parity for many features",
+          "Pick minimal for small services or microservices, controllers for large domains"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - binding directly to EF entity exposes unwanted fields\napp.MapGet(\"/products/{id}\", async (int id, AppDbContext db) =>\n    await db.Products.FindAsync(id));\n\n// ✅ GOOD - use a service layer, return a typed result\napp.MapGet(\"/products/{id}\", async (int id, IProductService svc) =>\n    await svc.FindAsync(id) is { } p ? Results.Ok(p) : Results.NotFound());",
+          "note": "Minimal API handlers inject dependencies as parameters and use Results helpers to return typed responses."
+        },
+        "analogy": "Minimal APIs are a food truck; controllers are a full restaurant kitchen.",
+        "redFlags": [
+          "Saying minimal APIs cannot do DI or validation - both work fine",
+          "Claiming controllers are always the better choice for every project",
+          "Not knowing that .NET 7 added endpoint filters to minimal APIs",
+          "Confusing endpoint filters with MVC action filters - they are different abstractions"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can minimal APIs use dependency injection?",
+            "a": "Yes - dependencies are injected directly as handler parameters, resolved from the DI container per request."
+          },
+          {
+            "q": "What did .NET 7 add to minimal APIs?",
+            "a": "Endpoint filters and route groups (MapGroup), which allow shared cross-cutting logic across endpoints similar to controller filters."
+          },
+          {
+            "q": "When would you choose controllers over minimal APIs?",
+            "a": "On a large, complex domain with many endpoints and shared cross-cutting behavior - MVC conventions and filters keep that organised better than a large set of map calls."
+          },
+          {
+            "q": "Can you mix minimal APIs and controllers in one app?",
+            "a": "Yes - you can use both in the same ASP.NET Core app. Some teams use controllers for complex domains and minimal APIs for lightweight utility endpoints."
+          },
+          {
+            "q": "Do minimal APIs support OpenAPI/Swagger?",
+            "a": "Yes - use WithOpenApi() on an endpoint or install the Microsoft.AspNetCore.OpenApi package to generate Swagger documentation."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Minimal APIs versus controller-based APIs - when do you use each?"
+          },
+          {
+            "role": "me",
+            "text": "Minimal APIs use app.MapGet and similar methods with no base class - very little ceremony, great for microservices and small services. Controllers bring the full MVC stack: filters, [ApiController] conventions, and better structure for large APIs with many shared behaviors."
+          },
+          {
+            "role": "interviewer",
+            "text": "I have heard minimal APIs cannot do validation or DI - is that true?"
+          },
+          {
+            "role": "me",
+            "text": "That was a common misconception early on. DI works - dependencies are just handler parameters. Since .NET 7 we have endpoint filters and route groups, so validation and cross-cutting logic are fully supported. The gap with controllers has narrowed significantly."
+          },
+          {
+            "role": "interviewer",
+            "text": "So when would minimal APIs actually not be the right choice?"
+          },
+          {
+            "role": "me",
+            "text": "On a large, complex domain with dozens of endpoints and lots of shared behavior - the convention-based organisation of controllers and their filter pipeline keeps it tidier. A big sprawl of MapGet calls gets hard to navigate."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you mix both styles in one project?"
+          },
+          {
+            "role": "me",
+            "text": "Yes, you can use both in the same ASP.NET Core app. Some teams use controllers for the main domain API and minimal APIs for lightweight health or utility endpoints - they coexist without conflict."
+          },
+          {
+            "role": "interviewer",
+            "text": "What specifically is an endpoint filter, and how does it compare to an MVC action filter?"
+          },
+          {
+            "role": "me",
+            "text": "An endpoint filter wraps a minimal API handler - you add it with AddEndpointFilter, it can read handler arguments via ctx.GetArgument<T>, and short-circuit early. MVC action filters belong to controllers only; they are not interchangeable abstractions even though the concept is similar."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-advanced-002",
+      "q": "Endpoint filters vs middleware vs MVC filters — when do you use each?",
+      "level": "senior",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["endpoint-filter", "middleware", "mvc-filters", "minimal-api"],
+      "answer": {
+        "oneLiner": "Middleware handles raw HTTP for every request. MVC filters run inside the controller pipeline with access to the action and model state. Endpoint filters (.NET 7) do the same job as MVC filters but for minimal API handlers.",
+        "detail": "Middleware runs first in the pipeline, before routing, and knows nothing about controllers or handlers. It sees raw HttpContext. MVC filters run much later, inside the MVC layer - they know the action being called, its bound arguments, and ModelState. Action, resource, exception, and result filters all exist here. Endpoint filters were introduced in .NET 7 as the minimal-API counterpart - they wrap the handler, can read its typed arguments via ctx.GetArgument<T>(index), and can be attached per-endpoint or shared across a route group via MapGroup. Key distinction: MVC filters do not work with minimal APIs and endpoint filters do not work with controllers.",
+        "keyPoints": [
+          "Middleware runs first on raw HTTP, before routing, no endpoint awareness",
+          "MVC filters run inside controller pipeline with action args and ModelState access",
+          "Endpoint filters (.NET 7) are the minimal-API equivalent - wrap the handler per-endpoint or per-group",
+          "MVC filters and endpoint filters are not interchangeable between styles"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - middleware cannot read handler arguments or short-circuit per handler\napp.Use(async (ctx, next) => { /* cannot inspect handler params */ await next(); });\n\n// ✅ GOOD - endpoint filter sees handler args and is scoped per endpoint/group\napp.MapPost(\"/orders\", CreateOrder)\n   .AddEndpointFilter(async (ctx, next) =>\n   {\n       var req = ctx.GetArgument<CreateOrderRequest>(0);\n       if (req.Quantity <= 0) return Results.BadRequest(\"Quantity must be positive\");\n       return await next(ctx);\n   });",
+          "note": "Endpoint filters access typed handler arguments and can short-circuit before the handler runs."
+        },
+        "analogy": "Middleware is the building entrance; filters are the desk guards specific to each office floor.",
+        "redFlags": [
+          "Saying MVC filters work with minimal APIs - they do not",
+          "Saying middleware can read ModelState or handler arguments - it cannot",
+          "Confusing endpoint filters (minimal API) with action filters (controller)",
+          "Not knowing that endpoint filters were added in .NET 7"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can you use an MVC action filter on a minimal API endpoint?",
+            "a": "No - MVC filters only apply to controllers. For minimal APIs use AddEndpointFilter instead."
+          },
+          {
+            "q": "How do you share an endpoint filter across multiple minimal API routes?",
+            "a": "Use MapGroup to create a route group and call AddEndpointFilter on the group - all routes in the group inherit it."
+          },
+          {
+            "q": "What can an endpoint filter access that middleware cannot?",
+            "a": "The handler's typed arguments via ctx.GetArgument<T>(index), allowing it to inspect or validate the exact parameters the handler will receive."
+          },
+          {
+            "q": "When would you use middleware over an endpoint filter?",
+            "a": "For truly global concerns - logging, compression, CORS, exception handling - that apply to every request including static files, not just specific endpoints."
+          },
+          {
+            "q": "What is the execution order for an endpoint filter?",
+            "a": "Endpoint filters run after middleware and routing but before the handler, in registration order, and unwind in reverse after the handler completes."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Endpoint filters versus middleware versus MVC filters - when do you use each?"
+          },
+          {
+            "role": "me",
+            "text": "Middleware runs first on the raw HTTP pipeline for every request - no knowledge of controllers or handlers. MVC filters run inside the controller pipeline with access to action arguments and ModelState. Endpoint filters, added in .NET 7, are the minimal-API equivalent - they wrap individual handlers and can read typed arguments."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why use an endpoint filter instead of middleware in a minimal API project?"
+          },
+          {
+            "role": "me",
+            "text": "Because an endpoint filter can read the handler's typed arguments via ctx.GetArgument<T> and is scoped to specific endpoints or groups. Middleware is global and cannot see the handler's parameters at all - useful for different things."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you use an MVC action filter on a minimal API endpoint?"
+          },
+          {
+            "role": "me",
+            "text": "No - MVC filters belong to the controller pipeline. For minimal APIs the equivalent is AddEndpointFilter. They are different abstractions even if they solve a similar problem."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you share filter logic across multiple minimal API routes?"
+          },
+          {
+            "role": "me",
+            "text": "Use MapGroup to create a route group, then call AddEndpointFilter on the group. Every endpoint in the group inherits the filter - same pattern as applying a filter to a controller class."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a real-world scenario where you would pick an endpoint filter over middleware."
+          },
+          {
+            "role": "me",
+            "text": "Validating a CreateOrderRequest before the handler runs - an endpoint filter reads the argument with ctx.GetArgument<CreateOrderRequest>(0), checks business rules like quantity greater than zero, and returns Results.BadRequest if invalid. Middleware cannot do that because it does not know the argument types."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-advanced-003",
+      "q": "How do you do centralised exception handling with IExceptionHandler in .NET 8?",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["exception-handling", "iexceptionhandler", "problemdetails", "dotnet8"],
+      "answer": {
+        "oneLiner": "Implement IExceptionHandler, register it with AddExceptionHandler, and call UseExceptionHandler. The handler converts unhandled exceptions into RFC 7807 ProblemDetails responses in one central place.",
+        "detail": "IExceptionHandler has a single method: TryHandleAsync(HttpContext, Exception, CancellationToken). Inside it you inspect the exception type, set the response status code, write a ProblemDetails JSON body, and return true to signal the exception is handled. Returning false passes it to the next registered handler. You can chain multiple handlers - for example one for domain exceptions, one for all others as a fallback. Register each with builder.Services.AddExceptionHandler<T>(). Also call builder.Services.AddProblemDetails() to get a built-in fallback for unhandled cases. Call app.UseExceptionHandler() in the pipeline early, before routing, so it wraps everything. The advantage over custom middleware is that it integrates cleanly with the built-in UseExceptionHandler infrastructure and ProblemDetails service.",
+        "keyPoints": [
+          "IExceptionHandler.TryHandleAsync: inspect exception, set status, write ProblemDetails, return true",
+          "Chain multiple handlers - first to return true wins, false passes to the next",
+          "AddProblemDetails() provides a built-in fallback for unhandled exceptions",
+          "Never leak stack traces to clients in production - log server-side, return a clean message"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - try/catch in every controller, scattered error logic\n[HttpGet(\"{id}\")] public async Task<Product> Get(int id) {\n    try { return await _repo.FindAsync(id); }\n    catch (NotFoundException) { /* duplicated everywhere */ throw; } }\n\n// ✅ GOOD - centralised handler maps exceptions to status codes\npublic class AppExceptionHandler : IExceptionHandler {\n    public async ValueTask<bool> TryHandleAsync(\n        HttpContext ctx, Exception ex, CancellationToken ct) {\n        var status = ex is NotFoundException ? 404 : 500;\n        ctx.Response.StatusCode = status;\n        await ctx.Response.WriteAsJsonAsync(\n            new ProblemDetails { Title = ex.Message, Status = status }, ct);\n        return true;\n    }\n}",
+          "note": "Register with builder.Services.AddExceptionHandler<AppExceptionHandler>() and call app.UseExceptionHandler()."
+        },
+        "analogy": "One receptionist handles all complaints rather than every desk writing its own complaint form.",
+        "redFlags": [
+          "Putting try/catch in every controller action instead of a global handler",
+          "Leaking stack traces or exception messages to API clients in production",
+          "Confusing IExceptionHandler (.NET 8) with the older UseExceptionHandler lambda pattern",
+          "Not calling AddProblemDetails() so the fallback shape is inconsistent"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is RFC 7807 ProblemDetails?",
+            "a": "A standard JSON error format with fields like title, status, detail, and type - it gives all API errors a consistent shape that clients can parse reliably."
+          },
+          {
+            "q": "What does returning true from TryHandleAsync mean?",
+            "a": "The exception is handled - no further handlers or middleware run. Returning false passes control to the next registered exception handler."
+          },
+          {
+            "q": "How do you map a domain NotFoundException to a 404?",
+            "a": "Inside TryHandleAsync, check the exception type with is NotFoundException, set ctx.Response.StatusCode = 404, write a ProblemDetails body, and return true."
+          },
+          {
+            "q": "Why use IExceptionHandler over a custom exception middleware?",
+            "a": "It integrates with UseExceptionHandler infrastructure, supports chaining multiple handlers cleanly, and works with AddProblemDetails for consistent fallbacks."
+          },
+          {
+            "q": "Where in the pipeline should UseExceptionHandler be placed?",
+            "a": "Near the top, before routing and other middleware, so it wraps everything and catches exceptions from all downstream components."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do you do centralised exception handling with IExceptionHandler in .NET 8?"
+          },
+          {
+            "role": "me",
+            "text": "Implement IExceptionHandler with a TryHandleAsync method, register it with AddExceptionHandler, and call UseExceptionHandler early in the pipeline. The handler maps exception types to status codes and writes RFC 7807 ProblemDetails responses in one place."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why is this better than try/catch in every controller?"
+          },
+          {
+            "role": "me",
+            "text": "Because scattered try/catch means duplicated error formatting and logging in every action - and easy to forget. One handler centralises the mapping: NotFoundException to 404, validation errors to 400, everything else to 500, consistently logged in one place."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if you return false from TryHandleAsync?"
+          },
+          {
+            "role": "me",
+            "text": "Control passes to the next registered exception handler. This lets you chain them - for example a specific handler for domain exceptions returning false passes to a catch-all fallback that handles everything else."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you ensure clients never see a raw stack trace in production?"
+          },
+          {
+            "role": "me",
+            "text": "Inside TryHandleAsync I write a clean ProblemDetails body with only a generic message and the status code. I log the full exception server-side with the logger. The stack trace never leaves the server."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is AddProblemDetails for and when do you need it?"
+          },
+          {
+            "role": "me",
+            "text": "It registers the built-in ProblemDetails service, which provides a consistent fallback format for cases your handlers did not catch. Without it, unhandled cases might return inconsistent error shapes. It also enables automatic ProblemDetails for validation failures from [ApiController]."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-advanced-004",
+      "q": "What are health checks in ASP.NET Core and why do they matter in microservices?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["health-checks", "microservices", "kubernetes", "liveness-readiness"],
+      "answer": {
+        "oneLiner": "Health checks expose a /health endpoint that reports whether the app and its dependencies are working. Orchestrators like Kubernetes use them to restart broken pods or stop routing traffic to unhealthy ones.",
+        "detail": "You register health checks with builder.Services.AddHealthChecks() and map the endpoint with app.MapHealthChecks. Built-in checks exist for SQL Server, Redis, and more via community packages. Each check returns Healthy, Degraded, or Unhealthy. The critical distinction in Kubernetes is liveness vs readiness. A liveness probe checks: is the process alive? If it fails, Kubernetes restarts the pod. A readiness probe checks: can the pod serve traffic right now? If it fails, Kubernetes removes the pod from the load balancer without restarting it - useful during startup warmup or when a dependency is briefly down. Combining them prevents restart loops caused by a dependency being unavailable.",
+        "keyPoints": [
+          "Register with AddHealthChecks(), expose with MapHealthChecks('/health')",
+          "Checks return Healthy, Degraded, or Unhealthy - check real dependencies like DB and Redis",
+          "Liveness: is the process alive? Failure triggers a pod restart",
+          "Readiness: can it serve traffic? Failure removes from load balancer without restart"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - always returns healthy without checking dependencies\napp.MapGet(\"/health\", () => \"healthy\");\n\n// ✅ GOOD - checks real dependencies, split by probe type\nbuilder.Services.AddHealthChecks()\n    .AddSqlServer(connString, tags: new[] { \"readiness\" })\n    .AddRedis(redisConn, tags: new[] { \"readiness\" });\napp.MapHealthChecks(\"/health/live\");\napp.MapHealthChecks(\"/health/ready\",\n    new HealthCheckOptions {\n        Predicate = c => c.Tags.Contains(\"readiness\")\n    });",
+          "note": "Separate liveness and readiness endpoints with tags so Kubernetes can probe each independently."
+        },
+        "analogy": "Liveness is the heartbeat; readiness is whether the doctor is in the room.",
+        "redFlags": [
+          "Returning healthy always without actually checking dependencies like the database",
+          "Confusing liveness with readiness - failing a DB check should not restart a healthy pod",
+          "Not knowing that Kubernetes uses separate probes for each",
+          "Saying health checks are only for monitoring tools - they drive orchestration decisions"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between liveness and readiness probes?",
+            "a": "Liveness checks if the process is alive - failure restarts the pod. Readiness checks if it can serve traffic - failure removes it from the load balancer without restarting."
+          },
+          {
+            "q": "Why should a failing database not trigger a liveness probe failure?",
+            "a": "Because restarting the pod will not fix the database. The pod is healthy - it just cannot reach a dependency. A readiness failure correctly pulls it from traffic until the DB recovers."
+          },
+          {
+            "q": "What statuses can a health check return?",
+            "a": "Healthy, Degraded, or Unhealthy. Degraded signals reduced capacity, Unhealthy signals complete failure."
+          },
+          {
+            "q": "How do you check a SQL Server connection as part of health checks?",
+            "a": "Use AddSqlServer(connectionString) from the AspNetCore.HealthChecks.SqlServer NuGet package - it pings the database and returns Unhealthy if it cannot connect."
+          },
+          {
+            "q": "Who typically consumes health check endpoints?",
+            "a": "Kubernetes for liveness/readiness probes, load balancers for traffic routing decisions, and monitoring dashboards for operational visibility."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What are health checks in ASP.NET Core and why do they matter in microservices?"
+          },
+          {
+            "role": "me",
+            "text": "Health checks expose a /health endpoint that reports whether the app and its dependencies - database, Redis, message broker - are available. Kubernetes and load balancers use them to restart broken instances or stop routing traffic to unhealthy ones."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the difference between liveness and readiness probes?"
+          },
+          {
+            "role": "me",
+            "text": "Liveness asks: is the process alive? If it fails, Kubernetes restarts the pod. Readiness asks: can it serve traffic right now? If it fails, Kubernetes removes the pod from the load balancer without restarting - for example during startup or when a dependency is briefly down."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why would you not include a database check in the liveness probe?"
+          },
+          {
+            "role": "me",
+            "text": "Because if the database is down, restarting the pod will not help - the pod itself is healthy. Putting the DB check on liveness causes needless restart loops. It belongs on readiness so traffic is held until the DB recovers."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you split the checks into separate endpoints for Kubernetes?"
+          },
+          {
+            "role": "me",
+            "text": "Tag the dependency checks, for example with 'readiness', then map two endpoints: MapHealthChecks('/health/live') with no predicate for the liveness probe, and MapHealthChecks('/health/ready') filtered to checks tagged 'readiness'."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does the Degraded status mean and when would you use it?"
+          },
+          {
+            "role": "me",
+            "text": "Degraded sits between Healthy and Unhealthy - the service is running but at reduced capacity, for example a read replica is down but the primary works. It lets monitoring dashboards surface partial failures without triggering orchestrator restarts."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-advanced-005",
+      "q": "How do you run background tasks with IHostedService / BackgroundService?",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["backgroundservice", "ihostedservice", "background-tasks", "hosted-service"],
+      "answer": {
+        "oneLiner": "Derive from BackgroundService and override ExecuteAsync to run long-lived work - queue processing, polling, or scheduled jobs - alongside the main app. Register with AddHostedService.",
+        "detail": "IHostedService has StartAsync and StopAsync. BackgroundService is a convenience base that implements IHostedService and runs your ExecuteAsync on a background thread automatically. Because BackgroundService is effectively a singleton in the DI container, you cannot inject scoped services like DbContext directly into the constructor - that would be a captive dependency. Instead, inject IServiceScopeFactory and create a scope inside the work loop for each unit of work. Always accept and respect the CancellationToken parameter in ExecuteAsync - the framework signals it on app shutdown so your loop can exit cleanly instead of being abruptly killed. For scheduled periodic work use PeriodicTimer (.NET 6+) which integrates with cancellation, or a library like Hangfire or Quartz for more complex job scheduling.",
+        "keyPoints": [
+          "Override ExecuteAsync - runs for the app lifetime on a background thread",
+          "Respect the CancellationToken so shutdown is graceful, not abrupt",
+          "Never inject scoped services in the constructor - use IServiceScopeFactory inside the loop",
+          "Use PeriodicTimer for periodic work or Hangfire/Quartz for complex scheduling"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - injects scoped DbContext in constructor - captive dependency bug\npublic class InvoiceWorker : BackgroundService {\n    public InvoiceWorker(AppDbContext db) { } }\n\n// ✅ GOOD - creates a scope per iteration to safely use scoped services\npublic class InvoiceWorker : BackgroundService {\n    private readonly IServiceScopeFactory _factory;\n    public InvoiceWorker(IServiceScopeFactory factory) => _factory = factory;\n    protected override async Task ExecuteAsync(CancellationToken ct) {\n        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));\n        while (await timer.WaitForNextTickAsync(ct)) {\n            using var scope = _factory.CreateScope();\n            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();\n            await ProcessInvoicesAsync(db, ct);\n        }\n    }\n}",
+          "note": "Register with builder.Services.AddHostedService<InvoiceWorker>() in Program.cs."
+        },
+        "analogy": "BackgroundService is a warehouse worker running all night while the shop is open.",
+        "redFlags": [
+          "Ignoring the CancellationToken - causes data corruption on app shutdown",
+          "Injecting a scoped DbContext into the BackgroundService constructor",
+          "Not knowing that BackgroundService is effectively a singleton in DI",
+          "Using Thread.Sleep instead of PeriodicTimer or await Task.Delay"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why can you not inject DbContext directly into BackgroundService constructor?",
+            "a": "BackgroundService is a singleton. Injecting a scoped DbContext captures it for the app lifetime, causing stale change tracking and thread-safety bugs across all loop iterations."
+          },
+          {
+            "q": "How do you use a scoped service from a BackgroundService?",
+            "a": "Inject IServiceScopeFactory, create a scope inside the loop with _factory.CreateScope(), resolve the scoped service from the scope, and dispose the scope after each unit of work."
+          },
+          {
+            "q": "What happens if you ignore the CancellationToken in ExecuteAsync?",
+            "a": "On app shutdown the runtime cannot signal your loop to stop cleanly, so the process may be forcefully killed mid-operation, risking data corruption or incomplete transactions."
+          },
+          {
+            "q": "What is PeriodicTimer and why is it better than Task.Delay?",
+            "a": "PeriodicTimer integrates with CancellationToken and does not drift over time like a Task.Delay loop - each tick fires at the intended interval regardless of how long the work took."
+          },
+          {
+            "q": "When would you use Hangfire instead of BackgroundService?",
+            "a": "When you need recurring scheduled jobs, job retries, a dashboard, or distributed job execution across multiple instances - Hangfire handles all of that; BackgroundService is better for simple continuous work."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do you run background tasks with BackgroundService?"
+          },
+          {
+            "role": "me",
+            "text": "Derive from BackgroundService, override ExecuteAsync to run long-lived work like order queue processing or invoice polling, and register it with AddHostedService. The framework starts it when the app starts and stops it on shutdown."
+          },
+          {
+            "role": "interviewer",
+            "text": "BackgroundService is a singleton - how do you safely use a scoped DbContext inside it?"
+          },
+          {
+            "role": "me",
+            "text": "I inject IServiceScopeFactory instead. Inside the work loop I create a scope with _factory.CreateScope(), resolve DbContext from it, do the work, then dispose the scope. Injecting the DbContext directly in the constructor is a captive dependency - it lives forever and causes stale data bugs."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if ExecuteAsync ignores the CancellationToken?"
+          },
+          {
+            "role": "me",
+            "text": "The framework cannot signal the loop to stop during app shutdown. The runtime may forcefully terminate the process mid-operation, which risks incomplete transactions or data corruption in a payment or inventory worker."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you schedule periodic work inside ExecuteAsync?"
+          },
+          {
+            "role": "me",
+            "text": "I use PeriodicTimer from .NET 6 - it fires on a fixed interval, integrates cleanly with CancellationToken via WaitForNextTickAsync, and does not drift over time the way a Task.Delay loop does."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you choose Hangfire over BackgroundService?"
+          },
+          {
+            "role": "me",
+            "text": "When I need advanced scheduling with cron expressions, automatic retries on failure, a monitoring dashboard, or job distribution across multiple instances. Hangfire stores jobs in SQL Server or Redis and handles all of that. BackgroundService is for simpler always-running work."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-advanced-006",
+      "q": "Output caching (.NET 7+) vs response caching — what's the difference?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["output-caching", "response-caching", "performance", "caching"],
+      "answer": {
+        "oneLiner": "Response caching uses HTTP headers to tell browsers and proxies to cache - but they can ignore it. Output caching (.NET 7) stores responses server-side and the app fully controls it, including tag-based cache invalidation.",
+        "detail": "Response caching middleware sets Cache-Control and related headers so the browser, CDN, or reverse proxy can cache the response. The server itself does not store anything. If a client or proxy ignores the headers, no caching happens. Output caching, introduced in .NET 7, stores the actual response in the server's memory (or a distributed store). On subsequent requests the server returns the stored response before even reaching the endpoint handler. Because the app owns the cache, it can also invalidate entries by tag - for example, evict all cached reports when data changes. This is impossible with response caching. Output caching also works with endpoints marked as vary-by parameters, headers, or custom keys.",
+        "keyPoints": [
+          "Response caching sets HTTP headers - clients and proxies may ignore them, server stores nothing",
+          "Output caching stores responses server-side - works regardless of client behavior",
+          "Output caching supports tag-based eviction - invalidate a group of entries at once",
+          "Output caching requires UseOutputCache() and works with both controllers and minimal APIs"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - response caching only works if the client/proxy honours headers\n[ResponseCache(Duration = 60)]\npublic IActionResult GetSalesReport() => Ok(_reportService.GetSales());\n\n// ✅ GOOD - output caching stores server-side, supports tag eviction\nbuilder.Services.AddOutputCache();\napp.UseOutputCache();\napp.MapGet(\"/reports/sales\", GetSalesReport)\n   .CacheOutput(p => p.Tag(\"reports\").Expire(TimeSpan.FromMinutes(5)));\n// On data update:\nawait _outputCache.EvictByTagAsync(\"reports\", ct);",
+          "note": "EvictByTagAsync invalidates all cached entries tagged 'reports' when underlying sales data changes."
+        },
+        "analogy": "Response caching puts a note on the package; output caching locks it in your own storage room.",
+        "redFlags": [
+          "Thinking response caching guarantees the server will cache - clients can ignore the headers",
+          "Not knowing output caching was introduced in .NET 7",
+          "Confusing IResponseCacheService with the output cache API",
+          "Not using tag-based eviction, leading to stale data being served too long"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why can response caching fail to cache even when configured?",
+            "a": "Because it relies on clients and proxies honoring HTTP cache headers - they are free to ignore them. A private browser or a proxy with its own rules may not cache at all."
+          },
+          {
+            "q": "How do you invalidate output-cached entries when data changes?",
+            "a": "Tag the cached entries when configuring the policy, then call outputCache.EvictByTagAsync('tag-name') after the data update to remove all matching entries."
+          },
+          {
+            "q": "Can output caching vary by query string or headers?",
+            "a": "Yes - use VaryByQuery, VaryByHeader, or VaryByValue in the cache policy to store separate cached responses for different parameter combinations."
+          },
+          {
+            "q": "Where does output caching store entries by default?",
+            "a": "In-memory on the server by default. You can configure a distributed store for multi-instance scenarios."
+          },
+          {
+            "q": "Which .NET version introduced output caching?",
+            "a": ".NET 7 introduced the built-in output caching middleware and the IOutputCacheStore abstraction."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Output caching versus response caching - what is the difference?"
+          },
+          {
+            "role": "me",
+            "text": "Response caching sets HTTP cache headers so browsers and proxies can cache the response - but they can choose to ignore them and the server stores nothing itself. Output caching, new in .NET 7, stores responses server-side so caching actually happens regardless of client behaviour."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why is server-side storage a significant advantage?"
+          },
+          {
+            "role": "me",
+            "text": "Because the app controls it completely. You can invalidate by tag - for example, tag all sales report responses with 'reports' and call EvictByTagAsync when the underlying data changes. Response caching has no equivalent invalidation mechanism."
+          },
+          {
+            "role": "interviewer",
+            "text": "Show me how you would cache a sales report endpoint with output caching."
+          },
+          {
+            "role": "me",
+            "text": "Register AddOutputCache and UseOutputCache, then on the route call .CacheOutput(p => p.Tag('reports').Expire(TimeSpan.FromMinutes(5))). When sales data is updated, call EvictByTagAsync('reports') to invalidate all cached report responses immediately."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can output caching vary responses by query string parameters?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - use VaryByQuery in the policy. For example, a product search endpoint can cache separately for each search term by calling VaryByQuery('q'). Each unique parameter combination gets its own cache entry."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is output caching suitable for a multi-instance deployment?"
+          },
+          {
+            "role": "me",
+            "text": "By default it is in-memory and per-instance, so different servers have different caches. For consistency across instances you configure a distributed store - there is an IOutputCacheStore abstraction for Redis or other providers."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-advanced-007",
+      "q": "Blazor Server vs Blazor WebAssembly vs SSR — brief comparison.",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "low",
+      "tags": ["blazor", "blazor-server", "webassembly", "ssr"],
+      "answer": {
+        "oneLiner": "Blazor Server runs C# on the server and pushes UI diffs over a SignalR connection. WebAssembly runs C# directly in the browser. SSR renders HTML on the server for fast load and SEO. In .NET 8 these are render modes you can mix per component.",
+        "detail": "Blazor Server executes all component logic on the server. Only UI diffs travel to the browser over a persistent SignalR WebSocket connection. This means a tiny initial download but requires a low-latency, always-on connection. Blazor WebAssembly compiles C# to WASM and ships it to the browser. After a larger initial download the app runs fully client-side with no server connection required - enabling offline scenarios. SSR (Static Server Rendering) in .NET 8 renders pure HTML on the server, sent to the browser with no JS framework needed for the initial view - fast first paint and search-engine friendly. .NET 8 Blazor unified these as per-component render modes: Server, WebAssembly, Auto (start with Server, switch to WASM once downloaded), and Static. You can mix them in one app.",
+        "keyPoints": [
+          "Server - tiny download, C# on server, needs low-latency connection, not offline-capable",
+          "WebAssembly - C# in browser via WASM, works offline, larger initial download",
+          "SSR - server-rendered HTML, fast first paint, SEO-friendly, limited interactivity",
+          ".NET 8 unifies these as per-component render modes: Server, WebAssembly, Auto, Static"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - forcing the whole app into one render mode wastes opportunities\n// All pages as WebAssembly even when SSR would load faster\n\n// ✅ GOOD - mix render modes per component in .NET 8\n// Static landing page for SEO\n@rendermode RenderMode.Static\n\n// Interactive order widget using Server for low latency\n@rendermode RenderMode.InteractiveServer\n\n// Client-side spreadsheet tool using WebAssembly\n@rendermode RenderMode.InteractiveWebAssembly",
+          "note": ".NET 8 lets you choose the best render mode per component rather than committing the whole app to one model."
+        },
+        "analogy": "Server is a puppet with strings; WebAssembly is a robot with its own brain.",
+        "redFlags": [
+          "Saying Blazor Server runs C# in the browser - it runs on the server only",
+          "Not knowing WebAssembly has a larger initial download compared to Server",
+          "Confusing SSR static rendering with full server-side Blazor Server",
+          "Not knowing .NET 8 introduced per-component render modes"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Does Blazor Server run any code in the browser?",
+            "a": "No - all C# executes on the server. Only UI diffs and event callbacks travel over a SignalR WebSocket connection to the browser."
+          },
+          {
+            "q": "What is the main downside of Blazor WebAssembly?",
+            "a": "A larger initial download because the .NET runtime and app DLLs must be sent to the browser before anything renders."
+          },
+          {
+            "q": "Why is SSR good for SEO?",
+            "a": "Search engine crawlers receive fully rendered HTML immediately without needing to execute JavaScript - the content is indexable from the first response."
+          },
+          {
+            "q": "What is the Auto render mode in .NET 8?",
+            "a": "It starts with Blazor Server for fast interactivity on the first visit, then switches to WebAssembly once the WASM payload has been downloaded and cached."
+          },
+          {
+            "q": "What does Blazor Server use for its connection to the browser?",
+            "a": "A persistent SignalR WebSocket connection that streams UI diffs and receives user events."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Blazor Server versus WebAssembly versus SSR - give me a brief comparison."
+          },
+          {
+            "role": "me",
+            "text": "Blazor Server runs C# on the server and pushes UI diffs over a SignalR connection - tiny download but needs an always-on connection. WebAssembly ships C# to run in the browser via WASM - works offline but has a larger initial download. SSR renders static HTML server-side for fast load and SEO."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you pick WebAssembly over Server?"
+          },
+          {
+            "role": "me",
+            "text": "When the app needs to work offline or heavily offload processing to the client, and the team can tolerate the larger initial download. Blazor Server requires a reliable low-latency connection - a mobile user on a flaky network has a bad experience."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does Blazor Server run any code in the browser?"
+          },
+          {
+            "role": "me",
+            "text": "No - all C# logic executes on the server. The browser only receives HTML diffs and sends event callbacks over the SignalR WebSocket. This is a common misconception about the name."
+          },
+          {
+            "role": "interviewer",
+            "text": "What did .NET 8 change about Blazor rendering?"
+          },
+          {
+            "role": "me",
+            "text": "It unified all modes as per-component render modes: Static, InteractiveServer, InteractiveWebAssembly, and Auto. You can render a landing page as static SSR for SEO and fast load, then make specific interactive widgets use Server or WASM - all in the same app."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the Auto render mode specifically?"
+          },
+          {
+            "role": "me",
+            "text": "It starts the component in Blazor Server mode so the user gets immediate interactivity, then switches to WebAssembly once the WASM payload finishes downloading. Best of both: fast initial render, then client-side independence."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-advanced-008",
+      "q": "How do you prevent over-posting / mass assignment in ASP.NET Core?",
+      "level": "mid",
+      "type": "scenario",
+      "freq": "medium",
+      "tags": ["over-posting", "mass-assignment", "dto", "security", "model-binding"],
+      "answer": {
+        "oneLiner": "Bind requests to purpose-built input DTOs that contain only the fields a client is allowed to set. Never bind directly to your EF entity, or an attacker can smuggle in fields like IsAdmin or Price.",
+        "detail": "Over-posting, also called mass assignment, happens when the model binder maps incoming JSON fields directly onto a class that has more properties than intended. If you bind to an EF entity like Product, a client can POST extra fields - IsActive, Price, IsAdmin - and the binder will set them on the entity, which you then save. The fix is to create a dedicated input DTO (Data Transfer Object) that exposes only the fields the caller may supply. On the server you then manually map from the DTO to the entity, explicitly setting only allowed fields. The [Bind] attribute can whitelist properties on a model but it is error-prone and not visible at the call site - a DTO is explicit and self-documenting. Libraries like AutoMapper or manual assignment both work for the mapping step.",
+        "keyPoints": [
+          "Over-posting means a client sets fields the server never intended to accept",
+          "Fix: use a dedicated input DTO containing only client-allowed fields",
+          "Map DTO fields to the entity manually on the server - never trust the client to set everything",
+          "[Bind] allow-list works but DTOs are cleaner and more explicit"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - binding directly to EF entity lets client set Price and IsActive\n[HttpPut(\"{id}\")] public async Task<IActionResult> Update(int id, Product product) {\n    _db.Entry(product).State = EntityState.Modified;\n    await _db.SaveChangesAsync();\n    return NoContent(); }\n\n// ✅ GOOD - input DTO limits what client can change\npublic record UpdateProductRequest(string Name, string Description);\n[HttpPut(\"{id}\")] public async Task<IActionResult> Update(int id, UpdateProductRequest req) {\n    var product = await _db.Products.FindAsync(id);\n    product.Name = req.Name;\n    product.Description = req.Description;\n    await _db.SaveChangesAsync();\n    return NoContent(); }",
+          "note": "The DTO defines exactly what the client may change. Price, IsActive, and IsAdmin cannot be set from outside."
+        },
+        "analogy": "Give customers a form with only the fields they need - never hand them the filing cabinet.",
+        "redFlags": [
+          "Binding POST/PUT request bodies directly to EF entity classes",
+          "Trusting all incoming JSON fields without explicitly controlling which ones apply",
+          "Using [Bind] as the only protection - it is easy to forget on a new action",
+          "Not knowing what over-posting is or why it is a security vulnerability"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the concrete attack scenario for over-posting?",
+            "a": "A client adds 'IsAdmin': true or 'Price': 0 to a JSON PUT body. If bound directly to the entity, the binder sets those fields and you save them - granting admin or zeroing the price."
+          },
+          {
+            "q": "What is the [Bind] attribute and why is it not enough?",
+            "a": "[Bind] allows you to whitelist properties on a model, but it lives on the action parameter and is easy to forget on a new endpoint. A dedicated DTO is self-documenting and always enforced."
+          },
+          {
+            "q": "How do you map a DTO to an entity without code duplication?",
+            "a": "Use AutoMapper with a defined mapping profile, or extension methods like product.ApplyUpdate(req). Either approach centralises the mapping logic."
+          },
+          {
+            "q": "Does over-posting apply to GET requests?",
+            "a": "No - GET requests bind from the query string or route, not a body. Over-posting applies to POST, PUT, and PATCH where a request body is bound."
+          },
+          {
+            "q": "If the client sends extra fields in a JSON body, does ASP.NET Core bind them by default?",
+            "a": "Extra fields in JSON are ignored by default during deserialization. The risk is when the target class has more properties than the client should control - they can be set if the field names match."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do you prevent over-posting or mass assignment in ASP.NET Core?"
+          },
+          {
+            "role": "me",
+            "text": "Bind requests to purpose-built input DTOs that expose only the fields a client may set - never directly to EF entities. This prevents a client from smuggling in fields like IsAdmin or Price by just adding them to the JSON body."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through the concrete attack if you bind straight to the entity."
+          },
+          {
+            "role": "me",
+            "text": "Say you have a Product entity with Name, Price, and IsActive. A client sends a PUT with 'IsActive': true and 'Price': 0.01 in the JSON. If you bind directly to the entity, the binder sets those fields and you call SaveChanges - the product is now nearly free and re-activated without any authorisation check."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about the [Bind] attribute - is that a valid alternative?"
+          },
+          {
+            "role": "me",
+            "text": "[Bind] can whitelist allowed properties, but it is on the action parameter and easy to forget when adding a new endpoint. A dedicated DTO is self-documenting - the type itself defines exactly what can come in - and works without any runtime attribute to remember."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you map from the DTO to the entity in a clean way?"
+          },
+          {
+            "role": "me",
+            "text": "I use an AutoMapper profile or explicit extension methods like product.ApplyUpdate(request). Both centralise the mapping so if the DTO or entity changes there is one place to update, not scattered assignment code across multiple actions."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does this apply to GET requests too?"
+          },
+          {
+            "role": "me",
+            "text": "No - GET binds from route and query string, not a body. Over-posting is a body-binding risk affecting POST, PUT, and PATCH. On GET you need to be careful about what you return - do not expose sensitive entity fields - but the attack vector is different."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-advanced-009",
+      "q": "Sync vs async controller actions — when does it actually matter?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["async", "sync", "thread-pool-starvation", "scalability"],
+      "answer": {
+        "oneLiner": "For I/O-bound work like database calls, HTTP requests, and file reads, async frees the thread while waiting, allowing far more concurrent requests. Synchronous blocking holds threads idle and causes thread-pool starvation under load.",
+        "detail": "ASP.NET Core handles each request on a thread from the thread pool. When a synchronous action calls a blocking I/O operation - for example a DbContext query with .ToList() instead of .ToListAsync() - the thread is held while waiting for the database to respond. It does no work during that wait. Under load this exhausts the thread pool: new requests queue waiting for a free thread, latency spikes, and the server appears to stall. With async, the thread is returned to the pool during the await. When the I/O completes, a thread is borrowed to resume the continuation. The same number of threads can serve far more concurrent requests. Async does not make a single request faster - the database takes the same time. The benefit is throughput and scalability. For CPU-bound work, async has no advantage because there is no I/O wait to release the thread during. Never block on async with .Result or .Wait() - in frameworks with a SynchronizationContext this causes deadlocks; in ASP.NET Core it causes thread-pool starvation instead.",
+        "keyPoints": [
+          "Async improves throughput and scalability, not single-request latency",
+          "Blocking I/O holds a thread idle - exhausts the pool under load, causing starvation",
+          "CPU-bound work gains nothing from async - there is no I/O wait to free the thread",
+          "Never block on async with .Result or .Wait() - causes deadlocks or starvation"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - blocks a thread while waiting for the database\n[HttpGet(\"{id}\")]\npublic IActionResult GetOrder(int id) {\n    var order = _db.Orders.Find(id);\n    return Ok(order); }\n\n// ✅ GOOD - releases the thread during the DB wait\n[HttpGet(\"{id}\")]\npublic async Task<IActionResult> GetOrder(int id) {\n    var order = await _db.Orders.FindAsync(id);\n    return Ok(order); }",
+          "note": "FindAsync releases the thread to the pool during the database round-trip, allowing other requests to be served."
+        },
+        "analogy": "Async is a waiter who takes other orders while the kitchen cooks yours.",
+        "redFlags": [
+          "Saying async makes a single request respond faster - it does not, it improves throughput",
+          "Calling .Result or .Wait() on async methods inside a controller action",
+          "Using async for CPU-bound work expecting performance gains",
+          "Not knowing what thread-pool starvation is or how it manifests under load"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Does async make a single request return faster?",
+            "a": "No - the I/O takes the same time. Async improves throughput by freeing threads to serve other requests during waits, not by making any individual request complete faster."
+          },
+          {
+            "q": "What is thread-pool starvation and how does it show up?",
+            "a": "When all pool threads are blocked on sync I/O, new requests queue waiting for a free thread. Latency spikes, the app appears to hang, even though the server is not CPU-bound."
+          },
+          {
+            "q": "Should you make CPU-bound work async?",
+            "a": "Not for the main action - there is no I/O wait to release the thread. For heavy CPU work offload to Task.Run so the request thread is freed, but async alone does not help."
+          },
+          {
+            "q": "What happens if you call .Result on an async method?",
+            "a": "In ASP.NET Core it causes thread-pool starvation under load because the calling thread blocks. In frameworks with a SynchronizationContext it can also deadlock."
+          },
+          {
+            "q": "What is async all the way and why does it matter?",
+            "a": "Every method in the call chain should use await rather than mixing sync and async. Mixing - calling async from sync with .Result - reintroduces blocking and negates the throughput benefit."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Sync versus async controller actions - when does it actually matter?"
+          },
+          {
+            "role": "me",
+            "text": "For I/O-bound work - database queries, downstream HTTP calls, file reads - async matters a lot. It frees the thread while waiting so the pool can serve other requests. Synchronous blocking holds the thread idle during the wait, which causes starvation under load."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does async make a single order lookup respond faster?"
+          },
+          {
+            "role": "me",
+            "text": "No - the database round-trip takes the same time either way. Async improves throughput and scalability, not per-request latency. That is the most common misconception. You use async to serve more concurrent users, not to speed up one user's request."
+          },
+          {
+            "role": "interviewer",
+            "text": "Explain thread-pool starvation in plain terms."
+          },
+          {
+            "role": "me",
+            "text": "Imagine a restaurant with ten waiters. If every waiter stands frozen at a table waiting for food instead of taking other orders, new customers get no service. Thread-pool starvation is the same thing - all threads blocked on sync I/O, new requests queuing, latency climbing even though the CPU is mostly idle."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about CPU-heavy work like PDF generation - does async help there?"
+          },
+          {
+            "role": "me",
+            "text": "Async alone does not help - there is no I/O wait to release the thread during. For heavy CPU work I offload to Task.Run so the request thread is freed immediately, but the work still consumes a pool thread. True CPU scalability needs separate worker processes, not just async."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if someone calls .Result on an async method in a controller?"
+          },
+          {
+            "role": "me",
+            "text": "In ASP.NET Core it causes thread-pool starvation under load because the calling thread blocks waiting for the async operation to complete. In frameworks with a SynchronizationContext it can deadlock entirely. The rule is async all the way - never mix sync blocking with async code."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

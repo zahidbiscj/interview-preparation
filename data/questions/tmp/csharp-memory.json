@@ -1,0 +1,1391 @@
+{
+  "subtopicId": "memory",
+  "questions": [
+    {
+      "id": "csharp-memory-001",
+      "q": "What is the difference between value types and reference types in C#?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["memory", "value-types", "reference-types", "stack", "heap"],
+      "answer": {
+        "oneLiner": "Value types hold their data directly and copy it on assignment. Reference types hold a pointer to a shared heap object, so assignment copies the pointer, not the data.",
+        "detail": "When you assign a value type (int, bool, struct, DateTime), the entire value is copied - the two variables are independent. When you assign a reference type (class, string, array), both variables point to the same heap object, so changing it through one variable affects the other. The common shortcut 'value types live on the stack' is an oversimplification. A value-type field inside a class lives on the heap, inside that class object. The real distinction is copy semantics vs shared reference semantics, which drives mutation bugs and how equality works.",
+        "keyPoints": [
+          "Value type assignment makes an independent copy - changing one does not affect the other.",
+          "Reference type assignment copies the reference - both variables share one heap object.",
+          "A value-type field inside a class lives on the heap with the containing object, not on the stack.",
+          "Common value types: int, bool, struct, DateTime. Common reference types: class, string, arrays.",
+          "string is a reference type but behaves like a value type because it is immutable and uses content equality."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - assuming reference type assignment creates an independent copy\nvar order1 = new Address(\"123 Main St\", \"New York\");\nvar order2 = order1;\norder2.City = \"London\"; // also changes order1.City - they share the same object\n\n// ✅ GOOD - use records with with-expression for immutable copies\npublic record class Address(string Street, string City);\nvar order1 = new Address(\"123 Main St\", \"New York\");\nvar order2 = order1 with { City = \"London\" }; // new object, order1 unchanged\nConsole.WriteLine(order1.City); // \"New York\" - unaffected",
+          "note": "record class gives reference semantics with value-based equality and safe non-destructive updates via with-expressions."
+        },
+        "analogy": "Value type is a photocopy; reference type is a shared Google Doc link.",
+        "redFlags": [
+          "Saying 'value types always live on the stack' with no qualification.",
+          "Not knowing that string is a reference type with content-based equality.",
+          "Confusing copy semantics with immutability - a mutable struct still copies, but the copy can be changed independently.",
+          "Not knowing a struct field inside a class lives on the heap."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Where does a value-type field inside a class live?",
+            "a": "On the managed heap, inside the containing class object - not on the stack."
+          },
+          {
+            "q": "Why does string behave like a value type even though it is a reference type?",
+            "a": "Because string is immutable and uses content-based equality with ==, so it feels like a value type even though assignment copies the reference."
+          },
+          {
+            "q": "What happens when you pass a struct to a method and mutate it?",
+            "a": "The method gets a copy of the struct, so mutations inside the method do not affect the caller's original - this is a common source of silent bugs."
+          },
+          {
+            "q": "What is the practical difference in equality between struct and class?",
+            "a": "Structs use value equality by default (field-by-field comparison), while classes use reference equality by default (same object in memory) unless you override Equals."
+          },
+          {
+            "q": "When would you choose a struct over a class?",
+            "a": "For small (roughly 16 bytes or less), immutable, frequently-created data where avoiding heap allocations is important - like a 2D coordinate or a currency amount."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain the difference between value types and reference types in C#?"
+          },
+          {
+            "role": "me",
+            "text": "Value types hold their data directly, so assignment copies the whole value and both variables are independent. Reference types hold a pointer to a heap object, so assignment copies the pointer - both variables share the same object, and mutating through one affects the other."
+          },
+          {
+            "role": "interviewer",
+            "text": "I hear developers say 'value types live on the stack' - is that accurate?"
+          },
+          {
+            "role": "me",
+            "text": "It is an oversimplification. A value-type field inside a class lives on the heap with that object, not on the stack. The real distinction is copy semantics versus shared reference semantics - where it lives in memory is a runtime implementation detail, not the defining characteristic."
+          },
+          {
+            "role": "interviewer",
+            "text": "String is technically a reference type, but it behaves differently. Why?"
+          },
+          {
+            "role": "me",
+            "text": "String is immutable, so no method can change its contents after creation. The == operator is also overloaded to compare content, not reference. So it feels like a value type even though assignment copies the reference internally."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is a practical bug this causes in real code?"
+          },
+          {
+            "role": "me",
+            "text": "Mutable structs in collections are a classic trap. If you fetch a struct from a List and mutate it, you are mutating a copy - the list entry is unchanged. In an e-commerce cart where LineItem is a mutable struct, calling cart[0].Quantity++ silently does nothing to the list."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you fix that cart bug?"
+          },
+          {
+            "role": "me",
+            "text": "Either make LineItem a class so assignment shares the reference, or replace the entire struct in the list: var item = cart[0]; item = item with { Quantity = item.Quantity + 1 }; cart[0] = item. Using readonly record struct also helps because the compiler prevents partial mutation."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-002",
+      "q": "What is boxing and unboxing? Why is it a performance concern?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["memory", "boxing", "performance", "value-types"],
+      "answer": {
+        "oneLiner": "Boxing wraps a value type inside a heap object so it can be treated as object. Unboxing extracts the value back out. Each operation allocates memory and adds garbage collector pressure.",
+        "detail": "When the runtime boxes a value type, it allocates a new object on the managed heap, copies the value into it, and returns a reference. Unboxing requires a cast - if the cast type does not exactly match the boxed type, the runtime throws InvalidCastException. In hot paths such as financial calculations or order processing loops, boxing thousands of integers per second creates thousands of short-lived heap objects, triggering frequent Gen 0 collections. The fix is generics - List<int> uses a typed int[] array internally with no wrapping at all. Simplified: boxing = value goes into a box on the heap. In production: avoid it with generics and do not pass value types as object in tight loops.",
+        "keyPoints": [
+          "Boxing allocates a new heap object and copies the value into it - one allocation per box.",
+          "Unboxing requires an explicit cast to the exact original type or InvalidCastException is thrown.",
+          "Non-generic collections such as ArrayList box every element they store.",
+          "String.Format with value-type arguments boxes them - interpolated string handlers in C# 10 may not.",
+          "Fix: use generic collections (List<int>) and generic methods to eliminate boxing entirely."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - ArrayList boxes every integer, allocating a heap object per item\nvar productIds = new ArrayList();\nfor (int i = 0; i < 10000; i++)\n    productIds.Add(i); // 10,000 heap allocations for the integers\n\n// ✅ GOOD - List<int> uses int[] internally, zero boxing\nvar productIds = new List<int>();\nfor (int i = 0; i < 10000; i++)\n    productIds.Add(i); // no heap allocations for the integers",
+          "note": "Switching from ArrayList to List<int> eliminates 10,000 heap allocations in this loop - the difference is visible under a profiler in high-throughput services."
+        },
+        "analogy": "Boxing is packing a coin in a postal box just to mail it - unnecessary wrapping every single time.",
+        "redFlags": [
+          "Not knowing that ArrayList boxes every element it stores.",
+          "Saying string interpolation never boxes - it depends on the argument type and C# version.",
+          "Confusing boxing with serialization or casting between reference types.",
+          "Not knowing that unboxing to the wrong type throws InvalidCastException at runtime."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Does string.Format(\"{0}\", orderId) box the integer?",
+            "a": "Yes - orderId is passed as object, which boxes it. Use $\"{orderId}\" with C# 10 interpolated string handlers to avoid this."
+          },
+          {
+            "q": "How do generics avoid boxing?",
+            "a": "List<int> stores a typed int[] array internally. The JIT generates specialized code for the value type so no object wrapping ever happens."
+          },
+          {
+            "q": "What exception does unboxing to the wrong type throw?",
+            "a": "InvalidCastException at runtime - for example, boxing an int and unboxing it as long throws even though the types are compatible."
+          },
+          {
+            "q": "Can implementing an interface on a struct cause boxing?",
+            "a": "Yes - calling an interface method on a struct through an interface reference boxes the struct. Generics with constraints (where T : IMyInterface) avoid this."
+          },
+          {
+            "q": "How do you detect boxing in production code?",
+            "a": "Use a memory profiler like dotMemory or dotTrace, or look at the IL with ILSpy - boxing appears as a 'box' IL opcode."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is boxing and unboxing in C#?"
+          },
+          {
+            "role": "me",
+            "text": "Boxing wraps a value type - like an int or a struct - inside a heap object so it can be treated as object. Unboxing is the reverse cast that extracts the value back. Each box is a heap allocation plus a copy, and each unbox is a type-checked cast."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why is that a performance concern?"
+          },
+          {
+            "role": "me",
+            "text": "In a hot path, boxing creates thousands of short-lived heap objects per second, which is exactly what the garbage collector hates. In a payment processing service looping over 50,000 transaction amounts, using ArrayList instead of List<decimal> allocates 50,000 unnecessary heap objects every cycle."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the fix?"
+          },
+          {
+            "role": "me",
+            "text": "Use generic collections and generic methods. List<int> stores a typed int[] array internally so no boxing ever happens. The JIT generates specialized native code for the value type - zero object overhead."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does string interpolation box its arguments?"
+          },
+          {
+            "role": "me",
+            "text": "In C# versions before 10, $\"{amount}\" calls ToString on a boxed copy internally. In C# 10 with interpolated string handlers, the compiler can avoid the box entirely. But string.Format(\"{0}\", amount) always boxes because the parameter is typed as object."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can calling an interface method on a struct cause boxing?"
+          },
+          {
+            "role": "me",
+            "text": "Yes. If you have ICalculator calc = myStruct, the assignment boxes the struct. Generic constraints avoid this - a method with where T : ICalculator receives the struct as T, and the JIT generates specialized code with no boxing."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-003",
+      "q": "How does the .NET garbage collector work? Explain generations.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["memory", "gc", "garbage-collection", "performance"],
+      "answer": {
+        "oneLiner": "The .NET GC is a generational mark-and-compact collector. It divides objects into Gen 0, Gen 1, and Gen 2 based on how long they survive, then collects short-lived objects cheaply and frequently.",
+        "detail": "The GC is built on one key observation: most objects die young. New objects go into Gen 0. When Gen 0 fills up, the GC runs a quick mark phase to find live objects, promotes survivors to Gen 1, and frees the rest. Objects that survive Gen 1 are promoted to Gen 2, which is collected infrequently because a full Gen 2 collection is expensive - it pauses all threads and compacts the heap. Objects 85 KB or larger go directly to the Large Object Heap (LOH), which is collected alongside Gen 2 but is not compacted by default, which can cause fragmentation. The GC is triggered by allocation pressure (when a generation budget is exceeded), not by a timer. Finalizers delay collection - a finalizable object survives one extra GC cycle - so prefer Dispose with GC.SuppressFinalize over finalizers.",
+        "keyPoints": [
+          "Gen 0 holds new allocations and is collected very frequently at low cost.",
+          "Gen 1 is a buffer between Gen 0 and Gen 2 - moderately collected.",
+          "Gen 2 holds long-lived objects and a full Gen 2 collection is expensive - keep it rare.",
+          "The LOH stores objects 85 KB or larger, collected with Gen 2 but not compacted by default.",
+          "GC is triggered by allocation pressure, not a timer - finalizers delay collection by one cycle."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - finalizer delays collection by one GC cycle unnecessarily\npublic class ReportExporter\n{\n    private FileStream _file;\n    ~ReportExporter() { _file?.Dispose(); } // non-deterministic, expensive\n}\n\n// ✅ GOOD - deterministic cleanup with Dispose pattern\npublic class ReportExporter : IDisposable\n{\n    private FileStream _file;\n    private bool _disposed;\n    public void Dispose()\n    {\n        if (_disposed) return;\n        _file?.Dispose();\n        _disposed = true;\n        GC.SuppressFinalize(this); // removes from finalization queue\n    }\n}",
+          "note": "GC.SuppressFinalize removes the object from the finalization queue so it is collected in the current cycle, not the next one."
+        },
+        "analogy": "Gen 0 is a fast daily cleanup; Gen 2 is an expensive annual deep clean - avoid triggering it.",
+        "redFlags": [
+          "Saying the GC runs on a timer or at fixed intervals.",
+          "Not knowing that finalizers cause an object to survive an extra GC cycle.",
+          "Confusing the LOH with Gen 2 - they are collected together but managed separately.",
+          "Not knowing the LOH is not compacted by default and can fragment."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What triggers a GC collection?",
+            "a": "Allocation pressure - when a generation's memory budget is exceeded - not a timer. You can also trigger it manually with GC.Collect(), but that is almost always wrong in production."
+          },
+          {
+            "q": "What is the Large Object Heap and why does it fragment?",
+            "a": "The LOH holds objects 85 KB or larger. It is not compacted by default because moving large objects is expensive, so freed slots can leave gaps that cannot always be reused."
+          },
+          {
+            "q": "Why do finalizers delay collection?",
+            "a": "Finalizable objects are put on the finalization queue when discovered as unreachable. The finalizer thread runs them and then the object becomes truly collectible - one full extra GC cycle later."
+          },
+          {
+            "q": "What is the difference between Server GC and Workstation GC?",
+            "a": "Server GC uses one heap and one GC thread per CPU core for maximum throughput, using more memory. Workstation GC uses a single heap and is tuned for low latency on client apps."
+          },
+          {
+            "q": "How do you reduce Gen 2 collections in a high-throughput API?",
+            "a": "Pool large objects with ArrayPool<byte>, avoid long-lived caches of short-lived data, and use Span<T> or stackalloc for temporary buffers to keep allocations off the heap entirely."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain how the .NET garbage collector works, including generations?"
+          },
+          {
+            "role": "me",
+            "text": "It is a generational mark-and-compact collector based on the observation that most objects die young. New allocations go into Gen 0, which is collected frequently and cheaply. Survivors are promoted to Gen 1, then Gen 2. A full Gen 2 collection is expensive because it pauses threads and compacts the heap."
+          },
+          {
+            "role": "interviewer",
+            "text": "What triggers a collection?"
+          },
+          {
+            "role": "me",
+            "text": "Allocation pressure - when a generation's memory budget is exceeded. Not a timer. In an ASP.NET API handling thousands of requests per second, Gen 0 collections happen constantly, but you want Gen 2 to be rare because a full collection can pause the process long enough to affect response times."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned compacting - what about the Large Object Heap?"
+          },
+          {
+            "role": "me",
+            "text": "Objects 85 KB or larger go directly to the LOH, which is collected alongside Gen 2 but is not compacted by default. That means freed slots can leave gaps and the LOH can fragment over time. For a document processing service that allocates large byte arrays constantly, I use ArrayPool<byte> to rent and return buffers instead of allocating new ones."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do finalizers affect GC behavior?"
+          },
+          {
+            "role": "me",
+            "text": "Finalizable objects are moved to the finalization queue when they become unreachable. The finalizer thread runs them, then the object is truly collectible one cycle later. That doubles the GC cost for the object. I always use the Dispose pattern with GC.SuppressFinalize so the finalizer is skipped entirely when Dispose has already run."
+          },
+          {
+            "role": "interviewer",
+            "text": "What practical steps do you take to keep Gen 2 collections rare?"
+          },
+          {
+            "role": "me",
+            "text": "Avoid large long-lived object graphs. Use ArrayPool<byte> for big buffers, Span<T> for temporary slices, and stackalloc for small fixed-size work buffers. On the configuration side, Server GC with concurrent mode reduces pause times for multi-core APIs."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-004",
+      "q": "What is the difference between `struct` and `class` in C#?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["memory", "struct", "class", "value-types"],
+      "answer": {
+        "oneLiner": "struct is a value type with copy semantics and no inheritance. class is a reference type with shared semantics, heap allocation, and full object-oriented features.",
+        "detail": "When you assign a struct, the entire value is copied - the two variables are independent. When you assign a class instance, both variables point to the same heap object. Structs cannot inherit from a class (only implement interfaces), which keeps them lightweight. The guideline for choosing a struct: keep it small (roughly 16 bytes or less), immutable, and frequently created. Large structs are expensive to copy on every assignment and method call. Mutable structs in collections are dangerous because fetching one returns a copy, so mutations are silently lost. C# 10 introduced parameterless constructors for structs and record struct, which gives value equality out of the box.",
+        "keyPoints": [
+          "struct copies the entire value on assignment - two independent variables after the copy.",
+          "class copies the reference - two variables sharing one heap object.",
+          "struct cannot inherit a class but can implement interfaces.",
+          "Use struct when the data is small (16 bytes or less), immutable, and frequently allocated.",
+          "Mutable structs in collections cause silent mutation bugs because indexing returns a copy."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - mutable struct in a list, mutation is silently lost\npublic struct CartItem { public int Quantity; }\nvar cart = new List<CartItem> { new CartItem { Quantity = 1 } };\ncart[0].Quantity++; // mutates a copy - cart[0].Quantity is still 1\n\n// ✅ GOOD - immutable record struct with explicit replacement\npublic readonly record struct CartItem(int Quantity);\nvar cart = new List<CartItem> { new CartItem(1) };\ncart[0] = cart[0] with { Quantity = cart[0].Quantity + 1 }; // replaces the item",
+          "note": "readonly record struct gives value equality, immutability, and copy-on-update semantics - the safest struct option in modern C#."
+        },
+        "analogy": "struct is a sticky note you photocopy when you pass it around; class is a whiteboard everyone reads from the same wall.",
+        "redFlags": [
+          "Recommending large structs to avoid heap allocation without measuring the copy cost.",
+          "Not knowing that mutable structs in List<T> cause silent mutation bugs.",
+          "Confusing struct inability to inherit a class with inability to use interfaces.",
+          "Not mentioning readonly struct or record struct as modern safer alternatives."
+        ],
+        "followUpsQA": [
+          {
+            "q": "When should you use readonly struct?",
+            "a": "When the struct is immutable. It prevents the compiler from making defensive copies when passing to in-parameters or ref readonly contexts, which can hurt performance with regular structs."
+          },
+          {
+            "q": "What is a ref struct?",
+            "a": "A struct that can only live on the stack - it cannot be boxed, stored in a field, or used across an await. Span<T> and ReadOnlySpan<T> are ref structs."
+          },
+          {
+            "q": "Can a struct implement an interface?",
+            "a": "Yes, but calling the interface through an interface-typed variable boxes the struct. Use generic constraints (where T : IMyInterface) to avoid boxing."
+          },
+          {
+            "q": "What does record struct add compared to a plain struct?",
+            "a": "Value-based equality with generated Equals and GetHashCode, a with-expression for non-destructive mutation, and a deconstructor - all with less boilerplate."
+          },
+          {
+            "q": "What is the rough size guideline for choosing a struct?",
+            "a": "Approximately 16 bytes or less. Beyond that, copying costs more than a single heap allocation reference, and the struct no longer helps performance."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between struct and class in C#?"
+          },
+          {
+            "role": "me",
+            "text": "struct is a value type - assignment copies the entire value and both variables are independent. class is a reference type - assignment copies the pointer, so both variables share one heap object. struct also cannot inherit a class, only implement interfaces."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you actually pick a struct over a class?"
+          },
+          {
+            "role": "me",
+            "text": "For small, immutable, frequently-created data where avoiding heap allocations matters. A geographic coordinate (lat, lon as floats) is roughly 8 bytes and created millions of times in a mapping service - that is a good struct candidate. For a full Customer entity with 20 fields, class is the right choice."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the danger with mutable structs?"
+          },
+          {
+            "role": "me",
+            "text": "Classic trap: cartItems[0].Quantity++ looks like it updates the cart, but it fetches a copy of the struct, increments the copy, and throws it away. The list entry is unchanged. I keep structs immutable - use readonly record struct and the with-expression to create updated copies."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is readonly struct and why does it matter for performance?"
+          },
+          {
+            "role": "me",
+            "text": "When a struct is passed to a method that takes an in parameter or ref readonly, the compiler may make a defensive copy to prevent mutation if the struct is not marked readonly. That copy defeats the purpose of using a struct. Marking it readonly tells the compiler the struct cannot be mutated, so no defensive copy is needed."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you call interface methods on a struct without boxing?"
+          },
+          {
+            "role": "me",
+            "text": "Yes, with generic constraints. void Process<T>(T item) where T : IShippable avoids boxing because the JIT generates specialized code for T. If you declare IShippable item = myStruct, the assignment itself boxes the struct - so use generics in performance-sensitive code."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-005",
+      "q": "What is the difference between `IEnumerable<T>` and `IQueryable<T>`?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["memory", "linq", "ienumerable", "iqueryable", "ef-core"],
+      "answer": {
+        "oneLiner": "IEnumerable<T> runs LINQ operations in memory using delegates. IQueryable<T> builds an expression tree that a provider like EF Core translates to SQL, so filtering happens in the database.",
+        "detail": "IEnumerable<T> iterates using a pull model - each call to MoveNext() executes a delegate. All data must be in memory before LINQ operates on it. IQueryable<T> extends IEnumerable<T> and adds an expression tree (IQueryable.Expression) and a provider (IQueryable.Provider). When you chain LINQ methods on an IQueryable, they build an expression tree. When you materialize (ToList, FirstOrDefault), the provider translates the tree to SQL and sends it to the database. Calling ToList early collapses the IQueryable to IEnumerable and all subsequent filtering loads data into memory first - potentially loading millions of rows. When a LINQ expression cannot be translated to SQL, EF Core throws or falls back to client evaluation depending on version.",
+        "keyPoints": [
+          "IEnumerable<T> evaluates LINQ in memory with delegates - all data must be loaded first.",
+          "IQueryable<T> builds an expression tree that EF Core translates to SQL.",
+          "Calling ToList() materializes the query - everything after it runs in memory.",
+          "Filter, sort, and page on IQueryable before calling ToList to keep the WHERE in SQL.",
+          "If EF Core cannot translate a LINQ expression to SQL it throws a runtime exception."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - loads ALL invoices into memory, then filters in C#\nvar overdueInvoices = _db.Invoices\n    .ToList()                          // pulls entire table into memory\n    .Where(i => i.DueDate < DateTime.Today && !i.IsPaid);\n\n// ✅ GOOD - WHERE clause is translated to SQL, only matching rows cross the wire\nvar overdueInvoices = _db.Invoices\n    .Where(i => i.DueDate < DateTime.Today && !i.IsPaid)\n    .OrderBy(i => i.DueDate)\n    .Take(100)\n    .ToList(); // materializes only the final 100 rows",
+          "note": "On a table with 2 million invoices, the bad version loads 2 million rows; the good version loads 100 rows - a real difference in memory and response time."
+        },
+        "analogy": "IEnumerable reads every book in the library and finds the one you want; IQueryable asks the librarian to fetch only your book.",
+        "redFlags": [
+          "Calling ToList early 'to be safe' before applying filters.",
+          "Not knowing that IQueryable carries an expression tree, not a delegate.",
+          "Saying IQueryable is just a faster IEnumerable - the mechanism is fundamentally different.",
+          "Not knowing that untranslatable LINQ expressions throw at runtime with EF Core."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What does IQueryable carry that IEnumerable does not?",
+            "a": "An expression tree (IQueryable.Expression) and a query provider (IQueryable.Provider) that translates that tree to a target query language like SQL."
+          },
+          {
+            "q": "What happens if you use a C# method in a Where clause that EF Core cannot translate?",
+            "a": "EF Core throws an InvalidOperationException at runtime stating the expression cannot be translated. You need to either use a database-compatible expression or call AsEnumerable() first to evaluate it in memory."
+          },
+          {
+            "q": "When would you intentionally switch from IQueryable to IEnumerable?",
+            "a": "When you need a C# method or custom logic that cannot be translated to SQL. Call AsEnumerable() to materialize first, then apply the in-memory filter - consciously accepting the cost of loading more data."
+          },
+          {
+            "q": "Should a repository return IQueryable<T> to callers?",
+            "a": "It leaks the ORM abstraction and makes query behavior unpredictable. Many teams return IReadOnlyList<T> with explicit named query methods to keep data access controlled."
+          },
+          {
+            "q": "What is deferred execution and how does it relate to this?",
+            "a": "Both IEnumerable and IQueryable use deferred execution - the query does not run until you iterate (foreach, ToList, FirstOrDefault). This is why adding Where before ToList works correctly."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between IEnumerable<T> and IQueryable<T>?"
+          },
+          {
+            "role": "me",
+            "text": "IEnumerable<T> runs LINQ operations in memory using delegates - the data must already be loaded. IQueryable<T> builds an expression tree that a provider like EF Core translates to SQL, so filtering and sorting happen inside the database, not in the application."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why does calling ToList early cause a problem?"
+          },
+          {
+            "role": "me",
+            "text": "ToList materializes the IQueryable immediately and returns a List<T> which is an IEnumerable. Every LINQ operation after that runs in memory. On an Invoices table with 3 million rows, calling ToList before Where pulls all 3 million rows across the network into the application server's RAM before discarding most of them."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does the expression tree translation actually work?"
+          },
+          {
+            "role": "me",
+            "text": "When you write _db.Invoices.Where(i => i.DueDate < today), EF Core does not execute a delegate - it captures the lambda as an expression tree. When you call ToList, the EF Core query provider walks that tree and emits SQL like WHERE DueDate < @p0."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if your Where uses a C# method EF Core cannot translate?"
+          },
+          {
+            "role": "me",
+            "text": "EF Core throws InvalidOperationException at runtime saying the expression cannot be translated. The fix is either rewrite the filter using database-translatable expressions, or call AsEnumerable() before the problematic Where to evaluate it in memory - consciously accepting the data transfer cost."
+          },
+          {
+            "role": "interviewer",
+            "text": "Should a repository return IQueryable<T> to callers?"
+          },
+          {
+            "role": "me",
+            "text": "It is a trade-off. Returning IQueryable<T> lets callers compose efficient queries, but it leaks the ORM abstraction and makes it hard to predict what SQL will be generated. In most of my teams we return IReadOnlyList<T> with explicit named query methods like GetOverdueInvoices(DateTime cutoff) to keep the data access layer in control."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-006",
+      "q": "Explain the `IDisposable` interface and the `using` statement.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["memory", "idisposable", "using", "unmanaged-resources"],
+      "answer": {
+        "oneLiner": "IDisposable.Dispose() provides deterministic cleanup of unmanaged resources. The using statement guarantees Dispose runs even if an exception is thrown.",
+        "detail": "The garbage collector manages memory but does not know about file handles, database connections, network sockets, or OS resources. IDisposable bridges this gap by letting a type declare that it holds such resources and must be cleaned up explicitly. The using block compiles to a try/finally - Dispose is called in the finally block, so it runs even if the body throws. C# 8 introduced using declarations (using var conn = ...) which dispose at the end of the enclosing scope, reducing nesting. The full Dispose pattern for a type that both holds unmanaged resources and may be subclassed uses a protected Dispose(bool disposing) overload, a finalizer as a safety net, and GC.SuppressFinalize in the public Dispose to prevent the finalizer from running unnecessarily. IAsyncDisposable and await using handle async cleanup (flushing buffers, closing connections gracefully).",
+        "keyPoints": [
+          "IDisposable.Dispose() is the deterministic contract to release unmanaged resources or subscriptions.",
+          "using compiles to try/finally - Dispose runs even on exceptions.",
+          "C# 8 using var disposes at end of scope, removing the braces.",
+          "Full pattern: Dispose(bool), GC.SuppressFinalize, and a finalizer as a safety net.",
+          "IAsyncDisposable with await using handles async cleanup operations."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - connection not disposed if exception is thrown\npublic async Task<decimal> GetBalanceAsync(int accountId)\n{\n    var conn = new SqlConnection(_connectionString);\n    await conn.OpenAsync();\n    // exception here = connection leak\n    return await QueryBalanceAsync(conn, accountId);\n}\n\n// ✅ GOOD - await using guarantees disposal even on exception\npublic async Task<decimal> GetBalanceAsync(int accountId)\n{\n    await using var conn = new SqlConnection(_connectionString);\n    await conn.OpenAsync();\n    return await QueryBalanceAsync(conn, accountId);\n    // conn.DisposeAsync() called automatically here\n}",
+          "note": "await using is the async equivalent of using - it calls DisposeAsync so the connection is closed with a proper async drain, not a blocking close."
+        },
+        "analogy": "using is a hospital checkout: the room is cleaned the moment you leave, not whenever the janitor feels like it.",
+        "redFlags": [
+          "Not calling GC.SuppressFinalize in the public Dispose method when implementing the full pattern.",
+          "Thinking using is only for database connections - it applies to any IDisposable.",
+          "Not knowing that a using block compiles to try/finally, not try/catch.",
+          "Forgetting that IAsyncDisposable and await using exist for async cleanup."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What does using compile to?",
+            "a": "A try/finally block where Dispose is called in the finally. This guarantees cleanup even when an exception is thrown inside the using block."
+          },
+          {
+            "q": "When do you implement the full Dispose pattern with Dispose(bool)?",
+            "a": "When your class directly holds unmanaged resources and may be subclassed. The bool parameter distinguishes managed (true) from finalizer (false) calls so you do not touch other managed objects in the finalizer path."
+          },
+          {
+            "q": "Why call GC.SuppressFinalize in Dispose?",
+            "a": "If Dispose has already cleaned up the resources, the finalizer does not need to run. SuppressFinalize removes the object from the finalization queue, saving one extra GC cycle."
+          },
+          {
+            "q": "What is IAsyncDisposable used for?",
+            "a": "For resources that need asynchronous cleanup - like flushing a write buffer to a file, draining a message queue, or closing a database connection without blocking a thread."
+          },
+          {
+            "q": "What is the difference between using and using var in C# 8?",
+            "a": "using block disposes when the braces close. using var (C# 8 declaration) disposes at the end of the enclosing scope without extra indentation."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain IDisposable and the using statement?"
+          },
+          {
+            "role": "me",
+            "text": "IDisposable gives a type a Dispose method for deterministic cleanup of resources the GC does not know about - database connections, file handles, network sockets. The using statement compiles to try/finally so Dispose always runs, even when an exception is thrown inside the block."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you implement IDisposable in your own class?"
+          },
+          {
+            "role": "me",
+            "text": "When my class wraps an unmanaged resource directly, holds an IDisposable field like a DbConnection, or subscribes to events from an external object. For example, a BackgroundDataSync service that holds a DbContext needs to dispose it to return the connection to the pool."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through the full Dispose pattern."
+          },
+          {
+            "role": "me",
+            "text": "There is a public void Dispose() that calls Dispose(true) and then GC.SuppressFinalize(this). The protected virtual Dispose(bool disposing) method does the actual cleanup - when disposing is true it frees both managed and unmanaged resources; when false (called from the finalizer) it only frees unmanaged ones because managed objects may already be collected."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why GC.SuppressFinalize specifically?"
+          },
+          {
+            "role": "me",
+            "text": "When Dispose has already cleaned up everything, the finalizer is redundant. Finalizable objects survive one extra GC cycle on the finalization queue. SuppressFinalize removes the object from that queue so it is collected in the current cycle - one less GC cycle per object."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about async scenarios like closing a database connection?"
+          },
+          {
+            "role": "me",
+            "text": "IAsyncDisposable with await using. SqlConnection implements it so await using var conn = new SqlConnection(...) calls DisposeAsync when the scope ends, which closes the connection with a proper async drain instead of blocking. This is important in high-throughput APIs where blocking on disposal wastes thread pool threads."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-007",
+      "q": "What is the difference between managed and unmanaged code, and what is the CLR?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["memory", "clr", "managed-code", "il"],
+      "answer": {
+        "oneLiner": "Managed code runs under the CLR, which provides garbage collection, type safety, and JIT compilation. Unmanaged code (C/C++, COM, native DLLs) runs directly on the OS without those services.",
+        "detail": "The Common Language Runtime (CLR) is the engine that hosts managed code. When you compile C#, the compiler produces Intermediate Language (IL) - a CPU-agnostic bytecode. At runtime, the CLR's Just-In-Time (JIT) compiler converts IL to native machine code for the current CPU. The CLR also handles garbage collection, exception handling, type verification, and code access security. Unmanaged code is native code that runs directly - C/C++ executables, Windows DLLs, COM components. When managed code calls unmanaged code via P/Invoke (DllImport) or COM interop, there is a marshalling step that converts data between CLR types and native types, which has a cost. Modern .NET uses tiered JIT - methods start with a quick unoptimized compile and are recompiled with full optimization if they are called frequently.",
+        "keyPoints": [
+          "Managed code runs under the CLR with GC, type safety, JIT, and exception handling.",
+          "C# compiles to IL (Intermediate Language), which is CPU-agnostic bytecode.",
+          "The JIT compiles IL to native code at runtime - .NET Core uses tiered JIT for hot methods.",
+          "Unmanaged code (C, C++, COM) runs natively with no CLR services.",
+          "P/Invoke (DllImport) calls unmanaged DLLs from managed code with type marshalling."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - raw IntPtr from P/Invoke has no CLR type safety or lifetime management\n[DllImport(\"kernel32.dll\")]\nstatic extern IntPtr GetStdHandle(int nStdHandle);\n// IntPtr is just a number - no automatic cleanup, no bounds checking\n\n// ✅ GOOD - SafeHandle wraps the native handle with deterministic cleanup\n[DllImport(\"kernel32.dll\", SetLastError = true)]\nstatic extern SafeFileHandle CreateFile(\n    string lpFileName, uint dwDesiredAccess, uint dwShareMode,\n    IntPtr lpSecurityAttributes, uint dwCreationDisposition,\n    uint dwFlagsAndAttributes, IntPtr hTemplateFile);\n// SafeFileHandle implements IDisposable - handle closed even on exceptions",
+          "note": "SafeHandle descendants wrap OS handles and implement IDisposable so the CLR manages handle lifetime even for unmanaged resources."
+        },
+        "analogy": "The CLR is like a safety harness - managed code climbs with it; unmanaged code climbs free solo.",
+        "redFlags": [
+          "Confusing IL with native assembly code - IL is still bytecode, not CPU instructions.",
+          "Not knowing the JIT step exists between compilation and execution.",
+          "Saying managed code is always slower than unmanaged code - tiered JIT and AOT close the gap.",
+          "Forgetting that P/Invoke marshalling has a cost - crossing the boundary should be batched."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is IL and where does it live?",
+            "a": "Intermediate Language is CPU-agnostic bytecode produced by the C# compiler. It lives in the .dll or .exe assembly file. The JIT converts it to native code at runtime."
+          },
+          {
+            "q": "What is tiered JIT compilation?",
+            "a": "Methods start with a fast, unoptimized Tier 0 compile. If a method is called frequently, the JIT recompiles it with full optimization (Tier 1), replacing the running code in memory."
+          },
+          {
+            "q": "What is AOT compilation and when is it used?",
+            "a": "Ahead-of-Time compilation converts IL to native code before deployment. NativeAOT in .NET 7+ produces a self-contained native binary - faster startup, no JIT cost at runtime, used for cloud functions and CLI tools."
+          },
+          {
+            "q": "How do you call a Windows API from C#?",
+            "a": "With P/Invoke using the [DllImport] attribute on an extern static method. The CLR handles calling convention and marshals types between CLR and native formats."
+          },
+          {
+            "q": "What tool do you use to inspect IL?",
+            "a": "ILSpy or dotPeek for decompiling assemblies. SharpLab.io shows IL and JIT output in the browser. Seeing a 'box' IL opcode tells you there is unintended boxing."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain managed vs unmanaged code and what the CLR is?"
+          },
+          {
+            "role": "me",
+            "text": "Managed code runs under the CLR - the runtime that provides garbage collection, type safety, exception handling, and JIT compilation. Unmanaged code like C/C++ or native Windows DLLs runs directly on the OS with none of those services."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does C# actually compile to?"
+          },
+          {
+            "role": "me",
+            "text": "The C# compiler produces IL - Intermediate Language - which is CPU-agnostic bytecode stored in the .dll assembly. The CLR's JIT compiler converts IL to native machine code at runtime. .NET Core uses tiered JIT: a fast Tier 0 compile first, then a fully optimized Tier 1 recompile for hot methods."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you call unmanaged code from C#?"
+          },
+          {
+            "role": "me",
+            "text": "Via P/Invoke using [DllImport]. You declare an extern static method with the matching signature, and the CLR handles the calling convention and type marshalling at the boundary. The marshalling step has a cost, so you want to minimize boundary crossings in tight loops."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is managed code always slower than unmanaged code?"
+          },
+          {
+            "role": "me",
+            "text": "Not necessarily. Tiered JIT produces highly optimized native code for hot paths, often matching hand-tuned C++. For startup-sensitive scenarios like AWS Lambda functions, NativeAOT compiles to a native binary ahead of time - no JIT cost, fast cold start. The CLR overhead is mostly the GC, which you can tune."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you inspect the IL for a suspicious method?"
+          },
+          {
+            "role": "me",
+            "text": "I use SharpLab.io for quick checks - paste C# code and see IL, JIT assembly, and compiler-lowered C# side by side. For production assemblies I use ILSpy. Seeing a 'box' opcode in the IL tells me there is unintended boxing somewhere in that method."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-008",
+      "q": "Why is `string` immutable in C# and what are the implications?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["memory", "string", "immutability"],
+      "answer": {
+        "oneLiner": "String is immutable - once created its characters never change. Every apparent modification produces a new string object. This makes strings safe to share but costly to build piece by piece.",
+        "detail": "String immutability means the runtime can safely share string instances across threads with no locks, use string literals as dictionary keys, and intern common strings into a pool. The CLR maintains an intern pool for string literals - two code locations writing the literal \"London\" share one instance. The downside is that concatenation with + creates a brand new string each time by copying all characters so far plus the new part. In a loop building an email body with 1,000 lines, += creates 1,000 intermediate strings, each longer than the last - O(n^2) total character copies. StringBuilder solves this with a resizable char array that is filled in place and converted to a string only at the end. For a fixed, small number of parts (two or three), + or string interpolation is clearest and creates just one new string.",
+        "keyPoints": [
+          "String immutability means no method modifies an existing string - all operations return a new one.",
+          "Immutability makes strings safe as dictionary keys, constants, and shared across threads.",
+          "The CLR interns string literals from the same assembly so identical literals share one heap object.",
+          "Loop concatenation with += is O(n^2) total character copies - use StringBuilder instead.",
+          "StringBuilder uses a growable char array internally and allocates one final string on ToString()."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - O(n^2) allocations building an HTML report with string +=\nstring htmlReport = \"<table>\";\nforeach (var invoice in invoices)\n    htmlReport += $\"<tr><td>{invoice.Id}</td><td>{invoice.Amount}</td></tr>\";\nhtmlReport += \"</table>\";\n\n// ✅ GOOD - StringBuilder builds the HTML in one growable buffer\nvar sb = new StringBuilder();\nsb.Append(\"<table>\");\nforeach (var invoice in invoices)\n    sb.Append($\"<tr><td>{invoice.Id}</td><td>{invoice.Amount}</td></tr>\");\nsb.Append(\"</table>\");\nstring htmlReport = sb.ToString(); // one allocation at the end",
+          "note": "With 10,000 invoices, the bad version creates 10,001 intermediate strings - the good version creates one. The difference is measured in seconds on large datasets."
+        },
+        "analogy": "Concatenating strings in a loop is like rewriting an entire manuscript from scratch every time you add one sentence.",
+        "redFlags": [
+          "Using += concatenation inside a loop for building reports, email bodies, or CSV exports.",
+          "Not knowing that string is immutable when explaining why thread safety works.",
+          "Confusing string interning with string equality - interning shares the reference, but always use Equals or == for correctness.",
+          "Not knowing when to choose StringBuilder vs + (for 2-3 parts, + is fine and more readable)."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why are strings safe to use as dictionary keys?",
+            "a": "Because they are immutable, their hash code never changes after creation. A mutable object used as a dictionary key could have its hash change, making it impossible to find later."
+          },
+          {
+            "q": "What is string interning?",
+            "a": "The CLR maintains a pool of string literals. Two string literals with the same content in the same assembly share one heap instance. You can force interning with string.Intern() and check with string.IsInterned()."
+          },
+          {
+            "q": "When should you use StringBuilder over + or interpolation?",
+            "a": "Use StringBuilder when concatenating inside a loop or building a string from an unknown number of parts. For two or three fixed parts, + or interpolation is cleaner and allocates just once."
+          },
+          {
+            "q": "What did C# 10 improve about string interpolation performance?",
+            "a": "C# 10 introduced interpolated string handlers. The compiler can generate code that writes directly into a destination buffer using Append calls, avoiding the intermediate string allocation."
+          },
+          {
+            "q": "What is the difference between string and ReadOnlySpan<char> for parsing?",
+            "a": "string.Substring allocates a new string. ReadOnlySpan<char> via AsSpan().Slice is a zero-allocation view into the original string's characters - use it in hot parsing paths."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Why is string immutable in C# and what does that mean in practice?"
+          },
+          {
+            "role": "me",
+            "text": "Once a string is created, its characters cannot change. Every method like Replace or ToUpper returns a new string object. That makes strings inherently thread-safe and safe as dictionary keys - their hash code can never change after creation."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the performance implication of immutability?"
+          },
+          {
+            "role": "me",
+            "text": "Loop concatenation with += is the classic pitfall. Each += copies the entire accumulated string into a new allocation plus the new characters. Building a 10,000-line CSV report with += creates 10,000 intermediate strings with O(n^2) total character copies. StringBuilder uses a single growable char[] and copies once at the end."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is string interning?"
+          },
+          {
+            "role": "me",
+            "text": "The CLR keeps a pool of string literals so that two occurrences of the literal \"Completed\" in the same assembly share one heap instance. This saves memory for common strings and makes reference equality fast, but you should never rely on reference equality for correctness - use == or Equals which compare content."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there a zero-allocation way to work with string substrings?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - ReadOnlySpan<char> via myString.AsSpan().Slice(start, length). This gives a view into the original string's memory with no allocation. In a payment processor parsing thousands of fixed-width transaction records per second, this avoids allocating a substring for each field."
+          },
+          {
+            "role": "interviewer",
+            "text": "When is StringBuilder overkill?"
+          },
+          {
+            "role": "me",
+            "text": "For $\"Hello {name}, your order {orderId} is ready\" - that is two parts, one allocation, and the intent is immediately clear. Using StringBuilder there is noise. The threshold I use: if there is a loop or an unknown number of parts, reach for StringBuilder."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-009",
+      "q": "What are nullable value types and nullable reference types in C#?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["memory", "nullable", "null-safety"],
+      "answer": {
+        "oneLiner": "int? is Nullable<int>, a runtime struct that can hold null. Nullable reference types (C# 8+) are compile-time annotations that warn about potential null dereferences - they change nothing at runtime.",
+        "detail": "Nullable value types solve a real problem: value types like int cannot hold null, but databases often have nullable columns. Nullable<int> (written as int?) is a struct with a bool HasValue and an int Value field. The compiler handles the ? sugar and null coalescing. Nullable reference types (NRT) solve a different problem: reference types can already be null, but the compiler had no way to distinguish intentional nullable references from accidental ones. NRT enables the compiler to do flow analysis and warn when you might dereference a null reference. It is enabled per-project with <Nullable>enable</Nullable>. Important: NRT is purely a compile-time feature. The IL is identical; string? and string are the same type at runtime. The null-forgiving operator ! suppresses a NRT warning but does not add any runtime check.",
+        "keyPoints": [
+          "int? is Nullable<int> - a struct with HasValue and Value properties, changes runtime behavior.",
+          "Nullable reference types (NRT, C# 8) are compile-time annotations only - no runtime effect.",
+          "Enable NRT with <Nullable>enable</Nullable> in the project file.",
+          "Key null-safety operators: ?? (null coalescing), ?. (null conditional), ??= (null coalescing assignment).",
+          "The ! null-forgiving operator suppresses compiler warnings but adds no runtime null check."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - nullable reference not checked, potential NullReferenceException at runtime\npublic string GetCustomerEmail(int customerId)\n{\n    Customer? customer = _repo.FindById(customerId);\n    return customer.Email; // NullReferenceException if customer is null\n}\n\n// ✅ GOOD - handle null explicitly, let compiler verify the path\npublic string GetCustomerEmail(int customerId)\n{\n    Customer? customer = _repo.FindById(customerId);\n    if (customer is null)\n        throw new ArgumentException($\"Customer {customerId} not found\");\n    return customer.Email; // compiler knows customer is not null here\n}",
+          "note": "With NRT enabled, the compiler tracks flow analysis - after the null check, customer.Email has no warning because the compiler knows customer cannot be null at that point."
+        },
+        "analogy": "Nullable value type is a box that can be empty; nullable reference type annotation is a sticky note warning you the box might be empty.",
+        "redFlags": [
+          "Saying nullable reference types change runtime behavior - they do not, they are compile-time only.",
+          "Using the ! null-forgiving operator frequently to silence warnings instead of fixing the null handling.",
+          "Confusing Nullable<int> (a struct) with a nullable reference type (annotation only).",
+          "Not knowing that int? HasValue/Value can be used instead of comparing to null."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is Nullable<int> under the hood?",
+            "a": "A struct with two fields: bool HasValue and int Value. The compiler translates int? to Nullable<int> and provides syntax sugar for null comparisons and ?? operators."
+          },
+          {
+            "q": "Does enabling nullable reference types break existing code?",
+            "a": "It produces compiler warnings (not errors by default) on code that might dereference null. You can use #nullable enable/disable to adopt it incrementally, file by file."
+          },
+          {
+            "q": "What does the ?. operator do?",
+            "a": "Null-conditional access - customer?.Email returns null if customer is null instead of throwing NullReferenceException. It short-circuits the entire chain if any step is null."
+          },
+          {
+            "q": "When is the ! null-forgiving operator legitimate?",
+            "a": "When you have context the compiler cannot see - like after a contract-enforcing method or a framework guarantee. Use it sparingly and document why."
+          },
+          {
+            "q": "How do you handle nullable values from a database column in EF Core?",
+            "a": "Map it to a nullable property - decimal? Price maps to a nullable decimal column. Use ?? to provide a default: invoice.Tax ?? 0m."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain nullable value types and nullable reference types in C#?"
+          },
+          {
+            "role": "me",
+            "text": "They solve two different problems. Nullable value types - int? which is Nullable<int> - are a runtime struct that lets a value type hold null, useful for database columns. Nullable reference types in C# 8 are a compile-time annotation system that lets the compiler warn when you might dereference a null reference."
+          },
+          {
+            "role": "interviewer",
+            "text": "Do nullable reference types change runtime behavior?"
+          },
+          {
+            "role": "me",
+            "text": "No - they are purely a compile-time feature. string? and string produce identical IL. The compiler does flow analysis and emits warnings, but there is no runtime null check added. A null reference will still throw NullReferenceException if you dereference it without checking."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the null-forgiving operator and when is it acceptable?"
+          },
+          {
+            "role": "me",
+            "text": "The ! operator tells the compiler 'trust me, this is not null' and suppresses the warning. It is legitimate when you have a framework guarantee the compiler cannot see - like after a [NotNull] attribute or a DI-injected dependency. In a shipping service I might write _logger!.LogInformation when the framework guarantees injection, but I use it sparingly because it defeats the purpose of NRT."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you safely access a chain of potentially null properties?"
+          },
+          {
+            "role": "me",
+            "text": "The null-conditional operator ?. short-circuits the chain: order?.Customer?.Address?.PostalCode returns null rather than throwing if any step is null. Combine it with ?? to provide a default: order?.Customer?.Address?.PostalCode ?? \"Unknown\"."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you handle database columns that are nullable in EF Core?"
+          },
+          {
+            "role": "me",
+            "text": "Map nullable columns to nullable C# properties - decimal? DiscountAmount for a nullable decimal column. In the service layer I use ?? to supply a default: lineItem.Discount ?? 0m. When a column should never be null, I use a non-nullable property and EF Core adds NOT NULL to the generated migration."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-010",
+      "q": "What is `Dispose` vs `Finalize` (destructor)?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["memory", "gc", "dispose", "finalize"],
+      "answer": {
+        "oneLiner": "Dispose is deterministic cleanup you call directly or via using. Finalize is a non-deterministic GC safety net that runs at an unknown time on a GC thread. Always prefer Dispose and suppress the finalizer.",
+        "detail": "When you call Dispose (or use a using block), resources are freed immediately and predictably. A finalizer (~ClassName) is a C# destructor - the CLR calls it before collecting the object, but you cannot control when or in what order. Finalizable objects are placed on the finalization queue when found unreachable. The finalizer thread runs them, then the objects become truly collectible in the next cycle - they survive an extra GC generation. This has two costs: extra GC overhead per finalized object, and holding OS resources for longer than necessary. The pattern to use both: public Dispose() calls Dispose(true) and GC.SuppressFinalize(this). The finalizer calls Dispose(false). The bool parameter tells Dispose not to touch managed objects in the finalizer path, because those objects may already have been collected.",
+        "keyPoints": [
+          "Dispose is deterministic - you control exactly when resources are freed.",
+          "Finalizer (destructor) is non-deterministic - runs on a GC thread at an unpredictable time.",
+          "Finalizable objects survive one extra GC cycle - they cost more GC work per object.",
+          "Call GC.SuppressFinalize(this) in Dispose so the finalizer is skipped when Dispose ran.",
+          "Never touch other managed objects in a finalizer - they may already be collected."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - relying on finalizer, file held open until GC decides to run\npublic class AuditLogger\n{\n    private FileStream _log;\n    ~AuditLogger() { _log?.Close(); } // non-deterministic, blocks other processes\n}\n\n// ✅ GOOD - Dispose pattern with finalizer as safety net only\npublic class AuditLogger : IDisposable\n{\n    private FileStream _log;\n    private bool _disposed;\n    protected virtual void Dispose(bool disposing)\n    {\n        if (_disposed) return;\n        if (disposing) _log?.Dispose(); // free managed resources\n        _disposed = true;\n    }\n    public void Dispose() { Dispose(true); GC.SuppressFinalize(this); }\n    ~AuditLogger() { Dispose(false); } // safety net only\n}",
+          "note": "The finalizer is a safety net for callers who forget to call Dispose. When Dispose runs first, GC.SuppressFinalize removes the object from the finalization queue so it is collected in the same cycle."
+        },
+        "analogy": "Dispose is locking the office when you leave; the finalizer is the security guard who eventually checks if you forgot.",
+        "redFlags": [
+          "Relying on the finalizer as the primary cleanup mechanism instead of Dispose.",
+          "Touching other managed objects inside a finalizer - they may already be collected.",
+          "Not calling GC.SuppressFinalize in the public Dispose method.",
+          "Not knowing that finalizable objects survive an extra GC cycle, increasing collection cost."
+        ],
+        "followUpsQA": [
+          {
+            "q": "When does a finalizer run?",
+            "a": "At an unpredictable time, on a dedicated GC finalizer thread, after the GC finds the object unreachable. There is no guarantee about order or timing relative to other finalizers."
+          },
+          {
+            "q": "Why is touching managed objects in a finalizer dangerous?",
+            "a": "When the finalizer runs, the GC has already found the object unreachable. Other managed objects the finalizer might reference could have been collected in the same GC cycle - accessing them is undefined behavior."
+          },
+          {
+            "q": "What is the purpose of the Dispose(bool disposing) pattern?",
+            "a": "The bool separates two call paths: true means called from public Dispose (safe to free managed objects), false means called from the finalizer (only free unmanaged resources, managed objects may be gone)."
+          },
+          {
+            "q": "Should every IDisposable class have a finalizer?",
+            "a": "No - only classes that directly own unmanaged resources (OS handles, native memory). If your class only holds IDisposable managed fields, implement IDisposable to dispose those fields but do not add a finalizer."
+          },
+          {
+            "q": "What happens if you call Dispose twice?",
+            "a": "The standard pattern guards with a _disposed boolean, so the second call is a no-op. The contract says Dispose must be safe to call multiple times."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between Dispose and Finalize in C#?"
+          },
+          {
+            "role": "me",
+            "text": "Dispose is deterministic cleanup - you call it directly or through a using block and resources are freed immediately. Finalize is a GC safety net that runs at an unpredictable time on a dedicated GC thread. You cannot control when it runs or in what order."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why is relying on the finalizer a problem in practice?"
+          },
+          {
+            "role": "me",
+            "text": "In a high-volume audit logging service, if the log FileStream is only released in the finalizer, the file stays open until the GC decides to collect the object - which could be seconds or minutes later. That blocks other processes from accessing the log and exhausts file handles under load."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens to finalizable objects in the GC?"
+          },
+          {
+            "role": "me",
+            "text": "They survive one extra GC cycle. When the GC finds a finalizable object unreachable, it puts it on the finalization queue rather than collecting it. The finalizer thread runs it, then it becomes collectible in the next cycle. That doubles the GC cost compared to a non-finalizable object."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through how GC.SuppressFinalize fits into the Dispose pattern."
+          },
+          {
+            "role": "me",
+            "text": "In the public Dispose method, after calling Dispose(true) to free everything, I call GC.SuppressFinalize(this). This removes the object from the finalization queue so it is collected in the current cycle - no extra cycle, no finalizer thread overhead. The finalizer is only a safety net for callers who forget to call Dispose."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you touch managed objects in a finalizer?"
+          },
+          {
+            "role": "me",
+            "text": "No - that is the rule. When the finalizer runs, the GC may have already collected other managed objects in the same batch. The Dispose(bool disposing) pattern enforces this: when disposing is false (finalizer path), you only free unmanaged resources. Only when disposing is true (Dispose path) do you also free managed fields."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-011",
+      "q": "What is `Span<T>` and when should you use it?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["memory", "span", "performance", "zero-alloc"],
+      "answer": {
+        "oneLiner": "Span<T> is a stack-only ref struct that provides a zero-allocation, type-safe view over any contiguous block of memory - array, string, stack-allocated buffer, or unmanaged memory.",
+        "detail": "Span<T> is a lightweight struct containing just a pointer and a length. Because it is a ref struct, it is restricted to the stack - it cannot be boxed, stored in a class field, captured in a lambda, or used across an await point (because async state machines store locals as heap fields). This restriction is what makes it safe and fast. Slice(start, length) returns a new Span pointing into the same memory with no copy. ReadOnlySpan<T> is the immutable variant - string.AsSpan() gives a ReadOnlySpan<char> over the string's characters with no allocation. stackalloc allocates a fixed-size buffer on the stack and can be wrapped in a Span<T>. For async scenarios where you need to hold the buffer across await, use Memory<T> instead.",
+        "keyPoints": [
+          "Span<T> is a ref struct - stack-only, cannot be boxed, stored in a field, or used across await.",
+          "Slice returns a new view into the same memory - zero allocation, zero copy.",
+          "ReadOnlySpan<char> via string.AsSpan() gives a zero-alloc view into a string.",
+          "stackalloc allocates on the stack and can be wrapped in Span<T> for fast temporary buffers.",
+          "Use Memory<T> when you need to cross async boundaries or store the buffer in a field."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - Substring allocates a new string for each date part\nstring rawDate = \"2024-06-15\";\nint year = int.Parse(rawDate.Substring(0, 4));\nint month = int.Parse(rawDate.Substring(5, 2));\nint day = int.Parse(rawDate.Substring(8, 2));\n// 3 heap allocations\n\n// ✅ GOOD - AsSpan().Slice gives a view, no allocation\nReadOnlySpan<char> rawDate = \"2024-06-15\".AsSpan();\nint year = int.Parse(rawDate.Slice(0, 4));\nint month = int.Parse(rawDate.Slice(5, 2));\nint day = int.Parse(rawDate.Slice(8, 2));\n// 0 heap allocations - Slice is a pointer+length view",
+          "note": "In a logistics system parsing millions of date strings from a flat-file import, the zero-alloc version reduces GC pressure dramatically compared to Substring."
+        },
+        "analogy": "Span<T> is a window into a building - you see the rooms through it, but you did not build a new building.",
+        "redFlags": [
+          "Trying to store a Span<T> in a class field - it is a ref struct, the compiler forbids this.",
+          "Using Span<T> across an await - it cannot cross the async state machine boundary.",
+          "Not knowing ReadOnlySpan<char> for string slicing - still using Substring in hot paths.",
+          "Confusing Span<T> with Memory<T> - Span is stack-only, Memory is heap-compatible."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why can Span<T> not cross an await boundary?",
+            "a": "An async method stores its locals as fields in a heap-allocated state machine struct. Span<T> is a ref struct and cannot be a field on the heap. The compiler enforces this with a compile-time error."
+          },
+          {
+            "q": "What is the difference between Span<T> and ReadOnlySpan<T>?",
+            "a": "ReadOnlySpan<T> does not allow writing to the underlying memory. string.AsSpan() returns ReadOnlySpan<char> because strings are immutable. Use ReadOnlySpan when you only need to read."
+          },
+          {
+            "q": "How do you use stackalloc safely?",
+            "a": "Wrap it in a Span<T>: Span<byte> buffer = stackalloc byte[256]. For larger or unknown sizes, use ArrayPool<byte>.Shared.Rent instead to avoid stack overflow."
+          },
+          {
+            "q": "When would you use Memory<T> instead of Span<T>?",
+            "a": "When you need to store the buffer in a class field, pass it to an async method, or hold it across an await. Memory<T> wraps the same contiguous memory but lives on the heap."
+          },
+          {
+            "q": "Can you create a Span over unmanaged memory?",
+            "a": "Yes - Span<T> can wrap a pointer to unmanaged memory using the unsafe Span<T>(void*, int) constructor, or via MemoryMarshal. This is used in interop scenarios to avoid copying data across the managed/unmanaged boundary."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is Span<T> and when do you use it?"
+          },
+          {
+            "role": "me",
+            "text": "Span<T> is a stack-only ref struct that represents a contiguous block of memory - an array slice, a string window, or a stackalloc buffer - without copying it. It is used in hot paths where you want to avoid heap allocations: parsing, formatting, processing binary protocols."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does ref struct mean and what restrictions does it add?"
+          },
+          {
+            "role": "me",
+            "text": "It means the struct can only live on the stack. You cannot box it, store it as a class field, capture it in a lambda, or use it across an await point. The compiler enforces all of these as errors. Those restrictions are what make it safe - no GC overhead and no race conditions."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you use it to parse a fixed-width transaction file without allocating?"
+          },
+          {
+            "role": "me",
+            "text": "I would use line.AsSpan() to get a ReadOnlySpan<char> over the line, then Slice to get windows for each field. int.Parse, decimal.Parse, and DateTime.Parse all have Span overloads. For a file with 500,000 transaction lines, this can cut allocation by 90% compared to using Substring."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if I need to hold the buffer across an await, like reading from a network stream?"
+          },
+          {
+            "role": "me",
+            "text": "Use Memory<T>. It wraps the same contiguous memory but is heap-compatible so it can cross async boundaries and live in class fields. The pattern is: Memory<byte> at the async boundary for the await, then .Span to get a Span<byte> for the synchronous processing inside the method."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does stackalloc fit into this?"
+          },
+          {
+            "role": "me",
+            "text": "Span<byte> buffer = stackalloc byte[128] allocates directly on the stack - zero GC involvement. I use it for small, fixed-size temporary buffers like hashing a key or formatting a small value. For larger or unknown sizes I use ArrayPool<byte>.Shared.Rent to avoid stack overflow."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-012",
+      "q": "What is the difference between `Span<T>` and `Memory<T>`?",
+      "level": "senior",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["memory", "span", "memory-t", "performance", "async"],
+      "answer": {
+        "oneLiner": "Span<T> is stack-only (fastest, no allocation) but cannot cross await or live on the heap. Memory<T> is heap-compatible, can be stored in fields and used in async methods, but yields a Span only for synchronous work.",
+        "detail": "Both types provide zero-copy views over contiguous memory. The difference is lifetime and storage. Span<T> is a ref struct - it lives exclusively on the stack. An async method compiles to a state machine class that stores locals as heap fields. A ref struct cannot be a field, so the compiler rejects Span<T> across await or yield. Memory<T> is a regular struct (not ref struct), so it can live on the heap as a class field or be passed to async methods. To do the actual processing, call .Span on a Memory<T> to get a Span<T> for the synchronous section. This gives you the best of both: Memory for the boundary, Span for the inner work. ReadOnlyMemory<T> and ReadOnlySpan<T> are the immutable equivalents.",
+        "keyPoints": [
+          "Span<T> is a ref struct - stack-only, fastest, cannot cross await or be stored in a field.",
+          "Memory<T> is a regular struct - heap-compatible, works in async methods and class fields.",
+          "Get a Span from Memory via .Span for synchronous processing only.",
+          "ReadOnlyMemory<T> and ReadOnlySpan<T> are the immutable read-only variants of each.",
+          "Use Span for synchronous hot paths; use Memory as the async boundary type."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - Span<T> cannot cross await, this does not compile\nasync Task ProcessPacketAsync(Span<byte> packet, Stream output)\n{\n    int written = await output.WriteAsync(packet); // compile error\n}\n\n// ✅ GOOD - Memory<T> at the async boundary, Span only for sync work\nasync Task ProcessPacketAsync(Memory<byte> packet, Stream output)\n{\n    await output.WriteAsync(packet);              // Memory works across await\n    int checksum = ComputeChecksum(packet.Span);  // Span for sync computation\n}\nint ComputeChecksum(ReadOnlySpan<byte> data)\n{\n    int sum = 0;\n    foreach (var b in data) sum += b;\n    return sum;\n}",
+          "note": "The pattern: Memory<T> at every async boundary, .Span only inside synchronous inner methods."
+        },
+        "analogy": "Memory<T> is a parcel tag you can put in a box; Span<T> is the item itself - you can only handle it in person, not ship it.",
+        "redFlags": [
+          "Trying to pass Span<T> to an async method - it does not compile and the reason is the state machine.",
+          "Not knowing that Memory<T>.Span gives a Span for synchronous processing.",
+          "Storing a Span<T> as a class field - the compiler forbids it.",
+          "Confusing ReadOnlyMemory<T> with ImmutableArray<T> - they are different abstractions."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why exactly does Span<T> not compile across await?",
+            "a": "An async method's locals become fields in a compiler-generated state machine class on the heap. ref struct types cannot be heap fields, so the compiler rejects any Span<T> local that is live across an await point."
+          },
+          {
+            "q": "How do you get a Span from a Memory<T>?",
+            "a": "Call memory.Span - this returns a Span<T> pointing to the same memory. Only do this in a synchronous scope where the Span will not outlive the Memory."
+          },
+          {
+            "q": "What is ReadOnlyMemory<T> used for?",
+            "a": "Passing immutable buffer views to async methods - for example, passing a ReadOnlyMemory<byte> to stream.WriteAsync to send bytes from a cached buffer without copying."
+          },
+          {
+            "q": "Which should I use for an async network protocol parser?",
+            "a": "Hold the received buffer as Memory<byte> in the async receive loop. Once bytes are available, call .Span inside a synchronous Parse method for zero-alloc parsing."
+          },
+          {
+            "q": "Can Memory<T> wrap an array, string, or native memory?",
+            "a": "Memory<T> wraps arrays and slices of arrays. For strings, use ReadOnlyMemory<char> via string.AsMemory(). For native memory, use MemoryMarshal or unsafe APIs."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between Span<T> and Memory<T>?"
+          },
+          {
+            "role": "me",
+            "text": "Both give zero-copy views over contiguous memory, but Span<T> is a ref struct that can only live on the stack, while Memory<T> is a regular struct that can live on the heap. That means Span cannot cross an await or be stored as a class field, but Memory can."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why can Span not cross an await boundary technically?"
+          },
+          {
+            "role": "me",
+            "text": "An async method compiles to a state machine class - a heap-allocated object where all locals become fields. ref struct types are forbidden as heap fields, so the compiler rejects any Span<T> local that is alive when an await is reached. It is a compile-time error, not a runtime issue."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you use both together in a real scenario?"
+          },
+          {
+            "role": "me",
+            "text": "In a TCP message handler: I hold Memory<byte> as the buffer type in the async receive loop - await socket.ReceiveAsync(buffer) works fine with Memory. Once bytes arrive, I call buffer.Span inside a synchronous ParseMessage method for zero-alloc parsing of the header and payload fields."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is ReadOnlyMemory and when do you choose it over Memory?"
+          },
+          {
+            "role": "me",
+            "text": "ReadOnlyMemory<T> is the immutable variant - useful for passing buffers you should not write into, like a response body cached as a byte array. I use it when calling stream.WriteAsync, for example ReadOnlyMemory<byte> responseBody = cachedResponse.AsMemory() - it communicates to the caller that the buffer is read-only."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does this improve performance in a real service?"
+          },
+          {
+            "role": "me",
+            "text": "In a financial data feed handler processing 50,000 market messages per second, switching from byte[] slices (each a new array allocation) to Memory<byte> with .Span for parsing eliminated most of the per-message heap allocations. Gen 0 collection frequency dropped significantly in the profiler, reducing GC pause time under load."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-013",
+      "q": "Compare `string` concatenation, `StringBuilder`, and string interpolation -- when do you use each?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["memory", "string", "stringbuilder", "interpolation", "performance"],
+      "answer": {
+        "oneLiner": "Use + or interpolation for a small fixed number of parts. Use StringBuilder when building strings in a loop or from an unknown number of pieces, because string immutability means += reallocates and copies everything each time.",
+        "detail": "String concatenation with + for a fixed number of known parts compiles to a single string.Concat call, which allocates one new string. String interpolation ($\"{name}\") is sugar for string.Format or, since C# 10, an interpolated string handler that can be even more efficient. The problem is loop concatenation: report += line inside a loop with n iterations copies 1 character, then 2, then 3 - the total is n*(n+1)/2 characters copied, which is O(n^2). StringBuilder maintains a growable char[] internally, doubling capacity when needed (like List<T>). The final ToString call makes one allocation. For 2-3 parts, StringBuilder is overkill and less readable. For loop or unknown count, StringBuilder is mandatory. C# 10 interpolated string handlers allow libraries like ASP.NET to accept interpolated strings and write directly into a buffer with no intermediate allocation.",
+        "keyPoints": [
+          "+ and interpolation are ideal for 2-5 fixed parts - they compile to a single concat call.",
+          "Loop concatenation with += is O(n^2) total character copies - use StringBuilder.",
+          "StringBuilder uses a growable char[] - one final allocation on ToString().",
+          "C# 10 interpolated string handlers can eliminate intermediate allocations in logging and formatting.",
+          "string.Join is cleaner than a loop for joining a collection with a separator."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - building a 10,000-line audit log with += is O(n^2) copies\nstring auditLog = \"\";\nforeach (var entry in auditEntries)\n    auditLog += $\"[{entry.Timestamp:O}] {entry.UserId}: {entry.Action}\\n\";\n\n// ✅ GOOD - StringBuilder builds the log in one growable buffer\nvar sb = new StringBuilder(auditEntries.Count * 80);\nforeach (var entry in auditEntries)\n    sb.Append('[').Append(entry.Timestamp.ToString(\"O\"))\n      .Append(\"] \").Append(entry.UserId)\n      .Append(\": \").AppendLine(entry.Action);\nstring auditLog = sb.ToString();",
+          "note": "Pre-sizing the StringBuilder with the expected capacity avoids internal array re-allocations during the loop - an extra optimization for large known-size outputs."
+        },
+        "analogy": "Loop += is writing a book by rewriting every previous page every time you add a new one; StringBuilder writes once.",
+        "redFlags": [
+          "Using StringBuilder for two or three fixed parts - it is premature optimization and less readable.",
+          "Using += inside a loop to build reports, logs, or CSV exports.",
+          "Not knowing that string.Concat with multiple arguments allocates just one string.",
+          "Not mentioning string.Join as a cleaner option for joining a collection with a separator."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why is loop concatenation O(n^2)?",
+            "a": "Each += creates a new string by copying all previous characters plus the new ones. After n iterations, total characters copied = 1+2+3+...+n = n*(n+1)/2, which is O(n^2)."
+          },
+          {
+            "q": "What did C# 10 improve about interpolated strings?",
+            "a": "Interpolated string handlers let the compiler generate code that writes directly into a destination buffer using Append calls, avoiding the intermediate string allocation. Logging frameworks use this to skip allocations for filtered log messages."
+          },
+          {
+            "q": "When would you use string.Join instead of StringBuilder?",
+            "a": "When you are joining a collection of strings with a separator - string.Join(\", \", productNames) is cleaner and more efficient than a manual StringBuilder loop with separator logic."
+          },
+          {
+            "q": "How do you pre-size a StringBuilder?",
+            "a": "Pass an initial capacity to the constructor: new StringBuilder(expectedLength). This avoids internal array doublings during the loop, especially useful when you can estimate the final size."
+          },
+          {
+            "q": "Does $\"{value}\" always box value types?",
+            "a": "In older C# it did because the interpolation called ToString on object. In C# 10 with interpolated string handlers, the compiler can call ToString directly on the typed value - no boxing."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Compare string concatenation, StringBuilder, and string interpolation - when do you use each?"
+          },
+          {
+            "role": "me",
+            "text": "For two to five fixed parts, + or interpolation is clearest and compiles to a single concat call - one allocation. For a loop or an unknown number of pieces, StringBuilder is mandatory because each += in a loop copies the entire accumulated string, giving O(n^2) total character copies."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why exactly is loop concatenation O(n^2)?"
+          },
+          {
+            "role": "me",
+            "text": "After 1 iteration you have copied 1 character. After 2 you copy 2. After n you copy n. Total is 1+2+...+n which is n*(n+1)/2 - O(n^2). StringBuilder uses a growable char array like List<T> does - it doubles in size when full and copies once at ToString."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would StringBuilder actually be the wrong choice?"
+          },
+          {
+            "role": "me",
+            "text": "For $\"Order {orderId} confirmed for {customerName}\" - that is two parts, one allocation, and it is immediately clear what the string says. Using StringBuilder there is noise. The threshold I use: if there is a loop or I cannot count the parts at compile time, use StringBuilder."
+          },
+          {
+            "role": "interviewer",
+            "text": "What improved in C# 10 around interpolated strings?"
+          },
+          {
+            "role": "me",
+            "text": "Interpolated string handlers let the compiler transform $\"{...}\" into a series of Append calls on a handler struct, writing directly into a destination buffer. Logging frameworks use this so that _logger.LogInformation($\"Processing order {orderId}\") skips the string allocation entirely if the log level is not enabled."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there a cleaner option than StringBuilder for joining a collection?"
+          },
+          {
+            "role": "me",
+            "text": "string.Join(\", \", productSkus) is much cleaner than a manual StringBuilder loop with separator tracking. Internally it still uses efficient buffer building. For large collections where I know the approximate size, I pre-size the StringBuilder: new StringBuilder(items.Count * 20) to avoid internal re-allocations."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-memory-014",
+      "q": "What is the difference between Server GC and Workstation GC, and when do you use each?",
+      "level": "senior",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["memory", "gc", "server-gc", "workstation-gc", "performance"],
+      "answer": {
+        "oneLiner": "Workstation GC is tuned for low latency with a single heap, ideal for desktop and client apps. Server GC uses one heap and one dedicated GC thread per CPU core for maximum throughput on multi-core server workloads.",
+        "detail": "Workstation GC uses a single managed heap and runs GC on the thread that triggered the allocation (or a helper thread in concurrent mode). It is optimized to minimize pauses for interactive apps. Server GC allocates a separate managed heap per CPU core and uses dedicated GC threads for each heap. Collections on different heaps can run in parallel, which dramatically increases throughput. The trade-off: Server GC uses significantly more memory (one full heap budget per core). On a 32-core server, this can mean gigabytes of reserved GC memory. On a memory-constrained container with 1 CPU and 512 MB, Server GC hurts. ASP.NET Core running in IIS or as a hosted service defaults to Server GC. Concurrent GC (background GC) runs Gen 2 collection concurrently with application threads to reduce pause time - available in both modes.",
+        "keyPoints": [
+          "Workstation GC - single heap, GC on the allocating thread, tuned for low latency, default for client apps.",
+          "Server GC - one heap per CPU core, parallel GC threads, maximum throughput, default for ASP.NET Core.",
+          "Server GC uses significantly more memory - one full heap budget per core.",
+          "ASP.NET Core defaults to Server GC automatically in hosted environments.",
+          "Do not enable Server GC blindly on memory-constrained single-core containers."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - enabling Server GC on a 1-core 256MB container wastes memory\n// runtimeconfig.json (wrong for a memory-constrained single-core pod)\n{\n  \"configProperties\": {\n    \"System.GC.Server\": true\n  }\n}\n// reserves most available RAM for per-core GC heap segments\n\n// ✅ GOOD - match GC mode to the deployment target\n// For a multi-core API server (8+ cores, 4+ GB RAM)\n{\n  \"configProperties\": {\n    \"System.GC.Server\": true,\n    \"System.GC.Concurrent\": true\n  }\n}\n// For a sidecar or single-core container: omit or set Server to false",
+          "note": "ASP.NET Core sets Server GC automatically when hosted. Only override this in runtimeconfig.json for console apps, worker services, or containers with unusual resource constraints."
+        },
+        "analogy": "Workstation GC is one fast cashier; Server GC is one cashier per checkout lane running in parallel.",
+        "redFlags": [
+          "Enabling Server GC on a 1-core memory-constrained container without considering the memory cost.",
+          "Not knowing that ASP.NET Core defaults to Server GC automatically in hosted environments.",
+          "Saying Workstation GC is better because it has fewer pauses - Server GC with concurrent mode also has low pauses.",
+          "Not knowing that Server GC uses one heap per core, which scales memory use with core count."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What does concurrent (background) GC add?",
+            "a": "Background GC collects Gen 2 on a dedicated thread concurrently with application threads, reducing the stop-the-world pause. Gen 0 and Gen 1 still have brief pauses. It is the default in both Server and Workstation modes."
+          },
+          {
+            "q": "Why does Server GC use more memory than Workstation GC?",
+            "a": "Server GC maintains a separate managed heap per CPU core, and each heap has its own Gen 0, Gen 1, Gen 2, and LOH segments. On a 16-core server, that is 16 times the heap segment overhead."
+          },
+          {
+            "q": "What is the default GC mode for an ASP.NET Core application?",
+            "a": "Server GC when hosted in IIS, Kestrel, or as a Windows Service. It is set automatically by the runtime based on the hosting model."
+          },
+          {
+            "q": "How do you tune GC for a low-allocation, latency-sensitive API?",
+            "a": "Use Server GC with concurrent mode, minimize long-lived object promotion to Gen 2, use ArrayPool<T> and ObjectPool<T> for frequently allocated objects, and consider GCSettings.LatencyMode = SustainedLowLatency for real-time sections."
+          },
+          {
+            "q": "What is GC.Collect() and should you call it?",
+            "a": "GC.Collect() forces an immediate collection. Almost never call it in production - it disrupts the generational tuning the runtime does automatically. Acceptable only after a known large allocation spike in test teardown."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between Server GC and Workstation GC?"
+          },
+          {
+            "role": "me",
+            "text": "Workstation GC uses a single managed heap and is tuned for low latency - it is the default for desktop and client apps. Server GC allocates one heap and one dedicated GC thread per CPU core so collections can run in parallel across cores, giving much higher throughput on multi-core servers."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the trade-off with Server GC?"
+          },
+          {
+            "role": "me",
+            "text": "Memory usage scales with core count. On a 32-core server, Server GC maintains 32 separate heaps with their own segment budgets - that can reserve several gigabytes of virtual address space for GC alone. On a memory-constrained single-core container with 512 MB, enabling Server GC is actively harmful."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the default for ASP.NET Core?"
+          },
+          {
+            "role": "me",
+            "text": "Server GC, automatically. When ASP.NET Core is hosted - in IIS, Kestrel, or as a Windows Service - the runtime detects the server hosting model and enables Server GC without any configuration. Most developers do not need to touch it unless they are running in a non-standard environment like a minimal container."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does concurrent GC do?"
+          },
+          {
+            "role": "me",
+            "text": "Background GC runs Gen 2 collections on a dedicated thread concurrently with the application. Gen 0 and Gen 1 still have brief stop-the-world pauses because they are fast. Concurrent mode reduces the long Gen 2 pauses that would otherwise spike response latency in a busy API - it is enabled by default in both Server and Workstation modes."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you tune GC for a payment processing API that requires very consistent response times?"
+          },
+          {
+            "role": "me",
+            "text": "Server GC with concurrent mode as the baseline. Then minimize Gen 2 promotions by reducing long-lived object graphs - use ArrayPool<byte> for network buffers, ObjectPool<T> for expensive objects, and avoid caching raw DbContext instances. For the most latency-sensitive sections, I would consider GCSettings.LatencyMode = SustainedLowLatency which tells the GC to favor low pause time over throughput during that window."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

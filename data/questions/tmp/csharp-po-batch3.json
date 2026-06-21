@@ -1,0 +1,235 @@
+[
+    {
+      "id": "csharp-po-021",
+      "q": "Predict the output: default values of an uninitialized struct.",
+      "level": "junior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["struct", "default-values"],
+      "answer": {
+        "oneLiner": "Prints True then 0. Struct fields are zero-initialized: reference fields become null, numeric fields become 0, bool becomes false.",
+        "detail": "When you write new Person(), the runtime creates a new struct value with all bytes set to zero. This is zero-initialization, not just 'left undefined'. For the string Name field (a reference type), null is the zero value - so Name == null is True. For the int Age field, 0 is the zero value. No custom constructor is needed to get this behavior; the default parameterless constructor always zero-initializes. This same rule applies to struct fields inside class objects.",
+        "keyPoints": [
+          "Struct fields are always zero-initialized: reference types become null, numerics become 0, bool becomes false.",
+          "new SomeStruct() performs zero-initialization even without a custom constructor.",
+          "A class reference can be null, but a struct value itself cannot be null (only Nullable<T> can).",
+          "default(SomeStruct) also produces the zero-initialized value."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - accessing struct field without checking zero initialization\nstruct ShippingAddress { public string Street; public int PostalCode; }\nShippingAddress addr = new ShippingAddress();\nConsole.WriteLine(addr.Street.Length); // NullReferenceException - Street is null\n\n// ✅ GOOD - check before use or initialize explicitly\nShippingAddress addr2 = new ShippingAddress { Street = \"Unknown\", PostalCode = 0 };\nConsole.WriteLine(addr2.Street.Length); // 7",
+          "note": "Reference-type fields of a default struct are null. Always check or initialize before use."
+        },
+        "analogy": "A default struct is a blank form - every field starts empty (zero), not pre-filled.",
+        "redFlags": [
+          "Saying struct fields contain random or garbage values like in C.",
+          "Saying Name == null would print False because a string is initialized to empty string by default.",
+          "Not knowing that reference-type fields of a struct start as null.",
+          "Confusing a struct value being null with a struct containing a null reference field."
+        ],
+        "followUpsQA": [
+          { "q": "Can a struct value itself be null?", "a": "No. A struct is a value type and cannot be null. Only a Nullable<T> wrapper (written as T?) allows a struct value to represent null." },
+          { "q": "What is default(Person) and how does it differ from new Person()?", "a": "They produce the same result - a zero-initialized Person. default(T) is the general way to get the zero value for any type including structs, classes, and value types." },
+          { "q": "Does the same zero-initialization apply to struct fields inside a class?", "a": "Yes. When a class is instantiated, all its fields are zero-initialized including embedded structs. A struct field in a class is zero-initialized inline, not separately allocated." },
+          { "q": "Can you define a parameterless constructor for a struct in C#?", "a": "Yes, since C# 10. You can define a parameterless constructor that initializes fields to non-default values. However, default(T) and array initialization still use zero-initialization, not your custom constructor." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "You create a new Person struct without setting any fields. You print Name == null and Age. What prints?" },
+          { "role": "me", "text": "True then 0. Struct creation zero-initializes all fields. The string Name field is a reference type so its zero value is null. The int Age field has zero value 0." },
+          { "role": "interviewer", "text": "Does this differ from how class fields are initialized?" },
+          { "role": "me", "text": "No, classes also zero-initialize fields. The difference is a class variable can itself be null if it has not been assigned an object. A struct variable always holds a value - you cannot have a null Person struct. To represent 'no person', you would use Person? which is Nullable<Person>." },
+          { "role": "interviewer", "text": "What would happen if you accessed Name.Length on a default struct?" },
+          { "role": "me", "text": "NullReferenceException. Name is null, not an empty string. Calling .Length on a null string throws. The distinction between null and empty string is often a source of bugs when developers assume reference fields are empty-initialized." },
+          { "role": "interviewer", "text": "Since C# 10, can you define a custom parameterless constructor for structs?" },
+          { "role": "me", "text": "Yes. You can write public Person() { Name = 'Unknown'; Age = 0; } and new Person() calls it. But default(Person) and array initialization like new Person[10] still use zero-initialization and bypass the custom constructor. This is a subtle gotcha." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-022",
+      "q": "Predict the output: mutating a list while a deferred query is held.",
+      "level": "mid",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["linq", "deferred-execution", "where"],
+      "answer": {
+        "oneLiner": "Prints 2 3. The .ToList() call forces immediate execution of the Where query before the Add(4). The result is a snapshot of the list at that moment, excluding 4.",
+        "detail": "When you call .ToList() immediately after the Where, the query runs right then and builds a new List<int> containing all elements greater than 1 from the current state of nums (which is 2 and 3). The 4 is added afterward to the original nums list, but the snapshot big already captured its results. Iterating big gives 2 and 3. Without the .ToList(), big would remain a deferred query that re-evaluates against nums when iterated, and 4 would be included.",
+        "keyPoints": [
+          "ToList() forces immediate execution and creates an independent snapshot.",
+          "Later changes to the source list do not affect a materialized (ToList) result.",
+          "Without ToList, the query would include 4 because it re-evaluates at iteration time.",
+          "Deferred queries hold a reference to the source; materialized results hold their own data."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - deferred query sees later mutations\nvar pendingOrders = orderRepository.GetAll();\nvar highValue = pendingOrders.Where(o => o.Total > 1000); // deferred\npendingOrders.Add(new Order { Total = 5000 }); // added after query definition\nforeach (var o in highValue) Process(o); // includes the new 5000 order\n\n// ✅ GOOD - snapshot at the right moment\nvar highValue2 = pendingOrders.Where(o => o.Total > 1000).ToList();\npendingOrders.Add(new Order { Total = 5000 }); // does NOT affect highValue2\nforeach (var o in highValue2) Process(o); // only orders present at query time",
+          "note": "ToList() snapshots results. Deferred queries reflect source mutations."
+        },
+        "analogy": "ToList is a photograph - it captures the scene at that moment. A deferred query is a live camera feed.",
+        "redFlags": [
+          "Saying the output includes 4 because 4 was added to the original list.",
+          "Not knowing the difference between deferred and immediate LINQ execution.",
+          "Saying ToList creates a copy of the original list rather than executing the query.",
+          "Not knowing which operators trigger immediate execution."
+        ],
+        "followUpsQA": [
+          { "q": "What would the output be without ToList?", "a": "2 3 4. Without ToList, big is a deferred IEnumerable. When the foreach iterates it after the Add, nums has 4 elements. The Where re-evaluates against the current nums and returns 2, 3, and 4." },
+          { "q": "What other operators force immediate execution?", "a": "ToArray, ToDictionary, ToHashSet, Count, First, Last, Sum, Any, All, Average, Max, Min, and Single all force immediate execution and return a concrete result." },
+          { "q": "Can iterating a deferred query twice give different results?", "a": "Yes if the source changed between iterations. Deferred queries re-evaluate from the source each time they are enumerated. This is a common bug when the same IEnumerable is iterated in multiple places." },
+          { "q": "Is there a performance cost to ToList?", "a": "Yes - it allocates a new List and copies all matching elements. For very large datasets this can be significant. Only materialize when you need a snapshot, need to iterate multiple times, or need indexed access." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "I define a Where query and immediately call ToList. Then I add 4 to the source list. Then I iterate the result. What prints?" },
+          { "role": "me", "text": "2 and 3. ToList forces the Where query to execute right away against the current state of nums which contains 1, 2, 3. The result is stored in a new List<int>. The subsequent Add(4) to nums has no connection to that stored list." },
+          { "role": "interviewer", "text": "What prints without the ToList?" },
+          { "role": "me", "text": "2, 3, and 4. Without ToList, big is a lazy IEnumerable that holds a reference to nums and the predicate. When the foreach triggers enumeration, it re-evaluates the Where against nums at that moment. By then nums has 4 elements including 4, which passes the x > 1 predicate." },
+          { "role": "interviewer", "text": "What is a real-world bug this pattern causes in a web API?" },
+          { "role": "me", "text": "Returning IQueryable or IEnumerable from a repository when the database context is scoped. The caller receives a deferred query. By the time the caller iterates it (possibly after a redirect or in a view), the DbContext is disposed and you get ObjectDisposedException. Always materialize with ToList inside the using scope of the context." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-023",
+      "q": "Predict the output: ref parameter modifying a value type.",
+      "level": "junior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["ref", "value-type"],
+      "answer": {
+        "oneLiner": "Prints 100. The ref keyword makes the parameter an alias for the caller's variable. The method sets x = 100 which directly modifies a in the caller.",
+        "detail": "Without ref, a value type parameter is a copy. The method gets its own slot and any changes are invisible to the caller. With ref, the compiler passes the address of the caller's variable. Inside the method, x and a are two names for the same storage location. Setting x = 100 writes 100 into that location. When the method returns, a holds 100. The ref keyword must appear at both the method declaration and the call site to make aliasing explicit.",
+        "keyPoints": [
+          "ref passes the variable's address - the parameter becomes an alias for the caller's variable.",
+          "Without ref, a value type is copied and mutations in the method do not affect the caller.",
+          "ref must appear at both the declaration and the call site.",
+          "ref also works on reference types - it lets the method re-point the caller's reference to a different object."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - expecting value type to be modified without ref\nvoid ApplyDiscount(decimal price)\n{\n    price = price * 0.9m; // modifies local copy only\n}\ndecimal orderTotal = 100m;\nApplyDiscount(orderTotal);\nConsole.WriteLine(orderTotal); // 100 - unchanged\n\n// ✅ GOOD - use ref to modify the caller's variable\nvoid ApplyDiscount(ref decimal price)\n{\n    price = price * 0.9m;\n}\nApplyDiscount(ref orderTotal);\nConsole.WriteLine(orderTotal); // 90",
+          "note": "Use ref to allow a method to modify a value type in the caller's scope."
+        },
+        "analogy": "Without ref you hand the method a photocopy. With ref you hand it the original document.",
+        "redFlags": [
+          "Saying the output is 5 because a was never changed.",
+          "Not knowing that value types are copied on method call.",
+          "Not knowing that ref must appear at both declaration and call site.",
+          "Confusing ref (bidirectional alias) with out (output-only, no initial value required)."
+        ],
+        "followUpsQA": [
+          { "q": "What prints if the method does not use ref?", "a": "5. Without ref, the method receives a copy of a. Setting x = 100 modifies only the local copy. a in the caller remains 5." },
+          { "q": "What is the difference between ref and out?", "a": "ref requires the variable to be assigned before the call. out does not require initialization and the compiler requires the method to assign the parameter before returning. out is for output-only parameters." },
+          { "q": "What does ref do when the parameter is a reference type?", "a": "For a reference type, ref lets the method reassign the caller's reference variable to point to a different object entirely. Without ref, the method can mutate the object but cannot redirect the caller's variable." },
+          { "q": "What is an 'in' parameter and how does it relate to ref?", "a": "in passes a readonly reference. It avoids copying a large struct but prevents the method from modifying it. It is ref for reading only - useful for performance with large readonly structs." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Modify(ref int x) sets x = 100. I call Modify(ref a) where a is 5. What prints?" },
+          { "role": "me", "text": "100. The ref keyword passes the address of a rather than a copy. Inside Modify, x is an alias for a. Setting x = 100 writes directly into a's storage location. When Modify returns, a is 100." },
+          { "role": "interviewer", "text": "What would print if ref were removed from both the declaration and the call site?" },
+          { "role": "me", "text": "5. Without ref, the int value 5 is copied into a new parameter slot x. Modify's assignment x = 100 changes only that local copy. The caller's a is untouched." },
+          { "role": "interviewer", "text": "Can you use ref with a reference type like a class?" },
+          { "role": "me", "text": "Yes, but the effect is different. For a class parameter without ref, the method can mutate the object's fields but cannot make the caller's variable point to a different object. With ref, the method can do: parameter = new SomeClass() and the caller's variable will now point to that new object." },
+          { "role": "interviewer", "text": "When would you use 'in' instead of ref for a struct?" },
+          { "role": "me", "text": "When you have a large struct and want to avoid the copy cost but the method should not modify it. 'in' passes a readonly reference - zero copy, zero mutation. For example, a Vector3 or Matrix4x4 struct in game math code is often passed as 'in' to avoid copying 12 or 64 bytes per call." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-024",
+      "q": "Predict the output: exception thrown mid-chain in a multicast Action.",
+      "level": "mid",
+      "type": "code",
+      "freq": "low",
+      "tags": ["delegate", "multicast", "exception"],
+      "answer": {
+        "oneLiner": "Prints AC. The first handler runs and prints A. The second handler throws and stops the entire invocation chain. The third handler never runs. The outer catch catches the exception and prints C.",
+        "detail": "When a multicast delegate is invoked, the runtime iterates the invocation list in order. If any handler throws an unhandled exception, the iteration stops immediately. Handlers that come after the throwing handler in the list are never called. The exception propagates to the d() call site where the outer try/catch catches it. In this example: first handler prints A, second throws, B never prints, the catch prints C. The output is AC.",
+        "keyPoints": [
+          "An exception in one multicast handler stops all remaining handlers from executing.",
+          "The exception propagates from the delegate invocation site to the enclosing try/catch.",
+          "To run all handlers regardless of exceptions, use GetInvocationList and wrap each in try/catch.",
+          "Action (void return) invokes all handlers in order unless one throws."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - one failing handler silently prevents others from running\nAction onOrderShipped = () => SendConfirmationEmail();\nonOrderShipped += () => throw new SmtpException(); // this one fails\nonOrderShipped += () => UpdateInventory(); // this never runs if above throws\ntry { onOrderShipped(); } catch { LogError(); }\n// UpdateInventory is skipped silently - inventory not updated\n\n// ✅ GOOD - invoke each handler independently\nforeach (Action handler in onOrderShipped.GetInvocationList())\n{\n    try { handler(); }\n    catch (Exception ex) { LogError(ex); }\n}\n// All handlers run; failures are logged per handler",
+          "note": "Use GetInvocationList with individual try/catch to prevent one failure from stopping others."
+        },
+        "analogy": "A multicast chain is like dominoes - one falling piece stops all pieces behind it from being knocked over.",
+        "redFlags": [
+          "Saying all three handlers run and the output is ABC.",
+          "Saying the output is AC but for the wrong reason.",
+          "Not knowing that an exception in a multicast handler stops subsequent handlers.",
+          "Not knowing GetInvocationList as the solution."
+        ],
+        "followUpsQA": [
+          { "q": "How do you run all handlers even if one throws?", "a": "Call GetInvocationList() to get each delegate individually. Invoke each one inside its own try/catch block. This way a failure in one handler is isolated and does not prevent others from running." },
+          { "q": "What is the difference between Action and Func in multicast behavior?", "a": "Both follow the same invocation behavior - one exception stops the chain. Func adds the detail that only the last handler's return value comes back to the caller. But for exception propagation, they behave identically." },
+          { "q": "Does the order of handlers matter here?", "a": "Yes. Handlers run in the order they were added with +=. If the throwing handler were last, both A and B would print before the exception is thrown. Order determines which handlers run before the chain stops." },
+          { "q": "What does -= do to a multicast delegate?", "a": "It removes the last added matching handler from the invocation list. If no matching handler is found, the delegate is unchanged. It creates a new delegate object - delegates are immutable." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "A multicast Action has three handlers: first prints A, second throws, third prints B. It is called inside a try/catch that prints C. What is the output?" },
+          { "role": "me", "text": "AC. The first handler runs and prints A. The second throws an exception which immediately stops the invocation chain. The third handler never gets a chance to run so B is never printed. The exception propagates to the try/catch which prints C." },
+          { "role": "interviewer", "text": "How would you redesign this to guarantee all three handlers run?" },
+          { "role": "me", "text": "Call GetInvocationList() to get each delegate as a separate Action. Loop through them and wrap each invocation in its own try/catch. That way a failure in the second handler is logged but does not prevent the third from executing." },
+          { "role": "interviewer", "text": "Where does this pattern cause silent data loss in real applications?" },
+          { "role": "me", "text": "In event-driven order processing. When OrderShipped fires and one subscriber throws - say the email service is down - the inventory update subscriber that comes after it never runs. The order is marked shipped but inventory is not decremented. The bug is invisible until stock counts diverge from reality." },
+          { "role": "interviewer", "text": "Is there a better pattern than multicast delegates for this scenario?" },
+          { "role": "me", "text": "Yes. Use a proper event bus or mediator - like MediatR or a custom IEventBus. Each handler is registered separately, invoked independently with its own error handling, and failures are reported per-handler. This is far more robust than relying on multicast delegate invocation order." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-025",
+      "q": "Predict the output: list of base reference holding derived, virtual call.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["polymorphism", "virtual", "override"],
+      "answer": {
+        "oneLiner": "Prints 'dog speak'. With virtual and override, the method call dispatches on the runtime type. The object is a Dog, so Dog.Speak() is called regardless of the Animal declared type.",
+        "detail": "When a method is marked virtual in the base class and override in the derived class, the CLR uses the virtual method table (vtable) to dispatch calls. At the call site a.Speak(), the compiler emits a virtual call instruction. At runtime, the CLR looks up the actual type of the object - which is Dog - finds Dog's override in the vtable, and calls it. This is dynamic/late binding. The declared type Animal is irrelevant for virtual dispatch. This is the foundation of polymorphism in object-oriented design.",
+        "keyPoints": [
+          "virtual + override enables runtime dispatch based on the actual object type.",
+          "The vtable maps each virtual method to the most-derived override for each type.",
+          "The declared type is irrelevant for virtual method calls.",
+          "Without virtual/override, the same code would call Animal.Speak (static dispatch)."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - non-virtual method; polymorphism does not work\nclass NotificationSender { public void Send() => Console.WriteLine(\"base\"); }\nclass SmsNotificationSender : NotificationSender { public void Send() => Console.WriteLine(\"sms\"); }\n\nNotificationSender sender = new SmsNotificationSender();\nsender.Send(); // prints \"base\" - wrong\n\n// ✅ GOOD - virtual + override enables correct polymorphic dispatch\nclass NotificationSender { public virtual void Send() => Console.WriteLine(\"base\"); }\nclass SmsNotificationSender : NotificationSender { public override void Send() => Console.WriteLine(\"sms\"); }\n\nNotificationSender sender2 = new SmsNotificationSender();\nsender2.Send(); // prints \"sms\"",
+          "note": "virtual + override is mandatory for runtime polymorphism. Without it you get static dispatch."
+        },
+        "analogy": "Virtual dispatch is like caller ID - it shows who is really on the line, not who you expected to call.",
+        "redFlags": [
+          "Saying it prints 'animal speak' because the variable is typed Animal.",
+          "Not knowing what virtual and override do together.",
+          "Confusing method hiding (new) with method overriding (override).",
+          "Not knowing about the virtual method table (vtable)."
+        ],
+        "followUpsQA": [
+          { "q": "What is the vtable?", "a": "A per-type table that maps each virtual method slot to the most-derived override for that type. When a virtual method is called, the CLR looks up the object's type, finds its vtable, and calls the correct method pointer." },
+          { "q": "What is the performance cost of virtual dispatch?", "a": "A small indirect function call through the vtable. The CPU cannot always predict the target, which can prevent inlining and hurt branch prediction. For hot inner loops this can matter, but for typical business logic the cost is negligible." },
+          { "q": "What is the difference between override and new in this context?", "a": "override replaces the base method in the vtable slot for the derived type, enabling polymorphism. new creates a separate method that hides the base method but does not replace the vtable entry, breaking polymorphism." },
+          { "q": "Can you call the base class version of an overridden method?", "a": "Yes. Inside an overriding method, use base.MethodName() to call the base implementation. This is useful for extending rather than replacing the base behavior." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Animal has a virtual Speak method. Dog overrides it. Animal a = new Dog(). What does a.Speak() print?" },
+          { "role": "me", "text": "'dog speak'. virtual + override puts Dog.Speak into the vtable slot for Speak on the Dog type. When a.Speak() is called, the CLR looks at the actual type of the object - Dog - finds Dog.Speak in the vtable, and calls it. The declared type Animal is not consulted for virtual calls." },
+          { "role": "interviewer", "text": "How does this enable the open/closed principle?" },
+          { "role": "me", "text": "New behavior can be added by creating a new derived class with override - without modifying the base class or any existing code that uses the base type. A List<NotificationSender> can hold Email, SMS, and Push senders. Calling Send() on each triggers the correct implementation automatically." },
+          { "role": "interviewer", "text": "What is the performance overhead of virtual dispatch in a tight loop?" },
+          { "role": "me", "text": "The main cost is two things: the indirect function call through the vtable pointer prevents the JIT from inlining the called method, and the indirect jump can cause branch misprediction in the CPU. In a loop processing millions of items this can be 2-3x slower than a direct call. In those scenarios, consider generics with constraints - the JIT can devirtualize and inline when T is a concrete struct." },
+          { "role": "interviewer", "text": "Can a sealed class override a virtual method?" },
+          { "role": "me", "text": "Yes. A sealed class can still override virtual methods from its base. But once sealed, no further derived class can override those methods. You can also seal just a specific override with sealed override to prevent further specialization while the class itself remains inheritable." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    }
+  ]

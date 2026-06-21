@@ -1,0 +1,426 @@
+{
+  "subtopicId": "performance",
+  "questions": [
+    {
+      "id": "sql-performance-001",
+      "q": "What is parameter sniffing and how do you deal with it?",
+      "level": "senior",
+      "type": "scenario",
+      "freq": "high",
+      "tags": [
+        "parameter sniffing",
+        "option recompile",
+        "optimize for",
+        "plan cache",
+        "performance"
+      ],
+      "answer": {
+        "oneLiner": "SQL Server builds an execution plan the first time a procedure runs and caches it using those parameter values. If later calls use very different values with very different row counts, the cached plan can be disastrously slow.",
+        "detail": "When you execute a stored procedure, SQL Server compiles a plan based on the actual parameters it sees at that moment. It stores the plan in the plan cache. Every future call reuses that plan. If the first call came in for a small customer with 10 orders, the optimizer builds a plan using nested loops. A later call for a large customer with 500,000 orders uses the same nested-loop plan, causing a full-table scan in disguise. The fix depends on the situation: OPTION (RECOMPILE) forces a new plan on every call and is the simplest fix but costs CPU. OPTIMIZE FOR (@cid = 100) tells the optimizer to assume a specific representative value. OPTIMIZE FOR UNKNOWN makes the optimizer use average row density rather than any sniffed value. Assigning the parameter to a local variable also defeats sniffing but trades one problem for another - the optimizer now uses density averages, which can be wrong too. Query Store is the most powerful long-term fix because you can identify which plan is good and force it permanently.",
+        "keyPoints": [
+          "The cached plan is built from the first set of parameter values SQL Server sees.",
+          "Sniffing usually helps but hurts when data distribution is highly skewed.",
+          "OPTION (RECOMPILE) solves it per call at the cost of extra CPU compile time.",
+          "Query Store lets you force a known-good plan without touching code.",
+          "Local variables defeat sniffing but use average density, which may also be inaccurate."
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - no hint, skewed data causes the cached plan to crush large customers\nCREATE PROCEDURE usp_GetCustomerOrders @CustomerId INT\nAS\n    SELECT OrderId, Total, OrderDate\n    FROM Orders\n    WHERE CustomerId = @CustomerId;\n\n// ✅ GOOD - RECOMPILE forces an optimal plan per call; use OPTIMIZE FOR on high-frequency paths\nCREATE PROCEDURE usp_GetCustomerOrders @CustomerId INT\nAS\n    SELECT OrderId, Total, OrderDate\n    FROM Orders\n    WHERE CustomerId = @CustomerId\n    OPTION (RECOMPILE);\n\n-- For high-frequency OLTP: force a known good plan via Query Store\nEXEC sp_query_store_force_plan @query_id = 42, @plan_id = 7;",
+          "note": "OPTION (RECOMPILE) is the fastest fix; Query Store plan forcing is the most stable long-term solution."
+        },
+        "analogy": "Build one bridge for a bicycle, then trucks must use it too.",
+        "redFlags": [
+          "Saying parameter sniffing is always bad - it usually produces a better plan than average density.",
+          "Adding OPTION (RECOMPILE) to every high-frequency OLTP query without measuring the compile overhead.",
+          "Not knowing that local variables defeat sniffing but introduce their own estimation risk.",
+          "Confusing OPTIMIZE FOR UNKNOWN with OPTION (RECOMPILE) - they use different estimation strategies."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why does assigning the parameter to a local variable disable sniffing?",
+            "a": "The optimizer cannot see the variable's runtime value at compile time, so it falls back to average column density, which ignores the specific parameter."
+          },
+          {
+            "q": "How does Query Store help fix a bad sniffed plan?",
+            "a": "It stores every plan variation with its runtime statistics, so you can compare plans, identify the best one, and force it permanently using sp_query_store_force_plan."
+          },
+          {
+            "q": "When would you use OPTIMIZE FOR UNKNOWN over RECOMPILE?",
+            "a": "On medium-frequency procedures where recompile CPU cost is a concern but you still want a more balanced plan than the sniffed one."
+          },
+          {
+            "q": "What tells you in the execution plan that sniffing is the issue?",
+            "a": "A big gap between estimated rows and actual rows - for example estimated 10 rows but actual 500,000 rows - indicates the plan was built for different parameters."
+          },
+          {
+            "q": "Is parameter sniffing specific to stored procedures?",
+            "a": "No - it affects any parameterized query including sp_executesql calls, but it is most visible in stored procedures because the plan is cached per procedure."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "A stored procedure fetches customer orders. It runs in 50ms for most customers but takes 45 seconds for one specific customer. What do you suspect first?"
+          },
+          {
+            "role": "me",
+            "text": "Parameter sniffing. SQL Server compiled the plan using the first customer's parameters - probably a small customer - and that plan is terrible for a customer with hundreds of thousands of orders. I would pull the actual execution plan for the slow call and compare estimated rows to actual rows."
+          },
+          {
+            "role": "interviewer",
+            "text": "You see estimated 12 rows but actual 480,000 rows. Confirmed. What is your fix?"
+          },
+          {
+            "role": "me",
+            "text": "Quickest fix is OPTION (RECOMPILE) on the query so SQL Server builds a fresh plan for every call using the real parameter. I would measure compile overhead first because on a high-frequency procedure that CPU cost matters."
+          },
+          {
+            "role": "interviewer",
+            "text": "The procedure runs 2,000 times per minute. RECOMPILE is too expensive. What else?"
+          },
+          {
+            "role": "me",
+            "text": "I would use Query Store to identify the good plan for large customers and force it with sp_query_store_force_plan. Alternatively OPTIMIZE FOR UNKNOWN makes the optimizer use average density, which is more balanced than one sniffed extreme."
+          },
+          {
+            "role": "interviewer",
+            "text": "A junior developer suggests assigning @CustomerId to a local variable to block sniffing. Is that right?"
+          },
+          {
+            "role": "me",
+            "text": "It does block sniffing, but it replaces the sniffed value with average column density, which can also be wrong on skewed data. It is not a reliable fix - it just changes which wrong estimate you get."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you prevent this from happening on new procedures going forward?"
+          },
+          {
+            "role": "me",
+            "text": "Enable Query Store on the database and set it to monitor plan regressions. Use OPTIMIZE FOR on representative values when data is known to be skewed, and review execution plans during code review for big estimated-vs-actual gaps. SQL Server 2022 also introduced parameter sensitive plan optimization which splits skewed parameters into multiple plans automatically."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-performance-002",
+      "q": "What is a columnstore index and when would you use one?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": [
+        "columnstore",
+        "analytical",
+        "olap",
+        "compression",
+        "batch mode"
+      ],
+      "answer": {
+        "oneLiner": "A columnstore index stores each column separately in compressed segments rather than storing full rows together. It delivers dramatic speed gains for aggregation and analytical queries over millions of rows but is a poor fit for single-row OLTP lookups.",
+        "detail": "Traditional rowstore indexes store each row as a unit on data pages. A columnstore index flips that: it stores all values for one column together in a compressed segment called a rowgroup, which holds up to about one million rows. Because similar values cluster together - for example all January sales amounts - run-length encoding and dictionary compression cut storage by 70 to 90 percent compared to rowstore. SQL Server also uses batch-mode execution with columnstore, processing roughly 900 rows per operator call instead of one row at a time. This combination makes aggregations like SUM, COUNT, and GROUP BY across hundreds of millions of rows extremely fast. A clustered columnstore index replaces the rowstore and is ideal for data-warehouse fact tables. A nonclustered columnstore index sits alongside a rowstore and enables HTAP - running analytics on live OLTP data without a separate warehouse. The trade-off is that single-row seeks and frequent small updates are slower because SQL Server must manage a delta rowgroup buffer before data is compressed and moved to a closed rowgroup.",
+        "keyPoints": [
+          "Data is stored column by column in compressed rowgroups of up to 1 million rows.",
+          "Batch-mode execution processes about 900 rows per operator call, slashing CPU for big scans.",
+          "Clustered columnstore replaces rowstore and suits data-warehouse fact tables.",
+          "Nonclustered columnstore sits alongside rowstore for hybrid OLTP and analytics (HTAP).",
+          "Poor fit for single-row point lookups or tables with heavy single-row updates."
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - rowstore index on a 200M-row sales fact table; aggregation does a full row-mode scan\nCREATE NONCLUSTERED INDEX IX_SalesFact_Date ON SalesFact (SaleDate);\nSELECT Region, SUM(Revenue) FROM SalesFact WHERE SaleDate >= '2024-01-01' GROUP BY Region;\n\n// ✅ GOOD - clustered columnstore; same query uses batch-mode and compressed segments\nCREATE CLUSTERED COLUMNSTORE INDEX CCI_SalesFact ON SalesFact;\nSELECT Region, SUM(Revenue) FROM SalesFact WHERE SaleDate >= '2024-01-01' GROUP BY Region;\n\n-- HTAP: add nonclustered columnstore to live OLTP orders table\nCREATE NONCLUSTERED COLUMNSTORE INDEX NCCI_Orders\n    ON Orders (OrderDate, CustomerId, Total, Region);",
+          "note": "Clustered columnstore is for analytics-only tables; nonclustered columnstore enables analytics on live OLTP tables without a separate warehouse."
+        },
+        "analogy": "Rowstore files each patient record together; columnstore files all blood-pressure readings together.",
+        "redFlags": [
+          "Using a clustered columnstore index on a table that needs frequent single-row inserts or updates by primary key.",
+          "Not knowing that batch-mode execution is what makes columnstore fast - compression alone is not the whole answer.",
+          "Confusing columnstore with a covering rowstore index - they solve entirely different problems.",
+          "Saying columnstore is always better than rowstore without qualifying the workload type."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is a rowgroup and a delta store in a columnstore index?",
+            "a": "A rowgroup is a compressed segment of up to about 1 million rows. The delta store is an open rowgroup in rowstore format that buffers new inserts until it fills up and is compressed into a closed columnstore rowgroup."
+          },
+          {
+            "q": "What is batch-mode execution and why does it matter?",
+            "a": "Batch mode processes about 900 rows per operator call instead of one row at a time, which dramatically reduces CPU overhead on large analytical scans and is the primary reason columnstore is fast for aggregations."
+          },
+          {
+            "q": "What is HTAP and how does a nonclustered columnstore enable it?",
+            "a": "HTAP means hybrid transactional and analytical processing. A nonclustered columnstore index sits on an OLTP table so analytical queries use the columnstore while OLTP queries continue using the rowstore, avoiding a separate data warehouse."
+          },
+          {
+            "q": "How do you rebuild or reorganize a columnstore index?",
+            "a": "ALTER INDEX REBUILD compresses open delta rowgroups and removes deleted rows. REORGANIZE does the same online with less locking and is preferred for large tables during business hours."
+          },
+          {
+            "q": "Can you combine a columnstore index with rowstore indexes on the same table?",
+            "a": "Yes - a nonclustered columnstore can coexist with rowstore indexes, so the optimizer picks the best structure per query, which is the foundation of HTAP."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Our monthly revenue reporting query scans 300 million rows and takes 8 minutes. What would you look at first?"
+          },
+          {
+            "role": "me",
+            "text": "A clustered columnstore index on that fact table. Columnstore stores data column by column in compressed segments, so a SUM or GROUP BY over 300 million rows uses batch-mode execution and reads only the columns it needs - that 8-minute query can drop to seconds."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why does it compress so well?"
+          },
+          {
+            "role": "me",
+            "text": "Similar values are stored together within each column, so run-length encoding and dictionary compression are very effective - you typically see 70 to 90 percent size reduction compared to rowstore. A revenue column full of numbers in a narrow range compresses far better than rows that mix all data types together."
+          },
+          {
+            "role": "interviewer",
+            "text": "We also write new orders to the same table every second. Would columnstore break those writes?"
+          },
+          {
+            "role": "me",
+            "text": "On a clustered columnstore yes - inserts go into a delta store first, which is a rowstore buffer. High-frequency single-row inserts cause many tiny delta rowgroups, which hurts read performance. I would keep a rowstore for the live OLTP table and add only a nonclustered columnstore for analytics, which is the HTAP pattern."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is batch-mode execution and why does it matter here?"
+          },
+          {
+            "role": "me",
+            "text": "Instead of processing one row per operator call, batch mode processes about 900 rows at once. On a 300 million row scan that cuts the number of operator calls by 900x, which is the primary reason columnstore aggregations are so much faster than rowstore - compression helps storage, batch mode helps CPU."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you monitor whether the columnstore is being used and staying healthy?"
+          },
+          {
+            "role": "me",
+            "text": "I would query sys.dm_db_column_store_row_group_physical_stats to check rowgroup state - I want COMPRESSED groups, not too many OPEN or TOMBSTONE ones. The execution plan should show columnstore scan operators with batch mode. If I see many small open rowgroups I would run ALTER INDEX REBUILD to compress them."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-performance-003",
+      "q": "What is the difference between optimistic and pessimistic locking?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": [
+        "optimistic locking",
+        "pessimistic locking",
+        "concurrency",
+        "rowversion",
+        "updlock"
+      ],
+      "answer": {
+        "oneLiner": "Pessimistic locking blocks other sessions by taking a lock before reading, assuming conflict is likely. Optimistic locking takes no lock, reads freely, and then checks at write time whether the row was changed by someone else.",
+        "detail": "In pessimistic locking you acquire an exclusive or update lock before reading the data you intend to modify. Other sessions that want the same row must wait until you release the lock at commit or rollback. This is safe and prevents conflicts but creates queues under contention and can lead to deadlocks if multiple sessions lock resources in different orders. The SQL Server hints UPDLOCK and HOLDLOCK implement this pattern. In optimistic locking you read the row without any lock and record a version stamp - typically a rowversion or timestamp column. When you write back, you include the original version stamp in the WHERE clause. If another session modified the row in between, your update matches zero rows (@@ROWCOUNT = 0) and you know there was a conflict. The application then re-reads and retries, or returns a 409 Conflict to the user. Optimistic locking is the better choice when reads are frequent and conflicts are rare, because no locks are held during the think time between read and write. Pessimistic locking is better in high-contention critical sections such as a payment processing queue where you must guarantee exclusive access. EF Core implements optimistic concurrency with a rowversion column marked as a concurrency token.",
+        "keyPoints": [
+          "Pessimistic locks the row up front and blocks other writers until the transaction commits.",
+          "Optimistic reads freely and validates a version stamp at write time - conflict = zero rows affected.",
+          "Optimistic wins under low contention because no locks are held during user think time.",
+          "Pessimistic wins under high contention or critical sections where you must prevent concurrent writes.",
+          "EF Core uses optimistic concurrency by default via a rowversion concurrency token."
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - no locking strategy; two sessions read the same balance and both write, one update is silently lost\nSELECT Balance FROM Accounts WHERE AccountId = 7;\n-- long user think time, another session also decrements\nUPDATE Accounts SET Balance = Balance - 200 WHERE AccountId = 7;\n\n// ✅ GOOD - optimistic: rowversion check detects conflict before update is lost\nSELECT Balance, RowVer FROM Accounts WHERE AccountId = 7;\nUPDATE Accounts\nSET Balance = Balance - 200\nWHERE AccountId = 7 AND RowVer = @originalRowVer;\n-- if @@ROWCOUNT = 0 then conflict - re-read and retry or return 409\n\n-- Pessimistic: lock the row for the duration of the transaction\nBEGIN TRANSACTION;\nSELECT Balance FROM Accounts WITH (UPDLOCK, HOLDLOCK) WHERE AccountId = 7;\nUPDATE Accounts SET Balance = Balance - 200 WHERE AccountId = 7;\nCOMMIT;",
+          "note": "Optimistic locking with rowversion is the default strategy in EF Core and prevents lost updates without holding locks during user think time."
+        },
+        "analogy": "Pessimistic puts a 'do not disturb' sign on the door; optimistic checks the sign was not changed when you return.",
+        "redFlags": [
+          "Saying optimistic locking takes a lock - it explicitly takes no lock at read time.",
+          "Not handling @@ROWCOUNT = 0 after an optimistic update - the lost update goes undetected.",
+          "Confusing RCSI row versioning with optimistic locking - RCSI is for read consistency, not write conflict detection.",
+          "Using pessimistic locking everywhere without considering deadlock risk under contention."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How does a rowversion column implement optimistic locking?",
+            "a": "SQL Server auto-increments the rowversion value on every update, so if you include the original rowversion in your WHERE clause, a concurrent update will have changed it and your write matches zero rows."
+          },
+          {
+            "q": "How does EF Core implement optimistic concurrency?",
+            "a": "You mark a rowversion or timestamp property as a concurrency token. EF Core includes it in generated UPDATE and DELETE WHERE clauses and throws a DbUpdateConcurrencyException when @@ROWCOUNT is zero."
+          },
+          {
+            "q": "When does pessimistic locking cause deadlocks?",
+            "a": "When two sessions each hold a lock the other needs - for example session A locks Orders then tries to lock Accounts, while session B locks Accounts then tries to lock Orders. Fix by accessing tables in a consistent order."
+          },
+          {
+            "q": "How does RCSI relate to optimistic locking?",
+            "a": "RCSI provides optimistic-style reads by using row versions so readers see the last committed state without shared locks, but it does not detect write conflicts - that still requires a rowversion check in the UPDATE."
+          },
+          {
+            "q": "What should the application do when an optimistic conflict is detected?",
+            "a": "Re-read the latest data, apply the business logic again with the new values, and retry the write - or return an HTTP 409 Conflict to the client if the conflict cannot be automatically resolved."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Two users open the same customer record, both change the credit limit, and both save. One change is silently lost. What is happening and how do you fix it?"
+          },
+          {
+            "role": "me",
+            "text": "That is a lost update - both sessions read the same row, both generate an UPDATE, and the second write overwrites the first with no awareness of the conflict. The fix is optimistic locking: add a rowversion column, include it in the WHERE clause of the update, and check @@ROWCOUNT after - zero means a conflict."
+          },
+          {
+            "role": "interviewer",
+            "text": "Show me what the WHERE clause looks like."
+          },
+          {
+            "role": "me",
+            "text": "UPDATE Customers SET CreditLimit = @newLimit WHERE CustomerId = 55 AND RowVer = @originalRowVer. If @@ROWCOUNT is zero then another session changed the row since we read it, so we re-read and retry or tell the user the record changed."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about pessimistic locking - why not just lock the row on read?"
+          },
+          {
+            "role": "me",
+            "text": "You can use SELECT WITH (UPDLOCK, HOLDLOCK) inside a transaction, but the lock is held during the user's entire think time between the read and the save. Under load that creates a queue, and if two sessions lock tables in different orders you get a deadlock. Optimistic locking avoids all of that."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you choose pessimistic over optimistic?"
+          },
+          {
+            "role": "me",
+            "text": "In a high-contention critical section where retrying is not an option - for example a payment processing queue where you must guarantee that exactly one worker picks a pending payment. Pessimistic UPDLOCK ensures no two workers select the same row, and the contention is short-lived because the lock scope is tight."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does EF Core handle this out of the box?"
+          },
+          {
+            "role": "me",
+            "text": "Mark a byte[] property with [Timestamp] and EF Core treats it as a concurrency token. Every generated UPDATE includes the rowversion in the WHERE clause, and if @@ROWCOUNT is zero EF Core throws DbUpdateConcurrencyException, which you catch and handle with a retry or a 409 response."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sql-performance-004",
+      "q": "What is READ COMMITTED SNAPSHOT isolation (RCSI) and why would you enable it?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": [
+        "rcsi",
+        "snapshot",
+        "row versioning",
+        "tempdb",
+        "blocking",
+        "isolation"
+      ],
+      "answer": {
+        "oneLiner": "RCSI is a database-level setting that changes the default READ COMMITTED behavior to use row versioning instead of shared locks. Readers see the last committed version of a row without taking any lock, so readers and writers no longer block each other.",
+        "detail": "By default, SQL Server READ COMMITTED uses shared (S) locks on rows as they are read. A writer holding an exclusive lock blocks readers, and readers holding shared locks can block writers. This causes blocking chains under load. When you enable RCSI with ALTER DATABASE SET READ_COMMITTED_SNAPSHOT ON, SQL Server switches to row versioning. Every time a row is modified, the old version is written to the version store in tempdb with a sequence number. Readers now pick up the latest committed version from the version store instead of taking a shared lock. The result is that readers never block writers and writers never block readers - the same benefit as Snapshot isolation for readers, but at statement level rather than transaction level. RCSI is transparent to the application because the isolation level name does not change - any query running under READ COMMITTED automatically gets versioned reads. The cost is extra tempdb I/O for maintaining the version store and a 14-byte version pointer added to every data row. In practice RCSI eliminates most blocking complaints in OLTP systems and is enabled by default on Azure SQL Database. The key difference from full Snapshot Isolation is that RCSI versions per statement, so you can see changes committed by other transactions between statements in the same transaction. Full Snapshot versions at transaction start and detects write conflicts.",
+        "keyPoints": [
+          "RCSI replaces shared read locks with row versions stored in tempdb so readers never block writers.",
+          "It is a database-level switch - all READ COMMITTED queries benefit automatically with no app code change.",
+          "The cost is extra tempdb usage for the version store and 14 bytes per row for the version pointer.",
+          "RCSI is statement-level versioning; full Snapshot Isolation is transaction-level and detects write conflicts.",
+          "Azure SQL Database has RCSI enabled by default; on-premises SQL Server requires you to enable it."
+        ],
+        "code": {
+          "lang": "sql",
+          "snippet": "// ❌ BAD - default READ COMMITTED with shared locks; a long-running report blocks all writers on Orders\nSET TRANSACTION ISOLATION LEVEL READ COMMITTED;\nSELECT SUM(Total) FROM Orders WHERE OrderDate >= '2024-01-01';\n-- writers are blocked while this scan holds shared locks row by row\n\n// ✅ GOOD - enable RCSI at database level; same query reads row versions with zero blocking\nALTER DATABASE SalesDb\n    SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;\n\n-- Same query now runs under READ COMMITTED with versioning - no code change needed\nSELECT SUM(Total) FROM Orders WHERE OrderDate >= '2024-01-01';\n\n-- Monitor version store size in tempdb\nSELECT reserved_page_count, reserved_space_kb\nFROM sys.dm_db_file_space_usage;",
+          "note": "RCSI is a one-time ALTER DATABASE command that eliminates most blocking in OLTP systems without any application code change."
+        },
+        "analogy": "RCSI gives every reader a personal photocopy so they never fight over the original document.",
+        "redFlags": [
+          "Confusing RCSI with NOLOCK - RCSI reads committed versions; NOLOCK reads dirty uncommitted data and can return inconsistent results.",
+          "Not knowing that row versions live in tempdb and that long-running transactions can bloat the version store.",
+          "Confusing statement-level RCSI with transaction-level Snapshot Isolation - they have different visibility guarantees.",
+          "Thinking RCSI solves write-write conflicts - it only solves read-write blocking; write conflicts still need locking or optimistic strategies."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between RCSI and full Snapshot Isolation?",
+            "a": "RCSI is statement-level - you see the latest committed row at the start of each statement. Full Snapshot Isolation is transaction-level - you see a consistent snapshot from the moment your transaction began, and SQL Server detects write conflicts from concurrent transactions."
+          },
+          {
+            "q": "Why does RCSI increase tempdb usage?",
+            "a": "Every row modification writes the old version to the tempdb version store with a sequence number. Long-running transactions that started before the modification extend the time the version must be kept, which can cause the version store to grow."
+          },
+          {
+            "q": "Why is RCSI better than adding NOLOCK hints everywhere?",
+            "a": "NOLOCK allows dirty reads of uncommitted data and can return duplicate or missing rows during page splits. RCSI gives you only committed data with full consistency, and it requires no query changes at all."
+          },
+          {
+            "q": "Is RCSI enabled by default on Azure SQL Database?",
+            "a": "Yes - Azure SQL Database enables both RCSI and Snapshot Isolation by default. On-premises SQL Server requires you to enable RCSI explicitly with ALTER DATABASE."
+          },
+          {
+            "q": "How do you monitor the version store to detect bloat?",
+            "a": "Query sys.dm_db_file_space_usage for version_store_reserved_page_count, and sys.dm_tran_active_snapshot_database_transactions to identify long-running transactions that are preventing version store cleanup."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Our OLTP system has constant blocking. Readers block writers and writers block readers. The DBA says just use NOLOCK. What do you think?"
+          },
+          {
+            "role": "me",
+            "text": "NOLOCK is the wrong fix. It allows dirty reads of uncommitted data, can return duplicate or missing rows during page splits, and gives users a false sense of safety. The right answer is RCSI - one ALTER DATABASE command that switches READ COMMITTED to use row versioning so readers never take shared locks at all."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does RCSI actually work internally?"
+          },
+          {
+            "role": "me",
+            "text": "When a row is modified, SQL Server writes the old version to the version store in tempdb. A reader under RCSI picks up the latest committed version from that store instead of waiting for a lock. The key point is readers see committed data - not dirty data like NOLOCK - and they hold no locks, so writers are never blocked."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does this cost us?"
+          },
+          {
+            "role": "me",
+            "text": "Extra tempdb I/O to maintain the version store and 14 bytes added to every data row for the version pointer. If you have long-running transactions the version store can grow large because SQL Server keeps old versions until no active transaction needs them. I would monitor sys.dm_db_file_space_usage after enabling it."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is RCSI the same as Snapshot Isolation? I see both mentioned."
+          },
+          {
+            "role": "me",
+            "text": "They use the same versioning mechanism but have different scopes. RCSI is statement-level - each statement sees the latest committed data at the moment it starts. Full Snapshot Isolation is transaction-level - the whole transaction sees a single point-in-time snapshot from when it began, and SQL Server detects write conflicts so two concurrent transactions cannot both commit changes to the same row."
+          },
+          {
+            "role": "interviewer",
+            "text": "What application code changes do we need to make to get RCSI benefits?"
+          },
+          {
+            "role": "me",
+            "text": "None - that is the key selling point. Any query already running under READ COMMITTED automatically gets versioned reads after the ALTER DATABASE. On Azure SQL Database it is already on by default. The only thing to watch is tempdb growth, which you handle by sizing tempdb correctly and hunting down any long-running open transactions."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

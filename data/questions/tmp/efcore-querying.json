@@ -1,0 +1,896 @@
+{
+  "subtopicId": "querying",
+  "questions": [
+    {
+      "id": "efcore-querying-001",
+      "q": "What is the difference between IEnumerable and IQueryable in the context of EF Core?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["IEnumerable", "IQueryable", "deferred execution", "SQL translation"],
+      "answer": {
+        "oneLiner": "IQueryable builds an expression tree that EF Core converts to SQL and runs on the database. IEnumerable runs LINQ operators in memory after rows are already fetched.",
+        "detail": "When you chain Where, OrderBy, or Select on an IQueryable, EF Core does not execute anything yet. It adds each operator to an expression tree. When you call ToListAsync or foreach, EF Core reads the entire tree and compiles it into a single SQL statement. That SQL runs on the database server, which filters and sorts millions of rows efficiently. IEnumerable has no expression tree. The moment EF hits AsEnumerable() or a cast to IEnumerable, it fires the SQL for all rows collected so far and loads them into .NET memory. Every LINQ operator you call after that point - Where, OrderBy, GroupBy - runs in C# on those in-memory rows. If you never filtered in SQL first, this means loading an entire table before filtering a handful of rows. Returning IQueryable from a repository keeps queries composable, but it leaks the EF abstraction to callers, who can accidentally trigger massive queries or hold the DbContext open too long. Returning a materialized IEnumerable or IReadOnlyList gives callers a clean, safe boundary.",
+        "keyPoints": [
+          "IQueryable composes operators into one SQL query that runs on the database server.",
+          "IEnumerable loads rows into .NET memory first, then applies LINQ operators in C#.",
+          "AsEnumerable() is the boundary: SQL runs before it, C# runs after it.",
+          "Returning IQueryable from a repository leaks EF internals and can cause accidental full-table scans.",
+          "Always finalize the query chain before enumerating to avoid loading tables you did not intend to."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - loads entire Orders table into memory before filtering\nIEnumerable<Order> allOrders = dbContext.Orders.AsEnumerable();\nvar bigOrders = allOrders.Where(o => o.Total > 500);\n\n// ✅ GOOD - single SQL with WHERE + ORDER BY runs on the database\nList<Order> bigOrders = await dbContext.Orders\n    .Where(o => o.Total > 500)\n    .OrderBy(o => o.CreatedAt)\n    .ToListAsync();",
+          "note": "The bad version sends SELECT * FROM Orders and filters 100,000 rows in .NET. The good version sends SELECT ... WHERE Total > 500 ORDER BY CreatedAt and returns only matching rows."
+        },
+        "analogy": "IQueryable hands a shopping list to the database; IEnumerable empties the whole shelf first.",
+        "redFlags": [
+          "Saying IQueryable is just a lazy IEnumerable without mentioning SQL expression trees.",
+          "Not knowing that casting to IEnumerable triggers in-memory evaluation of all rows fetched so far.",
+          "Confusing deferred execution with in-memory execution - both defer, but only IQueryable defers to the database.",
+          "Not knowing that EF Core 3.0 throws when a LINQ operator cannot be translated instead of silently going client-side."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What happens in EF Core 3.0 when a LINQ operator cannot be translated to SQL?",
+            "a": "EF Core 3.0 and later throws an InvalidOperationException at query execution time instead of silently falling back to client-side evaluation."
+          },
+          {
+            "q": "What happens if you call a custom C# method inside a Where clause on an IQueryable?",
+            "a": "EF Core cannot translate it to SQL and throws. Move the custom method call after AsEnumerable() to run it in memory after server-side filtering."
+          },
+          {
+            "q": "Should a repository expose IQueryable or a materialized list?",
+            "a": "Prefer a materialized IReadOnlyList or IEnumerable to give callers a clean boundary, unless you intentionally want composable queries and accept the leaky abstraction."
+          },
+          {
+            "q": "Does returning IEnumerable from a repo execute the query immediately?",
+            "a": "Only if you call ToList inside the repo first. A raw IEnumerable from a LINQ chain is still lazy and executes when the caller enumerates it."
+          },
+          {
+            "q": "How do you safely use a C# helper function inside an EF Core query?",
+            "a": "Apply all database-translatable filters first, call AsEnumerable() to cross into memory, then call the C# helper - this limits in-memory rows to those already filtered by SQL."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the practical difference between IEnumerable and IQueryable when writing EF Core queries?"
+          },
+          {
+            "role": "me",
+            "text": "IQueryable builds an expression tree that EF Core compiles into SQL and runs on the database server. IEnumerable pulls rows into .NET memory first, then runs LINQ in C#. The difference can be a single-row result versus loading an entire table."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where exactly does the switch from SQL to in-memory happen?"
+          },
+          {
+            "role": "me",
+            "text": "At AsEnumerable() or any cast to IEnumerable. Everything before that boundary composes into SQL. Everything after runs in .NET on the already-materialized rows. So if you call AsEnumerable() before a Where filter, the Where runs in C# on whatever SQL returned."
+          },
+          {
+            "role": "interviewer",
+            "text": "A teammate's repository returns IQueryable from every method. What concerns do you have?"
+          },
+          {
+            "role": "me",
+            "text": "Callers can chain unlimited operators, triggering expensive queries the repository author never intended. It also ties callers to EF Core internals and keeps the DbContext open longer than expected. I prefer returning a materialized list at the repo boundary unless composability is a deliberate, documented design decision."
+          },
+          {
+            "role": "interviewer",
+            "text": "A junior dev placed a custom C# string-formatting method inside a Where clause on an IQueryable. What breaks and how do you fix it?"
+          },
+          {
+            "role": "me",
+            "text": "EF Core cannot translate the custom method to SQL and throws InvalidOperationException at runtime. The fix is to filter on translatable SQL conditions first, call AsEnumerable() to cross into memory, then apply the C# method. This keeps the expensive server-side filter in SQL and limits in-memory work."
+          },
+          {
+            "role": "interviewer",
+            "text": "How did EF Core 3.0 change behavior around untranslatable queries?"
+          },
+          {
+            "role": "me",
+            "text": "Before 3.0, EF Core silently fell back to client evaluation on any part it could not translate, sometimes loading entire tables with no warning. EF Core 3.0 throws an exception instead, forcing developers to be explicit about where client evaluation happens."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-querying-002",
+      "q": "What is the N+1 query problem in EF Core and how do you fix it?",
+      "level": "mid",
+      "type": "scenario",
+      "freq": "high",
+      "tags": ["N+1", "eager loading", "Include", "performance", "lazy loading"],
+      "answer": {
+        "oneLiner": "N+1 happens when you load N parent records and then access each one's related collection, firing one extra SQL query per parent. Fix it with Include() so EF joins everything in one query.",
+        "detail": "The problem usually appears with lazy loading enabled. You fetch a list of 200 orders with one SELECT. Then in a loop you access order.Items, and because lazy loading is on, each access fires a separate SELECT for that order's items. That is 201 queries instead of 1. With eager loading using Include(), EF Core rewrites the query as a JOIN and fetches everything in one round-trip. However, if you Include multiple independent collections - say Items and Tags - EF Core JOINs all of them. This creates a Cartesian product: 10 items times 10 tags equals 100 rows per order. You get back far more rows than you expected. AsSplitQuery() solves the Cartesian problem by issuing a separate SELECT per collection and joining the results in memory. The trade-off is extra round-trips and a small consistency risk since the two SELECTs are not in one transaction by default. A projection using Select into a DTO is often the cleanest solution when you only need specific fields - you get exactly the columns you need in one efficient query with no tracking overhead.",
+        "keyPoints": [
+          "N+1 fires one query for N parent rows, then one query per row to load its navigation - N+1 total round-trips.",
+          "Include() with ThenInclude() collapses N+1 into a single SQL JOIN query.",
+          "Including multiple independent collections creates a Cartesian product - N x M rows.",
+          "AsSplitQuery() replaces the Cartesian JOIN with one SELECT per collection joined in memory.",
+          "A Select projection to a DTO avoids both N+1 and Cartesian explosion and skips change tracking."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - N+1: one SELECT per customer fires inside the loop\nvar customers = await ctx.Customers.ToListAsync();\nforeach (var c in customers)\n    Console.WriteLine(c.Orders.Count); // triggers SELECT per customer\n\n// ✅ GOOD - single JOIN loads customers and orders together\nvar customers = await ctx.Customers\n    .Include(c => c.Orders)\n    .AsSplitQuery()\n    .ToListAsync();\nforeach (var c in customers)\n    Console.WriteLine(c.Orders.Count); // no extra queries",
+          "note": "AsSplitQuery avoids Cartesian row explosion when including multiple collections, at the cost of one extra round-trip per collection."
+        },
+        "analogy": "A waiter making one trip per table instead of taking all orders at once.",
+        "redFlags": [
+          "Saying Include always fixes N+1 without mentioning Cartesian explosion from multiple collection includes.",
+          "Not knowing how to detect N+1 in production - look for repeated parameterized queries in SQL logs or a profiler.",
+          "Confusing AsSplitQuery with database sharding - they are unrelated concepts.",
+          "Enabling lazy loading on ASP.NET Core APIs without understanding the N+1 risk in request pipelines."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you detect N+1 in a running application?",
+            "a": "Enable SQL logging with LogTo or connect a profiler like MiniProfiler. Look for repeated parameterized queries with the same structure but different parameter values."
+          },
+          {
+            "q": "When would you choose a projection over Include to fix N+1?",
+            "a": "When you only need a few specific fields from the related data. A Select projection produces a targeted SELECT list, skips tracking, and avoids loading entire entities."
+          },
+          {
+            "q": "What is Cartesian explosion and how does AsSplitQuery help?",
+            "a": "Including multiple collection navigations causes the JOIN to multiply rows across all collections. AsSplitQuery issues one SELECT per collection and stitches results in memory, keeping row counts manageable."
+          },
+          {
+            "q": "Does Include always solve N+1 when lazy loading is on?",
+            "a": "Include collapses the N+1 into a JOIN for that navigation, but if the caller accesses a different navigation not covered by Include, lazy loading will still fire extra queries."
+          },
+          {
+            "q": "Are the multiple SELECTs from AsSplitQuery transactional?",
+            "a": "Not by default. Data can change between the separate SELECTs. For financial or audit reads, wrap them in an explicit transaction or use a single-query approach."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Describe the N+1 query problem in EF Core and how you would fix it."
+          },
+          {
+            "role": "me",
+            "text": "N+1 means you run one query to fetch N parent rows, then each time you access a navigation property in a loop, EF fires one more query per row. 200 customers becomes 201 queries. The standard fix is Include() so EF joins child data in the original query."
+          },
+          {
+            "role": "interviewer",
+            "text": "You added Include for Orders and Include for Payments on the same query, and suddenly the result has far more rows than the order count. Why?"
+          },
+          {
+            "role": "me",
+            "text": "That is Cartesian explosion. Including two independent collections causes a JOIN that multiplies rows - 10 orders times 10 payments gives 100 rows per customer. I would add AsSplitQuery() to issue a separate SELECT per collection and join them in memory, which keeps row counts small."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you detect N+1 in a production system?"
+          },
+          {
+            "role": "me",
+            "text": "I would look at the SQL logs - repeated queries with the same structure but different parameter values are the signature. Tools like MiniProfiler or Application Insights can surface this. TagWith() on the query helps trace it back to the code."
+          },
+          {
+            "role": "interviewer",
+            "text": "A team member suggests just enabling lazy loading globally to stop writing Include everywhere. What do you say?"
+          },
+          {
+            "role": "me",
+            "text": "Lazy loading makes N+1 invisible rather than solved. Every navigation access in a loop fires a query silently - you get the same problem but with no compile-time warning. It also breaks when the DbContext is disposed before serialization finishes. I keep eager loading explicit and use projections where I only need a few fields."
+          },
+          {
+            "role": "interviewer",
+            "text": "You have a report page that needs customer name, total order count, and latest order date for 10,000 customers. How do you query that efficiently?"
+          },
+          {
+            "role": "me",
+            "text": "I would use a Select projection directly to a DTO with the aggregates inline: ctx.Customers.Select(c => new CustomerSummaryDto { Name = c.Name, OrderCount = c.Orders.Count, LatestOrder = c.Orders.Max(o => o.CreatedAt) }). EF Core translates Count and Max to SQL aggregates - no items ever load into memory, no tracking overhead, and it is one query."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-querying-003",
+      "q": "What does AsNoTracking() do and when should you use it?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["AsNoTracking", "change tracking", "performance", "read-only"],
+      "answer": {
+        "oneLiner": "AsNoTracking() tells EF Core not to store change-tracking snapshots for returned entities, making reads faster and lighter - use it for any query where you will not save the results.",
+        "detail": "When EF Core loads a tracked entity, it does two things. First, it creates an EntityEntry object in the ChangeTracker. Second, it stores a deep snapshot of all property values as OriginalValues. When you call SaveChanges, EF compares current values against the snapshot to find changes and generate UPDATE statements. For read-only operations - GET endpoints, reports, dashboards - this snapshot is pure overhead. AsNoTracking() skips both steps. Returned objects are plain C# instances with no EF state attached. There is no snapshot to compare, so SaveChanges ignores them entirely. If you later need to update a no-tracking entity, you must Attach it and mark properties as modified before calling SaveChanges. The performance gain is real: no snapshot allocation, no EntityEntry objects, and the identity map does not grow. On read-heavy paths this typically cuts memory allocation by 30-50% and speeds up query materialization noticeably. AsNoTrackingWithIdentityResolution() is the middle option: it skips change snapshots but still deduplicates entities by key, so the same DB row always maps to the same .NET instance. This matters when you Include navigations that reference the same entity from multiple paths.",
+        "keyPoints": [
+          "Default tracking snapshots every property value so SaveChanges can detect changes - this costs memory and CPU.",
+          "AsNoTracking returns plain POCO objects with no EF state - SaveChanges will not see or save them.",
+          "Use it on every read-only query: GET endpoints, reports, list pages, search results.",
+          "AsNoTrackingWithIdentityResolution keeps deduplication without full change tracking - useful with Includes.",
+          "You can set QueryTrackingBehavior.NoTracking globally and opt back in with AsTracking() per query."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - tracking query on a read-only dashboard loads snapshots for every row\nvar products = await ctx.Products\n    .Where(p => p.CategoryId == categoryId)\n    .ToListAsync();\n\n// ✅ GOOD - no tracking for read-only query, less memory and faster materialization\nvar products = await ctx.Products\n    .AsNoTracking()\n    .Where(p => p.CategoryId == categoryId)\n    .OrderBy(p => p.Name)\n    .ToListAsync();",
+          "note": "On a dashboard loading 500 products, AsNoTracking skips creating 500 EntityEntry objects and 500 property snapshots - measurable savings on high-throughput endpoints."
+        },
+        "analogy": "Tracking is taking notes on every shelf you browse; no-tracking is just picking items and walking out.",
+        "redFlags": [
+          "Saying AsNoTracking skips the database round-trip - it only skips the change tracker, the SQL still runs.",
+          "Not knowing you can set NoTracking as the default context behavior and opt in selectively.",
+          "Confusing AsNoTracking with AsNoTrackingWithIdentityResolution - the latter still deduplicates entity instances.",
+          "Trying to call SaveChanges on a no-tracking entity without first attaching it - changes are silently ignored."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you save changes to an entity that was loaded with AsNoTracking?",
+            "a": "Attach the entity to the context to mark it Unchanged, then modify the specific properties you want to update, or call ctx.Update() to mark all properties as Modified before SaveChanges."
+          },
+          {
+            "q": "What is AsNoTrackingWithIdentityResolution and when does it matter?",
+            "a": "It skips change-tracking snapshots but still maps the same database row to the same .NET instance. It matters when Include paths share the same related entity - without it you get duplicate objects."
+          },
+          {
+            "q": "How do you set no-tracking as the default for all queries in a context?",
+            "a": "Set ctx.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking in the context constructor or DI registration, then use AsTracking() on specific queries that need saving."
+          },
+          {
+            "q": "Does AsNoTracking make queries faster only because of less memory?",
+            "a": "Both memory and CPU. Skipping snapshot creation reduces allocations and GC pressure. Skipping the identity map lookup also speeds up materialization of each row."
+          },
+          {
+            "q": "Does AsNoTracking affect which SQL runs against the database?",
+            "a": "No - the SQL generated is identical. AsNoTracking only changes what happens in .NET after rows are returned from the database."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What does AsNoTracking do and when should you use it?"
+          },
+          {
+            "role": "me",
+            "text": "It tells EF Core not to create change-tracking snapshots for returned entities. The objects come back as plain C# instances with no EF state attached - no EntityEntry, no OriginalValues snapshot. You use it on any query where you will not call SaveChanges on the results."
+          },
+          {
+            "role": "interviewer",
+            "text": "What exactly gets skipped when you add AsNoTracking?"
+          },
+          {
+            "role": "me",
+            "text": "EF skips creating EntityEntry objects in the ChangeTracker, skips storing OriginalValues snapshots, and skips registering the entity in the identity map. On a page that loads 500 products, that is 500 fewer objects and 500 fewer deep property copies."
+          },
+          {
+            "role": "interviewer",
+            "text": "You loaded an order with AsNoTracking, and a user edits the delivery address. How do you save it?"
+          },
+          {
+            "role": "me",
+            "text": "The entity is not tracked, so SaveChanges would ignore it silently. I would either Attach it by key, set only the changed properties as Modified, then save - or better, reload the entity with tracking, apply the changes, and save. The Attach approach avoids an extra database read."
+          },
+          {
+            "role": "interviewer",
+            "text": "You have a product listing that Includes the Category navigation. With AsNoTracking, a product shared by two categories shows up as two different C# objects. How do you fix that without full tracking?"
+          },
+          {
+            "role": "me",
+            "text": "AsNoTrackingWithIdentityResolution. It still deduplicates by primary key, so the same database row always returns the same .NET instance across all navigations - but without the cost of maintaining change-tracking snapshots."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you apply no-tracking globally to reduce boilerplate across a whole API?"
+          },
+          {
+            "role": "me",
+            "text": "Set QueryTrackingBehavior.NoTracking on the DbContext options in DI registration. Then on the few write endpoints where I need tracking, I call AsTracking() on that specific query. This makes the safe default explicit and forces you to opt in for writes rather than opt out for reads."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-querying-004",
+      "q": "What is client vs server evaluation in EF Core, and why did EF Core 3.0 change its behavior?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["client evaluation", "server evaluation", "SQL translation", "EF Core 3"],
+      "answer": {
+        "oneLiner": "Server evaluation runs LINQ as SQL on the database. Client evaluation runs LINQ in .NET memory. EF Core 3.0 made the change: it now throws if any part of a query cannot be translated to SQL instead of silently loading whole tables.",
+        "detail": "In EF Core 2.x, if part of a LINQ query could not be translated to SQL, EF would quietly split the work. It would translate what it could, execute that SQL, load the rows into memory, and then run the untranslatable parts in C#. This sounded helpful but was dangerous. A single untranslatable method call could cause EF to load an entire table - millions of rows - into memory before filtering. No error was thrown and no warning was obvious in most setups. Developers were unknowingly causing full-table scans in production. EF Core 3.0 changed this completely. Now if any part of a LINQ expression cannot be converted to SQL, EF throws an InvalidOperationException at query execution time. This forces you to be explicit. You write the translatable SQL filters first, call AsEnumerable() to mark the boundary where you are intentionally crossing into memory, then apply the C# logic. The AsEnumerable() call is the documented, explicit opt-in to client evaluation. EF Core does still allow client evaluation in the final Select projection - only filters and joins must be translatable.",
+        "keyPoints": [
+          "Server evaluation: LINQ translates to SQL and runs on the database - efficient and scalable.",
+          "Client evaluation: rows load into .NET memory first, then LINQ runs in C# - can cause full-table scans.",
+          "EF Core 2.x silently fell back to client evaluation, sometimes loading entire tables with no warning.",
+          "EF Core 3.0 throws InvalidOperationException if any filter or join cannot be translated to SQL.",
+          "Use AsEnumerable() as the explicit opt-in boundary for client evaluation after server-side filtering."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - custom method forces full table load in EF Core 3+ (throws)\nvar orders = await ctx.Orders\n    .Where(o => FormatOrderRef(o.Reference) == inputRef)\n    .ToListAsync();\n\n// ✅ GOOD - filter in SQL first, then apply C# logic in memory on small result set\nvar orders = await ctx.Orders\n    .Where(o => o.Status == OrderStatus.Active)  // SQL\n    .AsEnumerable()                               // explicit boundary\n    .Where(o => FormatOrderRef(o.Reference) == inputRef) // C# in memory\n    .ToList();",
+          "note": "AsEnumerable() is the documented explicit opt-in to client evaluation. Everything before it becomes SQL, everything after runs in .NET on the materialized rows."
+        },
+        "analogy": "Server evaluation asks the database to sort and filter; client evaluation hauls every box home first.",
+        "redFlags": [
+          "Not knowing EF Core 3.0 changed from silent client fallback to throwing exceptions.",
+          "Assuming all LINQ operators can always be translated to SQL by EF Core.",
+          "Not knowing that AsEnumerable() is the correct way to explicitly opt into client evaluation.",
+          "Using AsEnumerable() before all SQL filters are applied, causing unnecessary full-table loads."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Does EF Core allow any client evaluation in version 3.0 and later?",
+            "a": "Yes - the top-level Select projection can run client-side. Only filters, joins, and grouping must be fully translatable to SQL."
+          },
+          {
+            "q": "How do you use a vendor-specific database function like SOUNDEX in an EF Core query?",
+            "a": "Map it with EF.Functions or register it via HasDbFunction in the model configuration so EF Core knows how to translate it to the correct SQL."
+          },
+          {
+            "q": "What tools help you inspect whether a query is being evaluated client-side?",
+            "a": "Enable SQL logging with LogTo or EnableDetailedErrors in development. If your filter does not appear in the WHERE clause of the emitted SQL, it is running client-side."
+          },
+          {
+            "q": "If you must run a C# helper after some SQL filtering, what is the recommended pattern?",
+            "a": "Apply all translatable filters first to minimize rows, call AsEnumerable() to materialize, then run the C# helper on the small in-memory result set."
+          },
+          {
+            "q": "What is the risk of placing AsEnumerable() at the beginning of a long query chain?",
+            "a": "All subsequent operators run in C# on every row in the table. No SQL filtering happens, causing a full table scan that can load millions of rows into memory."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain client versus server evaluation in EF Core."
+          },
+          {
+            "role": "me",
+            "text": "Server evaluation is when EF Core translates your LINQ into SQL and the database does the work. Client evaluation is when EF fetches rows into .NET memory and your code runs the LINQ there. The difference in performance can be enormous - a database can filter a million rows in milliseconds using an index; filtering in C# means loading all those rows first."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why did EF Core 3.0 change this behavior?"
+          },
+          {
+            "role": "me",
+            "text": "Before 3.0, EF Core 2.x would silently fall back to client evaluation if it could not translate something. You might have an untranslatable method call and EF would load an entire table before filtering - no error, no warning. 3.0 throws an InvalidOperationException instead, making the performance cliff visible and forcing you to be explicit about where client evaluation is intentional."
+          },
+          {
+            "role": "interviewer",
+            "text": "You genuinely need a C# helper method in a filter. How do you handle it safely?"
+          },
+          {
+            "role": "me",
+            "text": "I apply all translatable conditions first to reduce the row count, then call AsEnumerable() to explicitly cross into memory, then call the C# helper. The SQL does the heavy lifting, and the in-memory work is on a small result set."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does EF Core 3.0 ban all client evaluation?"
+          },
+          {
+            "role": "me",
+            "text": "No - just filters and joins that cannot be translated. The final Select projection can still run client-side, so you can call C# methods inside your Select to shape the DTO. The restriction is specifically on WHERE and JOIN clauses."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you use a vendor-specific SQL function like a full-text search function that LINQ does not know about?"
+          },
+          {
+            "role": "me",
+            "text": "You register it via HasDbFunction in the model configuration, which teaches EF Core the SQL translation for that function. Then you can call it inside your LINQ query and EF will emit the correct SQL. EF.Functions also provides a set of pre-mapped database functions like Like and FreeText for SQL Server."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-querying-005",
+      "q": "How do you use Select projections to improve EF Core query performance?",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["Select", "projection", "DTO", "performance", "columns"],
+      "answer": {
+        "oneLiner": "Project with Select() into a DTO so EF Core emits SELECT only the columns you need, transferring less data from the database and skipping change tracking automatically.",
+        "detail": "Without a projection, EF Core emits SELECT * and maps every column into a full entity object, which it then adds to the ChangeTracker with a snapshot. If your Order entity has 30 columns but your order list page only needs Id, CustomerName, Total, and Status, you are transferring and allocating memory for 26 extra columns on every row. A Select projection maps only the fields in your DTO, so EF Core emits SELECT Id, CustomerName, Total, Status FROM Orders. The SQL is smaller, the network transfer is smaller, and fewer bytes are deserialized. Projected types - anonymous types or named DTOs - are never tracked. You get no-tracking behavior automatically without needing to call AsNoTracking(). Navigation properties inside Select are also translated to SQL. If you write o.Items.Count inside a Select, EF Core translates that to a COUNT subquery in SQL - no items are loaded into memory at all. Same for Sum, Any, and Max on navigation collections. Projections also break serialization cycles. When you return a DTO instead of the entity, you never accidentally trigger lazy loads during JSON serialization, and circular navigation references cannot exist in your output shape.",
+        "keyPoints": [
+          "Without projection EF emits SELECT * and tracks all columns - wasteful for read-only list views.",
+          "Select to a DTO emits only the columns in the projection - less data transferred and less memory used.",
+          "Projected types are never tracked, so you get no-tracking performance automatically.",
+          "Navigation aggregates like o.Items.Count and o.Payments.Sum translate to SQL subqueries - items never load into memory.",
+          "Projections decouple your API response shape from the domain model and prevent serialization cycles."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - loads full Order entities with all columns and tracking overhead for a list view\nvar orders = await ctx.Orders\n    .Where(o => o.CustomerId == customerId)\n    .ToListAsync();\n\n// ✅ GOOD - targeted projection emits only required columns, no tracking, COUNT in SQL\nvar summaries = await ctx.Orders\n    .Where(o => o.CustomerId == customerId)\n    .Select(o => new OrderSummaryDto\n    {\n        Id = o.Id,\n        Total = o.Total,\n        ItemCount = o.Items.Count,\n        Status = o.Status\n    })\n    .OrderByDescending(o => o.Id)\n    .ToListAsync();",
+          "note": "Items.Count translates to a SQL COUNT subquery - no item rows are loaded into .NET memory at all."
+        },
+        "analogy": "Projection is ordering from a menu; loading the full entity is buying the whole kitchen.",
+        "redFlags": [
+          "Loading full tracked entities and then mapping to DTOs in C# instead of projecting in the SQL query.",
+          "Not knowing that projected types are automatically untracked - calling AsNoTracking on top is redundant but harmless.",
+          "Assuming navigation aggregates like o.Items.Count load the items collection into memory.",
+          "Projecting into an entity type registered in the model - EF Core warns against this and behavior may be unexpected."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Do you need to call AsNoTracking when you use a Select projection?",
+            "a": "No - projected types are never tracked automatically. AsNoTracking is redundant when you project to a DTO or anonymous type, but it does not break anything."
+          },
+          {
+            "q": "Can you use navigation aggregates like Count, Sum, and Any inside a Select projection?",
+            "a": "Yes - EF Core translates them to SQL subqueries. o.Items.Count becomes a COUNT, o.Payments.Sum becomes a SUM, and o.Tags.Any() becomes an EXISTS. No navigation rows load into memory."
+          },
+          {
+            "q": "How do projections help prevent JSON serialization errors?",
+            "a": "DTOs do not have circular navigation references, so the serializer cannot enter infinite cycles. They also do not have lazy loading proxies that would fire queries during serialization after the context is disposed."
+          },
+          {
+            "q": "What is a downside of projecting everywhere?",
+            "a": "You write more DTO mapping code, and the projected result cannot be tracked for updates. At write boundaries you still need the full tracked entity."
+          },
+          {
+            "q": "Can you project and then filter or sort in the same query?",
+            "a": "Yes - Where, OrderBy, Skip, and Take can come before or after Select in the same query chain. EF Core incorporates all of them into the single generated SQL."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do Select projections improve EF Core query performance?"
+          },
+          {
+            "role": "me",
+            "text": "They tell EF Core exactly which columns to fetch. Instead of SELECT *, the query emits only the columns mapped in your DTO. You transfer less data over the network, allocate less memory, and skip change-tracking entirely because projected types are never tracked."
+          },
+          {
+            "role": "interviewer",
+            "text": "You have o.Items.Count in your projection. Does EF load all the items to count them?"
+          },
+          {
+            "role": "me",
+            "text": "No - EF Core translates Items.Count to a SQL COUNT subquery in the emitted SQL. Same for Sum, Any, and Max on navigation collections. The items never load into .NET memory at all."
+          },
+          {
+            "role": "interviewer",
+            "text": "A junior dev loads full Order entities and then maps to DTOs using AutoMapper after the query. What is wrong with that?"
+          },
+          {
+            "role": "me",
+            "text": "The query loads every column from Orders and creates tracked entity objects with snapshots - expensive for a read-only list. The projection should be in SQL so EF emits only the needed columns. AutoMapper has a ProjectTo method that generates the Select expression for you, so you get SQL-level projection without writing the DTO mapping by hand."
+          },
+          {
+            "role": "interviewer",
+            "text": "Your product listing needs the category name from a related table. Do you need an Include, or can you project it?"
+          },
+          {
+            "role": "me",
+            "text": "Projection handles it directly. In the Select I write CategoryName = p.Category.Name, and EF Core generates a JOIN to the Categories table in the SQL - no explicit Include needed. The projection drives the JOIN automatically."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you still load the full tracked entity instead of projecting?"
+          },
+          {
+            "role": "me",
+            "text": "At write boundaries. If I need to update a field, I load the tracked entity so SaveChanges can detect the change and emit the correct UPDATE. For pure reads - list pages, search results, API GET endpoints - I project to a DTO every time."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-querying-006",
+      "q": "What are compiled queries in EF Core and when are they worth using?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["compiled queries", "EF.CompileAsyncQuery", "performance", "query plan cache"],
+      "answer": {
+        "oneLiner": "Compiled queries pre-compile a LINQ expression into a reusable delegate once using EF.CompileAsyncQuery, removing per-call translation overhead on hot paths that run thousands of times per second.",
+        "detail": "Every time EF Core executes a LINQ query, it does several steps before sending SQL. It walks the expression tree, identifies the shape, checks the internal query plan cache by key, and if found, retrieves the cached translation. Even with a cache hit, there is still a hashing step and a lookup. For the vast majority of queries this overhead is negligible compared to the database round-trip. But on a very hot path - a customer lookup that runs 50,000 times per minute - even small per-call overheads accumulate. EF.CompileAsyncQuery compiles the LINQ expression tree once at startup into a typed delegate. When you call the delegate, EF Core skips expression tree walking, cache hashing, and lookup entirely. Parameters are passed as typed delegate arguments, so the query remains reusable with different values. The compiled query also benefits from combining with AsNoTracking for pure read paths. The limitation is that compiled queries have restricted support for dynamic Includes and complex compositions. They work best for simple, stable, high-frequency lookups like fetching by primary key or by a unique business identifier.",
+        "keyPoints": [
+          "EF Core already caches translated query plans automatically - most queries pay the cache lookup overhead only once.",
+          "EF.CompileAsyncQuery skips even the cache lookup by holding the compiled delegate directly.",
+          "Parameters are typed delegate arguments, so one compiled query handles many different parameter values.",
+          "Best ROI on stable, high-frequency, simple lookups - avoid for rare or complex queries.",
+          "Combine with AsNoTracking on read-only compiled queries for maximum throughput."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - paying expression-tree parsing and cache lookup on every call in a hot path\npublic Task<Customer?> GetByEmailAsync(string email) =>\n    _ctx.Customers.AsNoTracking().SingleOrDefaultAsync(c => c.Email == email);\n\n// ✅ GOOD - compiled once at startup, delegate called directly with zero translation overhead\nprivate static readonly Func<AppDbContext, string, Task<Customer?>> FindByEmail =\n    EF.CompileAsyncQuery((AppDbContext ctx, string email) =>\n        ctx.Customers\n            .AsNoTracking()\n            .SingleOrDefault(c => c.Email == email));\n\npublic Task<Customer?> GetByEmailAsync(string email) =>\n    FindByEmail(_ctx, email);",
+          "note": "Declare the compiled query as a static field so it is built once for the application lifetime. Each call passes the context and parameters as typed arguments."
+        },
+        "analogy": "A compiled query is a stamped form you fill in; a regular query is rewriting the form from scratch each time.",
+        "redFlags": [
+          "Thinking compiled queries bypass the database - they only remove translation overhead, SQL still executes.",
+          "Applying compiled queries to every method in a repository without profiling first.",
+          "Not knowing that EF Core already caches query plans, so compiled queries target a narrower set of hot paths.",
+          "Confusing compiled queries with stored procedures - they are different mechanisms for different problems."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How does the built-in query plan cache differ from compiled queries?",
+            "a": "The cache reuses translated SQL automatically for any query, but still does a hash and lookup per call. A compiled query holds the delegate directly and skips the cache entirely on each call."
+          },
+          {
+            "q": "What are the limitations of compiled queries?",
+            "a": "They have limited support for dynamic Includes and complex compositions. Parameters must be typed delegate arguments - you cannot pass a lambda as a parameter."
+          },
+          {
+            "q": "How do you know whether a query is hot enough to justify compiling it?",
+            "a": "Profile first. If the per-call translation overhead is measurable under load and the query runs thousands of times per second, it is a candidate. Most CRUD apps are IO-bound and never need this."
+          },
+          {
+            "q": "Should you combine compiled queries with AsNoTracking?",
+            "a": "Yes for read paths. The two optimizations stack - no translation overhead and no snapshot allocation combine for maximum read throughput on hot lookups."
+          },
+          {
+            "q": "Can you use EF.CompileQuery for synchronous queries as well?",
+            "a": "Yes - EF.CompileQuery is the synchronous version and EF.CompileAsyncQuery is the async version. Use the async version in ASP.NET Core to avoid blocking threads."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What are compiled queries in EF Core and when would you reach for them?"
+          },
+          {
+            "role": "me",
+            "text": "EF.CompileAsyncQuery compiles a LINQ expression tree into a typed delegate once at application startup. On every subsequent call you invoke the delegate directly with parameters, skipping the expression-tree parsing and query plan cache lookup that normally happen per call. You reach for them on genuinely hot paths that run thousands of times per second."
+          },
+          {
+            "role": "interviewer",
+            "text": "EF Core already caches query plans, so what exactly is the extra win with compiled queries?"
+          },
+          {
+            "role": "me",
+            "text": "Even with a cache hit, EF Core still walks the expression tree, computes a cache key, and does a dictionary lookup. On 50,000 calls per minute those steps accumulate. A compiled query holds the compiled delegate directly - no tree walk, no key hash, no lookup. The difference is roughly 2-3x faster per call on translation overhead alone, though the database round-trip still dominates total latency."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you pass different values to a compiled query without recompiling?"
+          },
+          {
+            "role": "me",
+            "text": "Parameters are typed delegate arguments. The compiled Func signature includes the context type and each parameter type - for example Func of AppDbContext, string, Task of Customer. You call FindByEmail(_ctx, emailAddress) each time. The SQL uses parameterized placeholders just like a normal query - only the translation step is removed."
+          },
+          {
+            "role": "interviewer",
+            "text": "A team member wants to compile every repository method. What do you say?"
+          },
+          {
+            "role": "me",
+            "text": "Overkill for most methods. Compiled queries add code complexity and have limited support for dynamic compositions and Includes. They pay off only on stable, simple, high-frequency lookups. I would profile under realistic load first and only compile the methods that show measurable translation overhead."
+          },
+          {
+            "role": "interviewer",
+            "text": "You have a compiled query for a hot customer lookup. What else would you add to maximize its performance?"
+          },
+          {
+            "role": "me",
+            "text": "AsNoTracking inside the compiled query. No translation overhead and no snapshot allocation together give maximum read throughput. Also make sure the query uses the indexed column - a compiled query on a non-indexed column is fast to translate but still slow to execute on the database."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-querying-007",
+      "q": "How do you log or inspect the SQL generated by EF Core?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["logging", "SQL", "debug", "LogTo", "EnableSensitiveDataLogging"],
+      "answer": {
+        "oneLiner": "Use LogTo() on DbContext options to write generated SQL to any output, and add EnableSensitiveDataLogging in development to see actual parameter values instead of placeholders.",
+        "detail": "EF Core generates SQL for every query, but by default it sends that SQL to a database silently. During development you need to see what SQL is being generated to catch N+1 problems, missing indexes, or unexpected full-table scans. The simplest approach is calling LogTo(Console.WriteLine, LogLevel.Information) on the DbContextOptionsBuilder in your DI setup. This writes every SQL statement to the console. In an ASP.NET Core application, you pass an ILoggerFactory from the DI container instead, so SQL logs appear in your structured logging output alongside request logs. By default EF Core replaces parameter values with placeholders like @p0 and @p1 to avoid logging sensitive data. Calling EnableSensitiveDataLogging() makes it log the actual values - a customer email address or a credit card number - which is essential for debugging but must never reach a production environment. In production you control SQL log verbosity through log level configuration in appsettings.json rather than in code, so you can enable it temporarily without redeploying. TagWith() is a powerful diagnostic tool: it injects a comment string directly into the SQL statement. When a slow query appears in a database trace or a query analyzer, the comment identifies exactly which LINQ code produced it, linking the database problem to the application code.",
+        "keyPoints": [
+          "LogTo(Console.WriteLine, LogLevel.Information) is the quickest way to see generated SQL in development.",
+          "Wire to ILoggerFactory in ASP.NET Core so SQL logs appear in your structured logging pipeline.",
+          "EnableSensitiveDataLogging shows real parameter values - only safe in development, never in production.",
+          "Control log verbosity via appsettings.json log level filters to toggle SQL logging without redeploying.",
+          "TagWith() injects a comment into the SQL so you can match a slow database trace to the code that caused it."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no visibility into SQL in development, can't diagnose slow queries\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseSqlServer(connStr));\n\n// ✅ GOOD - structured SQL logging with dev-only sensitive data\nbuilder.Services.AddDbContext<AppDbContext>(opt =>\n    opt.UseSqlServer(connStr)\n       .UseLoggerFactory(LoggerFactory.Create(b => b.AddConsole()))\n       .EnableSensitiveDataLogging()  // DEV ONLY\n       .EnableDetailedErrors());      // DEV ONLY",
+          "note": "In production remove EnableSensitiveDataLogging. Control which SQL appears in logs via the Microsoft.EntityFrameworkCore log category level in appsettings.json."
+        },
+        "analogy": "Logging SQL is reading the order ticket your waiter actually sent to the kitchen, not what you asked for.",
+        "redFlags": [
+          "Enabling EnableSensitiveDataLogging in production - it logs real customer data and passwords as parameter values.",
+          "Not knowing how to correlate a slow database trace to the LINQ code that caused it - TagWith solves this.",
+          "Thinking you must redeploy to change SQL log verbosity - log level configuration in appsettings.json avoids this.",
+          "Not knowing that EnableDetailedErrors provides richer EF error messages that are also dev-only."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you match a slow query in a database trace to the code that generated it?",
+            "a": "Call TagWith(\"GetActiveOrders\") on the query. EF injects that string as a SQL comment, which appears in the database trace and links directly to the code."
+          },
+          {
+            "q": "How do you enable SQL logging only for EF Core queries without flooding other log categories?",
+            "a": "Set the log level for Microsoft.EntityFrameworkCore.Database.Command to Information in appsettings.json and keep other EF categories at Warning or higher."
+          },
+          {
+            "q": "Why is EnableSensitiveDataLogging dangerous in production?",
+            "a": "It writes actual parameter values to logs, which can include passwords, emails, PII, or financial data. Log aggregation services store these persistently and are often accessible to many people."
+          },
+          {
+            "q": "What is MiniProfiler and how does it complement EF Core logging?",
+            "a": "MiniProfiler is a lightweight middleware that surfaces per-request SQL queries and timings inline in the browser during development, making it easy to spot N+1 problems on specific pages."
+          },
+          {
+            "q": "Can you see the generated SQL without running the query?",
+            "a": "Yes - call ToQueryString() on an IQueryable to get the SQL EF would generate without executing it. Useful for inspecting complex queries during development."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do you see the SQL that EF Core actually sends to the database?"
+          },
+          {
+            "role": "me",
+            "text": "The quickest way in development is LogTo(Console.WriteLine, LogLevel.Information) on the DbContext options. In ASP.NET Core I wire it to the DI ILoggerFactory so SQL statements appear in the structured logging output alongside other request logs, searchable and filterable."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you see the actual parameter values and not just @p0 placeholders?"
+          },
+          {
+            "role": "me",
+            "text": "EnableSensitiveDataLogging() - but only in development. It logs the real values in place of placeholders. In production that would write customer emails and payment amounts to logs, which is a serious data exposure risk."
+          },
+          {
+            "role": "interviewer",
+            "text": "A query is slow in production and you need to find it in the database monitoring tool. How do you connect it back to your code?"
+          },
+          {
+            "role": "me",
+            "text": "I add TagWith(\"InventoryReport:GetLowStockItems\") to that query in code. EF injects that string as a SQL comment at the top of the statement. When I look at the slow query log in the database tool, the comment is right there, telling me exactly which method generated it."
+          },
+          {
+            "role": "interviewer",
+            "text": "You want to temporarily enable SQL logging in production to diagnose a bug without redeploying. How?"
+          },
+          {
+            "role": "me",
+            "text": "I change the log level for the Microsoft.EntityFrameworkCore.Database.Command category in appsettings.json or the environment configuration store. In Azure App Service or Kubernetes I can update the environment variable without redeploying. The log level change takes effect on the next request if the app supports configuration reload."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you inspect the SQL a complex query would generate without actually running it against the database?"
+          },
+          {
+            "role": "me",
+            "text": "Call ToQueryString() on the IQueryable before calling ToListAsync. It returns the SQL string EF would emit. Useful during development or in unit tests to assert that a query generates the expected SQL without needing a database connection."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-querying-008",
+      "q": "When would you use FromSqlRaw or ExecuteSqlRaw instead of LINQ, and what are the risks?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["FromSqlRaw", "raw SQL", "SQL injection", "stored procedures", "LINQ"],
+      "answer": {
+        "oneLiner": "Use raw SQL for stored procedures or queries LINQ cannot express cleanly, like CTEs and window functions. Always parameterize values using FromSqlInterpolated or SqlParameter to prevent SQL injection.",
+        "detail": "LINQ is the default choice because it is type-safe, composable, and database-agnostic. But some SQL patterns are difficult or impossible to express in LINQ. Common-table expressions, window functions like ROW_NUMBER and LAG, vendor-specific hints, and complex recursive queries are all easier to write directly in SQL. FromSqlRaw accepts a raw SQL string and maps results to tracked entity objects. You can still compose LINQ on top of it with Where and OrderBy, and EF Core wraps the raw SQL as a subquery and applies the LINQ to it. FromSqlInterpolated accepts a C# interpolated string and automatically converts embedded values to parameterized SQL placeholders. This is safe because the values never become part of the SQL text - they are sent as parameters. FromSqlRaw with string interpolation or concatenation is the dangerous path: user input embedded directly in the SQL string is a classic SQL injection vulnerability. ExecuteSqlRaw and ExecuteSqlInterpolated are for non-query commands - UPDATE, DELETE, or EXEC for stored procedures that do not return entity shapes. They return the number of rows affected, not mapped objects. In EF Core 8, FromSql was introduced as a unified replacement for FromSqlInterpolated with a cleaner API.",
+        "keyPoints": [
+          "Use raw SQL for CTEs, window functions, vendor-specific hints, or complex stored procedures LINQ cannot express.",
+          "FromSqlRaw returns tracked entities you can compose LINQ on top of.",
+          "FromSqlInterpolated auto-parameterizes interpolated values - never concatenate or interpolate user input into FromSqlRaw.",
+          "ExecuteSqlRaw and ExecuteSqlInterpolated run non-query commands and return rows affected, not entity objects.",
+          "EF Core 8 introduced FromSql as the unified replacement for FromSqlInterpolated."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - SQL injection risk: user input directly in the SQL string\nvar orders = ctx.Orders.FromSqlRaw(\n    $\"SELECT * FROM Orders WHERE CustomerId = '{customerId}'\").ToList();\n\n// ✅ GOOD - interpolated string is auto-parameterized, safe from injection\ndecimal minAmount = 200m;\nvar orders = await ctx.Orders\n    .FromSqlInterpolated($\"\"\"\n        SELECT * FROM dbo.Orders\n        WHERE Total > {minAmount}\n          AND Status = 'Active'\n        \"\"\")\n    .AsNoTracking()\n    .OrderBy(o => o.CreatedAt)\n    .ToListAsync();",
+          "note": "FromSqlInterpolated looks like string interpolation but EF Core converts the embedded values to SqlParameter objects - the SQL string itself never contains user data."
+        },
+        "analogy": "FromSqlInterpolated is like a typed form with fields; FromSqlRaw with concatenation is writing freehand on a sticky note.",
+        "redFlags": [
+          "Using FromSqlRaw with C# string interpolation or string concatenation of user input - this is SQL injection.",
+          "Not knowing the difference between FromSqlRaw and ExecuteSqlRaw in terms of return types.",
+          "Not knowing that FromSqlInterpolated is not just string interpolation - it creates SQL parameters.",
+          "Trying to use ExecuteSqlRaw where you need entity results - it only returns rows affected count."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can you compose LINQ operators like Where and OrderBy after FromSqlRaw?",
+            "a": "Yes - if the raw SQL is composable, EF Core wraps it as a subquery and applies the LINQ operators on top of it in the outer query."
+          },
+          {
+            "q": "How do you map a stored procedure that returns a non-entity shape?",
+            "a": "Configure a keyless entity type with HasNoKey() and map it to the proc result shape, then use FromSqlRaw with that keyless entity in the DbSet."
+          },
+          {
+            "q": "Why prefer FromSqlInterpolated over FromSqlRaw with explicit SqlParameters?",
+            "a": "FromSqlInterpolated is cleaner and less error-prone. The values go in the interpolated string and EF handles parameterization automatically. FromSqlRaw with SqlParameter requires matching parameter names manually."
+          },
+          {
+            "q": "What replaced FromSqlInterpolated in EF Core 8?",
+            "a": "The unified FromSql method, which accepts a FormattableString so values are automatically parameterized, same safety as FromSqlInterpolated but with a cleaner API and better support for composability."
+          },
+          {
+            "q": "How do you call a stored procedure that returns no result set?",
+            "a": "Use ExecuteSqlInterpolated or ExecuteSqlRaw. It executes the command and returns the number of rows affected."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "When would you use FromSqlRaw or ExecuteSqlRaw instead of LINQ in EF Core?"
+          },
+          {
+            "role": "me",
+            "text": "When I need SQL patterns LINQ cannot express cleanly - CTEs, window functions like ROW_NUMBER or LAG, recursive queries, or vendor-specific hints. Calling a stored procedure is another common case. LINQ stays the default; raw SQL is the escape hatch for specific cases."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the main risk and how do you prevent it?"
+          },
+          {
+            "role": "me",
+            "text": "SQL injection. If you build the SQL string by concatenating or interpolating user input directly into FromSqlRaw, the user can inject arbitrary SQL. The safe approach is FromSqlInterpolated with a C# interpolated string - it looks like string interpolation but EF converts the embedded values to parameterized SqlParameter objects. The SQL string never contains user data."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the difference between FromSqlRaw and ExecuteSqlRaw?"
+          },
+          {
+            "role": "me",
+            "text": "FromSqlRaw returns mapped, tracked entity objects from a SELECT. You can compose LINQ on top of it. ExecuteSqlRaw runs non-query commands - UPDATE, DELETE, stored procs that do not return data - and returns an int for rows affected."
+          },
+          {
+            "role": "interviewer",
+            "text": "Your stored procedure returns a custom result shape that does not match any entity. How do you map it?"
+          },
+          {
+            "role": "me",
+            "text": "I define a class for the result shape and configure it as a keyless entity with HasNoKey() in the model. Add a DbSet of that type to the context, then query it with FromSqlRaw pointing at the stored procedure. Because it is keyless, EF Core does not expect a primary key or track it."
+          },
+          {
+            "role": "interviewer",
+            "text": "You are on EF Core 8. Is there anything new for raw SQL?"
+          },
+          {
+            "role": "me",
+            "text": "EF Core 8 introduced the unified FromSql method that replaces FromSqlInterpolated. It accepts a FormattableString so values are automatically parameterized, same safety as FromSqlInterpolated but with a cleaner API and better composability support."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "efcore-querying-009",
+      "q": "What are split queries in EF Core and when should you use them?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["AsSplitQuery", "Cartesian explosion", "Include", "performance"],
+      "answer": {
+        "oneLiner": "Split queries replace one big JOIN across multiple collection Includes with a separate SELECT per collection, eliminating Cartesian row explosion at the cost of extra database round-trips.",
+        "detail": "When you Include multiple independent collection navigations in one query, EF Core generates a single SQL statement with multiple JOINs. The database evaluates all the JOINs at once and returns a combined result set. The problem is that joining collections multiplies rows. If an order has 10 items and 10 tags, the JOIN produces 100 rows for that order - 10 items times 10 tags. With 1,000 orders each having 10 items and 10 tags, you get 100,000 rows instead of 11,000. This is Cartesian explosion. AsSplitQuery() tells EF Core to issue a separate SELECT for each Include. The first query fetches the root entities. Subsequent queries each fetch one navigation collection filtered to the primary keys from the first query. EF stitches the results together in memory. This keeps each result set a reasonable size. The trade-offs are real. Multiple SELECTs mean multiple round-trips. More critically, the separate SELECTs are not wrapped in a transaction by default, so data can change between them. A new order item inserted between the first and second SELECT would appear in one but not the other. For financial, audit, or consistency-critical reads this is unacceptable and you need either a single query or an explicit transaction wrapping the split queries.",
+        "keyPoints": [
+          "Multiple collection Includes with a single JOIN create Cartesian explosion: row count multiplies across all collections.",
+          "AsSplitQuery issues one SELECT per Include and stitches results in memory - smaller result sets per query.",
+          "Trade-off: fewer rows transferred but more database round-trips.",
+          "The separate SELECTs are not in one transaction by default - data can change between them.",
+          "For financial or audit reads, use a single query or wrap split queries in an explicit transaction."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - single JOIN across Students and Assignments causes Cartesian explosion\nvar courses = await ctx.Courses\n    .Include(c => c.Students)\n    .Include(c => c.Assignments)\n    .ToListAsync();\n\n// ✅ GOOD - AsSplitQuery issues one SELECT per collection, stitches in memory\nvar courses = await ctx.Courses\n    .Include(c => c.Students)\n    .Include(c => c.Assignments)\n    .AsSplitQuery()\n    .AsNoTracking()\n    .ToListAsync();",
+          "note": "Set QuerySplittingBehavior.SplitQuery globally in DbContext options if split queries should be the default. Override per query with AsSingleQuery() where consistency matters."
+        },
+        "analogy": "Split queries are separate shopping trips per aisle; single queries bring the whole supermarket on one conveyor belt.",
+        "redFlags": [
+          "Recommending split queries without mentioning the consistency risk between the separate SELECTs.",
+          "Confusing AsSplitQuery with database sharding - they are completely unrelated concepts.",
+          "Using split queries on financial or audit reads without an explicit transaction.",
+          "Not knowing you can set split queries as the global default and override per query with AsSingleQuery."
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you handle the consistency risk with split queries in a financial system?",
+            "a": "Wrap the query in an explicit transaction using Database.BeginTransactionAsync, or switch that specific query to AsSingleQuery so all collections load in one atomic statement."
+          },
+          {
+            "q": "How do you make split query the default for all queries in a context?",
+            "a": "Call UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery) in the provider options during DbContext configuration. Override specific queries with AsSingleQuery()."
+          },
+          {
+            "q": "Can you use split queries together with pagination using Skip and Take?",
+            "a": "Yes, but apply an OrderBy before Skip and Take on a stable column. EF Core uses the primary keys from the first paged result to filter the subsequent collection SELECTs correctly."
+          },
+          {
+            "q": "How do you override the global split query default for one specific query that needs consistency?",
+            "a": "Call AsSingleQuery() on that specific query. It overrides the global default and produces one joined SQL statement for that query only."
+          },
+          {
+            "q": "Does AsSplitQuery eliminate all round-trips or just the row explosion?",
+            "a": "It eliminates the Cartesian row explosion but adds one round-trip per collection navigation. The total data transferred is smaller but the number of database calls increases."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What are split queries in EF Core and what problem do they solve?"
+          },
+          {
+            "role": "me",
+            "text": "When you Include multiple collection navigations, EF Core joins them all in one SQL statement. The problem is Cartesian explosion: the JOIN multiplies rows across all collections. 100 products each with 10 reviews and 10 tags returns 100,000 rows. AsSplitQuery issues a separate SELECT per collection and stitches the results together in memory, keeping each result set to a manageable size."
+          },
+          {
+            "role": "interviewer",
+            "text": "What do you give up when you use split queries?"
+          },
+          {
+            "role": "me",
+            "text": "Two things. First, extra round-trips - one per collection. Second, and more importantly, the separate SELECTs are not in one transaction by default. Data can change between the first and second query. A row inserted or updated between queries may appear inconsistently across the stitched result."
+          },
+          {
+            "role": "interviewer",
+            "text": "You are building a bank statement view. Can you use split queries?"
+          },
+          {
+            "role": "me",
+            "text": "Not safely by default. For financial reads I need the entire result to be consistent. I would either use a single query to get everything in one JOIN, or if row counts force AsSplitQuery, I wrap all the queries in an explicit transaction with Database.BeginTransactionAsync to guarantee snapshot consistency."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you apply split queries globally instead of per query?"
+          },
+          {
+            "role": "me",
+            "text": "In the provider options during DbContext registration I call UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery). That makes split queries the default for the entire context. For the specific queries that need strong consistency, I call AsSingleQuery() to override the default and get one joined statement."
+          },
+          {
+            "role": "interviewer",
+            "text": "A teammate says split queries are like database sharding. How do you respond?"
+          },
+          {
+            "role": "me",
+            "text": "Completely different concepts. Split queries are a client-side EF Core strategy for loading one result set across multiple SELECT statements within one database. Sharding is a database architecture where data is partitioned across multiple separate databases or servers. Split queries affect how EF loads navigations; sharding affects where the data lives."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

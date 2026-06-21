@@ -1,0 +1,441 @@
+{
+  "questions": [
+    {
+      "id": "csharp-advanced-009",
+      "q": "What is the difference between `ref`, `out`, and `in` parameters?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["ref", "out", "in", "parameters", "performance"],
+      "answer": {
+        "oneLiner": "ref is read/write by reference. out is write-only and the callee must assign it before returning. in is a read-only reference used to avoid copying large structs.",
+        "detail": "By default C# passes arguments by value - the callee gets a copy. The ref, out, and in modifiers change this. ref passes a variable by reference so the callee can both read and write the caller's variable - the caller must initialize it first. out is like ref but write-only - the callee must assign a value before returning and the compiler ensures this. This is used for the TryParse pattern where the caller does not need to initialize the variable first. in passes a read-only reference - the callee cannot modify the value, but no copy is made. This is useful for large structs (like a 64-byte matrix) where copying is expensive. ref return and ref local extend the idea: a method can return a reference to a variable so the caller can read or write through it without copying.",
+        "keyPoints": [
+          "ref: caller must initialize; callee can read and write the caller's variable.",
+          "out: callee must assign before returning; caller does not need to initialize.",
+          "in: read-only reference - no copy of the value, callee cannot modify it.",
+          "out is the pattern behind TryParse - bool + result in one call.",
+          "in is for performance: avoids copying large structs on hot paths."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - return type forces caller to handle a separate null check\npublic decimal ParsePaymentAmount(string input)\n{\n    return decimal.Parse(input); // throws FormatException on bad input\n}\n\n// ✅ GOOD - out pattern gives both success flag and result in one call\npublic bool TryParsePaymentAmount(string input, out decimal amount)\n{\n    return decimal.TryParse(input, out amount);\n}\n\n// in - avoids copying a large pricing matrix struct\npublic decimal CalculateDiscount(in PricingMatrix matrix, int tier)\n    => matrix.Rows[tier] * 0.1m; // matrix is read-only, no 512-byte copy",
+          "note": "out forces the callee to assign the variable - the compiler enforces this, preventing uninitialized reads."
+        },
+        "analogy": "ref is a shared document; out is a blank form you must fill; in is a laminated read-only card.",
+        "redFlags": [
+          "Confusing ref and out - not knowing out requires the callee to assign the value.",
+          "Not knowing the caller must initialize a ref parameter before passing it.",
+          "Saying in is the same as ref - in is read-only, ref is read/write.",
+          "Not knowing the TryParse pattern is the canonical out use case."
+        ],
+        "followUpsQA": [
+          { "q": "Does the caller need to initialize an out parameter before passing it?", "a": "No - unlike ref, the caller does not need to initialize out. The callee is required to assign it before returning." },
+          { "q": "What is the TryParse pattern?", "a": "A method returns bool indicating success and uses out to provide the parsed value. The caller does int.TryParse(s, out var n) and checks the bool." },
+          { "q": "When would you use in?", "a": "When passing a large readonly struct to a hot-path method. in passes a reference so no copy is made, and the read-only contract prevents accidental mutation." },
+          { "q": "What is a ref return?", "a": "A method can return ref T, meaning it returns a reference to a variable. The caller can read or write through that reference, avoiding a copy." },
+          { "q": "Can you use out with async methods?", "a": "No - out parameters are not supported in async methods. Use a tuple return type instead." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Explain the difference between ref, out, and in parameters." },
+          { "role": "you", "text": "All three pass by reference rather than value, but with different contracts. ref is read/write - the caller initializes it and the callee can change it. out is write-only - the callee must assign it before returning and the caller does not need to initialize it. in is a read-only reference - no copy is made but the callee cannot modify it." },
+          { "role": "interviewer", "text": "What is the classic real-world use of out?" },
+          { "role": "you", "text": "The TryParse pattern: bool success = decimal.TryParse(input, out decimal amount). The method returns a success flag and writes the result to amount via out. The caller avoids a try/catch for format errors and gets both pieces of information from one call." },
+          { "role": "interviewer", "text": "Why does in exist? When would you actually use it?" },
+          { "role": "you", "text": "When you have a large readonly struct on a hot path. A struct is copied on every method call by default. If you have a 256-byte pricing matrix struct and you call a pricing method a million times, that is 256 MB of copies. Marking the parameter in passes a reference with zero copy cost." },
+          { "role": "interviewer", "text": "Can you use out parameters in async methods?" },
+          { "role": "you", "text": "No - the compiler does not allow out in async methods because the method may return before the out variable is assigned. The solution is to return a tuple: Task<(bool Success, decimal Amount)> is a clean replacement." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-010",
+      "q": "What are nullable reference types (NRT) and how do you enable and use them?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["nullable", "nrt", "csharp-8", "null-safety"],
+      "answer": {
+        "oneLiner": "Nullable reference types (C# 8+) add compile-time null-safety. You annotate string? to allow null and leave string meaning non-null. The compiler warns when you might dereference a null value.",
+        "detail": "Before C# 8, all reference types could silently hold null. With nullable reference types enabled, a type without ? (like string) is treated as non-nullable by the compiler. The compiler performs flow analysis to track when a variable might be null and warns you before a potential NullReferenceException. string? means the value may be null and you must check before using it. This is purely a compile-time feature - the runtime behavior does not change. You opt in per project with <Nullable>enable</Nullable> in the .csproj file, or per file with #nullable enable. You can use null-forgiving operator ! to suppress a warning when you know something is non-null, but use it sparingly. Nullability attributes like [NotNull], [MaybeNull], and [NotNullWhen(true)] let you express precise contracts on method parameters and return values.",
+        "keyPoints": [
+          "Opt in with <Nullable>enable</Nullable> in the .csproj or #nullable enable per file.",
+          "string is assumed non-null; string? explicitly allows null.",
+          "Compile-time flow analysis warns on risky dereferences - no runtime change.",
+          "[NotNullWhen(true)] and [MaybeNull] express precise contracts the compiler can track.",
+          "Migrate large projects incrementally - enable per file and fix warnings one by one."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no annotation, NullReferenceException waits at runtime\npublic string GetCustomerEmail(int id)\n{\n    var customer = _db.Customers.Find(id);\n    return customer.Email; // throws if customer is null\n}\n\n// ✅ GOOD - NRT makes the nullable contract explicit at compile time\npublic string? GetCustomerEmail(int id)\n{\n    var customer = _db.Customers.Find(id);\n    return customer?.Email; // null propagates safely\n}\n\n// Caller is warned to check before use\nstring? email = GetCustomerEmail(42);\nif (email is not null)\n    SendWelcome(email); // compiler knows email is non-null here",
+          "note": "Flow analysis means after the is not null check, the compiler treats email as string (non-nullable) in that branch."
+        },
+        "analogy": "NRT is a compiler guard dog - it barks before the null bites.",
+        "redFlags": [
+          "Saying NRT changes runtime behavior - it does not, it is compile-time analysis only.",
+          "Spraying ! (null-forgiving operator) everywhere to silence warnings without fixing the actual nullability.",
+          "Not knowing you can enable NRT per file with #nullable enable for incremental migration.",
+          "Not knowing about nullability attributes like [NotNullWhen] for methods like TryGet patterns."
+        ],
+        "followUpsQA": [
+          { "q": "Does enabling NRT change runtime behavior?", "a": "No - it is purely compile-time. A string? is still a regular string reference at runtime; no CLR enforcement happens." },
+          { "q": "How do you migrate a large existing project to NRT?", "a": "Enable per file using #nullable enable at the top, fix the warnings that appear, and repeat file by file. Then set it globally in the csproj once all files are clean." },
+          { "q": "What does the null-forgiving operator ! do?", "a": "It suppresses the nullable warning for that expression, telling the compiler you know it is not null. Use it sparingly - it hides real bugs if overused." },
+          { "q": "What is [NotNullWhen(true)]?", "a": "An attribute on an out parameter telling the compiler that if the method returns true, the out parameter is guaranteed non-null. Used for the TryGet pattern so callers do not need a separate null check." },
+          { "q": "Can value types be nullable with NRT?", "a": "Value types use int? (Nullable<int>) which already existed. NRT only affects reference types - it does not change how Nullable<T> works." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What are nullable reference types and how do you enable them?" },
+          { "role": "you", "text": "NRT is a C# 8 feature. You opt in with <Nullable>enable</Nullable> in the project file. After that, string means non-nullable and string? means it can be null. The compiler does flow analysis and warns whenever you might dereference a nullable without checking." },
+          { "role": "interviewer", "text": "Does this change anything at runtime?" },
+          { "role": "you", "text": "No - it is purely compile-time analysis. The CLR still treats string? as a plain object reference. The benefit is catching potential NullReferenceExceptions at build time in CI rather than at 3am in production." },
+          { "role": "interviewer", "text": "How would you migrate a large legacy codebase to NRT without breaking everything?" },
+          { "role": "you", "text": "I add #nullable enable at the top of individual files and fix the warnings one file at a time. This is incremental - the rest of the project still compiles without change. Once all files are clean I flip the global flag in the csproj. Typically I start with the domain model files where null bugs matter most." },
+          { "role": "interviewer", "text": "What are nullability attributes and when do you need them?" },
+          { "role": "you", "text": "They let you express contracts the flow analysis cannot infer. [NotNullWhen(true)] on a TryGet method's out parameter tells callers that if the method returns true, the out variable is guaranteed non-null - so they do not need an extra null check in the success branch." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-011",
+      "q": "What are expression-bodied members and when do you use them?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["expression-bodied", "syntax", "concise"],
+      "answer": {
+        "oneLiner": "Expression-bodied members use => instead of a block body for single-expression methods, properties, constructors, and operators - removing boilerplate without changing behavior.",
+        "detail": "An expression-bodied member replaces the { return ...; } block with => expression. They work on methods, read-only properties, full properties (get/set separately), constructors, finalizers, indexers, and operators. The compiler produces identical IL - there is no runtime difference. They work best when the body is a single readable expression. For constructors, a common pattern is (First, Last) = (first, last) on one line. For properties, FullName => $'{First} {Last}' is a classic example. The benefit is reduced visual noise. The risk is over-use on complex logic that would be clearer in a block.",
+        "keyPoints": [
+          "Works on methods, properties, constructors, indexers, and operators.",
+          "Compiles to identical IL as the block equivalent - no runtime difference.",
+          "Best for single, readable expressions that fit on one line.",
+          "Avoid for multi-step logic - a block is clearer in those cases.",
+          "Constructor expression body: public Customer(string name) => Name = name;"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - block bodies for trivial one-liners add visual noise\npublic class ShippingAddress\n{\n    public string Street { get; }\n    public string City { get; }\n    public ShippingAddress(string street, string city) { Street = street; City = city; }\n    public override string ToString() { return $\"{Street}, {City}\"; }\n}\n\n// ✅ GOOD - expression-bodied members cut the noise\npublic class ShippingAddress\n{\n    public string Street { get; }\n    public string City { get; }\n    public ShippingAddress(string street, string city) => (Street, City) = (street, city);\n    public string Display => $\"{Street}, {City}\";\n    public override string ToString() => Display;\n}",
+          "note": "The constructor uses tuple deconstruction in one expression to assign both properties."
+        },
+        "analogy": "Expression bodies are shorthand - say it in a sentence, not a paragraph.",
+        "redFlags": [
+          "Using expression bodies for multi-statement logic - that belongs in a block.",
+          "Thinking there is a runtime difference between expression and block bodies - there is none.",
+          "Not knowing expression bodies work on constructors and operators, not just methods.",
+          "Over-nesting lambdas inside expression bodies making them unreadable."
+        ],
+        "followUpsQA": [
+          { "q": "Is there a performance difference between expression-bodied and block-bodied members?", "a": "No - the compiler generates identical IL. The difference is purely syntactic." },
+          { "q": "Can a constructor be expression-bodied?", "a": "Yes - public Customer(string name, string email) => (Name, Email) = (name, email) is valid." },
+          { "q": "Can a property setter be expression-bodied?", "a": "Yes - you can have separate expression bodies for get and set: get => _value; set => _value = value;" },
+          { "q": "When should you avoid expression bodies?", "a": "When the body has multiple steps, conditional logic, or side effects that benefit from named intermediate variables and clear structure." },
+          { "q": "Can operators be expression-bodied?", "a": "Yes - public static Money operator +(Money a, Money b) => new(a.Amount + b.Amount, a.Currency) is a common pattern." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What are expression-bodied members?" },
+          { "role": "you", "text": "They replace a block body with => expression for single-expression members. The compiler generates the same IL - it is purely a readability feature. They work on methods, properties, constructors, indexers, and operators." },
+          { "role": "interviewer", "text": "Where do you find them most useful in practice?" },
+          { "role": "you", "text": "Read-only properties and ToString overrides are the classic cases. public string FullName => $'{First} {Last}' is cleaner than a four-line block. Constructor injection with tuple deconstruction is another good use: public Customer(string name) => Name = name." },
+          { "role": "interviewer", "text": "Are there cases where you would avoid them?" },
+          { "role": "you", "text": "Any time the body is more than one logical step. If I need a null guard, a calculation, and then a return, that belongs in a block with named variables. Chaining several method calls on => creates an unreadable wall of text." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-012",
+      "q": "What is covariance and contravariance in C# generics?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["generics", "covariance", "contravariance", "variance"],
+      "answer": {
+        "oneLiner": "Covariance (out T) lets you use a more-derived type where a less-derived one is expected. Contravariance (in T) is the reverse. Both apply only to interfaces and delegates, not classes.",
+        "detail": "By default generic types are invariant - IEnumerable<Dog> cannot be used where IEnumerable<Animal> is expected even though Dog is an Animal. Variance changes this for interfaces and delegates. Covariance (out T) means T is only ever produced (returned) by the type, never consumed. This makes it safe to assign IEnumerable<Dog> to IEnumerable<Animal> because reading Dogs as Animals is always safe. Contravariance (in T) means T is only ever consumed (accepted as input). This makes it safe to assign Action<Animal> to Action<Dog> because a handler that accepts any Animal can certainly handle a Dog. The keywords out and in on the type parameter in the interface definition declare the variance. This only works on interfaces and delegates, and only for reference types - not value types.",
+        "keyPoints": [
+          "Covariance (out T): output only - IEnumerable<Dog> is assignable to IEnumerable<Animal>.",
+          "Contravariance (in T): input only - Action<Animal> is assignable to Action<Dog>.",
+          "Only works on interfaces and delegates, not concrete classes.",
+          "Only applies to reference types - not value types like int.",
+          "Mnemonic: producers are out, consumers are in."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - trying to assign generic types without variance - compile error\nIEnumerable<Dog> dogs = new List<Dog> { new Dog() };\n// IEnumerable<Animal> animals = dogs; // error without covariance\n\n// ✅ GOOD - IEnumerable<out T> is covariant so this compiles\nIEnumerable<Animal> animals = dogs; // valid - T is out in IEnumerable<T>\n\n// Contravariance - Action<in T>\nAction<Animal> feedAnimal = a => Console.WriteLine($\"Feed {a.Name}\");\nAction<Dog> feedDog = feedAnimal; // valid - a handler for Animal works for Dog too\nfeedDog(new Dog { Name = \"Rex\" });",
+          "note": "IEnumerable<T> declares T as out in its interface definition; Action<T> declares T as in."
+        },
+        "analogy": "Covariance is reading a specialised list as a general one; contravariance is using a general handler for a specific type.",
+        "redFlags": [
+          "Saying variance works on classes - it only works on interfaces and delegates.",
+          "Confusing covariance and contravariance - out is for output/producers, in is for input/consumers.",
+          "Not knowing value types are excluded from variance.",
+          "Trying to declare variance on a class like class Bag<out T> - this is not allowed."
+        ],
+        "followUpsQA": [
+          { "q": "Name a covariant interface in .NET.", "a": "IEnumerable<out T> - you can assign IEnumerable<Dog> to IEnumerable<Animal>." },
+          { "q": "Name a contravariant delegate.", "a": "Action<in T> - you can assign Action<Animal> to Action<Dog>." },
+          { "q": "Can you declare variance on a class?", "a": "No - only interfaces and delegates support variance in C#." },
+          { "q": "Why does variance not apply to value types?", "a": "Value types have different memory layouts at runtime; allowing variance would allow unsafe memory misinterpretation." },
+          { "q": "What does IComparer<in T> being contravariant mean?", "a": "A comparer for Animal can compare Dogs - you can use a more general comparer where a more specific one is expected." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Explain covariance and contravariance in C# generics." },
+          { "role": "you", "text": "Generics are invariant by default - IEnumerable<Dog> cannot be used as IEnumerable<Animal>. Variance changes that for interfaces and delegates. Covariance with out T means the type parameter only appears in output positions, so IEnumerable<Dog> is safely assignable to IEnumerable<Animal>. Contravariance with in T means input only, so Action<Animal> is assignable to Action<Dog>." },
+          { "role": "interviewer", "text": "Why is it safe to assign IEnumerable<Dog> to IEnumerable<Animal>?" },
+          { "role": "you", "text": "Because IEnumerable<T> only ever produces values - you only read from it. Every Dog IS an Animal, so reading a Dog as an Animal is always valid. There is no write path where you could accidentally put a Cat into the Dog collection." },
+          { "role": "interviewer", "text": "Why does contravariance go the other direction?" },
+          { "role": "you", "text": "Action<Animal> consumes a value - it accepts an Animal and does something. If you need something that consumes a Dog, an Action<Animal> works because a Dog is an Animal. You are substituting a more general handler for a more specific need." },
+          { "role": "interviewer", "text": "Can you use variance on a class?" },
+          { "role": "you", "text": "No - only interfaces and delegates support it in C#. You cannot write class Bag<out T>. The compiler rejects it. The restriction makes sense because a class has writable fields - allowing out on a class field would break type safety." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-013",
+      "q": "What is `dynamic` in C# and when would you (and wouldn't you) use it?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["dynamic", "dlr", "late-binding"],
+      "answer": {
+        "oneLiner": "dynamic skips compile-time type checking and resolves member calls at runtime via the DLR. Use it only for COM interop, ExpandoObject, or truly dynamic data - avoid it in regular application code.",
+        "detail": "When you declare a variable as dynamic, the compiler does not check member access on it. Instead, at runtime the Dynamic Language Runtime (DLR) resolves the member call using the actual object type. This means you get no IntelliSense, no compile-time errors on typos or wrong signatures, and errors only surface at runtime as RuntimeBinderException. Dynamic dispatch is also slower than static dispatch. Legitimate uses include: COM interop (Office Automation) where the API is dynamically typed, ExpandoObject for building property bags at runtime, and consuming loosely-typed JSON or external data where the schema is not known at compile time. Prefer typed models, System.Text.Json, or generics instead in all other cases.",
+        "keyPoints": [
+          "No compile-time type checking on dynamic - errors surface at runtime.",
+          "The DLR resolves member calls at runtime - slower than static dispatch.",
+          "Legitimate uses: COM interop, ExpandoObject, loosely-typed external data.",
+          "var is statically typed inferred; dynamic defers type resolution to runtime.",
+          "Avoid dynamic in application business logic - prefer typed models or generics."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - using dynamic in application code hides errors until runtime\ndynamic order = GetOrderFromExternalApi();\nConsole.WriteLine(order.CustomerNmae); // typo - crashes at runtime, not compile time\n\n// ✅ GOOD - COM interop is the legitimate case for dynamic\ndynamic excelApp = Activator.CreateInstance(Type.GetTypeFromProgID(\"Excel.Application\"));\nexcelApp.Visible = true; // COM API is not statically typed\nexcelApp.Workbooks.Add();\n\n// Better alternative in most cases: use a typed model\nvar order = JsonSerializer.Deserialize<OrderDto>(json);",
+          "note": "In COM interop the API is inherently dynamic - there is no static type to use. Everywhere else, prefer typed models."
+        },
+        "analogy": "dynamic is driving blindfolded - you find the wall at runtime, not before.",
+        "redFlags": [
+          "Using dynamic to avoid writing a proper model or DTO class.",
+          "Not knowing dynamic is different from var - var is statically typed at compile time.",
+          "Not knowing errors on dynamic are RuntimeBinderException at runtime, not compile errors.",
+          "Confusing dynamic with reflection - both are late-binding but dynamic uses the DLR."
+        ],
+        "followUpsQA": [
+          { "q": "What is the difference between var and dynamic?", "a": "var infers a static type at compile time - the compiler knows the exact type. dynamic skips type checking entirely and resolves everything at runtime." },
+          { "q": "What exception do you get when a dynamic member call fails?", "a": "RuntimeBinderException - it is thrown at runtime when the DLR cannot find the member on the actual object." },
+          { "q": "What is ExpandoObject?", "a": "A dynamic object that lets you add properties at runtime like a dictionary: dynamic obj = new ExpandoObject(); obj.Name = 'Alice'. Useful for property bag scenarios." },
+          { "q": "Is dynamic faster or slower than a virtual method call?", "a": "Slower - DLR resolution involves reflection-like machinery at runtime. Static dispatch or even virtual dispatch is faster." },
+          { "q": "What is the DLR?", "a": "The Dynamic Language Runtime is a layer on top of the CLR that provides runtime type resolution, used by dynamic in C# and by IronPython and IronRuby." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What is dynamic in C# and when would you use it?" },
+          { "role": "you", "text": "dynamic tells the compiler to skip type checking on that variable. Member access is resolved at runtime by the DLR. You lose IntelliSense, compile-time error detection, and performance. I use it only when I have to - primarily COM interop where the API is inherently untyped." },
+          { "role": "interviewer", "text": "How is dynamic different from var?" },
+          { "role": "you", "text": "var infers a static type - the compiler knows exactly what type it is at compile time, you just do not have to spell it out. dynamic is the opposite - the compiler intentionally does not know the type and defers all member resolution to runtime." },
+          { "role": "interviewer", "text": "What happens when a dynamic member call fails?" },
+          { "role": "you", "text": "You get a RuntimeBinderException at the point of the call. If you wrote order.CustomerNmae with a typo in a dynamic variable, it compiles fine and blows up in production. That is the core danger." },
+          { "role": "interviewer", "text": "What would you use instead of dynamic for reading JSON with an unknown schema?" },
+          { "role": "you", "text": "System.Text.Json with JsonDocument or JsonElement. They give you a tree you can navigate with TryGetProperty and GetString, all type-safe. If the schema is partially known I will deserialize into a typed DTO with JsonExtensionData capturing unknown fields." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-014",
+      "q": "Explain the IOptions pattern: IOptions vs IOptionsSnapshot vs IOptionsMonitor.",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["ioptions", "configuration", "di", "asp.net-core"],
+      "answer": {
+        "oneLiner": "The options pattern binds configuration sections to strongly-typed classes. IOptions reads once at startup. IOptionsSnapshot refreshes per request. IOptionsMonitor refreshes live and fires a callback.",
+        "detail": "In ASP.NET Core you register a configuration section with services.Configure<SmtpOptions>(config.GetSection('Smtp')). Then you inject the options via one of three interfaces. IOptions<T> is a singleton - it reads the configuration once when first accessed and never updates. IOptionsSnapshot<T> is scoped - it re-reads configuration at the start of each HTTP request. This is the right choice for per-request fresh config in scoped services. IOptionsMonitor<T> is a singleton that watches for configuration file changes and raises an OnChange event. It is the right choice for singletons that need live-reload, like a rate limiter that reads limits from config. Injecting IOptionsSnapshot into a singleton is a captive dependency bug - the scoped service would be captured by the singleton's lifetime and never refreshed. Use IOptionsMonitor in singletons.",
+        "keyPoints": [
+          "IOptions<T>: singleton, reads once at startup, never refreshes.",
+          "IOptionsSnapshot<T>: scoped, re-reads per request - do not inject into a singleton.",
+          "IOptionsMonitor<T>: singleton, live reload, OnChange callback for file changes.",
+          "Register with services.Configure<T>(config.GetSection('SectionName')).",
+          "Validate on startup: .AddOptions<T>().Bind(...).ValidateDataAnnotations().ValidateOnStart()."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - injecting IOptionsSnapshot into a singleton service = captive dependency\npublic class NotificationSingleton\n{\n    public NotificationSingleton(IOptionsSnapshot<SmtpOptions> opts) { } // wrong!\n}\n\n// ✅ GOOD - IOptionsMonitor in singleton; IOptionsSnapshot in scoped service\npublic class EmailSender // registered as scoped\n{\n    private readonly SmtpOptions _opts;\n    public EmailSender(IOptionsSnapshot<SmtpOptions> opts) => _opts = opts.Value;\n}\n\npublic class RateLimiter // registered as singleton\n{\n    private readonly IOptionsMonitor<RateLimitOptions> _monitor;\n    public RateLimiter(IOptionsMonitor<RateLimitOptions> monitor) => _monitor = monitor;\n    public int GetLimit() => _monitor.CurrentValue.RequestsPerMinute;\n}",
+          "note": "IOptionsMonitor.CurrentValue always reflects the latest config; IOptionsSnapshot.Value is fixed for the request."
+        },
+        "analogy": "IOptions is a printed manual; IOptionsSnapshot is today's edition; IOptionsMonitor is a live news feed.",
+        "redFlags": [
+          "Injecting IOptionsSnapshot into a singleton - it is scoped and will never refresh in that context.",
+          "Not knowing IOptions never refreshes even if appsettings.json changes.",
+          "Not knowing you can validate options at startup with ValidateOnStart().",
+          "Confusing IOptionsMonitor.CurrentValue with IOptions.Value - CurrentValue reflects live changes."
+        ],
+        "followUpsQA": [
+          { "q": "Which options interface reloads live when appsettings.json changes?", "a": "IOptionsMonitor<T> - it watches the configuration source and its CurrentValue reflects the latest values." },
+          { "q": "Why can you not inject IOptionsSnapshot into a singleton?", "a": "IOptionsSnapshot is scoped - injecting it into a singleton creates a captive dependency where the scoped service lives for the full application lifetime and never refreshes." },
+          { "q": "How do you validate options at application startup?", "a": "Chain .ValidateDataAnnotations().ValidateOnStart() on the AddOptions<T> registration. Bad configuration throws on startup rather than at the first use." },
+          { "q": "How do you access the current value from IOptionsMonitor?", "a": "Via .CurrentValue - which is always the latest reloaded value. IOptionsMonitor also has an OnChange(callback) method to react to changes." },
+          { "q": "What is the difference between IOptions.Value and IOptionsSnapshot.Value?", "a": "IOptions.Value is set once at startup and never changes. IOptionsSnapshot.Value is re-read at the start of each request, so it reflects config file changes." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Explain the IOptions pattern and the differences between the three interfaces." },
+          { "role": "you", "text": "The options pattern binds a config section to a strongly typed class registered in DI. IOptions<T> is a singleton that reads once at startup and never refreshes. IOptionsSnapshot<T> is scoped and re-reads at the start of each request. IOptionsMonitor<T> is a singleton that reloads live when the file changes and has an OnChange callback." },
+          { "role": "interviewer", "text": "What happens if I inject IOptionsSnapshot into a singleton?" },
+          { "role": "you", "text": "Captive dependency - a scoped service injected into a singleton lives for the application lifetime, not per request. The snapshot will never refresh and you get an InvalidOperationException from the DI container's scope validation in development mode." },
+          { "role": "interviewer", "text": "When would you use IOptionsMonitor in production?" },
+          { "role": "you", "text": "For any singleton that needs live-reload of settings - feature flags, rate limits, email server endpoints. If an ops engineer changes the rate limit in appsettings.json and restarts is not acceptable, IOptionsMonitor picks it up automatically via IOptionsMonitor.OnChange." },
+          { "role": "interviewer", "text": "How do you make sure bad configuration fails fast?" },
+          { "role": "you", "text": "Chain ValidateDataAnnotations().ValidateOnStart() on AddOptions<T>. This runs Data Annotations validation on the bound class during startup. A missing required value or a value out of range throws on launch rather than when the setting is first read in some obscure code path." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-015",
+      "q": "What is a partial class (and partial method) in C#?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["partial", "code-generation", "syntax"],
+      "answer": {
+        "oneLiner": "partial splits a single class across multiple source files. The compiler merges them into one type. It is used mainly to separate generated code from hand-written code.",
+        "detail": "When you mark a class with partial, the compiler treats all files with that same class name and namespace as one type. Every part must use the partial keyword and the same access modifier. At compile time they merge into a single type with all the members combined. The main use case is separating code that tools generate - like EF Core model scaffolding, Razor pages, WinForms designer, or source generators - from the code you write by hand. This way regenerating the scaffold does not overwrite your business logic. Partial methods are a related feature: one part declares the method signature, another part optionally provides the body. If no part provides a body, the compiler removes the method declaration and all calls to it - a zero-cost hook point. In C# 9+ partial methods can have access modifiers and return types, making them more useful in source generators.",
+        "keyPoints": [
+          "All parts must have the partial keyword and the same access modifier.",
+          "Parts can be spread across multiple files but must be in the same assembly.",
+          "Main use: keeping generated code separate from hand-written code.",
+          "Partial method with no body: the declaration and all calls are removed by the compiler.",
+          "Source generators (C# 9+) rely heavily on partial classes to add generated code."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - hand-written code mixed into a generated file, overwritten on next scaffold\n// CustomerEntity.cs (EF generated + your code mixed in)\npublic class CustomerEntity\n{\n    public int Id { get; set; }      // generated\n    public string FullName => ...;   // your code - lost on next scaffold\n}\n\n// ✅ GOOD - keep generated and hand-written in separate partial files\n// CustomerEntity.Generated.cs (do not edit)\npublic partial class CustomerEntity { public int Id { get; set; } }\n\n// CustomerEntity.cs (your code - never overwritten)\npublic partial class CustomerEntity\n{\n    public string FullName => $\"{FirstName} {LastName}\";\n    public bool IsVerified => VerifiedAt.HasValue;\n}",
+          "note": "The compiler merges both partial files into one CustomerEntity type - the scaffold can be regenerated safely."
+        },
+        "analogy": "A partial class is a jigsaw - each file is a piece; the compiler assembles the picture.",
+        "redFlags": [
+          "Thinking partial classes can span assemblies - they must be in the same compilation.",
+          "Not knowing partial methods with no body are completely removed - even the call sites.",
+          "Using partial just to split a large class that should really be refactored into smaller classes.",
+          "Not knowing source generators use partial to inject generated code alongside your code."
+        ],
+        "followUpsQA": [
+          { "q": "Can partial class parts be in different assemblies?", "a": "No - all parts must be compiled together in the same assembly. Partial is a compile-time merge, not a runtime feature." },
+          { "q": "What happens to a partial method with no body?", "a": "The compiler removes the method declaration and every call to it. There is literally no IL generated for it - it is a zero-cost extension point." },
+          { "q": "What do source generators use partial for?", "a": "A source generator adds a partial class file at compile time with generated members. Your hand-written partial file is unchanged and the two merge at build time." },
+          { "q": "Can an interface be partial?", "a": "Yes - interfaces, structs, and records can all be partial in C#." },
+          { "q": "Can partial class parts have different base classes?", "a": "No - only one part can declare the base class. All parts can implement interfaces and they are all merged." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What is a partial class in C#?" },
+          { "role": "you", "text": "partial splits a class definition across multiple source files. The compiler merges them into a single type at build time. Every file must use the partial keyword with the same class name and namespace. The main reason to use it is to keep tool-generated code separate from hand-written code." },
+          { "role": "interviewer", "text": "Give me a concrete example from a real project." },
+          { "role": "you", "text": "EF Core scaffolding generates entity classes. If I add business logic to the generated file it is wiped the next time I regenerate. With partial, the scaffold writes CustomerEntity.Generated.cs and I write my computed properties and domain methods in CustomerEntity.cs. They compile into one class." },
+          { "role": "interviewer", "text": "What are partial methods and why would you use them?" },
+          { "role": "you", "text": "A partial method is a hook: one file declares the signature, another optionally provides the body. If no body exists, the compiler removes the declaration and every call to it - zero cost. Source generators use this to declare hook points that you can optionally implement to customize generated code." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-016",
+      "q": "What is the difference between `throw` and `throw ex`?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["exceptions", "stack-trace", "throw"],
+      "answer": {
+        "oneLiner": "throw; rethrows an exception preserving the original stack trace. throw ex; resets the stack trace to the current line, hiding where the error actually originated.",
+        "detail": "When you catch an exception and want to propagate it, you have two options. throw; (bare throw) rethrows the current exception with the original stack trace completely intact - debuggers and logs show the original throw location. throw ex; creates a new throw point at the current line and overwrites the stack trace. This is almost always a bug because it hides the real origin of the error. If you want to add context, create a new exception with the original as the inner exception: throw new OrderProcessingException('Payment failed', ex). If you need to rethrow an exception across thread or async boundaries while preserving the stack trace, use ExceptionDispatchInfo.Capture(ex).Throw(). In modern C# the ExceptionDispatchInfo pattern is rarely needed directly since await already preserves exceptions correctly.",
+        "keyPoints": [
+          "throw; preserves the original stack trace - always prefer this when rethrowing.",
+          "throw ex; resets the stack trace to the catch block line - hides the real origin.",
+          "To add context: throw new BusinessException('message', ex) with ex as inner exception.",
+          "ExceptionDispatchInfo.Capture(ex).Throw() preserves stack trace across boundaries.",
+          "Never catch and rethrow just to log - use a middleware or filter instead."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - throw ex resets the stack trace, hiding the real error location\ntry { ProcessPayment(order); }\ncatch (PaymentException ex)\n{\n    _logger.LogError(ex, \"Payment failed\");\n    throw ex; // stack trace now points here, not to the real failure line\n}\n\n// ✅ GOOD - bare throw preserves the original stack trace\ntry { ProcessPayment(order); }\ncatch (PaymentException ex)\n{\n    _logger.LogError(ex, \"Payment failed for order {OrderId}\", order.Id);\n    throw; // original stack trace intact\n}\n\n// ✅ ALSO GOOD - wrap with context when caller needs more info\ncatch (DbException ex)\n{\n    throw new OrderPersistenceException($\"Failed to save order {order.Id}\", ex);\n}",
+          "note": "The inner exception in OrderPersistenceException preserves the full chain - you see both the business context and the original DbException."
+        },
+        "analogy": "throw; passes the baton; throw ex; starts a new race from here.",
+        "redFlags": [
+          "Using throw ex; anywhere in production code - this almost always hides the bug origin.",
+          "Catching an exception only to rethrow it with throw ex; - no value, only harm.",
+          "Not knowing ExceptionDispatchInfo exists for preserving exceptions across threads.",
+          "Catching Exception at every layer instead of letting it bubble with throw;."
+        ],
+        "followUpsQA": [
+          { "q": "Which preserves the original stack trace?", "a": "Bare throw; - it rethrows the exception without modifying the stack trace." },
+          { "q": "How do you add context to an exception without losing the original?", "a": "Throw a new exception with the original as the inner exception: throw new OrderException('context message', ex)." },
+          { "q": "How do you rethrow across async or thread boundaries?", "a": "Use ExceptionDispatchInfo.Capture(ex).Throw() - it marshals the exception with its original stack trace across the boundary." },
+          { "q": "Is it ever correct to use throw ex;?", "a": "Rarely - only if you intentionally want to hide the original stack trace, for example when sanitizing exceptions before exposing them to a caller." },
+          { "q": "What is the best way to handle exceptions across all requests in ASP.NET Core?", "a": "Use middleware or exception filters so individual methods do not need try/catch at all - the middleware logs and returns appropriate HTTP responses." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What is the difference between throw and throw ex?" },
+          { "role": "you", "text": "throw; rethrows the current exception with the original stack trace intact. throw ex; creates a new throw point at the current line and overwrites the stack trace. This makes debugging very hard because you see the catch block in the trace instead of the actual failure location." },
+          { "role": "interviewer", "text": "So when would you ever use throw ex?" },
+          { "role": "you", "text": "Almost never in application code. One edge case is intentionally sanitizing an exception before returning it to an external caller - you might want to hide internal details. But even then, wrapping with a new exception and throw; is cleaner because you preserve the inner exception for your own logs." },
+          { "role": "interviewer", "text": "What do you do when you want to add context to an exception?" },
+          { "role": "you", "text": "Wrap it: throw new OrderProcessingException($'Failed on order {order.Id}', ex). The original exception is the inner exception. Logging can read ex.InnerException for the full chain. The stack trace in the new exception shows the business context and the inner exception shows the root cause." },
+          { "role": "interviewer", "text": "How do you handle this in an async method where the exception crosses thread boundaries?" },
+          { "role": "you", "text": "In modern async/await code, the runtime marshals exception stack traces through the state machine automatically - await preserves them. For manual thread scenarios, ExceptionDispatchInfo.Capture(ex).Throw() captures and re-throws with the original trace intact." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-017",
+      "q": "What is the difference between `const`, `readonly`, and `static readonly`?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["const", "readonly", "immutability"],
+      "answer": {
+        "oneLiner": "const is a compile-time constant baked into calling assemblies. readonly is set once at construction time per instance. static readonly is one shared value set at runtime for the type.",
+        "detail": "const must be a primitive type or string and its value is known at compile time. The compiler inlines it directly into every place it is used - including other assemblies that reference the declaring library. This means changing a public const value in a library requires recompiling all callers, or they silently keep the old value. This is a versioning hazard. readonly is an instance field that can be assigned in the field declaration or in any constructor of the class. After the constructor completes, it cannot be changed. static readonly is a field that belongs to the type (one shared copy) and is initialized once, either inline or in a static constructor. Unlike const it can hold any value including computed values and non-primitive types. Because it is read at runtime, callers always see the current value when they recompile.",
+        "keyPoints": [
+          "const: compile-time, implicitly static, only primitives and strings, inlined into callers.",
+          "Changing a public const is a binary breaking change - callers must recompile.",
+          "readonly: instance field, set in declaration or constructor, any type.",
+          "static readonly: one shared value per type, set at runtime, can hold computed values.",
+          "Prefer static readonly over const for public library values that may change."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - public const is inlined into callers; changing it is a silent breaking change\npublic const int MaxOrderLines = 50;\n// Caller assembly sees 50 baked in; updating to 100 here requires recompiling callers\n\n// ✅ GOOD - static readonly is read at runtime so callers always get the current value\npublic static readonly int MaxOrderLines = 50;\npublic static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(30);\n\n// readonly - per-instance, set in constructor\npublic class Order\n{\n    public readonly Guid OrderId;\n    public Order() => OrderId = Guid.NewGuid();\n}",
+          "note": "static readonly can hold TimeSpan, Guid, or any object - const cannot."
+        },
+        "analogy": "const is printed on the box at the factory; static readonly is on a tag you can swap.",
+        "redFlags": [
+          "Not knowing that changing a public const is a binary breaking change for callers.",
+          "Saying const and static readonly are the same - const is compile-time, static readonly is runtime.",
+          "Using const for values like TimeSpan or DateTime that are not compile-time constants.",
+          "Thinking readonly prevents the object's internal state from changing - it only prevents reassignment."
+        ],
+        "followUpsQA": [
+          { "q": "Why is changing a public const a breaking change?", "a": "The compiler inlines the const value into every caller. If you change the value in the library without recompiling callers, they keep the old baked-in value." },
+          { "q": "Can const hold a DateTime?", "a": "No - const only supports primitive types (int, double, bool, char) and string. For DateTime use static readonly." },
+          { "q": "Can a readonly field be set after the constructor?", "a": "No - readonly fields can only be assigned in the field declaration or inside a constructor. After the constructor completes, any assignment is a compile error." },
+          { "q": "What types can static readonly hold?", "a": "Any type - including TimeSpan, Guid, arrays, or instances of any class, including computed values." },
+          { "q": "What is the difference between a readonly field and a get-only property?", "a": "A readonly field is a field - direct memory access, no method call. A get-only property is a method call under the hood. Both achieve immutability from the outside but properties allow lazy initialization and encapsulation." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Explain the difference between const, readonly, and static readonly." },
+          { "role": "you", "text": "const is a compile-time constant - the compiler bakes its value directly into every call site, including other assemblies. readonly is an instance field set in the constructor and never changed after. static readonly is a shared field for the type, initialized once at runtime and can hold any type." },
+          { "role": "interviewer", "text": "What is the versioning risk with const?" },
+          { "role": "you", "text": "If you ship a library with public const int MaxRetries = 3 and later change it to 5, any assembly compiled against the old version has 3 baked into its IL. They will not pick up the change until they recompile. This is why public library values should be static readonly - it is read at runtime so callers always see the current value." },
+          { "role": "interviewer", "text": "Can readonly fields be mutable?" },
+          { "role": "you", "text": "The field reference cannot be reassigned after construction, but if the field holds a reference type the object itself can still be mutated. readonly List<Order> means you cannot swap the list reference, but you can still call orders.Add(). For true deep immutability you need IReadOnlyList or a copy." },
+          { "role": "interviewer", "text": "When would you actually use const?" },
+          { "role": "you", "text": "For true mathematical or protocol constants that will never change - Pi, HTTP status codes in a private internal switch, or a database column name constant used only within the same assembly. Internal const is safe because there are no external callers to worry about." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    }
+  ]
+}

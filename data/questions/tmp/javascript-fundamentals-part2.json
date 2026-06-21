@@ -1,0 +1,560 @@
+{
+  "questions_part2": [
+    {
+      "id": "js-fund-007",
+      "q": "How does the `this` keyword behave in regular vs arrow functions?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["this", "arrow-functions", "binding"],
+      "answer": {
+        "oneLiner": "Regular functions bind `this` based on how they are called at the call site. Arrow functions have no own `this` - they inherit it from the enclosing scope where they were defined.",
+        "detail": "In a regular function, `this` is determined when the function is called, not when it is defined. If you call `obj.method()`, `this` is `obj`. If you extract the method and call it as a plain function, `this` becomes undefined in strict mode or the global object in non-strict mode. This is the 'lost this' problem. Arrow functions solve this by not having their own `this` at all - they capture `this` from the lexical scope at the time they are defined. So an arrow function inside a class method always has the class instance as `this`, regardless of how it is called later. `call`, `apply`, and `bind` cannot change an arrow function's `this` because there is none to change.",
+        "keyPoints": [
+          "Regular function `this` is set at call time - by the object before the dot, or undefined/global for plain calls",
+          "Arrow functions have no own `this` - they capture it lexically from the surrounding scope",
+          "`call`, `apply`, and `bind` can change a regular function's `this` but have no effect on arrow functions",
+          "Use arrow functions as callbacks to keep the outer `this` - avoids the classic lost-this bug"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - regular function loses 'this' in a setTimeout callback\nclass NotificationService {\n  send() {\n    setTimeout(function() {\n      this.log('sent'); // TypeError: this is undefined\n    }, 1000);\n  }\n}\n\n// ✅ GOOD - arrow function keeps 'this' from the class method\nclass NotificationService {\n  send() {\n    setTimeout(() => {\n      this.log('sent'); // 'this' is the NotificationService instance\n    }, 1000);\n  }\n}",
+          "note": "Arrow functions capture 'this' lexically, making them ideal for callbacks inside class methods where you need the instance."
+        },
+        "analogy": "Regular functions check their ID at the door; arrow functions borrowed their ID from their parent.",
+        "redFlags": [
+          "Saying arrow functions always have `this` pointing to the global object",
+          "Thinking `bind` can change an arrow function's `this`",
+          "Not knowing that `this` in a regular function depends on the call site, not the definition",
+          "Confusing 'lexical this' with 'no this' - arrow functions do have a this, they just inherit it"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is `this` in a plain function call like `fn()` in strict mode?",
+            "a": "`undefined` - in strict mode, a plain function call sets `this` to undefined, not the global object."
+          },
+          {
+            "q": "How does `bind` work?",
+            "a": "`bind` returns a new function with `this` permanently set to the provided object. It does not mutate the original function. Arrow functions ignore `bind` entirely."
+          },
+          {
+            "q": "Why use an arrow function for a React event handler?",
+            "a": "Arrow functions capture `this` from the class instance at definition time. Without them, a regular function handler would lose `this` when React calls it, requiring manual binding in the constructor."
+          },
+          {
+            "q": "Can you use an arrow function as a constructor with `new`?",
+            "a": "No - arrow functions cannot be used as constructors. Calling `new ArrowFn()` throws a TypeError because they have no `prototype` property."
+          },
+          {
+            "q": "What is the difference between `call` and `apply`?",
+            "a": "Both invoke a function with a given `this`. `call` passes additional arguments individually: `fn.call(obj, a, b)`. `apply` passes them as an array: `fn.apply(obj, [a, b])`."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How does `this` behave differently in regular functions versus arrow functions?"
+          },
+          {
+            "role": "you",
+            "text": "In a regular function, `this` is determined at call time by the call site - if I call `invoice.calculate()`, `this` is `invoice`. If I extract that function and call it as `fn()`, `this` becomes undefined in strict mode. The definition location does not matter, only how it is called."
+          },
+          {
+            "role": "interviewer",
+            "text": "And arrow functions - how do they differ?"
+          },
+          {
+            "role": "you",
+            "text": "Arrow functions have no `this` of their own. They capture `this` lexically from the enclosing scope at the time they are defined. So in a class method, an arrow function inside it always sees the class instance as `this`, regardless of how or when it gets called later."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a real scenario where this matters."
+          },
+          {
+            "role": "you",
+            "text": "Classic case: a `setTimeout` inside a class method. If I use a regular function callback, `this` is lost and accessing `this.someProperty` throws. If I use an arrow function, `this` is the class instance from the enclosing method. In a payment service with a retry timer, this distinction is critical."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you fix the lost `this` problem without arrow functions?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - three ways. Store `this` in a local variable like `const self = this` before the callback. Use `.bind(this)` on the regular function to hard-bind the context. Or use `call` or `apply` to invoke it with an explicit `this`. But arrow functions are the cleanest solution in modern code."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can `bind` change an arrow function's `this`?"
+          },
+          {
+            "role": "you",
+            "text": "No - `bind`, `call`, and `apply` all ignore the `this` argument for arrow functions. The arrow's `this` is fixed at definition time and cannot be overridden. This is actually useful - it means arrow function callbacks always behave predictably."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-fund-008",
+      "q": "What are higher-order functions?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["higher-order", "functional", "callbacks"],
+      "answer": {
+        "oneLiner": "A higher-order function is a function that takes other functions as arguments, returns a function, or both. They are the foundation of functional programming patterns in JavaScript.",
+        "detail": "Functions in JavaScript are first-class values - they can be passed around like numbers or strings. A higher-order function exploits this. `Array.prototype.map` is a classic example: it takes a callback and returns a new array of transformed values. `filter` and `reduce` work the same way. A function factory like `const multiplier = x => y => x * y` returns a function when called, making `multiplier` a higher-order function that produces specialised functions. Higher-order functions enable composition: small single-purpose functions combined into more powerful ones. This pattern is used in middleware (Express), decorators, memoization wrappers, and event handler factories in React.",
+        "keyPoints": [
+          "A higher-order function takes a function as an argument, returns a function, or both",
+          "`map`, `filter`, `reduce`, `sort` are built-in higher-order array methods",
+          "Functions that return functions (factories, currying) also qualify as higher-order",
+          "They enable composition, reuse, and abstraction in functional-style code"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - imperative loop with duplicated logic for each filter type\nconst activeUsers = [];\nfor (let u of users) { if (u.isActive) activeUsers.push(u); }\nconst premiumUsers = [];\nfor (let u of users) { if (u.isPremium) premiumUsers.push(u); }\n\n// ✅ GOOD - higher-order filter with reusable predicate functions\nconst byActive = user => user.isActive;\nconst byPremium = user => user.isPremium;\nconst activeUsers = users.filter(byActive);\nconst premiumUsers = users.filter(byPremium);",
+          "note": "Higher-order functions like filter let you separate the iteration logic from the condition logic, making each piece reusable and testable on its own."
+        },
+        "analogy": "A higher-order function is a manager who delegates tasks to the function you hand them.",
+        "redFlags": [
+          "Not being able to name built-in higher-order functions beyond map",
+          "Confusing a callback (function passed in) with the higher-order function itself",
+          "Not knowing that a function returning a function also qualifies as higher-order",
+          "Saying higher-order functions are only about arrays"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Name three built-in higher-order array methods.",
+            "a": "`map`, `filter`, and `reduce`. Also `sort`, `find`, `every`, and `some` - they all take a callback function as an argument."
+          },
+          {
+            "q": "Is a function factory a higher-order function?",
+            "a": "Yes - a function that returns another function qualifies. For example `const withLogging = fn => (...args) => { console.log(args); return fn(...args); }` wraps any function with logging."
+          },
+          {
+            "q": "What is function composition?",
+            "a": "Combining two or more functions so the output of one becomes the input of the next: `compose(f, g)(x)` is equivalent to `f(g(x))`."
+          },
+          {
+            "q": "What is currying and how does it relate to higher-order functions?",
+            "a": "Currying transforms a function that takes multiple arguments into a chain of single-argument functions. Each step returns a new function until all arguments are collected. It relies on returning functions, making it a higher-order pattern."
+          },
+          {
+            "q": "Give a real-world example of a function that returns a function.",
+            "a": "Express middleware factories like `cors()` return a middleware function. Event handler factories in React like `const handleChange = field => e => setState({ [field]: e.target.value })` generate handlers per field."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is a higher-order function?"
+          },
+          {
+            "role": "you",
+            "text": "A higher-order function is one that takes a function as an argument, returns a function, or both. JavaScript functions are first-class values so they can be passed and returned just like numbers or strings."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me practical examples - beyond just saying map and filter."
+          },
+          {
+            "role": "you",
+            "text": "In an e-commerce system I would use `users.filter(user => user.isPremium)` to get premium users. The predicate function is passed in, so I can swap it without rewriting the loop logic. For returning functions, Express middleware factories like `cors()` return a middleware function - that is a higher-order function."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about functions that return other functions - walk me through an example."
+          },
+          {
+            "role": "you",
+            "text": "A logging wrapper: `const withLogging = fn => (...args) => { console.log('calling', fn.name, args); return fn(...args); }`. I pass in any function and get back a wrapped version with logging. This is the decorator pattern without decorator syntax."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does currying relate to higher-order functions?"
+          },
+          {
+            "role": "you",
+            "text": "Currying converts a multi-argument function into a chain of single-argument functions that each return the next step. `const discount = rate => price => price * (1 - rate)` lets me create `const tenPercent = discount(0.1)` and reuse it. Each call returns a function, making currying a higher-order pattern."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-fund-009",
+      "q": "What is automatic type conversion (coercion) in JavaScript?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["coercion", "type-conversion", "equality"],
+      "answer": {
+        "oneLiner": "Coercion is JavaScript automatically converting a value from one type to another when an operator or comparison requires it. It drives many surprising bugs in JavaScript code.",
+        "detail": "JavaScript coerces types when operators or comparisons encounter mismatched types. The `+` operator is the most infamous: if either operand is a string, it concatenates instead of adding - so `'5' + 1` gives `'51'`. Other arithmetic operators (`-`, `*`, `/`) always coerce both sides to numbers, so `'5' - 1` gives `4`. The `==` operator applies coercion rules before comparing, which is why `0 == ''` is true and `null == undefined` is true. The `===` operator skips coercion entirely. Falsy values are values that coerce to false in a boolean context: `0`, `''`, `null`, `undefined`, `NaN`, and `false`. Everything else, including empty arrays and empty objects, is truthy.",
+        "keyPoints": [
+          "`+` concatenates if either side is a string; `-`, `*`, `/` always convert to numbers",
+          "`==` applies coercion before comparing; `===` does not - always prefer `===`",
+          "Falsy values: `0`, `''`, `null`, `undefined`, `NaN`, `false` - all others are truthy",
+          "Empty arrays `[]` and objects `{}` are truthy even though they feel 'empty'"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - loose equality with coercion produces wrong results\nfunction isProductInStock(quantity) {\n  if (quantity == false) {   // matches 0, '', false, null, undefined\n    return false;            // BUG: quantity=0 is valid but caught here\n  }\n}\n\n// ✅ GOOD - strict equality and explicit checks\nfunction isProductInStock(quantity) {\n  if (quantity === 0) return false;  // only exact zero\n  if (quantity == null) throw new Error('quantity required');\n  return quantity > 0;\n}",
+          "note": "Coercion makes == checks match more values than you intend. Strict equality and explicit checks make the conditions clear and predictable."
+        },
+        "analogy": "Coercion is JavaScript trying to be helpful - and occasionally being dangerously wrong.",
+        "redFlags": [
+          "Using `==` throughout the codebase without knowing what coercions it applies",
+          "Not knowing the falsy values list - especially that `0` and `''` are falsy",
+          "Saying empty array `[]` is falsy - it is truthy",
+          "Not knowing that `+` with a string concatenates while `-` converts to number"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why always prefer `===` over `==`?",
+            "a": "`===` never coerces, so comparisons are always predictable. `==` applies complex coercion rules that are hard to remember and cause bugs."
+          },
+          {
+            "q": "List all the falsy values in JavaScript.",
+            "a": "`0`, `-0`, `''` (empty string), `null`, `undefined`, `NaN`, and `false`. Everything else is truthy, including `[]`, `{}`, and `'0'`."
+          },
+          {
+            "q": "Is an empty array truthy or falsy?",
+            "a": "Truthy - all objects including empty arrays and empty objects are truthy. Only the six specific falsy values are falsy."
+          },
+          {
+            "q": "What does `'5' * 2` produce?",
+            "a": "`10` - the multiplication operator coerces the string '5' to the number 5 first, then multiplies. Only `+` has the string concatenation behaviour."
+          },
+          {
+            "q": "What is `[] + {}` and why?",
+            "a": "It produces `'[object Object]'`. The array coerces to an empty string `''` and the object coerces to `'[object Object]'`, then they are concatenated by `+`."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is type coercion in JavaScript and why does it matter?"
+          },
+          {
+            "role": "you",
+            "text": "Coercion is when JavaScript automatically converts a value to a different type to satisfy an operator or comparison. It matters because the conversions are not always what you expect and can hide bugs. The most common surprise is `+` with a string - it concatenates instead of adding."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a concrete example that would actually break production code."
+          },
+          {
+            "role": "you",
+            "text": "In a stock management system, if a product has zero quantity and I check `if (quantity == false)`, that evaluates to true because `0 == false` due to coercion. So a valid product with zero stock incorrectly returns 'out of stock'. Using `quantity === 0` fixes it by preventing coercion."
+          },
+          {
+            "role": "interviewer",
+            "text": "Tell me the full list of falsy values - I want to see you know them all."
+          },
+          {
+            "role": "you",
+            "text": "`0`, `-0`, empty string `''`, `null`, `undefined`, `NaN`, and `false`. That is the complete list. Common gotcha: empty array `[]` and empty object `{}` are truthy, which surprises people who expect 'empty' things to be falsy."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is `'5' + 1` versus `'5' - 1`, and why the difference?"
+          },
+          {
+            "role": "you",
+            "text": "`'5' + 1` is `'51'` because `+` checks if either side is a string and concatenates if so. `'5' - 1` is `4` because subtraction has no string mode - it always converts both sides to numbers. This asymmetry of `+` is one of the most common JavaScript bugs in beginner code."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-fund-010",
+      "q": "What is strict mode and how do you enable it?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["strict-mode", "use-strict"],
+      "answer": {
+        "oneLiner": "Strict mode is a safer JavaScript variant that turns common silent mistakes into thrown errors. You enable it by adding `'use strict';` at the top of a file or function.",
+        "detail": "In normal JavaScript, many mistakes fail silently - assigning to an undeclared variable creates an accidental global, deleting a variable does nothing, and duplicate parameter names are allowed. Strict mode changes all of these to throw errors. It also changes `this` in plain function calls from the global object to `undefined`, which catches a common class of bugs where you forget the object context. ES modules and class bodies are automatically in strict mode - you do not need the directive there. In older code that uses script tags, you do need to add it explicitly. TypeScript and bundlers like Webpack typically emit strict mode code automatically.",
+        "keyPoints": [
+          "Enable with `'use strict';` at the top of a file or function body",
+          "Assigning to an undeclared variable throws a ReferenceError instead of creating a global",
+          "`this` in plain function calls is `undefined` instead of the global object",
+          "ES modules and class bodies are strict by default - no directive needed"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - without strict mode, typo creates accidental global\nfunction saveUserProfile(userData) {\n  userName = userData.name; // typo: should be userData.userName\n  // silently creates global 'userName' - hard to find bug\n}\n\n// ✅ GOOD - strict mode catches the undeclared variable\n'use strict';\nfunction saveUserProfile(userData) {\n  userName = userData.name; // ReferenceError: userName is not defined\n}",
+          "note": "Strict mode converts a silent global variable creation into an immediate ReferenceError, making the typo easy to find."
+        },
+        "analogy": "Strict mode is a code linter built into the language itself.",
+        "redFlags": [
+          "Not knowing that ES modules are strict by default - adding 'use strict' is redundant there",
+          "Saying strict mode only affects `this` - it also prevents accidental globals, duplicate params, and more",
+          "Not knowing that `this` becomes undefined in strict mode plain calls, not the global object",
+          "Thinking strict mode is a runtime performance mode - it is a correctness mode"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Do you need to add 'use strict' in an ES module?",
+            "a": "No - ES modules are strict by default. Class bodies are also strict automatically. The directive is only needed in regular scripts."
+          },
+          {
+            "q": "What is `this` in a strict mode plain function call?",
+            "a": "`undefined` - in strict mode, calling a function without an object context sets `this` to undefined instead of the global object."
+          },
+          {
+            "q": "What happens to `this` in class methods under strict mode?",
+            "a": "Class bodies are strict by default, so plain method calls that lose their object context will have `this` as `undefined`. This is why arrow functions or binding are needed for callbacks."
+          },
+          {
+            "q": "Name two other things strict mode prevents besides accidental globals.",
+            "a": "Duplicate parameter names in functions: `function f(a, a)` throws in strict mode. Also, `delete` on a variable name or a non-configurable property throws instead of silently failing."
+          },
+          {
+            "q": "Does TypeScript enforce strict mode?",
+            "a": "TypeScript emits 'use strict' in compiled output and has a `strict` compiler option that enables additional type-level strictness checks beyond JavaScript's runtime strict mode."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is strict mode and why would you use it?"
+          },
+          {
+            "role": "you",
+            "text": "Strict mode is a safer JavaScript variant that converts silent mistakes into thrown errors. You enable it with the string literal `'use strict';` at the top of a file or function. The main benefit is catching bugs early instead of having them fail silently."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a concrete example of something strict mode catches."
+          },
+          {
+            "role": "you",
+            "text": "The most common one is accidental globals. Without strict mode, a typo like `usrName = 'Alice'` where the variable was never declared creates a global variable silently. In strict mode it throws a ReferenceError immediately. In a user authentication service, that kind of typo could expose data in the global scope."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does strict mode do to `this` in a plain function call?"
+          },
+          {
+            "role": "you",
+            "text": "It sets `this` to `undefined` instead of the global object. In non-strict mode, calling `fn()` gives `this` as `window` in browsers or `global` in Node. In strict mode it is `undefined`, which makes it much clearer that you lost the object context - you get a TypeError when you try to access `this.anything`."
+          },
+          {
+            "role": "interviewer",
+            "text": "Do I always need to add the directive? What about modules and classes?"
+          },
+          {
+            "role": "you",
+            "text": "No - ES modules and class bodies are automatically in strict mode. If I am writing module files (with import/export) or class definitions, I do not need the directive. It is only necessary for old-style scripts without module syntax."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-fund-011",
+      "q": "What is a closure? Show a counter example.",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["closures", "scope", "counter"],
+      "answer": {
+        "oneLiner": "A closure is a function that remembers the variables from its outer scope even after that outer function has finished executing.",
+        "detail": "When a function is defined inside another function, it captures a reference - not a copy - of the outer function's variables. When the outer function returns, normally its local variables would be garbage-collected. But if an inner function still references those variables, they stay alive in memory as long as the inner function exists. This is a closure. The inner function 'closes over' the outer scope. This is how private state works in JavaScript: you expose only the inner functions and hide the outer variables. Closures are used in counters, memoization, event handlers, factory functions, and module patterns. A common bug is the classic var-in-loop problem where all loop callbacks share the same `var i` binding instead of per-iteration values.",
+        "keyPoints": [
+          "The inner function holds a live reference to outer variables, not a copy",
+          "Outer variables stay alive in memory as long as the closure exists",
+          "Closures enable data privacy - outer variables are not accessible from outside",
+          "Classic bug: `var` in a loop creates one shared binding; use `let` for per-iteration closures"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - var in loop creates shared binding, all callbacks see final value\nconst handlers = [];\nfor (var i = 0; i < 3; i++) {\n  handlers.push(() => console.log(i)); // all log 3\n}\n\n// ✅ GOOD - let creates a new binding per iteration\nconst handlers = [];\nfor (let i = 0; i < 3; i++) {\n  handlers.push(() => console.log(i)); // logs 0, 1, 2\n}",
+          "note": "let gives each loop iteration its own closure over a separate `i` binding, while var shares one binding across all iterations."
+        },
+        "analogy": "A closure is a backpack the function carries - filled with the variables it needs from home.",
+        "redFlags": [
+          "Saying closures copy the outer variable - they hold a reference, not a copy",
+          "Not knowing the var-in-loop closure bug and why let fixes it",
+          "Confusing closures with object methods - closures are about lexical scope, not `this`",
+          "Not knowing that closures cause memory leaks if they hold large objects longer than needed"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do closures cause memory leaks?",
+            "a": "If a closure holds a reference to a large object and the closure itself is long-lived (like an event listener that is never removed), the large object cannot be garbage-collected even if nothing else uses it."
+          },
+          {
+            "q": "Why does the classic var-in-loop problem happen?",
+            "a": "`var` creates one variable shared across all loop iterations. All callbacks close over the same reference, which holds the final value of `i` by the time they run. `let` creates a new binding per iteration, giving each callback its own `i`."
+          },
+          {
+            "q": "What are practical uses of closures?",
+            "a": "Counters with private state, memoization functions that cache results, factory functions that produce customised functions, and the module pattern for encapsulation."
+          },
+          {
+            "q": "Can two closures share the same outer variable?",
+            "a": "Yes - two functions defined in the same outer scope both close over the same variables. If one modifies the variable, the other sees the change. This is how a counter with separate increment and reset methods works."
+          },
+          {
+            "q": "How would you implement memoization using a closure?",
+            "a": "Define a cache object in the outer scope, then return a function that checks the cache before computing. The returned function closes over the cache, keeping it private: `const memoize = fn => { const cache = {}; return x => cache[x] ?? (cache[x] = fn(x)); }`."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is a closure? Walk me through an example."
+          },
+          {
+            "role": "you",
+            "text": "A closure is a function that keeps access to variables from its outer scope even after that outer function has returned. The inner function holds a live reference to those outer variables - they stay in memory because the closure needs them."
+          },
+          {
+            "role": "interviewer",
+            "text": "Show me how you would build a private counter using a closure."
+          },
+          {
+            "role": "you",
+            "text": "`function makeCounter() { let count = 0; return { increment: () => ++count, reset: () => { count = 0; } }; }`. The `count` variable is private - there is no way to access it from outside except through the returned methods. Both methods share the same `count` binding."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned live reference. Why does that matter versus a copy?"
+          },
+          {
+            "role": "you",
+            "text": "Because the closure sees changes to the variable made after the closure was created. If two functions close over the same `count`, one incrementing and one resetting, they both affect the same value. A copy would mean they each had their own isolated version - they would not share state."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the classic var-in-loop closure bug?"
+          },
+          {
+            "role": "you",
+            "text": "When you use `var` in a for loop and create callbacks inside, all callbacks close over the same `var i` binding. By the time they run, `i` is already at the final value - so they all log the same thing. `let` creates a new binding per iteration, so each callback gets its own `i`."
+          },
+          {
+            "role": "interviewer",
+            "text": "How can closures cause memory leaks in a frontend application?"
+          },
+          {
+            "role": "you",
+            "text": "If a closure inside an event listener holds a reference to a large data structure - like the full product catalogue - and the listener is never removed, the data cannot be garbage-collected. In a single-page app this compounds over navigation. The fix is to call `removeEventListener` in cleanup and avoid holding large objects in long-lived closures."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-fund-012",
+      "q": "What is the difference between a shallow copy and a deep copy?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["shallow-copy", "deep-copy", "objects"],
+      "answer": {
+        "oneLiner": "A shallow copy duplicates only the top-level properties - nested objects are still shared by reference. A deep copy recursively clones everything so no part of the copy shares memory with the original.",
+        "detail": "When you spread an object `{ ...original }` or use `Object.assign`, you copy the top-level key-value pairs. For primitive values (numbers, strings), that is a real copy. But for nested objects, you copy the reference - both the original and the copy point to the same nested object. Mutating the nested object through either variable affects both. A deep copy avoids this by recursively creating new objects for every level. `structuredClone()` is the modern native API for this, introduced in 2022. The older `JSON.parse(JSON.stringify(obj))` trick works for plain data but silently drops functions, `undefined` values, Date objects (converted to strings), and Symbols.",
+        "keyPoints": [
+          "Spread `{...obj}` and `Object.assign` create shallow copies - nested objects are shared",
+          "`structuredClone(obj)` is the modern built-in for deep copies",
+          "`JSON.parse(JSON.stringify(obj))` is a deep copy but drops functions, undefined, Dates, and Symbols",
+          "Mutating a nested property on a shallow copy also mutates the original"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - spread is shallow, nested address is shared\nconst originalOrder = { id: 1, customer: { name: 'Alice', city: 'London' } };\nconst clonedOrder = { ...originalOrder };\nclonedOrder.customer.city = 'Paris';\nconsole.log(originalOrder.customer.city); // 'Paris' - original mutated!\n\n// ✅ GOOD - structuredClone gives a true deep copy\nconst clonedOrder = structuredClone(originalOrder);\nclonedOrder.customer.city = 'Paris';\nconsole.log(originalOrder.customer.city); // 'London' - original safe",
+          "note": "Spread only copies the top level. For nested objects you must use structuredClone() or a recursive approach to avoid mutating the original."
+        },
+        "analogy": "Shallow copy is a photocopy of a folder cover; deep copy photocopies every page inside too.",
+        "redFlags": [
+          "Saying spread `{...obj}` does a deep copy - it is shallow",
+          "Using `JSON.parse(JSON.stringify(obj))` for objects that contain Date, functions, or undefined",
+          "Not knowing that `structuredClone` exists - it is the modern native solution",
+          "Confusing shallow copy with immutability - a shallow copy still shares nested mutable state"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Does object spread deep-copy nested objects?",
+            "a": "No - spread creates a shallow copy. Nested objects are still shared by reference between the original and the copy."
+          },
+          {
+            "q": "What does the JSON deep-copy trick lose?",
+            "a": "It loses functions (they are dropped), `undefined` values (dropped), `Date` objects (converted to ISO strings), `RegExp`, `Map`, `Set`, and circular references (throws an error)."
+          },
+          {
+            "q": "What is `structuredClone()` and when was it added?",
+            "a": "`structuredClone()` is a native browser and Node.js API added in 2022 that performs a deep clone. It handles Dates, Maps, Sets, and ArrayBuffers correctly, but cannot clone functions."
+          },
+          {
+            "q": "Name three ways to do a shallow copy.",
+            "a": "Object spread `{...obj}`, `Object.assign({}, obj)`, and `Array.prototype.slice()` for arrays."
+          },
+          {
+            "q": "How would you deep-clone an object that contains functions?",
+            "a": "Neither structuredClone nor JSON handles functions. You would need a library like Lodash's `_.cloneDeep()` which uses recursion and special handling for each type, or write a custom recursive clone."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between a shallow copy and a deep copy?"
+          },
+          {
+            "role": "you",
+            "text": "A shallow copy duplicates the top-level properties. For primitives like numbers and strings that is a real copy. But for nested objects, both the original and the copy point to the same nested object in memory - they share it."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why is that a problem? Give me a concrete scenario."
+          },
+          {
+            "role": "you",
+            "text": "In an order management system, if I spread an order object `{ ...originalOrder }` and then change the customer address on the copy, the original order's customer address also changes. Both point to the same customer object. In a checkout flow that could corrupt the original order record."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you do a true deep copy?"
+          },
+          {
+            "role": "you",
+            "text": "The modern way is `structuredClone(obj)` - a native API available in browsers and Node since 2022. It handles Dates, Maps, and Sets correctly. The old trick is `JSON.parse(JSON.stringify(obj))`, but that drops functions, undefined values, and converts Dates to strings."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if the object contains functions?"
+          },
+          {
+            "role": "you",
+            "text": "Neither structuredClone nor JSON handles functions. For those cases I would use Lodash `_.cloneDeep()` which handles more types, or write a custom recursive clone that explicitly handles each type including functions."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

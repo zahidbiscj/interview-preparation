@@ -1,0 +1,1092 @@
+{
+  "subtopicId": "oop",
+  "questions": [
+    {
+      "id": "csharp-oop-001",
+      "q": "Explain the four pillars of OOP.",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["oop", "encapsulation", "inheritance", "polymorphism", "abstraction"],
+      "answer": {
+        "oneLiner": "The four pillars are Encapsulation (hide internal state), Inheritance (reuse code via a parent class), Polymorphism (same call, different behavior depending on the type), and Abstraction (show only what the caller needs).",
+        "detail": "Encapsulation uses access modifiers like private and public to protect an object's internal data, exposing only safe operations. Inheritance lets a child class reuse and extend a parent class using the IS-A relationship. Polymorphism allows a base-typed reference to call the correct method at runtime through virtual dispatch - the CLR looks up the method table for the actual object type. Abstraction hides complexity behind a clean interface or abstract class, so callers work with a contract and not an implementation.",
+        "keyPoints": [
+          "Encapsulation bundles data and methods, then restricts access using private/public/protected.",
+          "Inheritance uses IS-A and lets a child class extend or specialize a parent.",
+          "Polymorphism requires virtual and override; the runtime type determines which method runs.",
+          "Abstraction exposes a contract (abstract class or interface) and hides the implementation details."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no encapsulation, no abstraction, hard to extend\npublic class PaymentProcessor\n{\n    public string CardNumber; // exposed raw field\n    public void ProcessVisa() { /* Visa logic hardcoded */ }\n    public void ProcessPaypal() { /* PayPal logic hardcoded */ }\n}\n\n// ✅ GOOD - all four pillars applied\npublic abstract class PaymentGateway\n{\n    private readonly string _merchantId; // encapsulation\n    protected PaymentGateway(string merchantId) => _merchantId = merchantId;\n    public abstract bool Charge(decimal amount); // abstraction\n}\n\npublic class StripeGateway : PaymentGateway // inheritance\n{\n    public StripeGateway(string id) : base(id) { }\n    public override bool Charge(decimal amount) => true; // polymorphism\n}",
+          "note": "A base reference of type PaymentGateway calls the correct Charge implementation at runtime based on the actual object type."
+        },
+        "analogy": "A car: pedals are the abstraction, the engine is encapsulated.",
+        "redFlags": [
+          "Confusing abstraction with encapsulation - abstraction is what you show, encapsulation is what you hide.",
+          "Saying polymorphism is only method overloading - overloading is compile-time, not runtime dispatch.",
+          "Not knowing that virtual and override are required for runtime polymorphism in C#.",
+          "Giving no concrete code example when asked."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between abstraction and encapsulation?",
+            "a": "Abstraction defines what the caller can see - the contract. Encapsulation protects internal state using access modifiers so no one breaks the invariant."
+          },
+          {
+            "q": "What makes polymorphism work at runtime in C#?",
+            "a": "The virtual keyword on the base method and override on the derived method cause the CLR to dispatch through the method table at runtime."
+          },
+          {
+            "q": "What is compile-time vs runtime polymorphism?",
+            "a": "Method overloading is compile-time - the compiler picks the method. Virtual override dispatch is runtime - the CLR picks the method based on the actual object type."
+          },
+          {
+            "q": "When would you choose composition over inheritance?",
+            "a": "When behavior varies and you want loose coupling - inject collaborators as interfaces rather than locking a subclass to a parent's internals."
+          },
+          {
+            "q": "Can a class inherit from multiple classes in C#?",
+            "a": "No - C# allows single class inheritance only, but a class can implement multiple interfaces."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you walk me through the four pillars of OOP?"
+          },
+          {
+            "role": "you",
+            "text": "Sure. Encapsulation hides internal state behind access modifiers. Inheritance lets a child class reuse and extend a parent via IS-A. Polymorphism lets the same method call behave differently depending on the runtime type. Abstraction exposes only a clean contract and hides the implementation."
+          },
+          {
+            "role": "interviewer",
+            "text": "Encapsulation and abstraction sound similar to me. How do you actually separate them?"
+          },
+          {
+            "role": "you",
+            "text": "Abstraction is about what you expose - the interface or abstract class that callers depend on. Encapsulation is about how you protect the data behind it using private fields and controlled accessors. You can have one without the other, but they work best together."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a concrete example of polymorphism in a real system."
+          },
+          {
+            "role": "you",
+            "text": "In a payment system, PaymentGateway has a virtual Charge method. StripeGateway and PayPalGateway each override it. The checkout service holds a PaymentGateway reference and calls Charge - the CLR dispatches to the correct implementation at runtime based on which object was injected."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if you forget the virtual keyword on the base method?"
+          },
+          {
+            "role": "you",
+            "text": "C# methods are non-virtual by default, unlike Java. Without virtual, calling Charge through a base-typed reference always runs the base implementation, even if the derived class defines its own. You get hiding with new, not true polymorphism."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why does that matter in practice for testability?"
+          },
+          {
+            "role": "you",
+            "text": "If methods are not virtual, mocking frameworks cannot intercept them - Moq and NSubstitute generate proxy classes that override virtual members. So sealing or forgetting virtual on a service method makes it untestable without an interface."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-002",
+      "q": "Explain the SOLID principles with a brief example for each.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["solid", "oop", "design-principles"],
+      "answer": {
+        "oneLiner": "SOLID is five design principles - Single Responsibility, Open-Closed, Liskov Substitution, Interface Segregation, Dependency Inversion - that keep code maintainable, testable, and easy to extend.",
+        "detail": "SRP: a class should have one reason to change - split invoice calculation from invoice printing. OCP: add behavior via new classes, not by editing existing ones - new discount strategies extend without changing the order service. LSP: a subtype must behave correctly anywhere the base type is expected - Square breaking Rectangle setters is the classic violation. ISP: many small focused interfaces beat one large one - an IReportPrinter should not force implementers to also send emails. DIP: high-level modules depend on abstractions, not concretions - inject IOrderRepository, not SqlOrderRepository, so you can swap for a test double.",
+        "keyPoints": [
+          "SRP - one reason to change; split responsibilities into separate classes.",
+          "OCP - extend via new classes; do not edit working code for new behavior.",
+          "LSP - a subtype must be substitutable for its base without breaking callers.",
+          "ISP - small focused interfaces so implementers are not forced to implement methods they do not use.",
+          "DIP - depend on abstractions; inject IRepository not SqlRepository so tests can swap the dependency."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - violates DIP, SRP, and OCP all at once\npublic class InvoiceService\n{\n    public void Process(Invoice invoice)\n    {\n        var db = new SqlConnection(\"...\"); // hardcoded concretion\n        db.Save(invoice);\n        new SmtpClient().Send(\"invoice@co.com\", invoice.ToString()); // two responsibilities\n    }\n}\n\n// ✅ GOOD - DIP via constructor injection, SRP via separate collaborators\npublic class InvoiceService\n{\n    private readonly IInvoiceRepository _repo;\n    private readonly IEmailNotifier _notifier;\n    public InvoiceService(IInvoiceRepository repo, IEmailNotifier notifier)\n    { _repo = repo; _notifier = notifier; }\n    public void Process(Invoice invoice) { _repo.Save(invoice); _notifier.Notify(invoice); }\n}",
+          "note": "Constructor injection satisfies DIP and SRP simultaneously, making InvoiceService testable with fakes."
+        },
+        "analogy": "Build on a contract, not a concrete foundation.",
+        "redFlags": [
+          "Reciting the acronym letters with no concrete examples when asked.",
+          "Confusing OCP with never modifying any code - it means adding new behavior through extension, not editing stable code.",
+          "Not mentioning testability as the key payoff of DIP.",
+          "Describing LSP without a real violation example like Square extending Rectangle."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Which SOLID principle does ASP.NET Core's built-in DI container primarily enable?",
+            "a": "Dependency Inversion - you register interfaces against implementations and the container injects abstractions into constructors."
+          },
+          {
+            "q": "Give a real LSP violation.",
+            "a": "Square inheriting Rectangle where setting Width also changes Height breaks any caller that assumes Width and Height are independent, which is the Rectangle contract."
+          },
+          {
+            "q": "Can you over-apply OCP?",
+            "a": "Yes - adding abstractions for changes that never happen is speculative generality; apply OCP when a real second variation exists, not in anticipation."
+          },
+          {
+            "q": "What is the payoff of ISP?",
+            "a": "Implementers only depend on methods they actually use, so changes to unrelated methods do not force unnecessary recompilation or empty implementations."
+          },
+          {
+            "q": "How does SRP relate to cohesion?",
+            "a": "SRP is the design rule; cohesion is the measurement - a high-cohesion class has one clear purpose and all its members serve that purpose."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through the SOLID principles."
+          },
+          {
+            "role": "you",
+            "text": "SOLID stands for Single Responsibility, Open-Closed, Liskov Substitution, Interface Segregation, and Dependency Inversion. Together they keep code maintainable and testable. SRP means one reason to change, OCP means extend without editing, LSP means subtypes must honour the base contract, ISP means small interfaces, and DIP means depend on abstractions not concretions."
+          },
+          {
+            "role": "interviewer",
+            "text": "Pick the one you apply most often and show why it matters."
+          },
+          {
+            "role": "you",
+            "text": "DIP - in every ASP.NET Core service I inject IOrderRepository rather than SqlOrderRepository. That lets me pass a fake in tests and swap to a NoSQL store without changing the OrderService at all."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a real LSP violation."
+          },
+          {
+            "role": "you",
+            "text": "Square inheriting Rectangle where setting Width also silently changes Height. A caller that expects Width and Height to be independent gets broken behaviour - it can no longer calculate area correctly, which violates the Rectangle contract."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you over-apply OCP? When does it cause harm?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - adding a strategy abstraction for every behavior creates speculative generality. I apply OCP the second time I need to extend something, not the first. Premature abstraction adds indirection without value."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you decide between ISP and a single interface in a new project?"
+          },
+          {
+            "role": "you",
+            "text": "I start with a focused interface per use case - IOrderReader and IOrderWriter rather than one IOrderRepository with both. If callers never need both, they should not be forced to depend on both. Narrower interfaces also make mocking in tests simpler."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-003",
+      "q": "What is the difference between an abstract class and an interface, and when do you use each?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["oop", "abstract-class", "interface", "design"],
+      "answer": {
+        "oneLiner": "An abstract class shares state and partial implementation for classes with a true IS-A relationship. An interface is a pure capability contract that any unrelated class can implement.",
+        "detail": "Abstract classes can have fields, constructors, and concrete methods. A class can only inherit one base class but can implement many interfaces. C# 8 added default interface methods, which lets you add new members without breaking existing implementers - but interfaces still cannot hold instance state. For public library contracts, interfaces are safer to version because adding a method to an abstract class is non-breaking, while adding one to an interface (pre C# 8) breaks all implementers. Choose abstract class for the Template Method pattern where subclasses share an algorithm skeleton. Choose interface for capabilities that cut across unrelated types, like IDisposable or IEnumerable.",
+        "keyPoints": [
+          "Abstract class can have fields, constructors, and concrete methods - interface cannot have instance state.",
+          "A class inherits one base class but can implement many interfaces.",
+          "C# 8 default interface methods let you add members without breaking implementers.",
+          "Use abstract class for shared state or a Template Method algorithm - use interface for cross-cutting capabilities.",
+          "Interfaces are easier to mock in unit tests because frameworks generate proxy implementations."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - using interface when shared state is needed, forcing duplication\npublic interface IReportExporter\n{\n    string ConnectionString { get; } // every implementer must repeat this\n    void Export();\n}\n\n// ✅ GOOD - abstract class for shared state + interface for capability\npublic abstract class ReportExporter\n{\n    protected string ConnectionString { get; }\n    protected ReportExporter(string cs) => ConnectionString = cs;\n    public void Export() { var data = FetchData(); WriteOutput(data); } // template method\n    protected abstract IEnumerable<string> FetchData();\n    protected abstract void WriteOutput(IEnumerable<string> rows);\n}\n\npublic interface ISchedulable { void RunOnSchedule(string cron); }\n\npublic class SalesReportExporter : ReportExporter, ISchedulable\n{\n    public SalesReportExporter(string cs) : base(cs) { }\n    protected override IEnumerable<string> FetchData() => new[] { \"row1\" };\n    protected override void WriteOutput(IEnumerable<string> rows) { }\n    public void RunOnSchedule(string cron) { }\n}",
+          "note": "Template Method in the abstract class handles the algorithm; ISchedulable adds a capability to any class regardless of hierarchy."
+        },
+        "analogy": "Abstract class is a job role with shared tools; interface is a professional certification anyone can earn.",
+        "redFlags": [
+          "Saying interfaces have no implementation - C# 8 added default interface methods.",
+          "Not mentioning that a class can implement many interfaces but inherit only one base class.",
+          "Choosing interface when subclasses genuinely share state or a constructor - that forces code duplication.",
+          "Not knowing that adding a method to a public interface breaks all implementers before C# 8."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What did C# 8 default interface methods add?",
+            "a": "Default method bodies so you can add new interface members without breaking existing implementers - useful for evolving library contracts."
+          },
+          {
+            "q": "Which is easier to mock in unit tests?",
+            "a": "Interfaces - mocking frameworks like Moq generate proxy classes by overriding virtual members, and all interface methods are implicitly virtual."
+          },
+          {
+            "q": "Can a class extend an abstract class and also implement interfaces?",
+            "a": "Yes - one base class and any number of interfaces, which is how you get both shared state and multiple capabilities."
+          },
+          {
+            "q": "When is an abstract class safer than an interface for a public library?",
+            "a": "When you need to add new concrete methods over time - adding a non-abstract method to an abstract class does not break subclasses, whereas adding to an interface breaks all implementers before C# 8."
+          },
+          {
+            "q": "What is the Template Method pattern and which one enables it?",
+            "a": "Template Method defines the algorithm skeleton in an abstract class and lets subclasses fill in specific steps - the abstract class is what enables this because it holds both concrete and abstract members."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Abstract class versus interface - when do you reach for each?"
+          },
+          {
+            "role": "you",
+            "text": "I use an abstract class when subclasses genuinely share state or a common algorithm - that IS-A relationship where a base constructor or shared field makes sense. I use an interface for a capability contract that cuts across unrelated types, like IDisposable or IEnumerable."
+          },
+          {
+            "role": "interviewer",
+            "text": "C# 8 added default interface methods. Does that blur the line between the two?"
+          },
+          {
+            "role": "you",
+            "text": "A little, but interfaces still cannot hold instance state, and you can implement many interfaces but only inherit one class. I keep interfaces stateless and use abstract classes whenever a constructor or shared field is needed."
+          },
+          {
+            "role": "interviewer",
+            "text": "Which is safer to version in a public library?"
+          },
+          {
+            "role": "you",
+            "text": "Abstract class before C# 8 - you can add a concrete method without breaking subclasses. Adding a method to a public interface breaks every implementer. With C# 8 default methods that gap narrows, but interface state is still off the table."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does your choice affect unit testing?"
+          },
+          {
+            "role": "you",
+            "text": "Interfaces are trivial to mock - Moq generates a proxy by implementing all interface members. Abstract classes can be mocked too, but only for virtual or abstract members. If a method on the abstract class is concrete and non-virtual, it cannot be intercepted."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a scenario where you actually used an abstract class over an interface."
+          },
+          {
+            "role": "you",
+            "text": "A report export pipeline where every exporter needed a connection string and a standard Export method calling FetchData then WriteOutput - the Template Method pattern. The connection string and Export were in the abstract class; subclasses only overrode FetchData and WriteOutput. An interface would have forced every exporter to duplicate the connection string and the orchestration logic."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-004",
+      "q": "What is Dependency Injection and how is it implemented in ASP.NET Core?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["di", "ioc", "asp.net-core", "solid"],
+      "answer": {
+        "oneLiner": "Dependency Injection supplies a class's dependencies from outside rather than letting the class create them itself. ASP.NET Core includes a built-in DI container configured in Program.cs via builder.Services.",
+        "detail": "Instead of calling new SqlOrderRepository() inside OrderService, you declare the dependency as a constructor parameter. The container reads that constructor, resolves the registered implementation, and injects it. ASP.NET Core supports three lifetimes: Transient creates a new instance on every request for the service, Scoped creates one per HTTP request (ideal for DbContext), and Singleton creates one for the entire application lifetime. A common mistake is the captive dependency - a Singleton that holds a Scoped service keeps that Scoped instance alive for the whole app, defeating request isolation. ASP.NET Core throws a diagnostic exception for this in Development mode.",
+        "keyPoints": [
+          "Register services in Program.cs: builder.Services.AddScoped<IOrderService, OrderService>().",
+          "Three lifetimes: Transient (every resolve), Scoped (per HTTP request), Singleton (app lifetime).",
+          "DbContext should be Scoped - one per request to match the unit of work.",
+          "Captive dependency: a Singleton consuming a Scoped service keeps it alive for the whole app - ASP.NET Core throws in Development.",
+          "Prefer constructor injection over IServiceProvider.GetService - hidden dependencies are a code smell."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - hard-coded dependency, untestable, violates DIP\npublic class OrderService\n{\n    private readonly SqlOrderRepository _repo = new SqlOrderRepository(); // tightly coupled\n    public Order GetOrder(int id) => _repo.GetById(id);\n}\n\n// ✅ GOOD - constructor injection, registered in Program.cs\n// Program.cs\nbuilder.Services.AddScoped<IOrderRepository, SqlOrderRepository>();\nbuilder.Services.AddScoped<IOrderService, OrderService>();\n\n// OrderService.cs\npublic class OrderService : IOrderService\n{\n    private readonly IOrderRepository _repo;\n    public OrderService(IOrderRepository repo) => _repo = repo;\n    public Order GetOrder(int id) => _repo.GetById(id);\n}",
+          "note": "The container resolves IOrderRepository automatically when OrderService is requested - swap to a fake by changing one registration in tests."
+        },
+        "analogy": "Don't create it, request it.",
+        "redFlags": [
+          "Confusing DI the pattern with the DI container the tool - DI is the technique, the container automates it.",
+          "Not knowing the three lifetimes or which one suits DbContext.",
+          "Using IServiceProvider.GetService everywhere instead of constructor injection - that is the Service Locator anti-pattern.",
+          "Not knowing what a captive dependency is or why it causes bugs in multi-tenant or per-request scenarios."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Which lifetime should DbContext use and why?",
+            "a": "Scoped - one DbContext per HTTP request maps to one unit of work, so changes tracked in one request do not leak into another."
+          },
+          {
+            "q": "What is a captive dependency?",
+            "a": "A Singleton holding a reference to a Scoped service - the Scoped instance is kept alive for the app lifetime, which defeats request isolation and causes stale data bugs."
+          },
+          {
+            "q": "When would you use IServiceScopeFactory?",
+            "a": "In a Singleton or background service that needs to resolve a Scoped service - you create a manual scope with IServiceScopeFactory.CreateScope() to get a fresh Scoped instance."
+          },
+          {
+            "q": "What is the difference between DI and Service Locator?",
+            "a": "With DI, dependencies are declared in the constructor so they are visible to callers and the container. With Service Locator, the class pulls dependencies from a global container, hiding them from callers and making the class harder to test."
+          },
+          {
+            "q": "Which SOLID principle does DI directly implement?",
+            "a": "Dependency Inversion - high-level modules depend on abstractions injected from outside rather than on concrete implementations created inside."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is dependency injection and how does ASP.NET Core implement it?"
+          },
+          {
+            "role": "you",
+            "text": "DI supplies a class's dependencies from outside rather than having the class create them with new. ASP.NET Core has a built-in container - you register services in Program.cs via builder.Services, declare dependencies as constructor parameters, and the container resolves the whole object graph."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through the three service lifetimes."
+          },
+          {
+            "role": "you",
+            "text": "Transient gives a new instance on every resolve. Scoped gives one instance per HTTP request - this is right for DbContext. Singleton gives one instance for the whole application lifetime - good for stateless services like configuration helpers."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is a captive dependency and why is it dangerous?"
+          },
+          {
+            "role": "you",
+            "text": "A Singleton that holds a Scoped service keeps that Scoped instance alive for the entire app, defeating request isolation. In a multi-user scenario, user A's DbContext could bleed into user B's request. ASP.NET Core throws a diagnostic exception in Development mode to catch this."
+          },
+          {
+            "role": "interviewer",
+            "text": "How is constructor injection different from using IServiceProvider directly?"
+          },
+          {
+            "role": "you",
+            "text": "Constructor injection is the preferred approach - the dependency is declared in the signature, so it is visible to callers and the container. Calling IServiceProvider.GetService inside a method is the Service Locator anti-pattern - dependencies are hidden and the class becomes hard to test without a real container."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you break the constructor injection rule and use IServiceScopeFactory instead?"
+          },
+          {
+            "role": "you",
+            "text": "In a background service registered as Singleton that needs a Scoped service like DbContext - IServiceScopeFactory.CreateScope() gives me a fresh scope per job run without violating the captive dependency rule."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-005",
+      "q": "What is the difference between method overloading and method overriding?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["oop", "polymorphism", "overloading", "overriding"],
+      "answer": {
+        "oneLiner": "Overloading means the same method name with different parameter signatures, resolved at compile time. Overriding means a subclass replaces a virtual base method, resolved at runtime based on the actual object type.",
+        "detail": "Overloading is compile-time polymorphism - the compiler looks at the argument types and picks the correct method signature before the program runs. Return type alone does not distinguish overloads. Overriding is runtime polymorphism - the base method must be marked virtual or abstract, and the derived class uses override. When called through a base-typed reference, the CLR dispatches to the most-derived override. Using new instead of override hides the base method but does not participate in virtual dispatch, so a base-typed reference still calls the original base method.",
+        "keyPoints": [
+          "Overloading is resolved at compile time by the argument types - return type alone does not count.",
+          "Overriding requires virtual or abstract on the base and override on the derived - resolved at runtime.",
+          "Using new instead of override hides the base method but breaks polymorphism for base-typed references.",
+          "You cannot override a static method because static methods are not virtual."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - using new instead of override loses polymorphism\npublic class Notification\n{\n    public virtual void Send() => Console.WriteLine(\"base send\");\n}\npublic class EmailNotification : Notification\n{\n    public new void Send() => Console.WriteLine(\"email send\"); // hiding, not overriding\n}\nNotification n = new EmailNotification();\nn.Send(); // prints \"base send\" - polymorphism lost\n\n// ✅ GOOD - override enables correct runtime dispatch\npublic class SmsNotification : Notification\n{\n    public override void Send() => Console.WriteLine(\"sms send\");\n}\nNotification n2 = new SmsNotification();\nn2.Send(); // prints \"sms send\" - correct runtime dispatch",
+          "note": "The new keyword hides the base method but only dispatches correctly when the reference type is the derived type - override always dispatches to the most-derived implementation."
+        },
+        "analogy": "Overloading is choosing a tool by its handle; overriding is the tool behaving differently based on what it actually is.",
+        "redFlags": [
+          "Saying overloading and overriding are the same thing or variations of each other.",
+          "Not knowing that virtual is required on the base method for overriding to work.",
+          "Confusing the new keyword with override - they produce very different runtime behavior.",
+          "Claiming you can override a static method."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can return type alone distinguish overloads?",
+            "a": "No - overloads must differ by parameter types or count. Two methods with the same name and parameters but different return types cause a compile error."
+          },
+          {
+            "q": "What does using new on a method do?",
+            "a": "It hides the base method - a base-typed reference still calls the original base version, so you lose polymorphism for that reference type."
+          },
+          {
+            "q": "Can you override a static method?",
+            "a": "No - static methods are resolved at compile time by the declared type and are not virtual, so they cannot participate in runtime dispatch."
+          },
+          {
+            "q": "What happens when you call an overriding method through a base reference?",
+            "a": "The CLR dispatches to the most-derived override through the method table - the declared reference type does not matter, only the runtime type of the object does."
+          },
+          {
+            "q": "Why is new on a method considered a code smell?",
+            "a": "It creates confusing behavior where the same method name produces different results depending on the declared reference type, which breaks the Principle of Least Surprise."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between method overloading and method overriding?"
+          },
+          {
+            "role": "you",
+            "text": "Overloading is the same method name with different parameter signatures - the compiler resolves which one to call at compile time based on the argument types. Overriding is a subclass replacing a virtual base method, resolved at runtime by the actual object type."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does the base method need for overriding to work?"
+          },
+          {
+            "role": "you",
+            "text": "It must be marked virtual or abstract. Without virtual, C# methods are non-virtual by default, so a base-typed reference always calls the base version regardless of the runtime type."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens when a developer uses new instead of override by mistake?"
+          },
+          {
+            "role": "you",
+            "text": "The method is hidden, not overridden. If you call it through a base-typed reference, you get the base implementation. Only a reference of the derived type calls the hidden version - polymorphism is broken for the base reference."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you distinguish overloads by return type only?"
+          },
+          {
+            "role": "you",
+            "text": "No - return type is not part of the overload signature in C#. Two methods with the same name and parameters but different return types cause a compile error."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where does overriding directly enable design patterns?"
+          },
+          {
+            "role": "you",
+            "text": "Runtime polymorphism through override is what powers the Strategy and Template Method patterns. In a payment system, each payment provider overrides ProcessPayment, and the checkout engine calls it through the base interface without knowing the concrete type."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-006",
+      "q": "Explain `virtual`, `override`, `new`, and `sealed` in C# inheritance.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["oop", "inheritance", "virtual", "override", "sealed"],
+      "answer": {
+        "oneLiner": "virtual opts a method into runtime dispatch, override replaces it in a subclass, new hides it without polymorphism, and sealed stops further overriding or class inheritance.",
+        "detail": "C# methods are non-virtual by default, unlike Java. You must explicitly mark a base method virtual to allow subclasses to override it. When you call a virtual method through a base reference, the CLR looks up the method table of the actual runtime object and calls the most-derived override. Using new instead of override hides the base member - resolution depends on the declared reference type, not the runtime type, so polymorphism is lost. sealed on a method stops the override chain - no further derived class can override it. sealed on a class prevents any class from inheriting it. The JIT can devirtualize and inline calls to sealed members because it knows no further overrides exist.",
+        "keyPoints": [
+          "C# methods are non-virtual by default - you must use virtual to opt in to runtime dispatch.",
+          "override replaces the method in the vtable so the most-derived version always runs through a base reference.",
+          "new hides the base method - a base-typed reference calls the original, losing polymorphism.",
+          "sealed on a method stops the override chain; sealed on a class prevents inheritance entirely.",
+          "The JIT can devirtualize and inline sealed members for a performance gain."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - using new instead of override, polymorphism broken\npublic class PricingEngine\n{\n    public virtual decimal Calculate(decimal basePrice) => basePrice;\n}\npublic class DiscountEngine : PricingEngine\n{\n    public new decimal Calculate(decimal basePrice) => basePrice * 0.9m; // hiding\n}\nPricingEngine engine = new DiscountEngine();\nengine.Calculate(100); // returns 100, not 90 - wrong!\n\n// ✅ GOOD - override for correct dispatch, sealed to lock the discount logic\npublic class DiscountEngine : PricingEngine\n{\n    public sealed override decimal Calculate(decimal basePrice) => basePrice * 0.9m;\n}",
+          "note": "sealed override gives correct runtime dispatch and also enables JIT devirtualization for the discount calculation."
+        },
+        "analogy": "virtual is an open door; override walks through it; new builds a wall next to it; sealed locks it shut.",
+        "redFlags": [
+          "Not knowing that C# methods are non-virtual by default - this is the opposite of Java.",
+          "Confusing new method hiding with override - they produce different behavior through a base reference.",
+          "Not knowing the JIT performance benefit of sealed.",
+          "Thinking sealed on a method and sealed on a class do the same thing."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Are C# methods virtual by default?",
+            "a": "No - C# methods are non-virtual by default. You must explicitly mark a method virtual to allow overriding, unlike Java where all instance methods are virtual."
+          },
+          {
+            "q": "What does a base-typed reference call when the derived class used new?",
+            "a": "The base version - new resolves by the declared type of the reference, not the runtime type, so polymorphism is lost for that reference."
+          },
+          {
+            "q": "Why seal an override?",
+            "a": "To stop further overriding and signal the implementation is final. The JIT can also devirtualize and inline calls to sealed members, removing the vtable lookup cost."
+          },
+          {
+            "q": "Can you seal an override partway down a hierarchy?",
+            "a": "Yes - you apply sealed override on any derived class to stop the chain there while still allowing the class itself to be extended for other purposes."
+          },
+          {
+            "q": "What is a real-world reason to seal a class?",
+            "a": "Immutable value-like types such as string, or security-sensitive classes where unexpected subclasses could override behavior and bypass checks."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain virtual, override, new, and sealed in C# inheritance."
+          },
+          {
+            "role": "you",
+            "text": "virtual opts a method into runtime dispatch, override replaces it in a subclass through the vtable, new hides it without polymorphism so a base reference still calls the original, and sealed stops further overriding or blocks inheritance on a class entirely."
+          },
+          {
+            "role": "interviewer",
+            "text": "Are C# methods virtual by default?"
+          },
+          {
+            "role": "you",
+            "text": "No - this is different from Java. In C#, you must explicitly mark a method virtual. That means a base class author deliberately decides what is extensible, which is safer for library design."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through what happens at the CLR level when a virtual method is called."
+          },
+          {
+            "role": "you",
+            "text": "Every object has a pointer to its method table. A virtual call follows that pointer and looks up the slot for the method, then calls the most-derived override stored there. sealed lets the JIT see no further override is possible and inline or devirtualize the call."
+          },
+          {
+            "role": "interviewer",
+            "text": "When is new on a method acceptable instead of a bug?"
+          },
+          {
+            "role": "you",
+            "text": "When you intentionally want different behavior per reference type and not polymorphism - for example, a fluent builder in a derived class that returns the derived type instead of the base type. But even then, a covariant return or generics often express the intent more clearly."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why seal a class like string?"
+          },
+          {
+            "role": "you",
+            "text": "string is sealed to protect its immutability invariant and security guarantees. If you could subclass it, a derived class could override equality or GetHashCode and break dictionary lookups or security comparisons. Sealing closes that attack surface."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-007",
+      "q": "What are access modifiers in C# and what does each allow?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["oop", "encapsulation", "access-modifiers"],
+      "answer": {
+        "oneLiner": "C# has six access modifiers - public, private, protected, internal, protected internal, and private protected - that control who can see a type or member across classes and assemblies.",
+        "detail": "public means accessible from anywhere. private means accessible only within the declaring class - this is the default for class members. protected means accessible within the class and any derived class. internal means accessible only within the same assembly - this is the default for top-level types. protected internal is the union: accessible from the same assembly OR any derived class anywhere. private protected is the intersection: accessible only from derived classes within the same assembly. For test projects, you can expose internals without making them public by using the assembly-level InternalsVisibleTo attribute.",
+        "keyPoints": [
+          "public: everywhere. private: declaring class only (member default). internal: same assembly (type default).",
+          "protected: declaring class and derived classes regardless of assembly.",
+          "protected internal: same assembly OR any derived class - it is the union.",
+          "private protected: derived classes within the same assembly only - it is the intersection.",
+          "Add [assembly: InternalsVisibleTo(\"ProjectName.Tests\")] to expose internals to a test assembly."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - exposing internal mutable fields publicly, breaks encapsulation\npublic class BankAccount\n{\n    public decimal Balance;       // anyone can set this directly\n    public string InternalAuditId; // internal detail exposed\n}\n\n// ✅ GOOD - correct access modifiers enforce encapsulation\npublic class BankAccount\n{\n    public decimal Balance { get; private set; }       // readable publicly, writable only here\n    internal string AuditId { get; set; }              // visible in the same assembly for logging\n    protected virtual void OnWithdraw(decimal amount) { } // hook for derived classes\n    public void Withdraw(decimal amount)\n    {\n        if (amount > Balance) throw new InvalidOperationException(\"Insufficient funds\");\n        Balance -= amount;\n        OnWithdraw(amount);\n    }\n}",
+          "note": "private set enforces that Balance can only change through Withdraw, protecting the invariant that balance never goes negative without a check."
+        },
+        "analogy": "Think of access modifiers as building security badges - public is the lobby, internal is the staff floor, private is the vault.",
+        "redFlags": [
+          "Not knowing internal exists or what assembly boundary means.",
+          "Forgetting InternalsVisibleTo when asked how test projects access internal members.",
+          "Confusing protected internal (union) with private protected (intersection).",
+          "Not knowing that the default for a class member is private and the default for a top-level type is internal."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the default access modifier for a class member?",
+            "a": "private - if you do not specify an access modifier on a field or method inside a class, it is private."
+          },
+          {
+            "q": "What is the default access modifier for a top-level class?",
+            "a": "internal - a class declared at namespace level with no access modifier is only visible within the same assembly."
+          },
+          {
+            "q": "What is the difference between protected internal and private protected?",
+            "a": "protected internal allows access from the same assembly or any derived class anywhere. private protected restricts to derived classes that are also in the same assembly - the intersection, not the union."
+          },
+          {
+            "q": "How do you give a unit test project access to internal members?",
+            "a": "Add [assembly: InternalsVisibleTo(\"YourProject.Tests\")] to the production project's AssemblyInfo.cs or any .cs file - this grants the named assembly access to all internal members."
+          },
+          {
+            "q": "Why expose something as internal instead of public?",
+            "a": "To keep implementation details hidden from external consumers of your library while still sharing them between projects in the same solution, reducing your public API surface."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Name the C# access modifiers and what each one allows."
+          },
+          {
+            "role": "you",
+            "text": "There are six: public is visible everywhere, private is only in the declaring class, protected adds derived classes, internal limits to the same assembly, protected internal is the union of those two, and private protected is derived classes within the same assembly only."
+          },
+          {
+            "role": "interviewer",
+            "text": "What are the defaults when you do not specify a modifier?"
+          },
+          {
+            "role": "you",
+            "text": "Class members default to private - fields and methods are hidden unless you explicitly open them up. Top-level types default to internal, so a class you declare in a library is not visible to consumers unless you make it public."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does a unit test project access internal members without making them public?"
+          },
+          {
+            "role": "you",
+            "text": "You add [assembly: InternalsVisibleTo(\"ProjectName.Tests\")] to the production project. That grants exactly the named assembly access to all internal members while keeping them invisible to other consumers."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the real difference between protected internal and private protected?"
+          },
+          {
+            "role": "you",
+            "text": "protected internal is the union - accessible from the same assembly or any derived class, even in a different assembly. private protected is the intersection - only derived classes that are also in the same assembly can access it. private protected is the stricter restriction."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you pick internal over public for a service class in a library?"
+          },
+          {
+            "role": "you",
+            "text": "When the class is an implementation detail that should not be part of the public API. Keeping it internal means consumers cannot depend on it, so I can change or delete it without a breaking change. This is the basis of good library design - minimize the public surface area."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-008",
+      "q": "What is the difference between static and instance members?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["oop", "static", "instance"],
+      "answer": {
+        "oneLiner": "Static members belong to the type and are shared across all instances. Instance members belong to a specific object and each object has its own copy.",
+        "detail": "Static members are accessed through the type name, not an object reference. They are allocated once in memory and persist for the life of the application domain. Static fields hold shared state - this creates thread safety risks in a multi-threaded server environment if the state is mutable. Static constructors run once per type, lazily just before first use, and the runtime guarantees thread safety for the constructor itself. A static class cannot be instantiated and can only contain static members - useful for utility groupings. Overusing static state is an anti-pattern because it makes unit tests interfere with each other through shared global state.",
+        "keyPoints": [
+          "Static members are accessed via the type name - Customer.TotalCount, not customer.TotalCount.",
+          "Static fields hold shared state across all instances - dangerous if mutable in multi-threaded code.",
+          "Static constructors run once per type, lazily before first use, and are thread-safe by the runtime.",
+          "Static classes cannot be instantiated and can only contain static members.",
+          "Avoid mutable static state in ASP.NET Core - shared across all concurrent requests."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - mutable static state, not thread-safe, breaks parallel tests\npublic class OrderService\n{\n    public static int ProcessedCount = 0; // shared mutable state\n    public void Process(Order order) { ProcessedCount++; } // race condition\n}\n\n// ✅ GOOD - instance state per object, static only for truly shared read-only data\npublic class OrderService\n{\n    private static readonly string _serviceName = \"OrderService\"; // immutable, safe\n    private int _processedInThisSession = 0;                       // per-instance\n    public void Process(Order order) { _processedInThisSession++; }\n    public static string ServiceName => _serviceName;\n}",
+          "note": "Static readonly is safe for shared immutable data; instance fields are safe for per-object state in a multi-threaded environment."
+        },
+        "analogy": "Static is a notice board everyone reads; instance is each person's personal notebook.",
+        "redFlags": [
+          "Overusing static for services or stateful objects - creates hidden global state.",
+          "Not knowing that mutable static fields cause race conditions in ASP.NET Core which handles requests concurrently.",
+          "Not knowing that static constructors run once and are thread-safe.",
+          "Confusing a static class with a singleton pattern - they are related ideas but different mechanisms."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Good uses of static members?",
+            "a": "Pure utility functions like Math.Sqrt, constants, factories, and readonly cached data that is safe to share across all threads."
+          },
+          {
+            "q": "Can a static class be instantiated?",
+            "a": "No - a static class is sealed and abstract at the IL level. It can only contain static members and cannot be used with new."
+          },
+          {
+            "q": "When does a static constructor run?",
+            "a": "Once per type, lazily just before the first access to any static member or instantiation of the type. The runtime guarantees the constructor is thread-safe."
+          },
+          {
+            "q": "Why is mutable static state dangerous in ASP.NET Core?",
+            "a": "ASP.NET Core handles many requests concurrently on multiple threads. Mutable static fields are shared across all of them, creating race conditions and cross-request data leaks."
+          },
+          {
+            "q": "What is the difference between a static class and the Singleton pattern?",
+            "a": "A static class can never be instantiated and cannot implement interfaces, which makes it hard to mock. The Singleton pattern creates one instance of a regular class registered with DI, which can implement interfaces and be replaced with a test double."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between static and instance members?"
+          },
+          {
+            "role": "you",
+            "text": "Static members belong to the type and are shared across all instances - one value in memory for the lifetime of the app. Instance members belong to a specific object, so each object has its own copy of the data."
+          },
+          {
+            "role": "interviewer",
+            "text": "When does static state become a problem in a web application?"
+          },
+          {
+            "role": "you",
+            "text": "ASP.NET Core processes requests concurrently on multiple threads. Mutable static fields are shared, so two requests incrementing the same static counter race each other. You need interlocking or you get silent incorrect counts. Even worse, static state between test runs can cause tests to interfere with each other."
+          },
+          {
+            "role": "interviewer",
+            "text": "When do static constructors run?"
+          },
+          {
+            "role": "you",
+            "text": "Once per type, lazily, just before the first access to any static member or the first instantiation. The CLR guarantees that the static constructor itself runs in a thread-safe way - only one thread executes it."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the difference between using a static class for a service versus registering it as a Singleton in DI?"
+          },
+          {
+            "role": "you",
+            "text": "A static class cannot implement interfaces, so you cannot mock it in tests. A Singleton registered in the DI container is a normal class instance that implements an interface - you can replace it with a test double in unit tests by changing the registration."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a legitimate use case for a static member in a real application."
+          },
+          {
+            "role": "you",
+            "text": "A static readonly field holding a compiled Regex pattern is a good example - compiled once, shared across all instances, immutable so thread-safe. Another is a factory method like OrderId.NewOrderId() that generates a new ID without needing an instance."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-009",
+      "q": "What is 'composition over inheritance' and why is it preferred?",
+      "level": "mid",
+      "type": "design",
+      "freq": "medium",
+      "tags": ["oop", "design-principles", "composition", "inheritance"],
+      "answer": {
+        "oneLiner": "Composition builds behavior by combining small injected objects (HAS-A) instead of deep class hierarchies. It is preferred because it is more flexible, testable, and loosely coupled.",
+        "detail": "Inheritance tightly couples a subclass to its parent's internals - a change to the base class can break all derived classes, and a subclass can only have one base. Composition lets you inject collaborators as interfaces, swap them at runtime or in tests, and combine behaviors from unrelated sources. The Strategy pattern is composition in action - you inject an IDiscountStrategy into an OrderService instead of inheriting from a DiscountedOrderService. Deep inheritance hierarchies are fragile: they create the Fragile Base Class problem where any change to the base ripples unpredictably down the chain. Inheritance is still appropriate when a stable, genuine IS-A relationship exists and the Template Method pattern is the right structure.",
+        "keyPoints": [
+          "Inheritance creates tight coupling - a subclass depends on base internals and breaks when the base changes.",
+          "Composition injects collaborators as interfaces, enabling runtime swapping and easy mocking in tests.",
+          "C# limits inheritance to one base class - composition has no such limit.",
+          "The Strategy pattern and Decorator pattern are both composition over inheritance in practice.",
+          "Use inheritance only when IS-A is stable, semantic, and you genuinely need the Template Method pattern."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - deep inheritance chain, rigid and fragile\npublic class Order { }\npublic class DiscountedOrder : Order { }\npublic class NotifyingDiscountedOrder : DiscountedOrder { }\npublic class LoggingNotifyingDiscountedOrder : NotifyingDiscountedOrder { } // explosion\n\n// ✅ GOOD - composition, each behavior is an injectable interface\npublic class OrderService\n{\n    private readonly IDiscountStrategy _discount;\n    private readonly IOrderNotifier _notifier;\n    private readonly IOrderLogger _logger;\n    public OrderService(IDiscountStrategy discount, IOrderNotifier notifier, IOrderLogger logger)\n    { _discount = discount; _notifier = notifier; _logger = logger; }\n    public void PlaceOrder(Order order)\n    {\n        var price = _discount.Apply(order.Total);\n        _notifier.Notify(order);\n        _logger.Log(order);\n    }\n}",
+          "note": "Each behavior is a separate injectable interface - swap PercentageDiscount for SeasonalDiscount or MockDiscount in tests without touching OrderService."
+        },
+        "analogy": "Build behavior like LEGO bricks - snap them together rather than carving one block deeper.",
+        "redFlags": [
+          "Not being able to explain why deep inheritance is fragile - the Fragile Base Class problem is key.",
+          "Saying composition always replaces inheritance - inheritance is correct for stable IS-A relationships.",
+          "Not connecting composition to testability - the ability to inject fakes is the biggest practical payoff.",
+          "Confusing HAS-A with IS-A."
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the Fragile Base Class problem?",
+            "a": "When a change to a base class breaks subclasses in unexpected ways - subclasses depend on undocumented base internals, so any base refactoring ripples unpredictably down the hierarchy."
+          },
+          {
+            "q": "How does DI relate to composition over inheritance?",
+            "a": "DI is the mechanism that enables composition - you inject collaborators as interfaces into constructors rather than inheriting from classes that provide the behavior."
+          },
+          {
+            "q": "Give a .NET framework example of composition over inheritance.",
+            "a": "ASP.NET Core middleware - each middleware component is independent and you compose them in the pipeline with app.Use, rather than inheriting from a base middleware class."
+          },
+          {
+            "q": "When is inheritance still the right choice?",
+            "a": "When a stable IS-A relationship genuinely exists and the Template Method pattern applies - for example, a ReportExporter base class where all exporters share the same fetch-then-write algorithm."
+          },
+          {
+            "q": "How do you handle shared state when using composition instead of inheritance?",
+            "a": "Extract shared state into a context object or a shared service injected into each collaborator - avoid putting state directly on the composed components."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What does composition over inheritance mean and why is it preferred?"
+          },
+          {
+            "role": "you",
+            "text": "It means building behavior by injecting small collaborators as interfaces (HAS-A) instead of extending a class hierarchy (IS-A). You get loose coupling because the composed class does not depend on a parent's internals, and you can swap behaviors in tests or at runtime by changing what you inject."
+          },
+          {
+            "role": "interviewer",
+            "text": "What specific problem does deep inheritance cause?"
+          },
+          {
+            "role": "you",
+            "text": "The Fragile Base Class problem - subclasses depend on undocumented base internals, so any refactoring of the base ripples unexpectedly down every derived class. Also you are stuck with one base in C#, so a class cannot inherit from two different behavior providers."
+          },
+          {
+            "role": "interviewer",
+            "text": "Show me how you would refactor a deep hierarchy to composition."
+          },
+          {
+            "role": "you",
+            "text": "Instead of NotifyingDiscountedLoggingOrder extending DiscountedOrder, you create an OrderService that receives IDiscountStrategy, IOrderNotifier, and IOrderLogger in its constructor. Each is a small interface. You register the real implementations in DI and inject mocks in tests."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you still choose inheritance over composition?"
+          },
+          {
+            "role": "you",
+            "text": "When a genuine stable IS-A relationship exists and I need the Template Method pattern - for example, a ReportExporter base class where every exporter follows the same fetch-then-write algorithm, and each subclass only fills in the specifics of fetching and formatting."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does composition connect to testability?"
+          },
+          {
+            "role": "you",
+            "text": "With composition, each dependency is an interface injected through the constructor. In tests you replace each collaborator with a mock or stub - no real database, no real SMTP server. With deep inheritance, the base class behavior is baked in and you cannot isolate the unit under test without setting up the entire hierarchy."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-010",
+      "q": "What is runtime polymorphism vs compile-time polymorphism in C#?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["oop", "polymorphism"],
+      "answer": {
+        "oneLiner": "Compile-time polymorphism is resolved by the compiler based on argument types - method overloading is the main example. Runtime polymorphism is resolved by the CLR at execution time based on the actual object type - virtual override dispatch is the main example.",
+        "detail": "Compile-time polymorphism includes method overloading, operator overloading, and generic type resolution. The compiler selects the correct method or type at build time with no runtime cost beyond the normal call. Runtime polymorphism works through the virtual method table. Every object has a pointer to its type's method table, and a virtual call follows that pointer to find the most-derived override. This enables the Strategy, Template Method, and Decorator patterns. C# generics add a third form - parametric polymorphism - where the compiler generates specialized code for each type argument. Value types like int get specialized IL with no boxing, unlike Java's erased generics.",
+        "keyPoints": [
+          "Compile-time: method overloading, operator overloading, and generic specialization - resolved with no runtime dispatch cost.",
+          "Runtime: virtual override dispatch via the method table - the actual object type determines which method runs.",
+          "C# generics are reified - the runtime creates specialized code per value type, avoiding boxing unlike Java.",
+          "Runtime polymorphism powers Strategy, Template Method, and Decorator patterns.",
+          "Compile-time resolution is faster; runtime dispatch has a small vtable lookup cost that sealed and JIT devirtualization can eliminate."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - using object parameter which causes boxing at compile-time resolution\npublic class TaxCalculator\n{\n    public decimal Calculate(object amount) => (decimal)amount * 0.2m; // unboxing cost\n}\n\n// ✅ GOOD - compile-time polymorphism via overloads + runtime via virtual\npublic class TaxCalculator\n{\n    public decimal Calculate(decimal grossAmount) => grossAmount * 0.20m; // compile-time overload\n    public decimal Calculate(int grossAmount) => grossAmount * 0.20m;     // compile-time overload\n}\n\npublic abstract class TaxStrategy // runtime polymorphism\n{\n    public abstract decimal ComputeTax(decimal grossAmount);\n}\npublic class VatStrategy : TaxStrategy\n{\n    public override decimal ComputeTax(decimal grossAmount) => grossAmount * 0.20m;\n}",
+          "note": "Overloads resolve at compile time with no boxing; virtual override dispatch resolves at runtime through the method table."
+        },
+        "analogy": "Compile-time polymorphism picks the road at the map stage; runtime polymorphism picks the turn while driving.",
+        "redFlags": [
+          "Saying polymorphism is only method overloading and missing runtime virtual dispatch entirely.",
+          "Not knowing that C# generics are reified and specialized per value type, unlike Java type erasure.",
+          "Not being able to name a design pattern enabled by runtime polymorphism.",
+          "Confusing method hiding with new as a form of polymorphism - it is not, it resolves by declared type."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Name a compile-time polymorphism example other than overloading.",
+            "a": "Generic methods - the compiler generates a specialized version per type argument. Operator overloading is another - the compiler resolves which + to call based on the operand types."
+          },
+          {
+            "q": "How does the CLR implement runtime virtual dispatch?",
+            "a": "Every object has a method table pointer. A virtual call dereferences that pointer, looks up the method slot, and calls the most-derived override stored there at the time the object was created."
+          },
+          {
+            "q": "Why are C# generics faster than Java generics for value types?",
+            "a": "C# reifies generics - the JIT generates specialized native code per value type, so List<int> uses int[] with no boxing. Java erases the type to Object at runtime, forcing boxing of every int."
+          },
+          {
+            "q": "Which design patterns rely on runtime polymorphism?",
+            "a": "Strategy, Template Method, Decorator, and Observer all depend on calling a method through a base type and having the runtime dispatch to the correct derived implementation."
+          },
+          {
+            "q": "Can the JIT eliminate runtime dispatch cost?",
+            "a": "Yes - through devirtualization. If the JIT can prove only one implementation exists (because the type is sealed or because the call site is monomorphic), it inlines the method directly, removing the vtable lookup."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain runtime polymorphism versus compile-time polymorphism in C#."
+          },
+          {
+            "role": "you",
+            "text": "Compile-time polymorphism is resolved by the compiler - method overloading and operator overloading are the main examples. The compiler picks the right method based on the argument types at build time. Runtime polymorphism is resolved by the CLR based on the actual object type at execution - virtual override dispatch through the method table."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through how virtual dispatch works at the CLR level."
+          },
+          {
+            "role": "you",
+            "text": "Every object has a pointer to its type's method table, which contains one slot per virtual method. When you call a virtual method, the CLR follows the pointer, looks up the slot, and jumps to whatever override was placed there when the object's type was loaded. The most-derived override always wins."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where do C# generics fit in - compile-time or runtime polymorphism?"
+          },
+          {
+            "role": "you",
+            "text": "Both, but primarily compile-time. The type arguments are resolved at compile time, and the JIT generates specialized native code per value type at first use - so List<int> gets an int[] implementation with no boxing. That is reification, unlike Java's type erasure."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does runtime polymorphism enable the Strategy pattern?"
+          },
+          {
+            "role": "you",
+            "text": "The checkout service holds an IShippingStrategy reference. At runtime the container injects StandardShipping or ExpressShipping. The service calls CalculateCost without knowing the concrete type. The CLR dispatches to the right override. Swap the strategy by changing one DI registration - zero changes to the checkout service."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can the JIT eliminate the runtime dispatch cost for virtual calls?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - devirtualization. If the JIT proves only one override can exist at a call site - because the type is sealed or because the call is monomorphic - it inlines the method directly and removes the vtable lookup entirely. sealed override is the explicit way to enable this."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "csharp-oop-011",
+      "q": "What does the `sealed` keyword do and when should you use it?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["oop", "inheritance", "sealed"],
+      "answer": {
+        "oneLiner": "sealed on a class prevents any class from inheriting it. sealed on an override method stops the override chain at that point. Both allow the JIT to devirtualize calls for a performance gain.",
+        "detail": "By default, any non-sealed class can be subclassed. Applying sealed to a class communicates that it is not designed to be extended and protects invariants that subclasses could otherwise break. string is sealed to preserve immutability and security guarantees. On a method, sealed override stops the chain - a further derived class cannot override that method. The JIT benefit comes from devirtualization: when the compiler or JIT knows no further override exists, it can inline the method call directly rather than going through the vtable lookup. This is measurable in hot paths like serializers or math-heavy code. Sealing should be a deliberate design decision, not a default, in application code.",
+        "keyPoints": [
+          "sealed class cannot be a base class - string is the most common example in the BCL.",
+          "sealed override stops the override chain at that level in the hierarchy.",
+          "The JIT can devirtualize and inline calls to sealed members, removing the vtable lookup.",
+          "Use sealed to signal 'not designed to be extended' and to protect invariants.",
+          "In performance-critical code, sealed classes can be noticeably faster in hot paths."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - leaving a security-critical class unsealed allows override of validation\npublic class JwtValidator\n{\n    public virtual bool Validate(string token) => VerifySignature(token);\n    private bool VerifySignature(string token) => true;\n}\n// A subclass could override Validate and return true without checking the signature\n\n// ✅ GOOD - sealed prevents subclass from bypassing the security logic\npublic sealed class JwtValidator\n{\n    public bool Validate(string token) => VerifySignature(token); // no vtable lookup\n    private bool VerifySignature(string token) => true;\n}",
+          "note": "Sealing JwtValidator means no subclass can override Validate to bypass signature checking, and the JIT can devirtualize every call to this class."
+        },
+        "analogy": "sealed is the final stamp on a contract - no amendments allowed.",
+        "redFlags": [
+          "Not knowing that string is sealed and why.",
+          "Not knowing the JIT devirtualization benefit of sealed.",
+          "Thinking sealed on a method and sealed on a class do exactly the same thing.",
+          "Sealing every class by default without a design reason - it restricts extensibility needlessly."
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why is string sealed?",
+            "a": "To protect its immutability invariant and security guarantees - if string could be subclassed, an overriding Equals or GetHashCode could break dictionary lookups and security comparisons."
+          },
+          {
+            "q": "What is the performance benefit of sealed?",
+            "a": "The JIT can devirtualize calls - instead of a vtable lookup it inlines the method directly. This is measurable in hot paths like parsers, serializers, or math loops."
+          },
+          {
+            "q": "Can you use sealed override partway down a hierarchy?",
+            "a": "Yes - you apply sealed override on any level of a derived class to stop further overriding at that point, while the class itself can still be extended for other non-sealed members."
+          },
+          {
+            "q": "Should you seal all classes by default?",
+            "a": "No - in application code, seal only when you have a specific design reason such as protecting invariants or enabling JIT optimization. Unnecessary sealing blocks legitimate extensibility."
+          },
+          {
+            "q": "What .NET types in the BCL are sealed?",
+            "a": "string, StringBuilder, and many concrete collection types are sealed. The pattern is common for types where subclassing would break correctness guarantees."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What does the sealed keyword do in C#?"
+          },
+          {
+            "role": "you",
+            "text": "On a class it prevents inheritance - no other class can extend it. On an override method it stops the override chain at that point in the hierarchy. Both cases allow the JIT to devirtualize calls because it knows no further override can exist."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why is string sealed?"
+          },
+          {
+            "role": "you",
+            "text": "To protect its immutability invariant and security properties. If string were unsealed, a subclass could override Equals or GetHashCode and break dictionary lookups or security comparisons that depend on string's well-defined behavior."
+          },
+          {
+            "role": "interviewer",
+            "text": "What exactly does devirtualization mean and when does it help?"
+          },
+          {
+            "role": "you",
+            "text": "Devirtualization is when the JIT replaces a vtable dispatch with a direct method call or an inline expansion. It matters in hot paths - tight loops, serializers, math pipelines. The overhead of a vtable lookup is small but adds up at millions of calls per second."
+          },
+          {
+            "role": "interviewer",
+            "text": "Should you seal all classes by default in application code?"
+          },
+          {
+            "role": "you",
+            "text": "No - only when you have a specific reason: protecting an invariant, a security guarantee, or a measured performance gain. Unnecessary sealing blocks legitimate extensibility and makes testing harder if consumers cannot create subclasses for stubbing."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give a scenario where you would specifically add sealed to a method override rather than to the class."
+          },
+          {
+            "role": "you",
+            "text": "A payment processing hierarchy where PaymentGateway has a virtual Authorize method. StripeGateway overrides it with specific Stripe logic that must not be changed further - sealed override on StripeGateway.Authorize locks that implementation. Other developers can still subclass StripeGateway to add a new property or override a different method, but they cannot change how authorization works."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

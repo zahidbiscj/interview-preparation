@@ -1,0 +1,945 @@
+{
+  "subtopicId": "binding",
+  "questions": [
+    {
+      "id": "angular-binding-001",
+      "q": "What are the four types of data binding in Angular?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": [
+        "data binding",
+        "interpolation",
+        "property binding",
+        "event binding",
+        "two-way binding",
+        "ngModel"
+      ],
+      "answer": {
+        "oneLiner": "Angular has four binding types: interpolation {{ }} renders values as text, property binding [prop] sets DOM properties, event binding (event) listens for user actions, and two-way binding [(ngModel)] combines both directions.",
+        "detail": "Interpolation converts an expression to a string and inserts it into the HTML. Property binding pushes data from the component into a DOM property or a child component @Input - it targets DOM properties, not HTML attributes. Event binding listens for browser events or custom @Output emitters and calls a handler. Two-way binding is shorthand for a property binding down and an event binding up at the same time. The banana-in-a-box syntax [(x)] desugars to [x]='value' plus (xChange)='value=$event'. To set an HTML attribute rather than a DOM property, use [attr.colspan] syntax. FormsModule must be imported to use [(ngModel)].",
+        "keyPoints": [
+          "Interpolation {{ value }} converts expressions to text, not HTML - use [innerHTML] for HTML content",
+          "Property binding [prop] targets DOM properties, not HTML attributes - use [attr.colspan] for true attributes",
+          "Event binding (click) calls a handler and $event holds the native browser event object",
+          "Two-way [(ngModel)] is sugar for [ngModel] plus (ngModelChange) - needs FormsModule imported"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - using attribute syntax to pass a dynamic object causes string coercion\n<app-order-summary status=\"{{ order.status }}\" />\n\n// ✅ GOOD - property binding passes the real typed value to the @Input\n<app-order-summary [status]=\"order.status\" />\n\n// All four binding types together:\n// <h2>{{ order.customerName }}</h2>          -- interpolation\n// <input [disabled]=\"isSubmitting\" />        -- property binding\n// <button (click)=\"placeOrder()\">Buy</button>  -- event binding\n// <input [(ngModel)]=\"promoCode\" />           -- two-way binding",
+          "note": "Property binding passes typed values directly; attribute interpolation coerces everything to a string which breaks non-string inputs."
+        },
+        "analogy": "Data flows like electricity: down the wire with property binding, back up with events.",
+        "redFlags": [
+          "Confusing HTML attributes with DOM properties - saying [src] and src= are the same thing",
+          "Using [(ngModel)] inside a reactive form alongside formControl - these conflict and will throw",
+          "Not knowing FormsModule must be imported before [(ngModel)] works",
+          "Saying interpolation can safely inject HTML - it escapes content, so use [innerHTML] for HTML"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between [src] and src={{ }}?",
+            "a": "[src] is property binding and passes the expression value directly; src='{{ }}' interpolates into an attribute string which works for simple values but breaks for non-string inputs like objects or numbers."
+          },
+          {
+            "q": "How do you bind to an HTML attribute rather than a DOM property?",
+            "a": "Use [attr.name]='expression' - for example [attr.colspan]='colCount' - because some HTML attributes like colspan have no matching DOM property."
+          },
+          {
+            "q": "How does custom two-way binding work without ngModel?",
+            "a": "Declare @Input() rating and @Output() ratingChange = new EventEmitter(), then the parent can use [(rating)] and Angular automatically wires the input down and the event up."
+          },
+          {
+            "q": "Can interpolation render HTML tags?",
+            "a": "No, Angular escapes the content for security. To render HTML use [innerHTML]='htmlString', and sanitise the string first."
+          },
+          {
+            "q": "What does $event contain in an event binding?",
+            "a": "For native DOM events it is the browser Event object; for @Output emitters it is whatever value was passed to EventEmitter.emit()."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through the four types of data binding in Angular."
+          },
+          {
+            "role": "me",
+            "text": "Interpolation with {{ }} renders values as text in the template. Property binding with [prop] pushes typed data from the component into a DOM property or child @Input. Event binding with (event) listens for user actions and calls a handler. Two-way binding with [(ngModel)] combines property and event binding in one syntax."
+          },
+          {
+            "role": "interviewer",
+            "text": "You said property binding targets DOM properties - what does that mean in practice?"
+          },
+          {
+            "role": "me",
+            "text": "A DOM property is the live JavaScript object property on an element, not the HTML attribute in the markup. For example, [value]='username' sets the input's value property, which is what the browser actually uses. For a true HTML attribute like colspan I would write [attr.colspan]='count' instead."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is two-way binding doing under the hood?"
+          },
+          {
+            "role": "me",
+            "text": "It is just property binding down plus event binding up. [(ngModel)]='searchTerm' desugars to [ngModel]='searchTerm' and (ngModelChange)='searchTerm=$event'. For custom components I pair @Input() rating with @Output() ratingChange and then [(rating)] works the same way."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you avoid [(ngModel)]?"
+          },
+          {
+            "role": "me",
+            "text": "Inside a reactive form. Mixing ngModel with formControl on the same element throws a runtime error in Angular. Reactive forms use FormControl.setValue() and valueChanges instead, so I keep the two approaches separate."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you think of a real gotcha with interpolation that trips people up?"
+          },
+          {
+            "role": "me",
+            "text": "Trying to render HTML with it. Interpolation escapes the output for XSS safety, so tags appear as literal text. If I need to display server-generated HTML - for example a product description from a CMS - I use [innerHTML]='description' and run it through Angular's DomSanitizer first."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-binding-002",
+      "q": "What is the difference between a Promise and an Observable?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": [
+        "Promise",
+        "Observable",
+        "RxJS",
+        "async",
+        "reactive"
+      ],
+      "answer": {
+        "oneLiner": "A Promise starts immediately, emits one value, and cannot be cancelled. An Observable is lazy, can emit zero or many values over time, can be cancelled by unsubscribing, and composes with RxJS operators.",
+        "detail": "A Promise starts executing the moment it is created and resolves or rejects exactly once. You cannot stop it mid-flight. An Observable does nothing until someone subscribes - this laziness is intentional. Once subscribed it can emit any number of values, complete, or error. Unsubscribing cancels the work, which is why Angular's HttpClient returns an Observable so you can cancel an in-flight request by unsubscribing. RxJS operators like map, filter, switchMap, and catchError let you transform, combine, and handle errors in declarative pipelines. The async pipe in Angular templates subscribes and unsubscribes automatically so you rarely need manual subscription management. To convert between them, use firstValueFrom() to turn an Observable into a Promise, or from() to turn a Promise into an Observable. The old toPromise() method is deprecated.",
+        "keyPoints": [
+          "Promise is eager - starts immediately on creation; Observable is lazy - starts only on subscribe",
+          "Promise emits exactly one value; Observable emits 0 to many values over time",
+          "Unsubscribing from an Observable cancels work - this is how you abort an HTTP request in Angular",
+          "Operators like switchMap, catchError, and combineLatest make Observables composable where Promises are not"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - Promise fires immediately and cannot be cancelled, even if user navigates away\nconstructor(private http: HttpClient) {\n  fetch('/api/invoices').then(r => r.json()).then(data => this.invoices = data);\n}\n\n// ✅ GOOD - Observable cancels the HTTP request when the component is destroyed\nexport class InvoiceListComponent {\n  invoices$ = inject(HttpClient).get<Invoice[]>('/api/invoices');\n  // template: *ngFor=\"let inv of invoices$ | async\"\n  // async pipe auto-cancels on destroy - no memory leak\n}",
+          "note": "HttpClient returns a cold Observable - subscribing starts the request, unsubscribing cancels it; the async pipe handles both automatically."
+        },
+        "analogy": "A Promise is a vending machine - you press the button and it starts; an Observable is a tap - nothing flows until you open it.",
+        "redFlags": [
+          "Saying Observables are just Promises with more features - they are a completely different execution model",
+          "Not knowing Observables are lazy - thinking creating one starts the HTTP call",
+          "Not knowing how to cancel an in-flight HTTP request - the answer is unsubscribe or use the async pipe",
+          "Using the deprecated toPromise() instead of firstValueFrom() or lastValueFrom()"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why does HttpClient return an Observable instead of a Promise?",
+            "a": "Because Observables are lazy and cancellable - if the user navigates away before the response arrives, unsubscribing cancels the in-flight request, which a Promise cannot do."
+          },
+          {
+            "q": "How do you convert an Observable to a Promise?",
+            "a": "Use firstValueFrom(obs$) which resolves on the first emission, or lastValueFrom(obs$) which resolves on the last - toPromise() is deprecated and removed in RxJS 8."
+          },
+          {
+            "q": "What does the async pipe do for you?",
+            "a": "It subscribes to the Observable when the component initialises, passes emitted values to the template, and unsubscribes automatically when the component is destroyed - preventing memory leaks."
+          },
+          {
+            "q": "When would you actually prefer a Promise over an Observable?",
+            "a": "For a one-off async operation with no need for cancellation or operators, like calling a third-party library that expects a Promise - use firstValueFrom() to bridge the gap."
+          },
+          {
+            "q": "How do you convert a Promise to an Observable?",
+            "a": "Wrap it with from(myPromise) - the resulting Observable is still eager because the Promise has already started, but you get operator composition on top."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between a Promise and an Observable?"
+          },
+          {
+            "role": "me",
+            "text": "A Promise starts immediately when created, resolves once, and cannot be cancelled. An Observable is lazy - nothing runs until you subscribe - can emit many values over time, and can be cancelled by unsubscribing. That laziness and cancellability is why Angular's HttpClient returns Observables."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned laziness - give me a concrete example of why that matters."
+          },
+          {
+            "role": "me",
+            "text": "If I build a product search where the user types and I fire an HTTP call, a Promise-based call starts the moment the component loads. With an Observable piped through switchMap, nothing fires until the user actually types, and if they type again before the first response arrives, switchMap cancels the previous request automatically."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you bridge between the two when a third-party library only accepts Promises?"
+          },
+          {
+            "role": "me",
+            "text": "I use firstValueFrom(obs$) from RxJS 7 onwards, which wraps the Observable and resolves on the first emission. The old toPromise() is deprecated. Going the other way I use from(promise) to get an Observable, but it is still eager since the Promise has already started."
+          },
+          {
+            "role": "interviewer",
+            "text": "In a template, how do you avoid manually subscribing to an Observable?"
+          },
+          {
+            "role": "me",
+            "text": "I use the async pipe: orders$ | async. It subscribes when the component mounts, pushes each emission to the template, and unsubscribes automatically on destroy - so there is no risk of a memory leak."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if you use the async pipe twice on the same cold Observable in a template?"
+          },
+          {
+            "role": "me",
+            "text": "Each async pipe creates a separate subscription, so a cold Observable like an HttpClient call fires twice - two HTTP requests. The fix is to pipe through shareReplay(1) first, which makes the Observable hot and caches the result for all subscribers."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-binding-003",
+      "q": "What are @Input and @Output and how do they enable component communication?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": [
+        "@Input",
+        "@Output",
+        "EventEmitter",
+        "component communication",
+        "parent-child"
+      ],
+      "answer": {
+        "oneLiner": "@Input lets a parent component push data down into a child component. @Output lets a child component emit events up to the parent using EventEmitter.",
+        "detail": "Angular components communicate in one direction by default: data flows down via @Input and events flow up via @Output. The parent binds a value with [childProp]='parentValue' and the child declares @Input() childProp. When the child needs to tell the parent something happened - for example a button click or a form submission - it declares @Output() saved = new EventEmitter<Order>() and calls saved.emit(order). The parent listens with (saved)='onOrderSaved($event)'. This keeps the child decoupled: it does not know who its parent is or what happens with the event. For sibling or cross-tree communication, use a shared injectable service with a BehaviorSubject or signals. Modern Angular (v16+) adds required inputs with input.required<T>() and a transform option. Angular v17.1 introduced signal-based input() and output() functions which are reactive and work inside computed() and effect() without needing ngOnChanges.",
+        "keyPoints": [
+          "@Input receives data from the parent - never mutate it directly in the child, emit back via @Output instead",
+          "@Output uses EventEmitter<T> - call .emit(value) to dispatch, parent listens with (eventName)='handler($event)'",
+          "Signal input() from v17.1 is reactive - you can use it in computed() and effect() without ngOnChanges",
+          "For sibling or unrelated components, use a shared service or state store - not inputs and outputs"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - child mutates the input object directly, breaking unidirectional data flow\nexport class ShippingFormComponent {\n  @Input() order!: Order;\n  confirmShipment() { this.order.status = 'shipped'; } // mutates parent's object\n}\n\n// ✅ GOOD - child emits an event, parent owns the state update\nimport { input, output } from '@angular/core';\nexport class ShippingFormComponent {\n  order = input.required<Order>();      // signal input - reactive\n  shipped = output<Order>();            // signal output\n  confirmShipment() {\n    this.shipped.emit({ ...this.order(), status: 'shipped' });\n  }\n}",
+          "note": "Signal input() is reactive and readable inside computed() and effect(); emitting a new object keeps data immutable and plays well with OnPush change detection."
+        },
+        "analogy": "Parent sends a package down (@Input); child puts a return receipt in the mailbox (@Output).",
+        "redFlags": [
+          "Mutating an @Input object directly in the child - this breaks unidirectional data flow and causes hard-to-debug bugs with OnPush",
+          "Not knowing @Output requires EventEmitter - using a plain Subject does not integrate with Angular's event system",
+          "Not knowing signal input() and output() for a senior role - these are the modern Angular API",
+          "Trying to use @Input/@Output between non-parent-child components instead of a shared service"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why should a child never mutate an @Input directly?",
+            "a": "The parent owns the data. If the child mutates it, the parent's state changes silently without its knowledge, which breaks the predictable one-way data flow and causes stale views with OnPush change detection."
+          },
+          {
+            "q": "How do you make an @Input mandatory in Angular?",
+            "a": "In decorator style use @Input({ required: true }) product!: Product; or with signal input use product = input.required<Product>() - Angular throws at build time if the parent omits it."
+          },
+          {
+            "q": "How do signal inputs improve on decorator @Input?",
+            "a": "Signal inputs are readable inside computed() and effect() and auto-track dependencies, so you do not need ngOnChanges to react to input changes - the computation updates automatically."
+          },
+          {
+            "q": "How do you communicate between two sibling components?",
+            "a": "Inject a shared service into both - the service holds a BehaviorSubject or signal that one sibling writes to and the other reads from, without coupling them to each other."
+          },
+          {
+            "q": "How do you alias an @Input?",
+            "a": "Use @Input('externalName') internalName or with signals input(initialValue, { alias: 'externalName' }) - the parent uses the alias in the template while the class uses the internal name."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain @Input and @Output and how they enable component communication."
+          },
+          {
+            "role": "me",
+            "text": "@Input lets a parent push data down into a child by binding with [childProp]='value'. @Output lets the child emit events up using EventEmitter - the parent listens with (eventName)='handler($event)'. Together they enforce one-way data flow with explicit event contracts."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if a child component mutates the @Input object directly?"
+          },
+          {
+            "role": "me",
+            "text": "It silently changes the parent's data without the parent knowing. That breaks the unidirectional flow. Worse, if the parent uses OnPush change detection, Angular won't detect the mutation since the reference didn't change, so the view goes stale. The child should emit a new object via @Output instead."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned the modern signal API - how does input() differ from @Input()?"
+          },
+          {
+            "role": "me",
+            "text": "Signal input() returns a reactive signal you can call like a function to read the value. Because it is a signal, you can use it inside computed() or effect() and Angular tracks the dependency automatically - no ngOnChanges needed. For example: product = input.required<Product>() and then in a computed: displayPrice = computed(() => this.product().price * 1.2)."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you handle communication between two components that are not parent and child?"
+          },
+          {
+            "role": "me",
+            "text": "I inject a shared service into both. The service holds a BehaviorSubject or a signal as the source of truth. One component writes to it, the other reads it. This way neither component knows about the other - they only know about the service."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you make an @Input required so Angular errors at build time if the parent forgets it?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - with the decorator syntax I write @Input({ required: true }) product!: Product and with signal inputs product = input.required<Product>(). Angular's template type-checking catches a missing binding at build time rather than at runtime."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-binding-004",
+      "q": "What is the difference between Reactive Forms and Template-driven Forms? When should you use each?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": [
+        "reactive forms",
+        "template-driven forms",
+        "FormControl",
+        "ngModel",
+        "validation",
+        "forms"
+      ],
+      "answer": {
+        "oneLiner": "Reactive forms define the form model in TypeScript using FormGroup and FormControl, giving you full control and testability. Template-driven forms build the model from ngModel directives in the template and suit simple, static forms.",
+        "detail": "With reactive forms you create the entire form structure in the component class using FormGroup, FormControl, and FormArray. You import ReactiveFormsModule (or use the standalone equivalents). Validation logic lives in the class, not in the template, which makes it easy to write unit tests against the FormGroup directly without rendering a component. Dynamic forms - adding or removing fields at runtime - are handled by manipulating FormArray. Cross-field validation is done with a validator at the FormGroup level. Since Angular 14, reactive forms are fully typed, so form.value carries real types and typos in control names are caught at build time. Template-driven forms use FormsModule, [(ngModel)], and directives like required and minlength in the HTML. The framework builds the form model implicitly. These are quicker to write for simple contact forms or login screens but are harder to test, do not support dynamic fields well, and have weaker typing. Never mix ngModel and formControl on the same element.",
+        "keyPoints": [
+          "Reactive forms: model in the class with FormGroup/FormControl, unit-testable without a DOM, supports dynamic fields via FormArray",
+          "Template-driven forms: model built by ngModel in the template, simpler for small static forms, harder to test and extend",
+          "Reactive forms are strictly typed since Angular 14 - form.value and form.get() carry real TypeScript types",
+          "Cross-field validation in reactive forms uses a validator at the FormGroup level, not per-control"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - template-driven form for a checkout wizard with dynamic address fields\n// Model is implicit, hard to test, no typed values, dynamic rows are painful\n<form #checkoutForm=\"ngForm\">\n  <input name=\"email\" ngModel required />\n</form>\n\n// ✅ GOOD - reactive form with typed FormGroup\nexport class CheckoutComponent {\n  checkoutForm = new FormGroup({\n    email: new FormControl('', { validators: [Validators.required, Validators.email] }),\n    shippingAddresses: new FormArray([])\n  });\n  addAddress() {\n    this.checkoutForm.controls.shippingAddresses.push(\n      new FormControl('', Validators.required)\n    );\n  }\n}",
+          "note": "Reactive form model lives in the class - testable, typed, and supports dynamic FormArray rows without touching the template."
+        },
+        "analogy": "Reactive forms are a blueprint you design upfront; template-driven forms are assembled on-site from whatever is in the HTML.",
+        "redFlags": [
+          "Mixing ngModel and formControl on the same element - Angular throws a runtime error",
+          "Not knowing how to read validation errors from FormControl.errors in the template",
+          "Choosing template-driven forms for a dynamic multi-step wizard with conditional fields",
+          "Confusing FormArray with FormGroup - FormArray holds ordered controls, FormGroup holds named ones"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How do you implement cross-field validation - for example confirming a password match?",
+            "a": "Add a validator function at the FormGroup level, not on individual controls. It receives the group as argument, reads both controls, and returns an error object or null."
+          },
+          {
+            "q": "What is FormArray and when do you use it?",
+            "a": "FormArray holds an ordered list of controls, ideal for repeating rows like line items on an invoice or multiple shipping addresses - you push and remove controls at runtime."
+          },
+          {
+            "q": "How do typed reactive forms (Angular 14+) help in practice?",
+            "a": "form.value has a real inferred type, form.get('email') returns a typed FormControl<string>, and accessing a non-existent control name is a TypeScript compile error - you catch mistakes before running the app."
+          },
+          {
+            "q": "How do you unit test a reactive form without rendering the component?",
+            "a": "Instantiate the FormGroup directly in the test, call setValue() or patchValue(), then assert against the group's valid state and errors - no TestBed or DOM needed."
+          },
+          {
+            "q": "Can you use template-driven forms in a standalone component?",
+            "a": "Yes, import FormsModule into the component's imports array - it no longer needs to go through an NgModule."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between reactive forms and template-driven forms, and when would you choose each?"
+          },
+          {
+            "role": "me",
+            "text": "Reactive forms define the model in the class with FormGroup and FormControl, giving full control over validation, dynamic fields, and testing. Template-driven forms build the model implicitly from ngModel in the template and are quicker to write for small static forms like a login page."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned dynamic fields - how do reactive forms handle that?"
+          },
+          {
+            "role": "me",
+            "text": "With FormArray. For example on an e-commerce checkout with multiple delivery addresses, I call shippingAddresses.push(new FormControl('')) to add a row and removeAt(index) to delete one. The template just iterates over the FormArray controls. That is nearly impossible to do cleanly with template-driven forms."
+          },
+          {
+            "role": "interviewer",
+            "text": "What changed with typed reactive forms in Angular 14?"
+          },
+          {
+            "role": "me",
+            "text": "Before Angular 14 every FormControl was typed as AbstractControl with value: any. Now FormControl infers the type from the initial value, so form.value is a proper typed object and a typo like form.get('emal') is caught at compile time rather than silently returning null at runtime."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you implement a password match validation across two controls?"
+          },
+          {
+            "role": "me",
+            "text": "I add a validator at the FormGroup level, not on either individual control. The validator receives the group, reads controls.password.value and controls.confirmPassword.value, and returns { passwordMismatch: true } or null. The template then checks group.errors?.passwordMismatch to show the message."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there anything you can do with template-driven forms that reactive forms cannot handle?"
+          },
+          {
+            "role": "me",
+            "text": "Not really, though template-driven forms are faster to write for very simple cases like a single-field newsletter signup. The downside is testability - you need to render the component to test the form state. For anything more complex than a login form I always reach for reactive forms."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-binding-005",
+      "q": "What is RxJS? Explain Observables, operators, and subscriptions.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": [
+        "RxJS",
+        "Observable",
+        "operator",
+        "subscription",
+        "reactive programming"
+      ],
+      "answer": {
+        "oneLiner": "RxJS is a library for composing async and event-based programs using Observables - lazy, cancellable streams. Operators transform streams via .pipe() and a subscription is the active execution that you can cancel.",
+        "detail": "An Observable is a blueprint for a stream of values. Nothing happens until you subscribe. The subscribe() call starts execution and returns a Subscription object. Calling subscription.unsubscribe() stops the execution and releases resources - this is how you cancel an HTTP request. Operators are pure functions that transform the stream without modifying the original. They compose inside .pipe(): map transforms each value, filter skips values, switchMap maps each value to a new inner Observable and cancels the previous one (critical for search), catchError handles failures without ending the outer stream, and debounceTime delays processing until input settles. Angular uses RxJS throughout: HttpClient returns Observables, the Router exposes events as an Observable, and reactive form controls expose valueChanges as an Observable. A Subject is both an Observable and an Observer - it can receive values and multicast them to multiple subscribers. Prefer the async pipe in templates to avoid managing subscriptions manually.",
+        "keyPoints": [
+          "Observable is lazy - subscribe() starts it; unsubscribe() cancels it and releases resources",
+          "Operators chain in .pipe() and are pure - switchMap cancels previous inner Observables which is critical for search",
+          "Angular uses RxJS in HttpClient, Router events, and form valueChanges out of the box",
+          "Nested subscribe() calls are an anti-pattern - use switchMap/concatMap/mergeMap to flatten inner Observables"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - nested subscribe creates unmanaged inner subscriptions and cannot cancel\nthis.searchControl.valueChanges.subscribe(query => {\n  this.productService.search(query).subscribe(results => this.results = results);\n});\n\n// ✅ GOOD - switchMap flattens and cancels previous search on each new keystroke\nresults$ = this.searchControl.valueChanges.pipe(\n  debounceTime(300),\n  distinctUntilChanged(),\n  filter(q => q.length > 2),\n  switchMap(q => this.productService.search(q)),\n  catchError(() => of([]))\n);",
+          "note": "switchMap cancels the previous HTTP call when a new keystroke arrives, preventing stale results from out-of-order responses."
+        },
+        "analogy": "An Observable is a recipe; subscribing is starting to cook; operators are the steps; unsubscribing turns off the stove.",
+        "redFlags": [
+          "Nesting subscribe() calls instead of using switchMap, concatMap, or mergeMap to flatten streams",
+          "Not unsubscribing from long-lived Observables like interval or WebSocket streams, causing memory leaks",
+          "Confusing switchMap with mergeMap - switchMap cancels previous, mergeMap runs all in parallel",
+          "Calling subscribe() in a constructor instead of using the async pipe or deferring to ngOnInit"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between map and switchMap?",
+            "a": "map transforms each emitted value synchronously and returns it. switchMap maps each value to an inner Observable, subscribes to it, and cancels the previous inner Observable if a new value arrives - essential for HTTP search where you want to discard stale responses."
+          },
+          {
+            "q": "What is the difference between combineLatest and forkJoin?",
+            "a": "combineLatest emits every time any source emits, but only after all sources have emitted at least once - useful for combining filters. forkJoin waits for all sources to complete and emits only the last value of each - useful for parallel HTTP calls that all need to finish."
+          },
+          {
+            "q": "How do you handle errors without killing the stream?",
+            "a": "Use catchError inside the inner Observable returned by switchMap, not on the outer stream. That way a failed search request returns an empty array and the outer valueChanges stream stays alive for the next keystroke."
+          },
+          {
+            "q": "What makes a Subject different from an Observable?",
+            "a": "A Subject is both an Observable and an Observer simultaneously - you can call .next() to push values in and subscribe to receive them. This makes it useful for multicasting one stream to multiple subscribers."
+          },
+          {
+            "q": "When would you use concatMap instead of switchMap?",
+            "a": "When order matters and you cannot afford to cancel previous work - for example saving a sequence of form steps to an API. concatMap queues each emission and only starts the next after the previous inner Observable completes."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain RxJS - what are Observables, operators, and subscriptions?"
+          },
+          {
+            "role": "me",
+            "text": "RxJS builds on Observables, which are lazy streams of values - nothing happens until you subscribe. The subscription is the live execution, and calling unsubscribe() cancels it. Operators like map, filter, and switchMap chain in .pipe() to transform the stream declaratively without modifying the source."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where does Angular use RxJS under the hood, without you setting it up?"
+          },
+          {
+            "role": "me",
+            "text": "In three main places: HttpClient.get() returns an Observable so you can cancel requests, the Router exposes events as a stream so you can react to navigation, and reactive form controls expose valueChanges as an Observable so you can debounce user input."
+          },
+          {
+            "role": "interviewer",
+            "text": "Tell me about a real bug you would get from nesting subscribe calls."
+          },
+          {
+            "role": "me",
+            "text": "In a product search, if I subscribe inside subscribe I cannot cancel the inner HTTP call when the user types again. The user types 'lap', fires a request, then types 'laptop', fires another. The 'lap' response might arrive after 'laptop' and overwrite the correct results. switchMap solves this by cancelling the 'lap' request the moment 'laptop' is typed."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you handle an HTTP error in a search pipeline without breaking the stream?"
+          },
+          {
+            "role": "me",
+            "text": "I put catchError inside the switchMap's inner Observable, not on the outer stream. Like: switchMap(q => this.api.search(q).pipe(catchError(() => of([])))). If a request fails, it returns an empty array and the outer valueChanges stream stays alive for the next keystroke."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the difference between switchMap and concatMap - give me a real example of each?"
+          },
+          {
+            "role": "me",
+            "text": "switchMap cancels previous work - use it for search where stale results are useless. concatMap queues - use it for saving order line items where each save must complete before the next starts, to avoid race conditions on the server."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-binding-006",
+      "q": "How do you prevent memory leaks from RxJS subscriptions in Angular?",
+      "level": "mid",
+      "type": "scenario",
+      "freq": "high",
+      "tags": [
+        "memory leak",
+        "unsubscribe",
+        "async pipe",
+        "takeUntilDestroyed",
+        "takeUntil",
+        "RxJS"
+      ],
+      "answer": {
+        "oneLiner": "Use the async pipe in templates for automatic cleanup, or takeUntilDestroyed() for imperative subscriptions in v16+. The classic fallback is a destroy$ Subject with takeUntil completed in ngOnDestroy.",
+        "detail": "A subscription to a long-lived Observable like an interval, a WebSocket, or a BehaviorSubject keeps the callback alive even after the component is destroyed. Angular does not clean these up for you - you must unsubscribe. The three main strategies are: first, use the async pipe in the template which subscribes on component creation and unsubscribes on destruction automatically; second, use takeUntilDestroyed() imported from @angular/core/rxjs-interop which hooks into the component's DestroyRef and completes the stream when the component is destroyed; third, the classic pattern is to create a Subject called destroy$ and pipe your subscription through takeUntil(this.destroy$), then in ngOnDestroy call destroy$.next() and destroy$.complete(). HttpClient calls complete naturally after one emission so they do not need cleanup, but a switchMap pipeline that wraps a BehaviorSubject does. The toSignal() function from @angular/core/rxjs-interop also auto-unsubscribes by tying itself to the injection context.",
+        "keyPoints": [
+          "Async pipe is the safest option - it subscribes on create and unsubscribes on destroy with no manual code",
+          "takeUntilDestroyed() from v16 is the cleanest imperative option - inject DestroyRef and pass it as the argument",
+          "The classic destroy$ Subject pattern with takeUntil still works and is common in pre-v16 codebases",
+          "HttpClient Observables complete after one emission so they auto-clean - long-lived streams like intervals do not"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - subscription never cancelled, lives until the app closes\nexport class LivePriceComponent implements OnInit {\n  ngOnInit() {\n    this.stockService.priceUpdates$.subscribe(price => this.price = price);\n  }\n}\n\n// ✅ GOOD - takeUntilDestroyed auto-cancels when the component is destroyed\nimport { takeUntilDestroyed } from '@angular/core/rxjs-interop';\nexport class LivePriceComponent {\n  private destroyRef = inject(DestroyRef);\n  constructor() {\n    this.stockService.priceUpdates$\n      .pipe(takeUntilDestroyed(this.destroyRef))\n      .subscribe(price => this.price = price);\n  }\n}",
+          "note": "takeUntilDestroyed(destroyRef) completes the stream automatically when the component is destroyed - no ngOnDestroy needed."
+        },
+        "analogy": "Unsubscribing is turning off the tap before you leave the kitchen - the water does not care that you have left.",
+        "redFlags": [
+          "Not knowing subscription leaks exist - thinking Angular cleans up subscriptions automatically",
+          "Only knowing the destroy$ pattern and not takeUntilDestroyed for a mid-level or senior role",
+          "Thinking all HttpClient subscriptions must be manually unsubscribed - they complete after one emission",
+          "Calling takeUntilDestroyed() outside an injection context without passing DestroyRef explicitly"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is DestroyRef and how does it differ from ngOnDestroy?",
+            "a": "DestroyRef is an injectable token that lets you register cleanup callbacks tied to the owner's lifetime - components, directives, or services. It works anywhere in an injection context, not just in component classes that implement OnDestroy."
+          },
+          {
+            "q": "How does toSignal() handle subscription cleanup?",
+            "a": "toSignal() internally uses takeUntilDestroyed tied to the injection context where it was called. When the component or service that called it is destroyed, the underlying subscription is cancelled automatically."
+          },
+          {
+            "q": "Do you need to unsubscribe from HTTP calls?",
+            "a": "Usually not - HttpClient Observables complete after one emission, so the subscription closes itself. But if you navigate away before the response arrives, the subscription is still alive. Using the async pipe or takeUntilDestroyed handles that edge case."
+          },
+          {
+            "q": "What happens if you forget to unsubscribe from a WebSocket stream?",
+            "a": "The component instance is held in memory by the subscription callback closure. The WebSocket listener keeps firing, updating a destroyed component's properties, and the garbage collector cannot reclaim the memory - a classic leak."
+          },
+          {
+            "q": "Can you use takeUntilDestroyed outside a constructor?",
+            "a": "Yes - pass the DestroyRef token explicitly: const ref = inject(DestroyRef); then use takeUntilDestroyed(ref) anywhere. Without the explicit token it must be called in an injection context such as the constructor or a field initializer."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do you prevent memory leaks from RxJS subscriptions in Angular?"
+          },
+          {
+            "role": "me",
+            "text": "The cleanest option in the template is the async pipe - it subscribes and unsubscribes automatically so there is nothing to forget. For imperative subscriptions in Angular 16+ I use takeUntilDestroyed() with an injected DestroyRef, which completes the stream when the component is destroyed with no ngOnDestroy needed."
+          },
+          {
+            "role": "interviewer",
+            "text": "What did you use before takeUntilDestroyed existed?"
+          },
+          {
+            "role": "me",
+            "text": "The classic destroy$ Subject pattern. I declare private destroy$ = new Subject<void>() and pipe every subscription through takeUntil(this.destroy$). In ngOnDestroy I call destroy$.next() then destroy$.complete(). Still works perfectly and you will see it in most pre-v16 production codebases."
+          },
+          {
+            "role": "interviewer",
+            "text": "Do you always need to unsubscribe from every Observable?"
+          },
+          {
+            "role": "me",
+            "text": "No. HttpClient Observables complete after one emission, which closes the subscription automatically. take(1) and first() do the same. The ones that need cleanup are long-lived streams: interval, timer, WebSocket connections, BehaviorSubjects from services, and anything inside a switchMap that wraps a stream."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through what actually happens when you forget to unsubscribe from a WebSocket price feed."
+          },
+          {
+            "role": "me",
+            "text": "When the user navigates away, Angular destroys the component but the subscription callback holds a reference to the component's closure. Every time a price update arrives it tries to update the destroyed component's property. The garbage collector cannot reclaim the component object because the subscription still holds a reference - that is the leak. The WebSocket keeps firing forever."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you use takeUntilDestroyed outside of the constructor?"
+          },
+          {
+            "role": "me",
+            "text": "Yes, but you need to inject DestroyRef explicitly first: const destroyRef = inject(DestroyRef). Then you can call takeUntilDestroyed(destroyRef) anywhere - inside ngOnInit, in a helper method, or even in a standalone utility function. Without passing the token explicitly it must be called in an injection context."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-binding-007",
+      "q": "What is the difference between Subject, BehaviorSubject, ReplaySubject, and AsyncSubject?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": [
+        "Subject",
+        "BehaviorSubject",
+        "ReplaySubject",
+        "RxJS",
+        "multicast"
+      ],
+      "answer": {
+        "oneLiner": "All four are multicast Observables. Subject has no memory. BehaviorSubject holds one current value. ReplaySubject replays N past values to new subscribers. AsyncSubject emits only the final value when the stream completes.",
+        "detail": "A plain Subject is like a live radio broadcast - if you tune in late you miss what was said. A BehaviorSubject is like a radio that replays the last message the moment you tune in; it always has a current value accessible via .value and requires an initial value when constructed. This makes it the default choice for shared state in services. A ReplaySubject(n) buffers the last n emissions and replays them to each new subscriber - useful when late subscribers need history, like a chat message log. An AsyncSubject only emits the last value and only when the source completes - rarely used in Angular apps. The critical practice with BehaviorSubject in a service is to expose it as asObservable() so consumers can subscribe but cannot call .next() from outside the service. Signals are a simpler alternative for UI state but BehaviorSubject composes with the full RxJS operator library.",
+        "keyPoints": [
+          "Subject multicasts live values - late subscribers get nothing from before they joined",
+          "BehaviorSubject needs an initial value and exposes .value synchronously - the go-to for shared state in services",
+          "Expose BehaviorSubject as asObservable() to prevent consumers from calling .next() directly",
+          "ReplaySubject(n) replays n buffered values; AsyncSubject emits only the last value on complete"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - exposing the Subject directly lets any component call .next() and corrupt shared state\n@Injectable({ providedIn: 'root' })\nexport class NotificationService {\n  public notifications$ = new BehaviorSubject<Notification[]>([]);\n}\n\n// ✅ GOOD - private Subject, public read-only Observable\n@Injectable({ providedIn: 'root' })\nexport class NotificationService {\n  private notificationsSource = new BehaviorSubject<Notification[]>([]);\n  readonly notifications$ = this.notificationsSource.asObservable();\n  addNotification(n: Notification) {\n    this.notificationsSource.next([...this.notificationsSource.value, n]);\n  }\n}",
+          "note": "asObservable() hides .next() from consumers so only the service can push new values, keeping state management centralised."
+        },
+        "analogy": "Subject is a live TV channel; BehaviorSubject is catch-up TV that always shows the last episode first.",
+        "redFlags": [
+          "Not knowing BehaviorSubject requires an initial value - omitting it throws at construction time",
+          "Exposing the BehaviorSubject publicly so any class can call .next() - this destroys encapsulation",
+          "Confusing Subject with BehaviorSubject and not knowing which to use for a notification or cart service",
+          "Using AsyncSubject for shared state - it only emits on complete, which in a long-lived service is never"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why expose a BehaviorSubject as asObservable() from a service?",
+            "a": "To make the service the only writer. If the Subject is public any component can call .next() and push corrupt or unexpected state, making bugs extremely hard to trace."
+          },
+          {
+            "q": "When would you use ReplaySubject instead of BehaviorSubject?",
+            "a": "When you need to replay more than one past value - for example a chat window that replays the last 50 messages to a component that mounts after the conversation has started."
+          },
+          {
+            "q": "What is the difference between BehaviorSubject and a Signal for shared state?",
+            "a": "A Signal is synchronous, simpler to read, and integrates with Angular's change detection directly. BehaviorSubject composes with the full RxJS operator library which signals cannot. For pure UI state prefer signals; for state that participates in async pipelines prefer BehaviorSubject."
+          },
+          {
+            "q": "Can late subscribers to a plain Subject receive past values?",
+            "a": "No - a Subject multicasts live emissions only. A component that subscribes after a value was emitted will not receive that value. Use BehaviorSubject or ReplaySubject if late subscribers need history."
+          },
+          {
+            "q": "How do you read the current value of a BehaviorSubject synchronously?",
+            "a": "Call .value on it - for example this.cartSource.value.items. This is a synchronous read, unlike subscribing which is async. Only the owner class should call this internally."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through the differences between Subject, BehaviorSubject, ReplaySubject, and AsyncSubject."
+          },
+          {
+            "role": "me",
+            "text": "All four can multicast values to multiple subscribers. Subject has no memory - late subscribers miss past values. BehaviorSubject holds one current value and immediately gives it to any new subscriber; it needs an initial value. ReplaySubject buffers the last N values and replays them. AsyncSubject only emits the very last value when the source completes."
+          },
+          {
+            "role": "interviewer",
+            "text": "Which one would you use for a shopping cart service and why?"
+          },
+          {
+            "role": "me",
+            "text": "BehaviorSubject with an initial value of an empty array. When any component subscribes - a cart icon in the header, the checkout page, a mini-basket sidebar - it immediately gets the current cart contents without waiting for the next emission. I read .value synchronously when I need to calculate the new state inside the service."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned making the cart state read-only from the outside - how do you enforce that?"
+          },
+          {
+            "role": "me",
+            "text": "I keep the BehaviorSubject private and expose a public readonly property typed as Observable<CartItem[]> using asObservable(). That strips .next() from the public API. Only the service's own methods like addItem() or removeItem() can push new state."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you reach for ReplaySubject over BehaviorSubject?"
+          },
+          {
+            "role": "me",
+            "text": "When more than one past value matters - for example a customer support chat panel that should show the last 20 messages when it first opens. BehaviorSubject can only replay one. ReplaySubject(20) replays all 20 to any subscriber that joins late."
+          },
+          {
+            "role": "interviewer",
+            "text": "Compared to a Signal, why would you still use a BehaviorSubject in 2025?"
+          },
+          {
+            "role": "me",
+            "text": "Signals are great for simple synchronous UI state. But if the state participates in async pipelines - for example it needs to be combined with an HTTP call using combineLatest, throttled with debounceTime, or piped through switchMap - then BehaviorSubject gives me the full RxJS toolkit. Signals cannot compose with those operators directly."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-binding-008",
+      "q": "What is the difference between hot and cold Observables?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": [
+        "hot observable",
+        "cold observable",
+        "multicast",
+        "RxJS",
+        "share"
+      ],
+      "answer": {
+        "oneLiner": "Cold Observables start a new producer for each subscriber - every subscribe triggers its own HTTP call. Hot Observables share one producer among all subscribers - like a WebSocket or a Subject.",
+        "detail": "A cold Observable creates its producer - for example an HTTP request - inside the subscribe callback, so each subscriber gets its own independent execution. HttpClient.get() is cold: subscribe twice and two HTTP calls fire. This is usually fine with a single subscriber but becomes a bug when two async pipes reference the same Observable in a template. A hot Observable has a producer that exists outside the subscribe - a WebSocket connection, a DOM event, a Subject, or the Angular Router events stream. All subscribers share the same live stream. To make a cold Observable hot, pipe it through share() or shareReplay(1). share() multicasts live emissions to all current subscribers. shareReplay(1) also caches the last emission so a new subscriber immediately gets the most recent value - ideal for caching API responses. The difference matters in real apps: using the same products$ Observable with the async pipe in two places doubles your API calls unless you shareReplay(1) it.",
+        "keyPoints": [
+          "Cold Observables create one producer per subscriber - HttpClient is cold, two async pipes mean two HTTP calls",
+          "Hot Observables share one producer - Subject, WebSocket, Router.events, fromEvent are all hot",
+          "shareReplay(1) makes a cold Observable hot and caches the last value for late subscribers",
+          "share() multicasts live values only; shareReplay(1) also replays the cache to new subscribers"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - cold Observable used twice triggers two HTTP requests\nexport class ProductPageComponent {\n  products$ = this.http.get<Product[]>('/api/products');\n  // template: *ngIf=\"products$ | async as products\" ... (products$ | async)?.length\n  // Two async pipes = two GET requests!\n}\n\n// ✅ GOOD - shareReplay(1) makes it hot and caches the result\nexport class ProductPageComponent {\n  products$ = this.http.get<Product[]>('/api/products').pipe(\n    shareReplay(1) // one request, result cached for late subscribers\n  );\n}",
+          "note": "shareReplay(1) deduplicates the HTTP call and caches the response so all current and future subscribers share one result."
+        },
+        "analogy": "Cold is a Netflix download - each user gets their own copy. Hot is a live TV broadcast - everyone watches the same stream.",
+        "redFlags": [
+          "Not knowing that using the async pipe twice on a cold Observable fires two separate HTTP requests",
+          "Confusing multicasting with caching - share() multicasts live; shareReplay(1) also caches",
+          "Not knowing what shareReplay does or when to use it",
+          "Saying HttpClient is hot - it is cold, which is why duplicate subscriptions are dangerous"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between share() and shareReplay(1)?",
+            "a": "share() multicasts the live stream to all current subscribers but gives nothing to a late subscriber who joins after an emission. shareReplay(1) also stores the last emission and replays it to any new subscriber immediately, which is what you want for HTTP caching."
+          },
+          {
+            "q": "How do you spot a double-fetch bug caused by cold Observables in a template?",
+            "a": "Open the browser network tab and look for duplicate GET requests. It usually happens when the same cold Observable reference is piped through the async pipe in two places, or when the Observable is declared in a method that is called on each change detection cycle rather than as a field."
+          },
+          {
+            "q": "Is the Angular Router's events stream hot or cold?",
+            "a": "Hot. The Router runs independently of your component subscriptions and emits events whether or not anyone is listening. All subscribers to router.events share the same stream."
+          },
+          {
+            "q": "When would you use share() instead of shareReplay(1)?",
+            "a": "For a truly live stream where past values are irrelevant - for example a WebSocket price feed where you do not want a new subscriber to receive a stale price from 10 seconds ago. share() gives only live updates."
+          },
+          {
+            "q": "Can shareReplay cause a memory leak?",
+            "a": "Yes - if refCount is false (the default before RxJS 6.4) the source Observable stays subscribed even when all consumers unsubscribe. Use shareReplay({ bufferSize: 1, refCount: true }) in long-lived services to allow the source to complete when no one is listening."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain the difference between hot and cold Observables."
+          },
+          {
+            "role": "me",
+            "text": "A cold Observable creates its producer inside the subscribe callback, so each subscriber triggers its own execution. HttpClient.get() is cold - subscribe twice and two HTTP requests fire. A hot Observable has a producer that exists independently of subscribers, like a WebSocket connection or the Angular Router's event stream - all subscribers share one live stream."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a real bug this causes in an Angular template."
+          },
+          {
+            "role": "me",
+            "text": "A product page that uses the async pipe in two places with the same cold Observable - once for the product grid and once to show the count in a badge. That is two subscriptions, two HTTP GET /api/products requests. You see it in the network tab as a duplicate call. The fix is to pipe through shareReplay(1) once, which makes the Observable hot and caches the response."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the difference between share() and shareReplay(1)?"
+          },
+          {
+            "role": "me",
+            "text": "share() multicasts live values to all current subscribers but gives nothing to a subscriber that joins after an emission. shareReplay(1) also caches the last emission and replays it immediately to any new subscriber. For HTTP caching you want shareReplay(1) so a component that mounts after the data arrived still gets the data without a new request."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can shareReplay itself cause a memory leak?"
+          },
+          {
+            "role": "me",
+            "text": "Yes - by default it keeps the source subscription alive even when all consumers unsubscribe, which means the HTTP request or WebSocket stays open. To avoid this I use shareReplay({ bufferSize: 1, refCount: true }). With refCount: true the source unsubscribes when the last consumer unsubscribes, then resubscribes when a new one joins."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you deliberately keep a cold Observable cold?"
+          },
+          {
+            "role": "me",
+            "text": "When each subscriber needs independent data. For example a component that renders two different user profiles side by side - each async pipe should trigger its own HTTP call with its own userId parameter. Sharing that stream would give both the same profile. Cold is the safe default; you opt into hot deliberately with share or shareReplay."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "angular-binding-009",
+      "q": "What are Angular Signals and how do they compare to RxJS for reactivity?",
+      "level": "senior",
+      "type": "comparison",
+      "freq": "high",
+      "tags": [
+        "signals",
+        "RxJS",
+        "reactivity",
+        "computed",
+        "effect",
+        "Angular 16"
+      ],
+      "answer": {
+        "oneLiner": "Signals (v16+) are synchronous reactive values that auto-track their dependencies and notify Angular of changes without Zone.js. RxJS is better for async streams. Use signals for state, RxJS for async flows, and bridge with toSignal() and toObservable().",
+        "detail": "A signal is a reactive container. You create one with signal(initialValue) and read it by calling it like a function: this.count(). Writing uses .set(newValue) to replace or .update(fn) to derive from the current value. computed() creates a derived signal that automatically re-evaluates only when one of its tracked signal dependencies changes - it is lazy and memoised. effect() runs a side-effect function whenever tracked signals change and is automatically cleaned up. The key advantage over Zone.js-based change detection is fine-grained reactivity: only the parts of the template that read a changed signal need to re-evaluate, not the whole component tree. Angular v17 enabled zoneless apps in developer preview using signals as the sole change notification mechanism. Compared to RxJS, signals are simpler for synchronous state - no subscribe, no unsubscribe, no pipe. But RxJS wins for async work: time-based operators, HTTP, WebSocket streams, and multicasting. Bridge between them with toSignal(obs$) which converts an Observable to a signal and auto-unsubscribes, and toObservable(sig) which wraps a signal in an Observable.",
+        "keyPoints": [
+          "Read a signal by calling it: count(); write with .set() or .update() - not like a regular property assignment",
+          "computed() is lazy and memoised - it re-evaluates only when a tracked dependency changes, not on every read",
+          "Signals enable zoneless change detection - Angular can update only the template nodes that read a changed signal",
+          "Bridge with toSignal(obs$) to use an Observable as a signal, and toObservable(sig) for the reverse"
+        ],
+        "code": {
+          "lang": "typescript",
+          "snippet": "// ❌ BAD - component has Zone.js overhead and needs manual ngOnChanges for derived values\nexport class OrderSummaryComponent implements OnChanges {\n  @Input() items: OrderItem[] = [];\n  total = 0;\n  ngOnChanges() { this.total = this.items.reduce((s, i) => s + i.price, 0); }\n}\n\n// ✅ GOOD - signal input with computed() - reactive, no ngOnChanges needed\nimport { input, computed } from '@angular/core';\nexport class OrderSummaryComponent {\n  items = input<OrderItem[]>([]);\n  total = computed(() => this.items().reduce((s, i) => s + i.price, 0));\n  // total() updates automatically whenever items() changes\n}",
+          "note": "computed() tracks items() as a dependency and recomputes total lazily whenever the items signal changes - no lifecycle hook required."
+        },
+        "analogy": "Signals are a spreadsheet cell - change one cell and every formula that depends on it updates itself.",
+        "redFlags": [
+          "Thinking signals completely replace RxJS - they cannot handle time-based operators or multicast async streams",
+          "Not knowing toSignal() and toObservable() for bridging between the two models",
+          "Using effect() for derived state - use computed() for derived values and effect() only for side effects like logging or analytics",
+          "Reading a signal like a property: this.count instead of this.count() - this always returns the SignalNode object, not the value"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between signal.set() and signal.update()?",
+            "a": ".set(value) replaces the current value unconditionally. .update(fn) receives the current value as the argument and returns the new value - useful when the new state depends on the old state, like incrementing a counter."
+          },
+          {
+            "q": "How does computed() avoid unnecessary recomputation?",
+            "a": "It is lazy - it does not run until someone reads it, and it is memoised - it only runs again if a tracked signal dependency has changed since the last read. If nothing changed the cached value is returned immediately."
+          },
+          {
+            "q": "What is zoneless change detection and how do signals enable it?",
+            "a": "Zoneless Angular removes the Zone.js dependency. Without Zone.js, Angular does not know when async operations complete, so it relies on signals to push notifications. When a signal changes, Angular knows exactly which component views read it and marks only those for update - far more targeted than the current whole-tree check."
+          },
+          {
+            "q": "When should you use effect() and when should you use computed()?",
+            "a": "Use computed() whenever you want a derived reactive value that the template or other signals can read. Use effect() only for true side effects like writing to localStorage, logging analytics events, or calling a non-Angular API - never for deriving state, because that would create circular dependencies."
+          },
+          {
+            "q": "How does toSignal() handle the async subscription lifecycle?",
+            "a": "toSignal() internally calls takeUntilDestroyed() tied to the injection context where it was called. When the component or service is destroyed, the subscription is cancelled automatically - no manual cleanup needed."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What are Angular Signals and how do they compare to RxJS?"
+          },
+          {
+            "role": "me",
+            "text": "Signals are synchronous reactive values introduced in Angular 16. You create one with signal(0), read it by calling it - this.count() - and write with .set() or .update(). Angular tracks which signals a template or computed() reads and updates only those when a signal changes. RxJS handles async streams and time-based operations which signals cannot. I use signals for state and RxJS for async pipelines, and bridge between them."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does computed() work and when does it re-evaluate?"
+          },
+          {
+            "role": "me",
+            "text": "computed() is lazy and memoised. When I write total = computed(() => this.items().reduce((s, i) => s + i.price, 0)), Angular registers items as a dependency. The computation runs only when someone reads total() and items() has changed since the last read. If nothing changed, Angular returns the cached value immediately - no wasted cycles."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is zoneless Angular and how do signals make it possible?"
+          },
+          {
+            "role": "me",
+            "text": "Currently Zone.js patches every async browser API - setTimeout, fetch, Promises - so Angular knows when something async completes and can check for changes. In zoneless mode Zone.js is removed. Signals take over as the notification mechanism: when a signal is written, Angular knows exactly which template nodes read it and marks only those for update. This is much more targeted than Zone.js scanning the entire component tree."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can I replace RxJS entirely with signals?"
+          },
+          {
+            "role": "me",
+            "text": "Not today. Signals are synchronous - they have no concept of time, no debounce, no switchMap, no multicasting. For an order search that debounces keystrokes, cancels in-flight HTTP calls, and shows an error state, I still need RxJS. The bridge is toSignal(searchResults$) which converts the Observable result to a signal for the template, and toObservable(searchTerm) to feed the signal value into a pipe."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you use effect() rather than computed()?"
+          },
+          {
+            "role": "me",
+            "text": "Only for true side effects - logging an analytics event when an order status signal changes, persisting a user preference to localStorage, or syncing a signal value into a third-party chart library that Angular does not control. Using effect() to derive a new state creates circular dependency risks and Angular will warn about it. Derived state always goes in computed()."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

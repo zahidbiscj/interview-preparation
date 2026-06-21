@@ -1,0 +1,237 @@
+[
+    {
+      "id": "csharp-po-026",
+      "q": "Predict the output:\n```csharp\nstruct Point { public int X; }\nclass PointClass { public int X; }\n\nPoint s1 = new Point { X = 1 };\nPoint s2 = s1;\ns2.X = 99;\n\nPointClass c1 = new PointClass { X = 1 };\nPointClass c2 = c1;\nc2.X = 99;\n\nConsole.WriteLine(s1.X);\nConsole.WriteLine(c1.X);\n```",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["struct", "value-type", "reference-type", "copy-semantics"],
+      "answer": {
+        "oneLiner": "Prints 1 then 99. Struct assignment copies the full value so s1 is unaffected. Class assignment copies only the reference so c1 and c2 share one object and the mutation is visible through c1.",
+        "detail": "s2 = s1 copies every byte of s1 into a new slot for s2. s1 and s2 are independent. Setting s2.X = 99 only changes s2. s1.X stays 1. For the class: c2 = c1 copies the reference pointer only. Both c1 and c2 now point to the same heap object. Setting c2.X = 99 mutates the shared object. Reading c1.X returns 99. The key rule: structs copy on assignment, classes share.",
+        "keyPoints": [
+          "Struct assignment copies all fields - both variables are fully independent.",
+          "Class assignment copies the reference - both variables alias one heap object.",
+          "Mutation through either class reference is visible through the other.",
+          "Changing a struct from class (or vice versa) is a breaking behavioral change, not just a syntax change."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - developer uses class for a coordinate and gets accidental sharing\nclass Coordinate { public double Lat; public double Lng; }\nCoordinate origin = new Coordinate { Lat = 51.5, Lng = -0.1 };\nCoordinate waypoint = origin;\nwaypoint.Lat = 48.8; // intended to move only waypoint\nConsole.WriteLine(origin.Lat); // 48.8 - origin was also moved\n\n// ✅ GOOD - use struct for small data with value semantics\nstruct Coordinate { public double Lat; public double Lng; }\nCoordinate origin = new Coordinate { Lat = 51.5, Lng = -0.1 };\nCoordinate waypoint = origin;\nwaypoint.Lat = 48.8;\nConsole.WriteLine(origin.Lat); // 51.5 - origin unchanged",
+          "note": "Use struct for small, logically independent data. Use class when sharing is intentional."
+        },
+        "analogy": "Struct is a sticky note you can photocopy. Class is a Google Doc - editing any copy edits the shared document.",
+        "redFlags": [
+          "Saying s1.X is 99 because s2 = s1 makes them the same.",
+          "Saying c1.X is still 1 because c2 was the one modified.",
+          "Not knowing the fundamental difference between value type and reference type assignment.",
+          "Saying the behavior depends on whether X is public or private."
+        ],
+        "followUpsQA": [
+          { "q": "What is the risk of changing a type from struct to class silently in a library?", "a": "Callers that depended on copy-on-assignment semantics will now share state unexpectedly. Code that assumes independent copies will introduce aliasing bugs that are hard to reproduce." },
+          { "q": "Are structs always allocated on the stack?", "a": "No. A struct that is a field of a class lives on the heap inline inside that object. A boxed struct lives on the heap. Stack vs heap is an implementation detail, not a language guarantee." },
+          { "q": "When should you choose struct over class?", "a": "Microsoft guidelines: prefer struct when the type is small (<=16 bytes), logically immutable or has value-equality semantics, and short-lived. Otherwise use class." },
+          { "q": "Can you make a class behave like a struct for assignment?", "a": "Not automatically. You must implement a copy constructor or use C# records with the with-expression to create modified copies. Records still share by reference but with-expression creates a shallow copy." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Walk me through what gets printed and why." },
+          { "role": "me", "text": "s1.X prints 1 and c1.X prints 99. Struct s2 = s1 copies every field byte-for-byte into an independent slot. Mutating s2.X does not affect s1. Class c2 = c1 copies only the 8-byte reference pointer. Both variables point to the same heap object. Mutating c2.X mutates the shared object so c1.X returns 99." },
+          { "role": "interviewer", "text": "What is the memory layout difference between the two?" },
+          { "role": "me", "text": "s1 and s2 are two independent 4-byte slots on the stack (or wherever local variables live). The PointClass instance is one object on the heap. c1 and c2 are two 8-byte reference slots on the stack, both containing the same heap address." },
+          { "role": "interviewer", "text": "What breaks silently if you change Point from struct to class in a large codebase?" },
+          { "role": "me", "text": "Any code that does p2 = p1 and then modifies p2 expecting p1 to be untouched will now accidentally mutate p1 through the shared reference. Unit tests may still pass if they test only p2 after the copy. The aliasing bug shows up only in integration or in production." },
+          { "role": "interviewer", "text": "Is there a way to make the class version also print 1 for c1.X without changing to struct?" },
+          { "role": "me", "text": "Yes - create an independent copy: var c2 = new PointClass { X = c1.X }. Or use a copy constructor. Or change PointClass to a record and write: var c2 = c1 with { X = 99 }. The with-expression creates a new object with X overridden, leaving c1 unchanged." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-027",
+      "q": "Predict the output:\n```csharp\nstruct Counter { public int Value; }\n\nvoid Increment(Counter c) { c.Value++; }\n\nCounter counter = new Counter { Value = 10 };\nIncrement(counter);\nConsole.WriteLine(counter.Value);\n```",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["struct", "value-type", "method-parameter", "copy-semantics"],
+      "answer": {
+        "oneLiner": "Prints 10. The struct is passed by value, so Increment receives its own copy. The increment inside the method modifies the copy only. The caller's counter is untouched.",
+        "detail": "Method parameters for value types are copies by default. When you call Increment(counter), the runtime copies the Counter struct into the parameter c on Increment's stack frame. c.Value++ changes only c. When Increment returns, c is discarded. The caller's counter still holds Value = 10. This is correct behavior for value semantics but surprises developers expecting object-like mutation. To modify the caller's struct, use ref. To get the updated value back, return a copy.",
+        "keyPoints": [
+          "Value type method parameters are copies - mutations inside the method are invisible to the caller.",
+          "Use 'ref' to make the parameter an alias for the caller's variable.",
+          "Returning the modified copy is the immutable-update pattern: Counter Increment(Counter c) { c.Value++; return c; }",
+          "Large structs passed by value have a copy cost per call - use 'in' for read-only large structs."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - expecting struct mutation to reach the caller\nstruct PageViewCounter { public int Count; }\nvoid TrackView(PageViewCounter c) { c.Count++; } // mutates local copy only\nPageViewCounter pvc = new PageViewCounter { Count = 0 };\nTrackView(pvc);\nConsole.WriteLine(pvc.Count); // 0 - bug: view was not tracked\n\n// ✅ GOOD - use ref to modify the caller's struct\nvoid TrackView(ref PageViewCounter c) { c.Count++; }\nTrackView(ref pvc);\nConsole.WriteLine(pvc.Count); // 1",
+          "note": "Struct parameters are copies. Use ref to modify the original, or return a new copy."
+        },
+        "analogy": "Passing a struct to a method is like giving a hotel receptionist a photocopy of your ID - changes to the copy do not update the original.",
+        "redFlags": [
+          "Saying the output is 11 because the struct was passed to the method.",
+          "Thinking value types behave like reference types when passed to methods.",
+          "Not knowing the three options: ref, return copy, or change to class.",
+          "Not knowing the 'in' parameter modifier for large read-only structs."
+        ],
+        "followUpsQA": [
+          { "q": "What are the three ways to let the method's change be visible to the caller?", "a": "1) Use ref: void Increment(ref Counter c). 2) Return the modified copy: Counter Increment(Counter c) { c.Value++; return c; } and assign counter = Increment(counter). 3) Change Counter to a class." },
+          { "q": "What is the performance cost of passing a large struct by value?", "a": "Every call copies every byte of the struct onto the call stack. A 64-byte struct passed 1 million times in a loop copies 64 MB of data. Use 'in' to pass a readonly reference with zero copy cost." },
+          { "q": "When should you use 'in' vs 'ref' for struct parameters?", "a": "Use 'in' when the method only reads the struct - zero copy, no mutation possible. Use 'ref' when the method needs to modify the caller's variable." },
+          { "q": "Does this behavior differ for an array element passed by index?", "a": "If you pass an array element by value (e.g., Increment(arr[0])), it copies the element. With ref, Increment(ref arr[0]) gives direct access to the array's storage, no copy." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What does this print and why?" },
+          { "role": "me", "text": "10. When Increment is called, C# copies the counter struct into the parameter c. The c.Value++ inside the method increments c's copy to 11. When Increment returns, c is gone. The caller's counter was never touched, so it still holds 10." },
+          { "role": "interviewer", "text": "How would you fix it so the caller sees 11 without changing Counter to a class?" },
+          { "role": "me", "text": "Two options. First, add ref: void Increment(ref Counter c) and call Increment(ref counter). That makes c an alias for the caller's variable. Second, return the updated copy: Counter Increment(Counter c) { c.Value++; return c; } and write counter = Increment(counter). This is the functional immutable-update pattern." },
+          { "role": "interviewer", "text": "Is there a modern alternative besides ref for large structs you want to pass without copying?" },
+          { "role": "me", "text": "Yes, the 'in' modifier: void Process(in BigStruct s). It passes a readonly reference - the method gets the address of the caller's variable but cannot modify it. Zero copy overhead, guaranteed read-only. Used extensively in math libraries for matrix and vector types." },
+          { "role": "interviewer", "text": "Does this same copying happen when you pass a struct to an async method?" },
+          { "role": "me", "text": "Yes, but with an extra complication. The async method's parameters are lifted into a state machine class when the method suspends. The struct is captured by value into a heap-allocated class field, which means boxing-like behavior. For performance-sensitive async code, avoid large struct parameters." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-028",
+      "q": "Predict the output:\n```csharp\nstruct Counter { public int Value; }\n\nvoid Increment(ref Counter c) { c.Value++; }\n\nCounter counter = new Counter { Value = 10 };\nIncrement(ref counter);\nConsole.WriteLine(counter.Value);\n```",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["struct", "value-type", "ref-parameter"],
+      "answer": {
+        "oneLiner": "Prints 11. The ref keyword passes a managed reference to the caller's variable. c.Value++ inside the method writes directly into the caller's storage location.",
+        "detail": "With ref, the parameter c is not a copy - it is an alias for the caller's counter variable. Both names refer to the same memory location. c.Value++ reads 10, adds 1, and writes 11 back to that location. When Increment returns, the caller reads counter.Value and gets 11. The ref keyword must appear at both the method declaration and the call site. This explicitness is by design - it makes aliasing visible to code readers.",
+        "keyPoints": [
+          "ref makes the parameter an alias for the caller's variable - same memory location.",
+          "Mutations through the parameter are immediately visible to the caller.",
+          "ref must appear at both the declaration and the call site.",
+          "The variable must be definitely assigned before being passed as ref."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - missing ref means the increment is lost\nstruct Inventory { public int Stock; }\nvoid DeductStock(Inventory inv, int qty) { inv.Stock -= qty; } // modifies copy only\nInventory warehouse = new Inventory { Stock = 100 };\nDeductStock(warehouse, 10);\nConsole.WriteLine(warehouse.Stock); // still 100 - bug\n\n// ✅ GOOD - ref lets the method update the caller's value\nvoid DeductStock(ref Inventory inv, int qty) { inv.Stock -= qty; }\nDeductStock(ref warehouse, 10);\nConsole.WriteLine(warehouse.Stock); // 90",
+          "note": "ref enables in-place mutation of a struct variable by the callee."
+        },
+        "analogy": "ref is like handing someone the original document with a pen - what they write changes the real thing.",
+        "redFlags": [
+          "Saying the output is 10 because the previous question without ref also used a struct.",
+          "Not knowing that ref requires the variable to be initialized before the call.",
+          "Confusing ref (read-write alias) with out (write-only, no init required).",
+          "Not knowing that ref must appear at the call site too."
+        ],
+        "followUpsQA": [
+          { "q": "Why must ref appear at the call site?", "a": "C# requires explicit call-site annotation so code readers immediately see that the argument may be modified. It prevents accidental aliasing during refactoring and makes the contract visible without reading the method signature." },
+          { "q": "What is the difference between ref and out?", "a": "ref requires the argument to be initialized before the call. The method can read and write it. out does not require initialization; the method must write it before returning. out is output-only." },
+          { "q": "Can you use ref on a property?", "a": "No. Properties are backed by getter/setter methods, not a direct variable. You can only pass ref to a variable (field, local, or array element). You would need to copy the property value to a local, pass ref to the local, then write it back." },
+          { "q": "What is a ref local?", "a": "ref int alias = ref counter declares a local that is an alias for another variable. Writing to alias also writes to counter. It is like a ref parameter but scoped to a block of code instead of crossing a method boundary." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Compare this to the previous question. What changed and what is the output?" },
+          { "role": "me", "text": "The only change is adding ref. Now the output is 11. ref makes parameter c an alias for the caller's counter variable. They share the same memory location. c.Value++ increments the value in that shared location from 10 to 11. The caller reads counter.Value after the call and gets 11." },
+          { "role": "interviewer", "text": "Why does C# require you to write ref at the call site as well?" },
+          { "role": "me", "text": "Explicitness and readability. When you see Increment(ref counter) at the call site, you immediately know counter could be modified. If ref were only on the declaration, you would need to look up the method signature to understand whether the argument is aliased. The call-site annotation makes the contract visible inline." },
+          { "role": "interviewer", "text": "What is the difference between ref and out for this kind of parameter?" },
+          { "role": "me", "text": "Both pass by reference. The difference is the pre-call contract. ref requires counter to already be assigned before the call. out does not - you can pass an uninitialized variable and the method is required to assign it before returning. out is for output parameters, ref is for bidirectional parameters." },
+          { "role": "interviewer", "text": "Does passing a class instance with ref have any additional effect over passing without ref?" },
+          { "role": "me", "text": "Yes. Without ref, a method can mutate the class object's fields through the reference but cannot change which object the caller's variable points to. With ref, the method can also reassign the caller's variable itself - parameter = new SomeClass() changes what the caller's variable references after the call returns." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-029",
+      "q": "Predict the output:\n```csharp\nstruct Point { public int X; }\n\nvar list = new List<Point> { new Point { X = 1 } };\nlist[0].X = 99;\nConsole.WriteLine(list[0].X);\n```",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["struct", "value-type", "list", "indexer", "compile-error"],
+      "answer": {
+        "oneLiner": "Compile error CS1612. List<T>'s indexer returns a copy of the struct, not a variable. The compiler rejects assignment to a field of a non-variable return value.",
+        "detail": "List<T>'s indexer is a get/set property pair. When you write list[0], the getter runs and returns a copy of the Point struct stored internally. That copy is a temporary value, not a storage location. Assigning to a field of a temporary (list[0].X = 99) would mutate the temporary and immediately discard it - the list would be unchanged. The compiler recognizes this as a useless and likely erroneous operation and reports CS1612. Arrays do not have this problem because array element access is a built-in lvalue that directly references the element's storage.",
+        "keyPoints": [
+          "List<T> indexer getter returns a value copy, not a reference to the element's storage.",
+          "CS1612 prevents assignment to fields of temporary (non-variable) values.",
+          "The fix: copy out, mutate, write back - var p = list[0]; p.X = 99; list[0] = p.",
+          "Array element access (T[]) is a true lvalue and allows in-place mutation."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - assigning to a field of a List indexer return value (compile error)\nList<Point> points = new List<Point> { new Point { X = 1 } };\npoints[0].X = 99; // CS1612 - cannot modify the return value of List indexer\n\n// ✅ GOOD - copy out, mutate, copy back\nvar p = points[0];\np.X = 99;\npoints[0] = p;\nConsole.WriteLine(points[0].X); // 99",
+          "note": "List<T> indexer returns a value copy. Copy out, mutate, write back to update an element."
+        },
+        "analogy": "List indexer is like a vending machine dispensing a copy of the item - writing on the dispensed copy does not change what is inside the machine.",
+        "redFlags": [
+          "Saying the output is 99 because the assignment works.",
+          "Not knowing the difference between List<T> indexer and array indexer for struct elements.",
+          "Not knowing the copy-out-mutate-copy-back pattern.",
+          "Not knowing about CS1612."
+        ],
+        "followUpsQA": [
+          { "q": "How do you correctly update X to 99 in the list?", "a": "Copy out: var p = list[0]. Mutate: p.X = 99. Write back: list[0] = p. This uses the indexer setter to store the modified copy." },
+          { "q": "Does the same error occur with an array?", "a": "No. Array element access is a first-class lvalue. The compiler knows the element's exact storage address and allows arr[0].X = 99 to compile and work correctly." },
+          { "q": "What is CollectionsMarshal.AsSpan and how does it help?", "a": "CollectionsMarshal.AsSpan(list) returns a Span<T> over the List's internal array. Span's indexer returns ref T, so span[0].X = 99 directly modifies the element's storage in-place. Used in performance-critical code." },
+          { "q": "Would switching Point to a class fix the compile error?", "a": "Yes. Class indexer returns a reference to the heap object. list[0].X = 99 would mutate the shared object. But this changes value semantics to reference semantics, which may not be what you want." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Does list[0].X = 99 compile? What happens?" },
+          { "role": "me", "text": "No, it fails with CS1612: Cannot modify the return value of 'List<Point>.this[int]' because it is not a variable. The List indexer getter returns a copy of the struct. Assigning to a field of that copy would silently discard the change, so the compiler rejects it outright." },
+          { "role": "interviewer", "text": "How do you correctly change X to 99 in the list?" },
+          { "role": "me", "text": "Three steps: var p = list[0] copies the element out. p.X = 99 mutates the local copy. list[0] = p writes the modified copy back using the indexer setter. This is the standard pattern for mutating struct elements in List<T>." },
+          { "role": "interviewer", "text": "Does the same error occur with an array instead of a List?" },
+          { "role": "me", "text": "No. Array element access is a built-in lvalue. The CLR exposes it via the ldelema IL instruction which produces a managed reference to the element's inline storage. arr[0].X = 99 compiles and writes directly to the element. Arrays are special-cased at the language and runtime level." },
+          { "role": "interviewer", "text": "How would you handle this efficiently in a hot path updating many elements?" },
+          { "role": "me", "text": "Use CollectionsMarshal.AsSpan(list) from System.Runtime.InteropServices. It returns a Span<Point> over the list's internal array. Span's indexer returns ref Point, so span[i].X = 99 modifies the element directly without any copy. This is used in game engines and high-performance .NET services." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-po-030",
+      "q": "Predict the output:\n```csharp\nstruct Point { public int X; }\n\nPoint[] arr = { new Point { X = 1 } };\narr[0].X = 99;\nConsole.WriteLine(arr[0].X);\n```",
+      "level": "mid",
+      "type": "code",
+      "freq": "high",
+      "tags": ["struct", "value-type", "array", "indexer"],
+      "answer": {
+        "oneLiner": "Prints 99. Array element access for structs is a direct lvalue - the compiler writes to the element's actual storage location in the array, not to a copy.",
+        "detail": "Arrays in .NET store struct elements inline (contiguously) in the array's memory block. When you write arr[0].X = 99, the compiler emits an ldelema IL instruction which produces a managed reference (a pointer) to the first element's storage. The assignment then writes 99 directly into that location. No copy is made. This is fundamentally different from List<T> where the indexer is a property pair that returns a copy on get.",
+        "keyPoints": [
+          "Array element access for value types is a direct lvalue - it gives the element's actual memory address.",
+          "The compiler emits ldelema (load element address) to get a managed reference to the element.",
+          "No copy is made - mutations go directly into the array's storage.",
+          "This contrasts with List<T> where the indexer property returns a copy."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - developer confuses List and array behavior and writes wrong code\nvar points = new List<Point> { new Point { X = 1 } };\npoints[0].X = 99; // CS1612 compile error\n\n// ✅ GOOD - arrays allow direct in-place mutation of struct elements\nPoint[] arr = { new Point { X = 1 } };\narr[0].X = 99; // compiles and works - direct lvalue access\nConsole.WriteLine(arr[0].X); // 99",
+          "note": "Array elements are lvalues. List<T> indexer returns a copy. Choose the container based on mutation needs."
+        },
+        "analogy": "An array element is a named locker - you open locker 0 and write directly inside. A List indexer dispenses a copy - you write on the copy, not the locker.",
+        "redFlags": [
+          "Saying this is a compile error like the List<T> version.",
+          "Not knowing why arrays allow this but List<T> does not.",
+          "Not knowing what 'lvalue' means in this context.",
+          "Saying the output is 1 because the array stored a copy."
+        ],
+        "followUpsQA": [
+          { "q": "Why does List<T> return a copy but T[] does not?", "a": "T[] element access is a built-in language operation that yields a managed reference (ldelema). List<T>'s indexer is an ordinary get property that executes a method and returns a value - no address, no lvalue." },
+          { "q": "If you copy the array reference, do mutations through one affect the other?", "a": "Yes. Arrays are reference types. Both variables point to the same heap block of inline struct elements. arr2[0].X = 99 also changes arr[0].X because they reference the same storage." },
+          { "q": "How does Span<T> relate to this?", "a": "Span<T> wraps a contiguous block - including array segments. Its indexer returns ref T (a managed reference to the element). So span[0].X = 99 works the same way as array access for the same reason." },
+          { "q": "Would ImmutableArray<T> allow in-place mutation?", "a": "No. ImmutableArray<T> indexer returns a value copy, like List<T>. Its purpose is immutability, so mutation is intentionally prevented." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "This looks almost identical to the List question. Does it compile and what prints?" },
+          { "role": "me", "text": "Yes it compiles and prints 99. Array element access is a built-in lvalue. The compiler emits ldelema which produces a managed reference directly to the element's inline storage in the array's memory block. arr[0].X = 99 writes 99 into that location." },
+          { "role": "interviewer", "text": "Why does the array allow this but List<T> does not?" },
+          { "role": "me", "text": "Arrays are a CLR primitive. ldelema is a native IL instruction that yields an address. List<T>'s indexer is a normal C# property. The getter is a method that returns T by value. There is no address to write to. The language cannot treat a method return value as a storage location." },
+          { "role": "interviewer", "text": "How does this relate to Span<T>?" },
+          { "role": "me", "text": "Span<T> wraps any contiguous block of memory including array segments. Its indexer is declared as ref T this[int index] - it returns a managed reference to the element, not a copy. So span[0].X = 99 works identically to arr[0].X = 99 for the same reason: direct reference to storage." },
+          { "role": "interviewer", "text": "In a high-throughput data pipeline, when would you prefer arrays over List for struct storage?" },
+          { "role": "me", "text": "When you need in-place mutation without the copy-out-modify-copy-back overhead, and when the size is known upfront. Audio buffers, physics simulation frames, and network packet buffers are typical examples. Arrays also have slightly less overhead than List because they lack the capacity/count tracking." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    }
+  ]

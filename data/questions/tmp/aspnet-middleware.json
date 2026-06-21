@@ -1,0 +1,684 @@
+{
+  "subtopicId": "middleware",
+  "questions": [
+    {
+      "id": "aspnet-middleware-001",
+      "q": "What is middleware and how does the request pipeline work?",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["middleware", "pipeline", "request"],
+      "answer": {
+        "oneLiner": "Middleware are components chained into a pipeline. Each one processes the request, optionally passes control to the next, then can act on the response on the way back out.",
+        "detail": "When a request arrives, ASP.NET Core passes it through a chain of middleware components in the order they were registered. Each component receives an HttpContext and a delegate called next that points to the rest of the chain. Code written before calling next() runs on the inbound path. Code written after next() returns runs on the outbound path as the response travels back. This makes the pipeline bidirectional - like walking into a corridor and walking back out the same way. If a component never calls next(), nothing further in the chain runs and the response is returned immediately.",
+        "keyPoints": [
+          "The pipeline is registered in Program.cs using app.Use() calls and order is execution order",
+          "Each middleware receives HttpContext and a next delegate to call the remainder of the chain",
+          "Code before next() runs inbound (request side); code after next() runs outbound (response side)",
+          "Not calling next() short-circuits the pipeline - nothing downstream executes"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - logging only on the way in, response time is never captured\napp.Use(async (ctx, next) =>\n{\n    _logger.LogInformation(\"Request: {Path}\", ctx.Request.Path);\n    await next();\n});\n\n// ✅ GOOD - bidirectional: log request in, log duration out\napp.Use(async (ctx, next) =>\n{\n    var start = DateTime.UtcNow;\n    _logger.LogInformation(\"Inbound: {Path}\", ctx.Request.Path);\n    await next();\n    var elapsed = (DateTime.UtcNow - start).TotalMilliseconds;\n    _logger.LogInformation(\"Outbound: {Path} took {Ms}ms\", ctx.Request.Path, elapsed);\n});",
+          "note": "Code before next() runs on the inbound request path; code after next() runs when the response unwinds back through this middleware."
+        },
+        "analogy": "Request goes in like a letter, response comes back stamped by each desk.",
+        "redFlags": [
+          "Saying the pipeline is one-directional and only processes the request",
+          "Not knowing that middleware order in Program.cs determines execution order",
+          "Confusing short-circuiting with an error - it is intentional in auth and caching",
+          "Saying each middleware gets its own copy of HttpContext rather than the shared one"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What does HttpContext contain?",
+            "a": "The full request and response objects, user identity, connection info, and a feature collection for extending pipeline capabilities."
+          },
+          {
+            "q": "Why does middleware order matter so much?",
+            "a": "Each component can short-circuit or transform the request before later ones run, so swapping order changes behavior - for example, auth must run before business logic endpoints."
+          },
+          {
+            "q": "What is the next delegate?",
+            "a": "A function that, when called, invokes the remaining pipeline chain; not calling it stops the chain at that point."
+          },
+          {
+            "q": "Can middleware modify the response after the endpoint writes it?",
+            "a": "Not the body if it has already been flushed, but it can add response headers before next() is called or read them after - the outbound code runs once the endpoint finishes writing."
+          },
+          {
+            "q": "Where do you register middleware?",
+            "a": "In Program.cs using app.Use(), app.Run(), or app.Map() calls after calling builder.Build()."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain what middleware is in ASP.NET Core and how the request pipeline works?"
+          },
+          {
+            "role": "you",
+            "text": "Middleware are components chained together in a pipeline. Each one receives the HTTP request, can do some work, then calls next() to pass control forward. After the endpoint responds, control unwinds back through each middleware in reverse so they can act on the response too."
+          },
+          {
+            "role": "interviewer",
+            "text": "You said it unwinds back - what do you mean by that exactly?"
+          },
+          {
+            "role": "you",
+            "text": "Every middleware has two halves separated by await next(). The code before next() runs as the request comes in. The code after next() runs as the response travels back out. So a single middleware can measure duration by noting the time before next() and calculating elapsed after it returns."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if a middleware never calls next()?"
+          },
+          {
+            "role": "you",
+            "text": "It short-circuits the pipeline. Nothing downstream executes - the response is written right there and returned. That is exactly how authentication rejects an invalid token with a 401 before the request ever reaches your controller."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does earlier middleware still get to run its outbound code when a downstream component short-circuits?"
+          },
+          {
+            "role": "you",
+            "text": "Yes. Short-circuiting only skips components that have not started yet. Any middleware that already called next() and is waiting for it to return still runs its post-next() code. The unwinding still happens for everything that entered the pipeline."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does the framework know what order to run the middleware in?"
+          },
+          {
+            "role": "you",
+            "text": "Registration order in Program.cs is execution order. The first app.Use() call you write is the first middleware to run inbound and the last to run outbound. This is why exception handling should be registered first - it wraps the entire remaining pipeline."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-middleware-002",
+      "q": "What is the difference between app.Use, app.Run, and app.Map?",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["use", "run", "map", "middleware"],
+      "answer": {
+        "oneLiner": "app.Use adds middleware that can call the next component; app.Run is terminal and ends the pipeline; app.Map branches the pipeline for requests matching a path prefix.",
+        "detail": "These three methods register different kinds of middleware in Program.cs. app.Use() registers middleware that receives a next delegate and can pass control forward or choose to short-circuit. app.Run() registers a terminal middleware - it has no next delegate and always ends the pipeline at that point. app.Map() creates a separate sub-pipeline that only runs when the request path starts with the given prefix; that branch has its own middleware chain and does not return to the main pipeline. app.MapWhen() extends this to branch on any condition over the HttpContext, not just the path.",
+        "keyPoints": [
+          "app.Use() - passes control to next; the standard choice for cross-cutting middleware",
+          "app.Run() - terminal; never calls next; anything registered after it is dead code",
+          "app.Map() - branches by path prefix; matched requests follow a separate pipeline",
+          "app.MapWhen() - branches by any predicate on HttpContext, not just the path"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - app.Run placed before other middleware; nothing after it ever runs\napp.Run(async ctx => await ctx.Response.WriteAsync(\"Caught everything\"));\napp.UseAuthentication(); // dead code - never reached\n\n// ✅ GOOD - app.Map branches the /health path; main pipeline continues for everything else\napp.Map(\"/health\", healthApp =>\n{\n    healthApp.Run(async ctx =>\n    {\n        ctx.Response.StatusCode = 200;\n        await ctx.Response.WriteAsync(\"Healthy\");\n    });\n});\napp.UseAuthentication();\napp.MapControllers();",
+          "note": "The /health branch terminates inside its own sub-pipeline; all other requests continue through the main pipeline with authentication and controller routing."
+        },
+        "analogy": "app.Use is a door you can open or close; app.Run is a wall; app.Map is a fork in the road.",
+        "redFlags": [
+          "Saying app.Run and app.Use are interchangeable - Run never passes control forward",
+          "Not knowing that code registered after app.Run is unreachable dead code",
+          "Confusing app.Map (branches and stays there) with normal middleware that returns to the main chain",
+          "Not knowing about app.MapWhen for condition-based branching beyond path matching"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What happens if you put app.Run before app.UseAuthentication()?",
+            "a": "Authentication never runs - app.Run is terminal so every request is handled there and nothing after it executes."
+          },
+          {
+            "q": "Does a branch created by app.Map rejoin the main pipeline?",
+            "a": "No. Once a request matches the Map prefix it runs that sub-pipeline exclusively and never falls back to the main chain."
+          },
+          {
+            "q": "When would you use app.MapWhen instead of app.Map?",
+            "a": "When you need to branch on something other than the path - for example, branching based on a header value or query string parameter."
+          },
+          {
+            "q": "Is app.Use terminal if it never calls next()?",
+            "a": "Effectively yes - it short-circuits the pipeline, but the intent is unclear. Use app.Run to make the terminal nature explicit."
+          },
+          {
+            "q": "Can a Map branch have its own Use and Run calls?",
+            "a": "Yes - the branch receives its own IApplicationBuilder so you can chain any middleware inside it."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the difference between app.Use, app.Run, and app.Map?"
+          },
+          {
+            "role": "you",
+            "text": "app.Use adds middleware that can call next() to pass control forward. app.Run is terminal - it has no next delegate and always ends the pipeline. app.Map creates a separate sub-pipeline for requests matching a path prefix."
+          },
+          {
+            "role": "interviewer",
+            "text": "What goes wrong if you put app.Run first in your pipeline?"
+          },
+          {
+            "role": "you",
+            "text": "Everything after it is dead code. app.Run is terminal so every request stops there and no subsequent middleware ever executes. I have seen this catch teams out when they move a health check endpoint to the top and accidentally block authentication."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned app.Map creates a sub-pipeline - does that branch rejoin the main pipeline after?"
+          },
+          {
+            "role": "you",
+            "text": "No. Once a request matches the path prefix it runs that branch exclusively. The main pipeline does not see it again. This makes it ideal for things like a /health endpoint that needs no authentication or a /admin section with its own middleware stack."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if you want to branch not on a path but on a request header?"
+          },
+          {
+            "role": "you",
+            "text": "Use app.MapWhen(). It takes a predicate over the HttpContext so you can branch on anything - a header, query string, or even the remote IP. The inner sub-pipeline works the same way as app.Map."
+          },
+          {
+            "role": "interviewer",
+            "text": "In a Map branch, can you still use all the same middleware like UseAuthentication?"
+          },
+          {
+            "role": "you",
+            "text": "Yes. The branch receives its own IApplicationBuilder instance so you can call app.Use(), app.Run(), and any app.Use{Middleware}() extension just as you would in the main pipeline. Each branch is a full independent pipeline."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-middleware-003",
+      "q": "How does Kestrel work?",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["kestrel", "server", "hosting"],
+      "answer": {
+        "oneLiner": "Kestrel is ASP.NET Core's built-in, cross-platform web server. It listens for HTTP connections on a socket and passes each incoming request to the middleware pipeline.",
+        "detail": "Kestrel is implemented as a socket-based HTTP server that ships with ASP.NET Core. When the app starts, Kestrel binds to one or more endpoints (IP and port, or Unix socket) and waits for TCP connections. When a connection arrives it parses the HTTP request, builds an HttpContext, and hands it to the middleware pipeline configured in Program.cs. After the pipeline writes the response, Kestrel serializes and sends it back over the TCP connection. Kestrel supports HTTP/1.1, HTTP/2, and HTTP/3. In production it is often placed behind a reverse proxy such as Nginx or IIS which handles TLS termination, load balancing, and slow-client protection before forwarding to Kestrel. Kestrel can also face the internet directly, which is common in containerized deployments where the cloud load balancer handles TLS.",
+        "keyPoints": [
+          "Kestrel is the default cross-platform web server included with ASP.NET Core",
+          "It supports HTTP/1.1, HTTP/2, and HTTP/3 and can listen on TCP sockets or Unix domain sockets",
+          "In production it often sits behind a reverse proxy like Nginx or IIS for TLS offload and security",
+          "It can also be edge-facing directly - common in Docker behind a cloud load balancer"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no limits configured; Kestrel exposed edge-facing with defaults only\nvar builder = WebApplication.CreateBuilder(args);\nvar app = builder.Build();\napp.Run();\n\n// ✅ GOOD - explicit Kestrel limits and HTTPS for edge-facing deployment\nvar builder = WebApplication.CreateBuilder(args);\nbuilder.WebHost.ConfigureKestrel(options =>\n{\n    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10 MB\n    options.ListenAnyIP(443, listenOptions =>\n        listenOptions.UseHttps());\n});\nvar app = builder.Build();\napp.Run();",
+          "note": "Configuring Kestrel limits protects against oversized request attacks when Kestrel is internet-facing without a reverse proxy in front."
+        },
+        "analogy": "Kestrel is the post room - it receives all deliveries before anyone upstairs sees them.",
+        "redFlags": [
+          "Saying Kestrel cannot face the internet directly - it can, depending on deployment",
+          "Confusing Kestrel (the web server) with the middleware pipeline (request processing logic)",
+          "Not knowing that a reverse proxy is recommended for production TLS and slow-client protection",
+          "Saying Kestrel only supports HTTP/1.1 - it also supports HTTP/2 and HTTP/3"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why put Nginx or IIS in front of Kestrel in production?",
+            "a": "For TLS termination, slow-client buffering, request queuing, and centralized load balancing - concerns you do not want to embed in every app instance."
+          },
+          {
+            "q": "Can Kestrel face the internet directly?",
+            "a": "Yes - it is fully capable, and this is common in containerized deployments where a cloud load balancer handles TLS offload before traffic reaches Kestrel."
+          },
+          {
+            "q": "What HTTP versions does Kestrel support?",
+            "a": "HTTP/1.1, HTTP/2 (including server push), and HTTP/3 over QUIC in .NET 7 and later."
+          },
+          {
+            "q": "What does Kestrel hand the request to after parsing it?",
+            "a": "The middleware pipeline configured in Program.cs, via the ASP.NET Core hosting layer."
+          },
+          {
+            "q": "How do you configure Kestrel's limits?",
+            "a": "Via builder.WebHost.ConfigureKestrel() where you set properties like MaxRequestBodySize and connection limits."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain how Kestrel works?"
+          },
+          {
+            "role": "you",
+            "text": "Kestrel is ASP.NET Core's built-in cross-platform web server. It binds to a port, listens for TCP connections, parses incoming HTTP requests, builds an HttpContext, and passes it to the middleware pipeline. When the pipeline writes the response, Kestrel sends it back to the client."
+          },
+          {
+            "role": "interviewer",
+            "text": "Would you expose Kestrel directly to the internet in a production e-commerce API?"
+          },
+          {
+            "role": "you",
+            "text": "I could, but I would typically put Nginx or a cloud load balancer in front of it for TLS termination, slow-client buffering, and rate limiting at the network edge. In a containerized deployment on Azure or AWS the cloud LB handles TLS and I run Kestrel without HTTPS internally."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does the reverse proxy actually give you that Kestrel cannot do itself?"
+          },
+          {
+            "role": "you",
+            "text": "Kestrel can technically handle all of it, but the proxy centralizes TLS cert management, handles slow clients before they tie up Kestrel threads, and provides cross-app load balancing. It is a separation of concerns - Kestrel processes requests, the proxy handles infrastructure."
+          },
+          {
+            "role": "interviewer",
+            "text": "If a load balancer is in front, how does Kestrel know the real client IP?"
+          },
+          {
+            "role": "you",
+            "text": "The proxy forwards it in an X-Forwarded-For header. I add UseForwardedHeaders() middleware to the pipeline so ASP.NET Core reads that header and populates HttpContext.Connection.RemoteIpAddress correctly. Without it my IP-based rate limiting would see the proxy IP instead of the actual client."
+          },
+          {
+            "role": "interviewer",
+            "text": "Which HTTP versions does Kestrel support?"
+          },
+          {
+            "role": "you",
+            "text": "HTTP/1.1 and HTTP/2 out of the box, and HTTP/3 over QUIC starting in .NET 7. HTTP/2 enables multiplexing multiple requests over a single connection which significantly reduces latency for SPAs making many parallel API calls."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-middleware-004",
+      "q": "What is the role of Program.cs in ASP.NET Core (minimal hosting model)?",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["program.cs", "hosting", "startup"],
+      "answer": {
+        "oneLiner": "Program.cs is the single entry point that creates the host, registers services into the DI container, builds the app, configures the middleware pipeline, and starts the server.",
+        "detail": "Since .NET 6, ASP.NET Core uses the minimal hosting model which collapses the old Startup.cs class into a single Program.cs file. The file has two logical halves separated by builder.Build(). Before Build() you have service registration: you call builder.Services.Add...() to register every dependency, controller, DbContext, and other service into the DI container. After Build() you configure the middleware pipeline by calling app.Use...() methods in the order you want them to execute. Finally app.Run() starts the server. You cannot register services after Build() because the DI container is locked at that point. The minimal model uses C# top-level statements so there is no explicit class or Main method visible in the file.",
+        "keyPoints": [
+          "WebApplication.CreateBuilder(args) sets up the host, config, logging, and DI container",
+          "builder.Services.Add...() before Build() is the service registration phase",
+          "builder.Build() locks the DI container and returns the WebApplication",
+          "app.Use...() calls after Build() configure the pipeline; app.Run() starts the server"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - attempting middleware config before Build(); WebApplication does not exist yet\nvar builder = WebApplication.CreateBuilder(args);\nbuilder.UseAuthentication(); // compile error - builder has no Use methods\n\n// ✅ GOOD - services before Build(), pipeline after Build()\nvar builder = WebApplication.CreateBuilder(args);\nbuilder.Services.AddControllers();\nbuilder.Services.AddScoped<IOrderRepository, OrderRepository>();\nvar app = builder.Build();\napp.UseExceptionHandler(\"/error\");\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();\napp.Run();",
+          "note": "The Build() call is the dividing line - services go before it, pipeline configuration goes after it. Crossing this boundary is either a compile error or a runtime exception."
+        },
+        "analogy": "Program.cs is the blueprint and the builder - plan the rooms first, then open the doors.",
+        "redFlags": [
+          "Not knowing the dividing line between service registration (before Build) and pipeline config (after Build)",
+          "Saying you can register services after builder.Build() - the container is locked at that point",
+          "Confusing the old Startup.cs two-method pattern with the current single-file minimal model",
+          "Not knowing that app.Run() blocks and keeps the server alive until shutdown"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What does WebApplication.CreateBuilder give you?",
+            "a": "A pre-configured host builder with default config sources (appsettings.json, environment variables, command line), default logging, and the empty DI service collection."
+          },
+          {
+            "q": "Can you still use a Startup.cs class in .NET 6 and later?",
+            "a": "Yes, you can configure the builder to use a Startup class, but the minimal hosting model in a single Program.cs is the recommended default for new projects."
+          },
+          {
+            "q": "How do you run database migrations at startup in Program.cs?",
+            "a": "After Build(), call app.Services.CreateScope() to get a DI scope, resolve the DbContext, call MigrateAsync(), dispose the scope, then call app.Run()."
+          },
+          {
+            "q": "Can you add middleware before calling builder.Build()?",
+            "a": "No - the WebApplication object that exposes app.Use() does not exist until after Build() returns."
+          },
+          {
+            "q": "What config sources does CreateBuilder wire up by default?",
+            "a": "appsettings.json, appsettings.{Environment}.json, environment variables, command-line arguments, and user secrets in Development - loaded in that order with later sources overriding earlier ones."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the role of Program.cs in the minimal hosting model?"
+          },
+          {
+            "role": "you",
+            "text": "It is the single entry point for the whole application. It creates the host via WebApplication.CreateBuilder(), registers all services into the DI container, calls Build() to lock the container, configures the middleware pipeline, then starts the server with app.Run()."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned Build() locks the container - what does that mean in practice?"
+          },
+          {
+            "role": "you",
+            "text": "Once you call builder.Build(), the DI service provider is constructed and the service collection is frozen. You cannot add new registrations after that point. Any attempt to register a service after Build() will either be ignored or throw, depending on how you try to do it."
+          },
+          {
+            "role": "interviewer",
+            "text": "How is this different from the old Startup.cs pattern?"
+          },
+          {
+            "role": "you",
+            "text": "The old pattern had two explicit methods: ConfigureServices() for DI registration and Configure() for the pipeline. The minimal model merges both into Program.cs with Build() as the natural dividing line. The conceptual split is the same - just fewer files and no class boilerplate."
+          },
+          {
+            "role": "interviewer",
+            "text": "If I need to run a database migration at startup - how would you do that in Program.cs?"
+          },
+          {
+            "role": "you",
+            "text": "After Build() I call app.Services.CreateScope() to get a DI scope and resolve the DbContext from it. I call database.MigrateAsync(), dispose the scope, then call app.Run(). This is the standard pattern - you need a scope because DbContext is scoped and cannot be resolved from the root provider."
+          },
+          {
+            "role": "interviewer",
+            "text": "What config sources does CreateBuilder wire up by default?"
+          },
+          {
+            "role": "you",
+            "text": "appsettings.json, appsettings.{Environment}.json, environment variables, command-line arguments, and user secrets in the Development environment. They load in that order and later sources override earlier ones, so an environment variable overrides appsettings.json which is exactly what you want in CI and production deployments."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-middleware-005",
+      "q": "How do you write custom middleware?",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["custom-middleware", "convention"],
+      "answer": {
+        "oneLiner": "Write a class with a constructor taking RequestDelegate and a public InvokeAsync(HttpContext) method, then register it with app.UseMiddleware<T>(). For small one-off cases use an inline app.Use() lambda.",
+        "detail": "The convention-based middleware pattern requires a class with two things: a constructor that accepts a RequestDelegate (which represents the next component in the chain), and a public method named Invoke or InvokeAsync that accepts an HttpContext. The framework constructs the class once at startup so it is effectively a singleton. Because of this, you must not inject scoped or transient services through the constructor - they would be captured and reused across all requests. Instead, declare scoped services as additional parameters on InvokeAsync; the framework resolves them per request from the current scope. Inline lambda middleware using app.Use() is suitable for quick, small logic but cannot have services injected per request the same way.",
+        "keyPoints": [
+          "Constructor accepts RequestDelegate next - this represents the rest of the pipeline",
+          "InvokeAsync(HttpContext ctx) is called per request; call _next(ctx) to continue the chain",
+          "The class is instantiated once (singleton lifetime) - never inject scoped services in the constructor",
+          "Inject scoped services as additional InvokeAsync parameters; the framework resolves them per request"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - scoped OrderRepository injected in constructor; becomes a captured singleton\npublic class AuditMiddleware\n{\n    private readonly RequestDelegate _next;\n    private readonly IOrderRepository _orders; // wrong - captured for app lifetime\n    public AuditMiddleware(RequestDelegate next, IOrderRepository orders)\n    { _next = next; _orders = orders; }\n}\n\n// ✅ GOOD - scoped service in InvokeAsync; resolved fresh per request\npublic class AuditMiddleware\n{\n    private readonly RequestDelegate _next;\n    public AuditMiddleware(RequestDelegate next) => _next = next;\n    public async Task InvokeAsync(HttpContext ctx, IOrderRepository orders)\n    {\n        await _next(ctx);\n        await orders.LogRequestAsync(ctx.Request.Path);\n    }\n}",
+          "note": "The framework injects scoped services into InvokeAsync parameters per request, keeping them properly scoped even though the middleware class itself lives as a singleton."
+        },
+        "analogy": "Middleware is a reusable stamp; the ink (scoped services) is fresh for each envelope.",
+        "redFlags": [
+          "Injecting a scoped service like DbContext or a repository into the middleware constructor",
+          "Not knowing that middleware is singleton - created once at startup, reused for every request",
+          "Confusing app.Use() lambda (inline, no per-request DI parameters) with convention-based class middleware",
+          "Forgetting to call await _next(ctx) and accidentally short-circuiting the pipeline"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why is middleware effectively a singleton?",
+            "a": "It is constructed once when UseMiddleware<T>() runs during app startup and the same instance handles every request for the lifetime of the application."
+          },
+          {
+            "q": "What happens if you inject a DbContext into the middleware constructor?",
+            "a": "The DbContext becomes a captive dependency - one instance reused across all requests causing stale change tracking and concurrency bugs because DbContext is not thread-safe."
+          },
+          {
+            "q": "Can you unit test convention-based middleware?",
+            "a": "Yes - instantiate the class directly with a mock RequestDelegate and a mock HttpContext, then call InvokeAsync() and assert the results."
+          },
+          {
+            "q": "What is the difference between Invoke and InvokeAsync?",
+            "a": "They serve the same role; InvokeAsync is the preferred async signature. The framework accepts either name."
+          },
+          {
+            "q": "How do you write a middleware extension method for cleaner registration?",
+            "a": "Write a static extension on IApplicationBuilder that calls app.UseMiddleware<YourMiddleware>() so callers write app.UseAuditLogging() instead of the generic form."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do you write custom middleware in ASP.NET Core?"
+          },
+          {
+            "role": "you",
+            "text": "Two options: an inline app.Use() lambda for something small and throwaway, or a convention-based class with a constructor taking RequestDelegate and a public InvokeAsync(HttpContext) method. I register the class with app.UseMiddleware<AuditMiddleware>()."
+          },
+          {
+            "role": "interviewer",
+            "text": "In that class, how do you get a per-request scoped service like a DbContext?"
+          },
+          {
+            "role": "you",
+            "text": "Not through the constructor. The middleware is a singleton so anything injected there lives forever. I add the scoped service as an extra parameter on InvokeAsync - the framework resolves it from the current request scope each time InvokeAsync is called."
+          },
+          {
+            "role": "interviewer",
+            "text": "What breaks in production if you inject DbContext in the constructor?"
+          },
+          {
+            "role": "you",
+            "text": "The DbContext becomes a captive dependency - one instance serving every concurrent request. DbContext is not thread-safe, so you get corrupted change tracking and data from one user leaking into another user's request. In development the scope validation might even throw at startup to warn you."
+          },
+          {
+            "role": "interviewer",
+            "text": "How would you unit test this middleware?"
+          },
+          {
+            "role": "you",
+            "text": "Instantiate the class directly with a mock RequestDelegate and call InvokeAsync() with a mock HttpContext. Because scoped dependencies come in through InvokeAsync parameters I can pass mocks there too. No TestServer needed for a pure unit test."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you make registration cleaner than calling UseMiddleware every time?"
+          },
+          {
+            "role": "you",
+            "text": "Write a static extension method on IApplicationBuilder: public static IApplicationBuilder UseAuditLogging(this IApplicationBuilder app) => app.UseMiddleware<AuditMiddleware>(). Callers then write app.UseAuditLogging() which matches the style of built-in middleware like app.UseAuthentication()."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-middleware-006",
+      "q": "Why does middleware ordering matter? Give an example.",
+      "type": "scenario",
+      "freq": "medium",
+      "tags": ["ordering", "pipeline"],
+      "answer": {
+        "oneLiner": "Order matters because each middleware can short-circuit or transform the request before later ones run. Authentication must come before Authorization, and exception handling must be first to wrap the whole pipeline.",
+        "detail": "The ASP.NET Core middleware pipeline executes components in the exact order they are registered. Each component can read and modify the request before passing it forward, and can read and modify the response on the way back. If a component short-circuits it does not call next(), so nothing registered after it runs. Authentication must run before Authorization because Authorization needs the ClaimsPrincipal that Authentication builds from the JWT or cookie. CORS must run after UseRouting but before UseAuthorization so that preflight responses include correct headers and CORS checks can see the matched endpoint. Exception handling should be the first registration so it wraps all other components and can catch exceptions from any of them.",
+        "keyPoints": [
+          "UseAuthentication must come before UseAuthorization - you need to know who before deciding what they can do",
+          "Exception handling must be first in the pipeline to wrap everything downstream",
+          "UseRouting must come before endpoint-aware middleware like CORS and Authorization",
+          "UseCors must run after UseRouting and before UseAuthorization"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - Authorization before Authentication; ClaimsPrincipal is empty; all requests get 401\napp.UseAuthorization();\napp.UseAuthentication();\napp.MapControllers();\n\n// ✅ GOOD - correct order wraps exception handling around everything\napp.UseExceptionHandler(\"/error\");\napp.UseRouting();\napp.UseCors(\"storefront-policy\");\napp.UseAuthentication();\napp.UseAuthorization();\napp.MapControllers();",
+          "note": "Placing UseAuthorization before UseAuthentication means the user's identity is never populated, so every request is rejected even with a valid token."
+        },
+        "analogy": "You cannot check someone's ticket before they show their passport.",
+        "redFlags": [
+          "Not knowing that UseAuthentication must precede UseAuthorization",
+          "Putting exception handling anywhere other than first in the pipeline",
+          "Not knowing that UseCors must come after UseRouting and before UseAuthorization",
+          "Saying middleware order does not matter as long as the right components are registered"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What happens if you swap UseAuthentication and UseAuthorization?",
+            "a": "Authorization runs against an empty ClaimsPrincipal because the JWT has not been validated yet, so even users with valid tokens get rejected with 401 or 403."
+          },
+          {
+            "q": "Why must exception handling be registered first?",
+            "a": "So it wraps the entire remaining pipeline; if it is registered later it cannot catch exceptions thrown by the middleware registered before it."
+          },
+          {
+            "q": "Why must UseCors come after UseRouting?",
+            "a": "CORS middleware needs to know the matched endpoint to apply endpoint-level CORS policies; before UseRouting there is no matched endpoint available."
+          },
+          {
+            "q": "What is the recommended full ordering for a typical Web API?",
+            "a": "UseExceptionHandler, UseHttpsRedirection, UseRouting, UseCors, UseAuthentication, UseAuthorization, then MapControllers or endpoint mapping."
+          },
+          {
+            "q": "Does registration order affect DI resolution order?",
+            "a": "No - DI registration order affects which implementation wins when multiple registrations exist for the same interface, not pipeline execution order."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Why does middleware ordering matter? Can you give me a real example?"
+          },
+          {
+            "role": "you",
+            "text": "Because each middleware runs inbound in registration order and can short-circuit before later ones execute. The most common example: UseAuthentication must come before UseAuthorization. Authentication builds the ClaimsPrincipal from the JWT; Authorization checks that principal. If you flip them, Authorization sees an empty identity and rejects every request even with a valid token."
+          },
+          {
+            "role": "interviewer",
+            "text": "What status code would a user with a valid JWT get if those two are swapped?"
+          },
+          {
+            "role": "you",
+            "text": "They would get a 401 Unauthorized because from the Authorization middleware's perspective the user is unauthenticated - the identity was never populated. The valid token in their Authorization header has simply not been processed yet."
+          },
+          {
+            "role": "interviewer",
+            "text": "Where should exception handling sit and why?"
+          },
+          {
+            "role": "you",
+            "text": "At the very top - the first UseExceptionHandler call. It wraps everything that follows it. If you register it halfway down the pipeline, exceptions thrown by the middleware above it escape the handler and bubble up as unhandled 500s with no consistent error response."
+          },
+          {
+            "role": "interviewer",
+            "text": "What about CORS - where does that go?"
+          },
+          {
+            "role": "you",
+            "text": "After UseRouting and before UseAuthorization. CORS middleware needs routing to have run so it can read the matched endpoint's CORS policy. If it runs before UseRouting it cannot apply per-endpoint policies and preflight responses may be missing the correct headers."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you give me the full recommended order for a typical banking API?"
+          },
+          {
+            "role": "you",
+            "text": "UseExceptionHandler, UseHttpsRedirection, UseRouting, UseCors, UseAuthentication, UseAuthorization, then MapControllers. In a banking context I would also add a rate limiting middleware after UseCors and a custom request logging middleware right after the exception handler so every request gets a correlation ID before anything else touches it."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aspnet-middleware-007",
+      "q": "What does it mean to short-circuit the pipeline?",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["short-circuit", "pipeline"],
+      "answer": {
+        "oneLiner": "Short-circuiting means a middleware writes a response and does not call next(), so all downstream components are skipped and the response is returned immediately.",
+        "detail": "In the ASP.NET Core pipeline, every middleware receives a next delegate that represents the remainder of the chain. When a middleware calls next(), the request continues forward. When it does not call next(), nothing downstream runs - the response is written right there and the pipeline unwinds back through only the middleware that had already run inbound. This is an intentional design pattern, not an error. Common short-circuit scenarios include: authentication middleware rejecting an invalid token with a 401, a rate-limiter returning 429 when a client exceeds its quota, and a response cache middleware returning a cached response without hitting the application logic. Importantly, middleware that already ran inbound and is waiting for next() to return still gets to execute its outbound code. Only the components that had not yet started are completely skipped.",
+        "keyPoints": [
+          "Short-circuit happens when middleware writes a response without calling next()",
+          "Nothing registered after the short-circuiting component executes for that request",
+          "Middleware that already ran inbound still runs its outbound (post-next) code on unwinding",
+          "Common uses: auth rejection (401), rate limiting (429), cache hit returning cached response"
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - sets 401 status but still calls next(); downstream may overwrite the status\napp.Use(async (ctx, next) =>\n{\n    var key = ctx.Request.Headers[\"X-Api-Key\"].FirstOrDefault();\n    if (string.IsNullOrEmpty(key)) { ctx.Response.StatusCode = 401; }\n    await next(); // BUG - endpoint still runs and can reset the status to 200\n});\n\n// ✅ GOOD - returns early to short-circuit; downstream is protected\napp.Use(async (ctx, next) =>\n{\n    var key = ctx.Request.Headers[\"X-Api-Key\"].FirstOrDefault();\n    if (string.IsNullOrEmpty(key) || !IsValidKey(key))\n    {\n        ctx.Response.StatusCode = 401;\n        await ctx.Response.WriteAsync(\"Invalid or missing API key\");\n        return; // short-circuit - no next() call\n    }\n    await next();\n});",
+          "note": "Without the early return the middleware sets a 401 status but then continues into the downstream pipeline - the endpoint may still execute and overwrite the status code."
+        },
+        "analogy": "Short-circuiting is a security guard turning you away at the door - no point walking you through the whole building.",
+        "redFlags": [
+          "Setting the response status code but still calling next() - the downstream may overwrite it",
+          "Thinking short-circuiting is an error condition - it is a deliberate pipeline design pattern",
+          "Not knowing that middleware already entered still runs its outbound code after a downstream short-circuit",
+          "Confusing app.Run (always terminal by design) with a conditional short-circuit in app.Use"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Does middleware above the short-circuit still run its outbound code?",
+            "a": "Yes - middleware that already called next() and is waiting gets its post-next code executed as the pipeline unwinds; only components not yet started are skipped."
+          },
+          {
+            "q": "What is the difference between a short-circuit and app.Run?",
+            "a": "app.Run is always terminal by design regardless of the request; a short-circuit in app.Use is conditional based on runtime logic like whether the token is valid."
+          },
+          {
+            "q": "Name three real-world short-circuit scenarios.",
+            "a": "Authentication rejecting an invalid JWT with 401, rate limiting returning 429 when quota is exceeded, and a response cache middleware returning a cached response without calling the endpoint."
+          },
+          {
+            "q": "What is the bug if you set the status code but still call next()?",
+            "a": "The downstream middleware or endpoint may reset the status code to 200 and write its own body, completely overriding your rejection response."
+          },
+          {
+            "q": "Can you short-circuit from inside a Map branch?",
+            "a": "Yes - short-circuiting works the same inside a Map sub-pipeline; it stops execution of components within that branch's chain only."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What does it mean to short-circuit the middleware pipeline?"
+          },
+          {
+            "role": "you",
+            "text": "Short-circuiting means a middleware writes a response and does not call next(). Because next() is what triggers the rest of the chain, nothing downstream executes. The response returns immediately and the pipeline unwinds back through only the middleware that had already run."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a real scenario where you would deliberately short-circuit."
+          },
+          {
+            "role": "you",
+            "text": "API key validation in a SaaS product. If the request has no valid X-Api-Key header I write a 401 and return without calling next(). There is no reason to run authentication, authorization, model binding, or the endpoint logic for an unauthenticated client. Short-circuiting saves all that work."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the bug if a developer sets the status code to 401 but forgets to return before calling next()?"
+          },
+          {
+            "role": "you",
+            "text": "The downstream pipeline still executes. The endpoint may reset the status code to 200 and write its own response body, completely overriding the rejection. The client sees a successful response instead of a 401. This is a subtle bug that only shows up at runtime under specific conditions."
+          },
+          {
+            "role": "interviewer",
+            "text": "Does the middleware above the short-circuit still get to run its outbound code?"
+          },
+          {
+            "role": "you",
+            "text": "Yes. Any middleware that already called next() and is awaiting it still runs its post-next code as the pipeline unwinds. For example, a request-logging middleware at the top would still log the response status code even if the API key middleware short-circuited below it. Only components that had not started at all are completely skipped."
+          },
+          {
+            "role": "interviewer",
+            "text": "How is that different from how app.Run works?"
+          },
+          {
+            "role": "you",
+            "text": "app.Run is unconditionally terminal - it always ends the pipeline regardless of any runtime conditions. A conditional short-circuit in app.Use is logic-driven: this particular request gets short-circuited, but another valid request through the same middleware continues forward by calling next(). Both stop the chain but for very different reasons."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

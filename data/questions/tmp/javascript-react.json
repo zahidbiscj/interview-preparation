@@ -1,0 +1,887 @@
+{
+  "subtopicId": "react",
+  "questions": [
+    {
+      "id": "js-react-001",
+      "q": "Why use React, and what is the Virtual DOM?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["react", "virtual-dom", "rendering"],
+      "answer": {
+        "oneLiner": "React is a declarative UI library where you describe what the screen should look like. It uses a Virtual DOM - an in-memory copy of the real DOM - to figure out the smallest set of changes needed on each update.",
+        "detail": "When your component state changes, React creates a new Virtual DOM tree and compares it to the previous one. This comparison is called diffing. React then calculates the minimum number of real DOM operations needed and applies them in a batch. The real DOM is expensive to change - every write can trigger reflows and repaints. By doing the heavy thinking in memory first, React keeps the actual DOM touches as small as possible. Simplified: think of it like editing a Google Doc draft before publishing - you make all your edits offline, then only send the final diff to the server.",
+        "keyPoints": [
+          "Virtual DOM is a lightweight JavaScript object tree, not actual browser DOM nodes",
+          "React diffs the new VDOM against the old one after every state change",
+          "Only the changed parts of the real DOM get updated, not the whole page",
+          "Declarative style means you describe the end state - React handles the imperative steps"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - direct DOM manipulation, bypasses React's diffing\nfunction updateProductPrice(price) {\n  document.getElementById('price').textContent = '$' + price;\n}\n\n// ✅ GOOD - React diffs and updates only what changed\nfunction ProductPrice({ price }) {\n  return <span className=\"price\">${price}</span>;\n}",
+          "note": "The GOOD version lets React decide what DOM update is needed, keeping updates minimal and predictable."
+        },
+        "analogy": "Edit a draft first, then publish only the actual changes.",
+        "redFlags": [
+          "Saying the Virtual DOM is always faster than the real DOM - diffing itself has a cost",
+          "Confusing the Virtual DOM with Shadow DOM, which is a browser feature for CSS encapsulation",
+          "Not knowing that React batches multiple state updates before touching the real DOM",
+          "Saying React re-renders the whole page on every state change"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Is the Virtual DOM always faster than direct DOM updates?",
+            "a": "No - for very simple pages, direct DOM updates can be faster. The Virtual DOM shines when you have complex UIs with frequent updates, where minimising DOM writes saves significant time."
+          },
+          {
+            "q": "What is the difference between the Virtual DOM and the Shadow DOM?",
+            "a": "Virtual DOM is a React concept - a JS object tree React uses for diffing. Shadow DOM is a browser feature that lets you encapsulate CSS and HTML for web components. They are completely unrelated."
+          },
+          {
+            "q": "What does declarative mean in the context of React?",
+            "a": "You describe the target UI state and React figures out the DOM operations needed to get there. You do not manually write add/remove/update DOM instructions."
+          },
+          {
+            "q": "How does React decide what to update?",
+            "a": "Through reconciliation - it diffs the new Virtual DOM tree against the previous one and finds the minimal set of changes to apply to the real DOM."
+          },
+          {
+            "q": "What triggers a Virtual DOM re-render in React?",
+            "a": "A state change via setState or a hook like useState, or a change in props passed down from a parent component."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Why would you choose React for a new project, and can you explain the Virtual DOM to me?"
+          },
+          {
+            "role": "you",
+            "text": "React is declarative and component-based, which makes complex UIs manageable. The Virtual DOM is an in-memory JavaScript copy of the real DOM. When state changes, React builds a new Virtual DOM tree, diffs it against the old one, and applies only the minimal real DOM changes needed."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why not just update the DOM directly every time something changes?"
+          },
+          {
+            "role": "you",
+            "text": "Real DOM operations are expensive - they can trigger reflows and repaints. Batching the changes and writing only the diff keeps the browser work to a minimum, which matters when you have a product listing page with hundreds of items updating simultaneously."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is the Virtual DOM always faster than direct DOM manipulation?"
+          },
+          {
+            "role": "you",
+            "text": "Not always. The diffing process itself has a cost. For a very simple page, direct DOM writes can be faster. React wins when UIs are complex and updates are frequent, because it avoids redundant DOM writes across the whole tree."
+          },
+          {
+            "role": "interviewer",
+            "text": "People sometimes confuse Virtual DOM with Shadow DOM. Can you distinguish them?"
+          },
+          {
+            "role": "you",
+            "text": "They are completely different things. Virtual DOM is a React implementation detail - a JS object tree used for diffing. Shadow DOM is a browser-native feature that encapsulates CSS and HTML inside web components. One is a library pattern, the other is a browser API."
+          },
+          {
+            "role": "interviewer",
+            "text": "What triggers a re-render in React?"
+          },
+          {
+            "role": "you",
+            "text": "A state change via useState or setState, or a prop change from a parent. React then re-runs the component function, builds a new VDOM tree, and reconciles it against the previous one to determine the minimum real DOM update."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-react-002",
+      "q": "How does React's DOM diffing / reconciliation work?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["reconciliation", "diffing", "virtual-dom", "keys"],
+      "answer": {
+        "oneLiner": "When state changes, React builds a new Virtual DOM tree, compares it to the previous one level by level using a fast heuristic algorithm, and applies only the changed nodes to the real DOM.",
+        "detail": "React's reconciliation uses two main rules. First, if two elements have different types (e.g. a div becomes a span), React tears down the entire subtree and builds a fresh one. Second, for elements of the same type, React keeps the DOM node and only updates the changed attributes. For lists, React uses the key prop to track which items moved, were added, or were removed. Without stable keys, React cannot tell which item is which after a reorder, so it may destroy and recreate DOM nodes unnecessarily - or worse, apply state to the wrong element. The diffing algorithm runs in O(n) time using these heuristics, not a full tree-comparison which would be O(n^3).",
+        "keyPoints": [
+          "Diffing is O(n) because React only compares nodes at the same level, not across levels",
+          "Different element type means React tears down and rebuilds the whole subtree",
+          "The key prop tells React which list item is which across renders",
+          "Using array index as a key breaks reconciliation when the list can reorder or change"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - index as key causes wrong node reuse when list order changes\norders.map((order, index) => (\n  <OrderRow key={index} order={order} />\n));\n\n// ✅ GOOD - stable unique ID lets React track items correctly\norders.map((order) => (\n  <OrderRow key={order.id} order={order} />\n));",
+          "note": "Using order.id as the key means React correctly identifies each row even after sorting or filtering the list."
+        },
+        "analogy": "Keys are name badges at a conference - without them React cannot tell who left and who just moved seats.",
+        "redFlags": [
+          "Using array index as key for any list that can be filtered, sorted, or reordered",
+          "Saying the Virtual DOM diffing is O(n^3) - React uses a fast O(n) heuristic",
+          "Not knowing that changing an element type causes a full subtree rebuild",
+          "Confusing reconciliation with hydration, which is a server-side rendering concept"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Why is the diffing algorithm O(n) and not O(n^3)?",
+            "a": "React uses two heuristics: it only compares nodes at the same level, and it uses keys for lists. A full tree diff would be O(n^3), but these shortcuts bring it down to O(n)."
+          },
+          {
+            "q": "When is it safe to use array index as a key?",
+            "a": "Only when the list is static - it will never be reordered, filtered, or have items added or removed. In practice this is rare, so prefer a stable unique ID."
+          },
+          {
+            "q": "What happens when two adjacent elements swap types?",
+            "a": "React tears down the old subtree and creates a fresh one. This means component state inside that subtree is lost, which can cause visible bugs like losing form input."
+          },
+          {
+            "q": "What does React do with unchanged attributes during reconciliation?",
+            "a": "It leaves the DOM node in place and only updates the specific attributes that changed, avoiding unnecessary DOM work."
+          },
+          {
+            "q": "How does React Fiber relate to reconciliation?",
+            "a": "Fiber is React's internal reconciliation engine introduced in React 16. It breaks rendering work into small units that can be paused, making the reconciliation process interruptible and enabling features like Concurrent Mode."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through how React's reconciliation algorithm works."
+          },
+          {
+            "role": "you",
+            "text": "When state changes, React creates a new Virtual DOM tree and diffs it against the previous one using a level-by-level heuristic. If element types match, it keeps the DOM node and patches only changed attributes. If types differ, it tears down the subtree entirely and builds fresh nodes."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the complexity of that diffing, and why?"
+          },
+          {
+            "role": "you",
+            "text": "It runs in O(n) time. A full tree comparison would be O(n^3), but React's two heuristics - same-level comparison and keys for lists - reduce it dramatically. For a list of 10,000 orders on a dashboard, that difference is the gap between fast and unusable."
+          },
+          {
+            "role": "interviewer",
+            "text": "Tell me more about how keys help the algorithm."
+          },
+          {
+            "role": "you",
+            "text": "Keys are stable identifiers React uses to track list items across renders. If I have a sorted product list and the user reverses it, React uses the keys to know which DOM node belongs to which item, so it moves nodes instead of destroying and recreating them."
+          },
+          {
+            "role": "interviewer",
+            "text": "What goes wrong if I use array index as the key?"
+          },
+          {
+            "role": "you",
+            "text": "If the list reorders, the indexes shift. React sees key=0 in the new render and assumes it is the same item as key=0 before, so it applies the old item's state to the new first item. For a shopping cart with editable quantities, this means the wrong quantity shows next to the wrong product."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there any scenario where index keys are acceptable?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - a fully static list that will never reorder, never have items inserted in the middle, and never be filtered. A read-only list of fixed FAQ items is one example. But the moment the list can change dynamically, a stable unique ID is required."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-react-003",
+      "q": "What is useMemo and when should you use it?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["useMemo", "hooks", "memoization", "performance"],
+      "answer": {
+        "oneLiner": "useMemo caches the return value of an expensive function and only recalculates it when one of its listed dependencies changes, skipping the work on every other render.",
+        "detail": "Every time a React component re-renders, all code inside it runs again. For cheap calculations like string formatting, this is fine. But if you are sorting 50,000 customer records or running a complex filter, recalculating on every render causes visible lag. useMemo wraps that expensive call and stores the result. On the next render React checks the dependency array - if nothing changed, it returns the cached value and skips the function entirely. If a dependency changed, it reruns the function and caches the new result. useMemo also helps when you pass a derived object or array as a prop - without it, a new object reference is created on every render, which can cause child components wrapped in React.memo to re-render unnecessarily even though the data is identical.",
+        "keyPoints": [
+          "useMemo caches a VALUE, not a function - useCallback is the hook for caching functions",
+          "It only recalculates when a dependency in the array changes",
+          "Overusing it adds memory and bookkeeping cost - measure before adding it",
+          "It also stabilises object/array references, preventing unnecessary child re-renders"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - sorts the full customer list on every render, even unrelated state changes\nfunction CustomerReport({ customers, searchTerm }) {\n  const sorted = customers.slice().sort((a, b) => a.name.localeCompare(b.name));\n  return <CustomerList items={sorted} />;\n}\n\n// ✅ GOOD - sort only runs when the customers array actually changes\nfunction CustomerReport({ customers, searchTerm }) {\n  const sorted = useMemo(\n    () => customers.slice().sort((a, b) => a.name.localeCompare(b.name)),\n    [customers]\n  );\n  return <CustomerList items={sorted} />;\n}",
+          "note": "Without useMemo, every keystroke in a search box re-sorts 50,000 customers. With it, the sort only runs when the customer data itself changes."
+        },
+        "analogy": "Cache the answer, not the question.",
+        "redFlags": [
+          "Wrapping every calculation in useMemo by default - the overhead can exceed the savings for cheap operations",
+          "Confusing useMemo (caches a value) with useCallback (caches a function reference)",
+          "Putting a dependency in the array that is recreated on every render, making the memo pointless",
+          "Not knowing that useMemo does not guarantee the cache is kept - React may evict it"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between useMemo and useCallback?",
+            "a": "useMemo caches the return value of a function - the computed result. useCallback caches the function itself so its reference stays stable across renders. useCallback(fn, deps) is equivalent to useMemo(() => fn, deps)."
+          },
+          {
+            "q": "Does useMemo guarantee it will never recompute?",
+            "a": "No. React may discard the cached value in low-memory situations and recompute on the next render. useMemo is a performance hint, not a guarantee."
+          },
+          {
+            "q": "When is useMemo harmful rather than helpful?",
+            "a": "When the wrapped computation is cheap, the memoization overhead - storing the cached value and checking the dependency array - can actually cost more than just recomputing."
+          },
+          {
+            "q": "How does useMemo prevent unnecessary child re-renders?",
+            "a": "If you pass a derived object or array as a prop and wrap it in useMemo, the reference stays stable across renders. A child wrapped in React.memo will skip re-rendering because the prop reference has not changed."
+          },
+          {
+            "q": "What happens if you omit a dependency from the array?",
+            "a": "useMemo will use a stale cached value even when the omitted dependency changes, causing the component to show outdated data. The React ESLint plugin exhaustive-deps catches this."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is useMemo and when would you reach for it?"
+          },
+          {
+            "role": "you",
+            "text": "useMemo caches the return value of an expensive function and only recomputes it when its dependencies change. I reach for it when a calculation is genuinely costly - like sorting or filtering thousands of records - and it would otherwise run on every render including renders triggered by unrelated state changes."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you give me a real scenario where it matters?"
+          },
+          {
+            "role": "you",
+            "text": "In a logistics dashboard with 20,000 shipment records, the user can search by destination. Without useMemo, every character they type re-sorts the full list. With useMemo wrapping the sort and declaring the shipments array as a dependency, the sort only runs when the data itself updates, not on every keystroke."
+          },
+          {
+            "role": "interviewer",
+            "text": "How is it different from useCallback?"
+          },
+          {
+            "role": "you",
+            "text": "useMemo caches a computed value - the result of calling the function. useCallback caches the function reference itself. In fact, useCallback(fn, deps) is just useMemo(() => fn, deps) under the hood."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there a risk to overusing useMemo?"
+          },
+          {
+            "role": "you",
+            "text": "Yes. For cheap calculations, the overhead of storing the cache and checking the dependency array can cost more than just recomputing. I treat useMemo like a performance tool - profile first, apply only where the slowness is measurable."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if you forget a dependency in the array?"
+          },
+          {
+            "role": "you",
+            "text": "useMemo returns a stale cached value even when that dependency changes, so the UI shows outdated data. The react-hooks/exhaustive-deps ESLint rule catches this at development time, which is why I always enable it in projects."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-react-004",
+      "q": "What is useRef used for?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["useRef", "hooks", "dom", "mutable"],
+      "answer": {
+        "oneLiner": "useRef gives you a mutable box with a .current property that survives re-renders without causing them - used for direct DOM access and for storing any value that should persist but should not trigger a re-render.",
+        "detail": "useRef returns an object like { current: initialValue }. Unlike state, writing to .current does not schedule a re-render. The object itself is the same across all renders - only its .current property changes. This makes it useful in two distinct ways. First, you can attach it to a JSX element as the ref prop, and after React mounts the element, .current will point to the actual DOM node - letting you call .focus(), measure dimensions, or control a video player. Second, you can use it as an instance variable to store values that need to survive renders but should not cause them - for example a timer ID, a previous prop value for comparison, or a flag to prevent a stale-closure effect from running.",
+        "keyPoints": [
+          "Changing .current never triggers a re-render - unlike setState",
+          "The ref object is the same reference across all renders, only .current changes",
+          "Use case 1: attach to a DOM node for imperative access (focus, scroll, measure)",
+          "Use case 2: store mutable values like timer IDs or previous values without causing renders"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - using state to store a timer ID causes an unnecessary re-render on each start/stop\nconst [timerId, setTimerId] = useState(null);\nconst start = () => setTimerId(setInterval(pollOrder, 2000));\nconst stop = () => { clearInterval(timerId); setTimerId(null); };\n\n// ✅ GOOD - ref stores the timer ID without triggering any re-render\nconst timerRef = useRef(null);\nconst start = () => { timerRef.current = setInterval(pollOrder, 2000); };\nconst stop = () => { clearInterval(timerRef.current); };",
+          "note": "Storing the timer ID in a ref means starting and stopping the polling interval does not cause the component to re-render."
+        },
+        "analogy": "A sticky note on your desk that remembers something between meetings without interrupting the meeting.",
+        "redFlags": [
+          "Using useRef to store state that should trigger a re-render - the UI will not update when .current changes",
+          "Reading .current during render to drive UI output - it is not reactive",
+          "Not knowing that a normal variable declared inside a component resets to its initial value on every render",
+          "Confusing useRef with createRef, which creates a new ref object on every render and is meant for class components"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between useRef and a regular variable declared inside the component?",
+            "a": "A regular variable is recreated fresh on every render and loses its previous value. A ref persists the same object across all renders, so its .current value survives re-renders."
+          },
+          {
+            "q": "When would you use useRef instead of useState?",
+            "a": "When you need to remember a value between renders but changing it should not cause a re-render - for example, a timer ID, a scroll position, or an abort controller reference."
+          },
+          {
+            "q": "Can you read a ref value inside JSX to control what is displayed?",
+            "a": "You can, but it is an anti-pattern. Refs are not reactive so React will not re-render when .current changes, meaning the displayed value may be stale. Use state for anything that drives the UI."
+          },
+          {
+            "q": "How do you attach a ref to a DOM element?",
+            "a": "Create the ref with useRef(null) and pass it as the ref prop to the JSX element. After mount, .current points to the actual DOM node."
+          },
+          {
+            "q": "What is the difference between useRef and createRef?",
+            "a": "createRef creates a brand new ref object every render and is designed for class components. useRef always returns the same object across renders, making it correct for function components."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is useRef used for in React?"
+          },
+          {
+            "role": "you",
+            "text": "useRef returns a mutable object with a .current property that persists across re-renders without causing them. I use it in two main ways: to get a direct reference to a DOM node for things like focusing an input, and to store values like timer IDs that need to survive renders but should not trigger a re-render when they change."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why not just use a regular variable inside the component?"
+          },
+          {
+            "role": "you",
+            "text": "A regular variable inside the component body is recreated on every render - it does not remember its previous value. A ref holds the same object across renders, so its .current value persists. For a polling interval in an order-tracking page, I store the timer ID in a ref so I can cancel it later without losing track of it."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why not use state to store the timer ID?"
+          },
+          {
+            "role": "you",
+            "text": "Calling setState causes a re-render, and storing a timer ID does not need to affect what the user sees. Using a ref avoids the unnecessary render. The rule I follow is: if changing the value should update the UI, use state; if not, use a ref."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you use a ref value inside JSX to conditionally render something?"
+          },
+          {
+            "role": "you",
+            "text": "Technically yes, but it is an anti-pattern. Refs are not reactive - React does not know when .current changes, so it will not re-render, and the user will see stale UI. Anything that drives what is displayed should live in state."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does useRef differ from createRef?"
+          },
+          {
+            "role": "you",
+            "text": "createRef creates a new ref object on every render and was designed for class components. useRef always returns the same object instance across all renders of a function component, which is exactly what you need to persist values."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-react-005",
+      "q": "What is the difference between useMemo and useRef?",
+      "level": "senior",
+      "type": "comparison",
+      "freq": "medium",
+      "tags": ["useMemo", "useRef", "hooks", "comparison"],
+      "answer": {
+        "oneLiner": "useMemo caches a computed value and automatically recalculates when its dependencies change. useRef is a plain mutable box that you update manually and that never triggers any recalculation on its own.",
+        "detail": "Both hooks persist a value across renders without causing a re-render when that value changes. That is where the similarity ends. useMemo is dependency-driven: you give it a factory function and a dependency array, and React decides when to recompute by comparing the dependencies. It is designed for expensive derived data. useRef has no dependencies - it just holds whatever you put in .current. You are in full control of when you write to it and what it contains. A second key difference is intent: useMemo is for computed values that derive from other data, while useRef is for imperative values that exist outside the render cycle - DOM nodes, timer IDs, previous values, abort controllers. If you need the cached value to update automatically when inputs change, use useMemo. If you need a stable container you update yourself, use useRef.",
+        "keyPoints": [
+          "Neither triggers a re-render when its stored value changes",
+          "useMemo is dependency-driven and recalculates automatically when deps change",
+          "useRef has no dependencies - you manually write to .current whenever you want",
+          "useMemo is for derived computed data; useRef is for imperative mutable state outside the render cycle"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - using useRef for derived data means it never updates automatically\nconst filteredRef = useRef(products.filter(p => p.inStock));\n// filteredRef.current is stale when products changes\n\n// ✅ GOOD - useMemo recomputes when products changes, useRef stores the abort controller\nconst inStockProducts = useMemo(\n  () => products.filter(p => p.inStock),\n  [products]\n);\nconst abortRef = useRef(null); // manually set when starting a fetch",
+          "note": "inStockProducts stays in sync with products automatically. abortRef is managed imperatively - no dependency array needed."
+        },
+        "analogy": "useMemo is a smart cache that refreshes itself; useRef is a drawer you open and close yourself.",
+        "redFlags": [
+          "Using useRef to store derived data that should update when inputs change - it will go stale",
+          "Using useMemo to store values you intend to update manually - state or useRef is the right tool",
+          "Saying both hooks cause re-renders when their value changes - neither does",
+          "Confusing the dependency array as optional for useMemo - omitting needed deps causes stale values"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Do either useMemo or useRef cause a re-render when their stored value changes?",
+            "a": "No. Neither hook schedules a re-render when the stored value changes. That is what distinguishes them from useState."
+          },
+          {
+            "q": "When would you reach for useRef instead of useMemo?",
+            "a": "When you need to store something that is not derived from props or state - like a DOM node, a timer ID, or an abort controller. These values you manage imperatively, not through a dependency array."
+          },
+          {
+            "q": "Can you replace useMemo with a useRef and update it manually in useEffect?",
+            "a": "Technically yes, but it is unnecessarily complex. useMemo handles the dependency-tracking and recomputation automatically. Manually syncing a ref in useEffect is more code with more chances for bugs."
+          },
+          {
+            "q": "What happens if you store a computed value in useRef and the input changes?",
+            "a": "The ref stays stale. React has no way to know the value is outdated because refs have no dependency tracking. The user sees wrong data until something else triggers a re-render and you manually update the ref."
+          },
+          {
+            "q": "What is the mental model for choosing between the two?",
+            "a": "If the value derives from other data and should update automatically, use useMemo. If the value is something you control and update imperatively - not derived, not reactive - use useRef."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain the difference between useMemo and useRef?"
+          },
+          {
+            "role": "you",
+            "text": "Both persist a value across renders without causing re-renders. But useMemo is dependency-driven - you give it a function and a dependency array and React automatically recomputes the cached value when a dependency changes. useRef is just a plain mutable box with no dependencies - you write to .current manually whenever you need to."
+          },
+          {
+            "role": "interviewer",
+            "text": "So if I store a filtered list in a useRef, what happens when the original list changes?"
+          },
+          {
+            "role": "you",
+            "text": "The ref goes stale. React has no dependency tracking for refs, so it will not know the filter needs rerunning. The user sees the old filtered list even after the source data changed. That is exactly when useMemo is the right tool - it watches the dependency and recomputes automatically."
+          },
+          {
+            "role": "interviewer",
+            "text": "Give me a case where useRef is clearly the better choice."
+          },
+          {
+            "role": "you",
+            "text": "Storing an AbortController for a fetch request. When the user navigates away, I call abortRef.current.abort() in the cleanup of useEffect. There is no computation, no dependencies - I just need a stable container to hold the controller so I can reach it from the cleanup function."
+          },
+          {
+            "role": "interviewer",
+            "text": "Do either of them trigger a re-render when the value changes?"
+          },
+          {
+            "role": "you",
+            "text": "No - that is the key distinction from useState. Neither useMemo nor useRef causes a re-render when the stored value changes. For useMemo, the recomputation happens silently and the new value is available on the next render that was already triggered by something else."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you quickly decide which one to use?"
+          },
+          {
+            "role": "you",
+            "text": "I ask one question: does this value derive from props or state and should update automatically when they change? If yes, useMemo. If no - it is something I manage imperatively like a DOM node or a timer ID - useRef."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-react-006",
+      "q": "What is the Context API and when would you use it?",
+      "level": "mid",
+      "type": "scenario",
+      "freq": "high",
+      "tags": ["context", "props-drilling", "state", "hooks"],
+      "answer": {
+        "oneLiner": "The Context API lets you broadcast a value to any component in a subtree without passing it through every intermediate component as a prop.",
+        "detail": "You create a context with createContext, wrap a part of your tree in a Provider that supplies a value, and then any descendant can read that value with the useContext hook. The main problem it solves is prop drilling - when a value needed deep in the tree must be passed as a prop through many intermediate components that do not use it themselves. Good candidates for Context are stable, infrequently-changing values like the logged-in user, the current theme, or the application locale. The performance trap is that every component calling useContext for a given context will re-render whenever that context value changes. If the context value is an object that gets recreated on every parent render, all consumers re-render even if the data they care about did not change. Solutions include splitting one large context into smaller focused contexts, or memoizing the context value with useMemo.",
+        "keyPoints": [
+          "Solves prop drilling - no more threading the same prop through unrelated intermediate components",
+          "Setup: createContext then Provider with value then useContext in any descendant",
+          "Best for stable values: auth user, theme, locale, feature flags",
+          "Every consumer re-renders when the context value changes - avoid putting hot state in context"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - threading auth user as a prop through every layout layer\nfunction App() {\n  const user = useAuth();\n  return <Layout user={user}><Dashboard user={user} /></Layout>;\n}\n\n// ✅ GOOD - Context broadcasts the user without threading it as a prop\nconst AuthContext = createContext(null);\nfunction App() {\n  const user = useAuth();\n  return (\n    <AuthContext.Provider value={user}>\n      <Layout><Dashboard /></Layout>\n    </AuthContext.Provider>\n  );\n}\nfunction Dashboard() {\n  const user = useContext(AuthContext);\n}",
+          "note": "Any component in the tree can read the auth user without every intermediate component needing to forward it."
+        },
+        "analogy": "Context is a Wi-Fi signal - broadcast once, anyone in range can connect without you handing them a cable.",
+        "redFlags": [
+          "Using Context for high-frequency state like form input or scroll position - it re-renders all consumers on every change",
+          "Not knowing that every consumer re-renders when the context value changes",
+          "Recreating the context value object inside the Provider without memoizing it, causing constant re-renders",
+          "Treating Context as a full replacement for a state management library in large applications"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is prop drilling and how does Context solve it?",
+            "a": "Prop drilling is passing a value through intermediate components that do not need it, just to reach a deeply nested child. Context lets any descendant read the value directly without the intermediaries forwarding it."
+          },
+          {
+            "q": "What are good candidates for Context?",
+            "a": "Values that change infrequently and are needed across many parts of the tree - the authenticated user, the current theme, the application locale, or feature flags."
+          },
+          {
+            "q": "Why is Context a bad choice for frequently-changing state?",
+            "a": "Every component that calls useContext for that context re-renders whenever the value changes. If the value changes many times per second - like a cursor position or scroll offset - you cause a cascade of re-renders across the whole consumer tree."
+          },
+          {
+            "q": "How do you prevent unnecessary re-renders with Context?",
+            "a": "Split large contexts into smaller, focused ones so only the relevant consumers re-render. Also memoize the context value with useMemo so the object reference stays stable between parent renders."
+          },
+          {
+            "q": "When should you replace Context with a state management library?",
+            "a": "When state is frequently updated from many parts of the app, when you need time-travel debugging, or when Context re-renders are visibly hurting performance. Libraries like Zustand or Redux Toolkit give you fine-grained subscriptions so components only re-render when their specific slice of state changes."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is the Context API and when would you reach for it?"
+          },
+          {
+            "role": "you",
+            "text": "Context lets you broadcast a value to any component in a subtree without threading it as a prop through every intermediate layer. I reach for it when I have a stable, widely-needed value like the logged-in user or the current theme that would otherwise require prop drilling through many components that do not care about it."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you actually set it up?"
+          },
+          {
+            "role": "you",
+            "text": "Three steps: createContext to make the context object, wrap the relevant subtree in a Provider with the value prop, then call useContext in any descendant that needs it. For an e-commerce app, I might wrap the whole App in an AuthContext.Provider supplying the logged-in user, and any page that needs the user's name or role reads it directly with useContext."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the performance concern with Context?"
+          },
+          {
+            "role": "you",
+            "text": "Every component calling useContext for a given context re-renders whenever that context value changes. If I put frequently-changing state like a search filter into context, every consumer re-renders on each keystroke. For a healthcare dashboard with dozens of panels, that would be visibly slow."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you mitigate that?"
+          },
+          {
+            "role": "you",
+            "text": "Split large contexts into smaller focused ones - an AuthContext, a ThemeContext, a LocaleContext - so only the relevant consumers re-render. I also memoize the context value with useMemo inside the Provider so the object reference stays stable between parent renders."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you graduate from Context to a library like Redux?"
+          },
+          {
+            "role": "you",
+            "text": "When state is updated frequently from many places, when you need fine-grained subscriptions so components only re-render on their specific slice, or when you need middleware for things like logging or async flows. For a SaaS app with complex server-side data sync, Context alone would cause too many re-renders and make the codebase hard to trace."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-react-007",
+      "q": "How do you share data between components in React?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["props", "context", "state-management", "lifting-state"],
+      "answer": {
+        "oneLiner": "Pass data down as props for parent-to-child, use callback props for child-to-parent, lift state to a shared ancestor for siblings, and use Context or a state library for widely-shared or global data.",
+        "detail": "React has a one-way data flow by design - data moves from parent to child through props. When a child needs to communicate back up, the parent passes down a callback function as a prop and the child calls it with the new value. When two sibling components need the same piece of state, you lift that state up to their nearest common ancestor, which then distributes it as props. When data needs to reach deeply nested components across the tree, prop drilling becomes painful and you switch to the Context API. When state is complex, updated from many places, or the Context re-render behaviour causes performance problems, you introduce a dedicated state management library like Zustand, Redux Toolkit, or Jotai.",
+        "keyPoints": [
+          "Parent to child: props",
+          "Child to parent: callback props passed from parent down to child",
+          "Siblings sharing state: lift state up to the nearest common ancestor",
+          "Distant or global data: Context API or a dedicated state library like Zustand or Redux"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - sibling components each manage their own copy of the selected order\nfunction OrderList() { const [selected, setSelected] = useState(null); }\nfunction OrderDetail() { const [selected, setSelected] = useState(null); }\n\n// ✅ GOOD - lift state to the parent so both siblings share the same value\nfunction OrderPage() {\n  const [selectedOrderId, setSelectedOrderId] = useState(null);\n  return (\n    <>\n      <OrderList onSelect={setSelectedOrderId} />\n      <OrderDetail orderId={selectedOrderId} />\n    </>\n  );\n}",
+          "note": "Lifting state to OrderPage ensures OrderList and OrderDetail always see the same selected order."
+        },
+        "analogy": "Props are handing a note to your neighbour; Context is pinning it to the office noticeboard.",
+        "redFlags": [
+          "Keeping duplicate state in two sibling components instead of lifting it up",
+          "Using Context for every shared value regardless of update frequency",
+          "Not knowing about callback props as the mechanism for child-to-parent communication",
+          "Jumping straight to Redux for a small app where props or lifted state would be sufficient"
+        ],
+        "followUpsQA": [
+          {
+            "q": "How does a child component update state in its parent?",
+            "a": "The parent passes a callback function as a prop. The child calls that callback with the new value, and the parent's setState updates the state. The change then flows back down as updated props."
+          },
+          {
+            "q": "What is lifting state up?",
+            "a": "Moving a piece of state from a child component to the nearest common ancestor of all components that need it, then distributing it as props. This is the React way to share state between siblings."
+          },
+          {
+            "q": "When does Context become the right tool over props?",
+            "a": "When the data must cross many layers of components that do not use it themselves - prop drilling becomes too verbose and fragile. Context removes the intermediate forwarding."
+          },
+          {
+            "q": "What is the difference between Context and a state library like Zustand?",
+            "a": "Context re-renders all consumers when the value changes. Zustand gives fine-grained subscriptions - a component only re-renders when the specific slice of state it subscribes to changes, making it far more efficient for frequently-updated global state."
+          },
+          {
+            "q": "Can you use props for two-way communication?",
+            "a": "Data only flows down through props. Two-way communication is achieved by combining a data prop going down with a callback prop going down that the child uses to send data back up."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How do you share data between React components?"
+          },
+          {
+            "role": "you",
+            "text": "It depends on the relationship. Parent to child is straightforward - pass it as a prop. For child to parent, the parent passes down a callback and the child calls it with the updated value. For siblings, I lift the shared state up to their common ancestor. For deeply nested or globally needed data, I use Context or a state library."
+          },
+          {
+            "role": "interviewer",
+            "text": "Walk me through lifting state with a concrete example."
+          },
+          {
+            "role": "you",
+            "text": "On a logistics app order page, I have an OrderList panel and an OrderDetail panel side by side. Both need to know which order is selected. If each manages its own selectedOrderId they will diverge. I lift the selected ID into the parent OrderPage, pass setSelectedOrderId down to OrderList as a callback, and pass the selectedOrderId down to OrderDetail as a prop. Now they stay in sync."
+          },
+          {
+            "role": "interviewer",
+            "text": "When would you stop lifting state and introduce Context?"
+          },
+          {
+            "role": "you",
+            "text": "When the data needs to cross many layers of components that do not use it themselves. If the auth user needs to be available in a deeply nested user avatar component inside a sidebar inside a layout, threading it as a prop through Layout, Sidebar, and NavBar just to reach Avatar is prop drilling - Context removes all that."
+          },
+          {
+            "role": "interviewer",
+            "text": "And when do you move from Context to Redux or Zustand?"
+          },
+          {
+            "role": "you",
+            "text": "When Context re-renders hurt. Context re-renders every consumer when the value changes. Zustand gives fine-grained subscriptions so a component only re-renders when the exact slice it uses changes. For a SaaS dashboard where a background polling service updates many parts of the state every few seconds, Context would make the whole UI stutter."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there ever a case to pass data via something other than props, Context, or a store?"
+          },
+          {
+            "role": "you",
+            "text": "For cross-component communication that falls outside the React tree - like coordinating between a React app and a third-party library - I sometimes use a custom event emitter or the browser's own CustomEvent. But within a React tree, props, Context, and a state store cover every case cleanly."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-react-008",
+      "q": "What is the difference between AOT and JIT compilation?",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "low",
+      "tags": ["aot", "jit", "compilation", "angular"],
+      "answer": {
+        "oneLiner": "AOT (Ahead-of-Time) compiles your code before it ships to the browser at build time. JIT (Just-in-Time) ships uncompiled code and compiles it inside the browser at runtime.",
+        "detail": "AOT compilation happens during the build step - your templates and components are converted to optimised JavaScript before any user receives them. When the browser loads the page, all it has to do is execute already-compiled JS, so startup is fast and bundle sizes are smaller because the compiler itself does not need to ship. Errors in templates are caught at build time, not by a real user in production. JIT compilation delays this work to the browser - the framework ships a compiler as part of the bundle, which processes your code when the page first loads. This makes the bundle larger and startup slower but simplifies the development workflow because you do not need a full build step for every change. In Angular, AOT has been the production default since Angular 9. React does not have this distinction in the same way - JSX is transpiled to plain JavaScript by the bundler (Babel or the TypeScript compiler) at build time, which is essentially always AOT.",
+        "keyPoints": [
+          "AOT compiles at build time - faster browser startup, smaller bundle, build-time error detection",
+          "JIT compiles at runtime in the browser - the compiler ships with the bundle, making it larger",
+          "This is primarily an Angular distinction - React JSX is always transpiled at build time",
+          "Angular has used AOT as the production default since Angular 9 with the Ivy compiler"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - JIT: shipping uncompiled Angular templates (requires runtime compiler in bundle)\n// platformBrowserDynamic().bootstrapModule(AppModule) - this triggers JIT compilation\n\n// ✅ GOOD - AOT: templates compiled before shipping (Angular production default)\n// ng build --configuration production uses Ivy AOT compiler\n// React equivalent: JSX is always transpiled at build time\nconst ProductCard = ({ name, price }) => (\n  <div className=\"card\"><h2>{name}</h2><span>${price}</span></div>\n);",
+          "note": "React always transpiles JSX at build time via Babel or TypeScript, so it behaves like AOT. Angular explicitly distinguishes JIT (dev) from AOT (production)."
+        },
+        "analogy": "AOT is cooking the meal before guests arrive; JIT is cooking it while they wait at the table.",
+        "redFlags": [
+          "Saying React supports JIT compilation of templates the way Angular does - React has no runtime template compiler",
+          "Not knowing that AOT catches template errors at build time rather than at runtime in production",
+          "Confusing AOT compilation with minification or tree-shaking, which are separate build optimisations",
+          "Saying JIT is always inferior - in development it avoids a full build step, speeding up the iteration loop"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Which compilation mode does Angular use in production by default?",
+            "a": "AOT - it has been the default since Angular 9 with the Ivy compiler. Running ng build --configuration production triggers AOT."
+          },
+          {
+            "q": "What is the main benefit of AOT for end users?",
+            "a": "Faster page startup because the browser receives pre-compiled JavaScript and does not have to run a framework compiler on page load."
+          },
+          {
+            "q": "Why does JIT result in a larger bundle?",
+            "a": "The framework must ship its own compiler as part of the bundle so it can compile templates in the browser. AOT eliminates this because the compiler ran at build time."
+          },
+          {
+            "q": "Does React use JIT or AOT?",
+            "a": "React always uses AOT in effect - JSX is transpiled to plain JavaScript by Babel or TypeScript at build time. There is no runtime template compiler in React."
+          },
+          {
+            "q": "What kind of errors does AOT catch that JIT would miss in production?",
+            "a": "Template binding errors - like referencing a property that does not exist on the component class. In JIT these surface as runtime errors in the browser; AOT surfaces them as build failures before deployment."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Can you explain the difference between AOT and JIT compilation?"
+          },
+          {
+            "role": "you",
+            "text": "AOT compiles your code before it ships - at build time. JIT ships the code uncompiled and lets the browser do the compilation work at runtime. AOT gives faster startup and smaller bundles because the compiler does not need to run in the browser. JIT is slower to start but simplifies local development because you skip a full build step."
+          },
+          {
+            "role": "interviewer",
+            "text": "Which framework is this distinction most relevant to?"
+          },
+          {
+            "role": "you",
+            "text": "Angular. It explicitly supported both modes - JIT was the default in development for a fast feedback loop, and AOT became the production default from Angular 9 onwards using the Ivy compiler. React does not have this distinction the same way - JSX is always transpiled at build time by Babel or TypeScript, so React behaves like AOT in effect."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does AOT do for bundle size?"
+          },
+          {
+            "role": "you",
+            "text": "It reduces it significantly because the framework compiler does not need to ship to the browser. In JIT mode, the Angular compiler is part of the bundle because the browser needs it to compile templates at load time. With AOT, all templates are already compiled to JS before the bundle is created, so the compiler can be excluded."
+          },
+          {
+            "role": "interviewer",
+            "text": "What types of errors does AOT catch that JIT would not?"
+          },
+          {
+            "role": "you",
+            "text": "Template binding errors - like binding to a property that does not exist on the component class. In JIT, the template is compiled at runtime in the user's browser, so these errors surface as runtime exceptions in production. AOT compiles at build time, so these become build failures that are caught before any code ships."
+          },
+          {
+            "role": "interviewer",
+            "text": "Any scenario where you would choose JIT in production?"
+          },
+          {
+            "role": "you",
+            "text": "It is rare, but some dynamic plugin systems that load Angular components at runtime need JIT because the components are not known at build time. The trade-off is a larger bundle and slower startup, and you need to consider security because you are allowing code compilation in the browser."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-react-009",
+      "q": "Why doesn't React use direct DOM manipulation, and when is it still needed?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["dom", "virtual-dom", "useRef", "performance"],
+      "answer": {
+        "oneLiner": "React avoids direct DOM manipulation because it is slow and hard to keep in sync with application state. React controls the DOM through its declarative rendering system. You only drop down to direct DOM access - via refs - for things React cannot express declaratively.",
+        "detail": "Every real DOM write can trigger a browser reflow, repaint, or layout recalculation, all of which are expensive. React's declarative model means you describe the desired UI as a function of state, and React batches all the DOM writes together and applies only the minimal changes. This keeps renders fast and keeps the UI in sync with state. The problem with mixing manual DOM manipulation with React is that React has its own internal model of what the DOM looks like. If you mutate a DOM node outside of React, React's internal model and the real DOM diverge, and the next render may overwrite your changes or produce inconsistent output. There are legitimate cases where you must touch the DOM imperatively: focusing an input after a dialog opens, measuring the height of an element to position a tooltip, controlling video or audio playback, scrolling a list to a specific item, or integrating a third-party library like a chart or map that manages its own DOM subtree. For all of these, you use useRef to get a reference to the DOM node and call imperative APIs on it directly.",
+        "keyPoints": [
+          "Real DOM writes are expensive and can trigger reflows - React batches them to minimise cost",
+          "Mixing manual DOM edits with React-managed nodes desyncs React's internal model from the real DOM",
+          "Legitimate cases for direct DOM access: focus, scroll, measure, media control, third-party lib integration",
+          "Use useRef to access a DOM node imperatively without fighting React's rendering"
+        ],
+        "code": {
+          "lang": "jsx",
+          "snippet": "// ❌ BAD - mutating a React-managed node directly desyncs React's internal model\nfunction PaymentForm() {\n  const handleError = () => {\n    document.getElementById('card-number').style.border = '2px solid red';\n  };\n}\n\n// ✅ GOOD - use ref for imperative DOM access, let React handle everything else\nfunction PaymentForm() {\n  const cardInputRef = useRef(null);\n  const handleError = () => {\n    cardInputRef.current.focus();\n  };\n  return <input ref={cardInputRef} id=\"card-number\" />;\n}",
+          "note": "Focusing the input on validation error is an imperative operation - useRef gives clean access without fighting React's rendering."
+        },
+        "analogy": "Let React paint the wall; only pick up the brush yourself for the tiny detail it cannot reach.",
+        "redFlags": [
+          "Calling document.getElementById or document.querySelector to mutate nodes React is managing",
+          "Not knowing that mixing manual DOM edits with React can cause React to overwrite your changes on the next render",
+          "Saying you never need direct DOM access in React - focus, measure, and third-party lib integration all require it",
+          "Confusing useRef for DOM access with useRef for storing mutable values - they use the same API but serve different purposes"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What goes wrong if you mutate a React-managed DOM node directly?",
+            "a": "React's internal Virtual DOM model and the real DOM go out of sync. On the next render triggered by a state change, React will reconcile against its internal model and may overwrite your manual changes or produce inconsistent output."
+          },
+          {
+            "q": "Name three valid reasons to access the DOM directly in a React app.",
+            "a": "Focus management - focusing an input when a modal opens. Measurement - reading element dimensions to position a tooltip. Third-party library integration - handing a DOM node to a charting library like Chart.js that manages its own subtree."
+          },
+          {
+            "q": "How do you safely integrate a third-party library that manages its own DOM?",
+            "a": "Attach a ref to an empty container div that React renders. Pass the DOM node to the third-party library in a useEffect so the library fully owns and manages that subtree. On cleanup, call the library's destroy method to avoid memory leaks."
+          },
+          {
+            "q": "Why does React batch DOM writes?",
+            "a": "To minimise browser reflows and repaints. Multiple state changes triggered in the same event handler are batched into a single DOM update pass, which is significantly faster than applying each change individually."
+          },
+          {
+            "q": "What is the difference between useEffect and useLayoutEffect for DOM work?",
+            "a": "useEffect runs after the browser paints - fine for most work. useLayoutEffect runs synchronously after React commits the DOM but before the browser paints. Use useLayoutEffect when you need to measure a DOM node and adjust the layout before the user sees it, to prevent visible flicker."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Why doesn't React encourage direct DOM manipulation, and when is it unavoidable?"
+          },
+          {
+            "role": "you",
+            "text": "React avoids direct DOM manipulation because real DOM writes are expensive - they can trigger browser reflows and repaints. React batches all changes, applies only the minimal diff, and keeps the DOM in sync with state. If you manually mutate a React-managed node, you desync React's internal model from the real DOM, and the next render can overwrite your changes or create inconsistent UI."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you give me a concrete example of that desync problem?"
+          },
+          {
+            "role": "you",
+            "text": "On a payment form, if I call document.getElementById('card-input').style.border = '2px solid red' directly, React does not know about that style change. When the user corrects the error and React re-renders the input, it reconciles against its Virtual DOM model which has no border style - so it removes the red border, even if the field is still invalid."
+          },
+          {
+            "role": "interviewer",
+            "text": "So when is direct DOM access legitimate?"
+          },
+          {
+            "role": "you",
+            "text": "Several cases React cannot express declaratively. Focus management - after a booking dialog opens, focus should move to the first input automatically. Measuring an element's height or position to place a tooltip. Controlling video playback. And integrating third-party libraries like Mapbox or a rich-text editor that manage their own DOM subtree completely outside React."
+          },
+          {
+            "role": "interviewer",
+            "text": "How do you integrate a library like Chart.js that manages its own DOM?"
+          },
+          {
+            "role": "you",
+            "text": "I render an empty div with a ref. In useEffect, I pass the DOM node to Chart.js to initialise the chart - Chart.js then fully owns that subtree. The cleanup function calls chart.destroy() to remove the chart and prevent memory leaks. React never touches the inside of that div, so there is no conflict."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the difference between doing DOM work in useEffect versus useLayoutEffect?"
+          },
+          {
+            "role": "you",
+            "text": "useEffect runs asynchronously after the browser has painted, which is fine for most work. useLayoutEffect runs synchronously after React commits the DOM but before the browser paints. If you need to measure a DOM node and adjust the layout based on that measurement before the user sees the screen - like repositioning a tooltip - useLayoutEffect prevents the visible flash that useEffect would cause."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

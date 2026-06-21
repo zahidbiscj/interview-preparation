@@ -1,0 +1,257 @@
+[
+    {
+      "id": "csharp-advanced-026",
+      "q": "How do you add new methods to a sealed class you cannot modify?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["extension-methods", "sealed", "design"],
+      "answer": {
+        "oneLiner": "Use extension methods. You cannot inherit from a sealed class, but you can define a static method with `this SealedType` as the first parameter and call it like an instance method.",
+        "detail": "`sealed` prevents inheritance. You cannot subclass a sealed third-party type to add methods. Extension methods are the standard solution: a static method in a static class with `this SealedType` as the first parameter. The compiler lets callers invoke it like an instance method. The extension only sees public members - it cannot access private state. If the sealed class later adds an instance method with the same signature, the extension is silently shadowed. This is exactly how all LINQ operators extend `IEnumerable<T>` and `string`, both of which are sealed.",
+        "keyPoints": [
+          "`sealed` blocks inheritance - you cannot subclass and add methods via override.",
+          "Extension method: static class, static method, `this SealedType` first parameter - called like an instance method.",
+          "Only sees public members - cannot access private fields or methods of the sealed type.",
+          "If the sealed class later adds the same instance method, it wins over your extension silently.",
+          "All LINQ operators extend `IEnumerable<T>`; all string utilities like `.ToUpper()` exist on the sealed `string` type."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - trying to inherit from a sealed class; compile error\npublic class ExtendedString : string { } // compile error: cannot inherit sealed type\n\n// ✅ GOOD - extension method adds methods without touching the sealed class\npublic static class StringExtensions {\n    public static bool IsValidPostcode(this string s) =>\n        System.Text.RegularExpressions.Regex.IsMatch(s, @\"^[A-Z]{1,2}\\d[A-Z\\d]? ?\\d[A-Z]{2}$\");\n}\n// Usage on the sealed string type:\nbool ok = addressLine.PostCode.IsValidPostcode();",
+          "note": "Extension methods are the only way to add methods to sealed or third-party types you cannot modify."
+        },
+        "analogy": "An extension method is a stick-on tab on a sealed folder - you cannot open the folder but you can attach a label.",
+        "redFlags": [
+          "Saying you can wrap the sealed class in a subclass - `sealed` explicitly forbids this.",
+          "Not knowing that extension methods cannot access private members of the target type.",
+          "Not knowing that LINQ uses extension methods to extend `IEnumerable<T>`, which cannot be inherited directly.",
+          "Not knowing that an instance method on the target type always wins over an extension with the same signature."
+        ],
+        "followUpsQA": [
+          { "q": "Why can't you inherit from a sealed class?", "a": "The `sealed` modifier is an explicit design decision to prevent subclassing - the CLR and compiler enforce this." },
+          { "q": "What can an extension method not do?", "a": "Access private or protected members - it only sees the public API of the sealed type." },
+          { "q": "What happens if the sealed class later adds the same method?", "a": "The instance method silently takes priority over the extension - your extension is still compiled but never called from that point." },
+          { "q": "Can you use extension methods on interfaces?", "a": "Yes - LINQ operators extend `IEnumerable<T>` which is an interface. Any type implementing the interface gets the extensions." },
+          { "q": "Can you extend a generic sealed class?", "a": "Yes - `public static T Clamp<T>(this T val, T min, T max) where T : IComparable<T>` extends any comparable type." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "How do you add methods to a sealed class you cannot modify?" },
+          { "role": "you", "text": "Extension methods. You cannot inherit from a sealed type - `sealed` blocks that. Instead you write a static method in a static class with `this SealedType` as the first parameter. The compiler lets callers invoke it as an instance method. That is exactly how LINQ extends `IEnumerable` and how all the string utility methods work." },
+          { "role": "interviewer", "text": "What limitations do extension methods have?" },
+          { "role": "you", "text": "They only see public members. No access to private fields, protected methods, or internal implementation details. And if the sealed class is later updated to add an instance method with the same signature, the extension is silently shadowed - without any compiler warning." },
+          { "role": "interviewer", "text": "Give me a real scenario where you needed this." },
+          { "role": "you", "text": "A payment SDK used a sealed `PaymentResult` class. We needed a method to check if a result was retryable based on the error code. We added `public static bool IsRetryable(this PaymentResult r)` that checked `r.ErrorCode` against our list of retryable codes. Called as `result.IsRetryable()` - readable and non-invasive." },
+          { "role": "interviewer", "text": "Can you extend an interface?" },
+          { "role": "you", "text": "Yes - extension methods on interfaces work for all types that implement the interface. LINQ exploits this: every type that implements `IEnumerable<T>` gets `Where`, `Select`, and all other LINQ operators. The extension does not care about the concrete type, only the interface." },
+          { "role": "interviewer", "text": "Is there a way to truly add new methods without extension methods?" },
+          { "role": "you", "text": "Wrapping - the Decorator or Adapter pattern. Create a new type that holds an instance of the sealed class and delegates all calls to it, while adding new methods. More overhead but you get your own class hierarchy. For simple additions, extension methods are always cleaner." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-027",
+      "q": "Is the index accessible inside a foreach loop?",
+      "level": "junior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["foreach", "loop", "index", "linq"],
+      "answer": {
+        "oneLiner": "No. `foreach` only exposes the current element, not its index. Use a `for` loop, a manual counter, or `Select((item, i) => ...)` to access the index.",
+        "detail": "`foreach` desugars to `GetEnumerator()` and repeated `MoveNext()`/`Current` calls. `IEnumerator` has no index concept - it is a forward-only cursor. If you need the index, the options are: a classic `for` loop when the collection supports indexing (array, List), a manual integer counter you increment inside `foreach`, or the LINQ overload `enumerable.Select((item, index) => ...)` that projects each element with its zero-based index. Deconstruct the tuple in the loop for clean syntax. C# does not have a built-in `enumerate()` like Python, but the Select approach achieves the same result.",
+        "keyPoints": [
+          "`foreach` desugars to `IEnumerator.MoveNext()` and `Current` - there is no index property on `IEnumerator`.",
+          "Use a `for` loop when the collection is indexable and you need random access.",
+          "LINQ: `.Select((item, i) => (item, i))` projects index alongside each element and you deconstruct in `foreach`.",
+          "A manual counter `int i = 0; i++;` inside `foreach` is the simplest fallback for non-indexable sequences.",
+          "C# 14 (preview) adds `foreach` with index via deconstruction using `Index` operator - not yet mainstream."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - no index in foreach; developer uses a separate counter incorrectly\nint index = 0;\nforeach (var product in products) {\n    Console.WriteLine($\"{index}: {product.Name}\");\n    index++; // easy to forget; easy to increment in wrong place\n}\n\n// ✅ GOOD - LINQ Select with index: clean and idiomatic\nforeach (var (product, i) in products.Select((p, i) => (p, i)))\n    Console.WriteLine($\"{i}: {product.Name}\");\n\n// ✅ GOOD - for loop when collection supports indexing\nfor (int i = 0; i < products.Count; i++)\n    Console.WriteLine($\"{i}: {products[i].Name}\");",
+          "note": "Select with index is the idiomatic LINQ approach; a for loop is simpler and faster for indexable collections."
+        },
+        "analogy": "foreach is a conveyor belt - it delivers items one by one but does not count them. You have to count yourself.",
+        "redFlags": [
+          "Saying foreach provides an index - it does not; IEnumerator has no index concept.",
+          "Not knowing the LINQ Select overload that takes `(item, index)` as the selector parameters.",
+          "Using a separate counter variable that gets incremented in the wrong place or inside a conditional.",
+          "Not knowing that a `for` loop is faster and simpler for indexable collections like arrays and List<T>."
+        ],
+        "followUpsQA": [
+          { "q": "What does foreach desugar to?", "a": "A call to `GetEnumerator()` then a loop of `MoveNext()` and `Current`, with `Dispose()` called in a finally block." },
+          { "q": "Which LINQ operator gives you an index?", "a": "`Select((item, i) => ...)` - the overload that takes a two-parameter selector where the second parameter is the zero-based index." },
+          { "q": "When is a for loop better than foreach with index?", "a": "When the collection is indexable (array, List<T>) and you need random access or backwards traversal - `for` is simpler and avoids creating a tuple projection." },
+          { "q": "Can you modify the collection inside a foreach?", "a": "No - modifying the collection while iterating throws `InvalidOperationException` because the enumerator detects the change." },
+          { "q": "Is foreach faster or slower than a for loop?", "a": "For arrays the JIT optimises both to similar performance. For List<T> a `for` loop using the indexer is marginally faster. For arbitrary IEnumerable, foreach is the only option." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Is the index accessible inside a foreach loop?" },
+          { "role": "you", "text": "No - foreach desugars to IEnumerator MoveNext and Current, and IEnumerator has no index property. You get the current element only. For the index, use a for loop, a manual counter, or `Select((item, i) => (item, i))` from LINQ." },
+          { "role": "interviewer", "text": "Which approach is most idiomatic in C#?" },
+          { "role": "you", "text": "For non-indexable sequences, the LINQ select approach: `foreach (var (product, i) in products.Select((p, i) => (p, i)))`. It is clean, avoids mutation of a counter, and works on any IEnumerable. For arrays and List<T>, a `for` loop is simpler and slightly faster." },
+          { "role": "interviewer", "text": "What happens if you modify the collection inside foreach?" },
+          { "role": "you", "text": "You get an `InvalidOperationException: Collection was modified` on the next MoveNext call. The enumerator detects that the underlying collection changed. If you need to remove items while iterating, iterate backwards with a `for` loop or collect items to remove and delete them after the loop." },
+          { "role": "interviewer", "text": "Is there any performance difference between the approaches?" },
+          { "role": "you", "text": "For arrays the JIT typically eliminates bounds checking in a `for` loop, so it can be marginally faster. For List<T> the for loop accesses the indexer directly. The LINQ `Select` approach creates a tuple per element which adds minor allocation. For most business logic the difference is negligible - choose clarity." },
+          { "role": "interviewer", "text": "What if you only need to process every other item?" },
+          { "role": "you", "text": "A `for` loop with `i += 2` is the clearest. You could also do `products.Where((_, i) => i % 2 == 0)` using the same index-aware Where overload. Either works; the for loop is more obvious for step iteration." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-028",
+      "q": "Name a few notable features added in C# 10, 11, and 13.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["csharp-10", "csharp-11", "csharp-13", "language-features"],
+      "answer": {
+        "oneLiner": "C# 10 brought global usings, file-scoped namespaces, and record structs. C# 11 added raw string literals, required members, and list patterns. C# 12 added primary constructors and collection expressions. C# 13 added params collections and a new Lock type.",
+        "detail": "C# 10 (.NET 6): `global using` for project-wide imports, file-scoped namespaces `namespace MyApp;` to remove indentation, and `record struct`. C# 11 (.NET 7): raw string literals `\"\"\"` for multi-line strings without escaping, `required` members to force property initialisation at construction, generic math interfaces, and list patterns `[first, .., last]`. C# 12 (.NET 8): primary constructors for classes and structs, collection expressions `[1, 2, 3]` as a unified syntax for arrays and collections, and `using` aliases for any type. C# 13 (.NET 9): `params` collections (any IEnumerable, not just arrays), `System.Threading.Lock` as a dedicated lock type replacing `object`, and `\e` escape for ANSI escape sequences.",
+        "keyPoints": [
+          "C# 10: `global using`, file-scoped namespaces, `record struct`, constant interpolated strings.",
+          "C# 11: raw string literals `\"\"\"`, `required` members, list patterns, generic math (`INumber<T>`).",
+          "C# 12: primary constructors `class Order(int id, decimal total)`, collection expressions `[..]`.",
+          "C# 13: `params IEnumerable<T>` (not just arrays), `System.Threading.Lock`, `\\e` escape.",
+          "Language versions align with .NET: C# 10/.NET 6, 11/.NET 7, 12/.NET 8, 13/.NET 9."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// C# 10 - file-scoped namespace, record struct\nnamespace ECommerceApp.Orders; // no braces\npublic record struct Money(decimal Amount, string Currency);\n\n// C# 11 - raw string literal (no escaping needed)\nvar json = \"\"\"\n    { \"name\": \"Alice\", \"role\": \"admin\" }\n    \"\"\";\n\n// C# 12 - primary constructor and collection expression\npublic class Cart(IEnumerable<Product> products) {\n    private readonly List<Product> _items = [.. products]; // collection expression\n}",
+          "note": "These features reduce boilerplate; knowing them shows you keep pace with the language evolution."
+        },
+        "analogy": "Each C# version is a software update - the core engine does not change but the controls get smoother.",
+        "redFlags": [
+          "Not knowing what version introduced the features you use daily - e.g. records are C# 9, not C# 8.",
+          "Thinking C# 10 features like file-scoped namespaces require a specific project type - they work in all .NET 6+ projects.",
+          "Not knowing required members (C# 11) enforce property initialisation at compile time, not just by convention.",
+          "Confusing C# version with .NET runtime version - they align but are separate versioning systems."
+        ],
+        "followUpsQA": [
+          { "q": "What does `required` on a property do?", "a": "Forces callers to set the property in an object initialiser; the compiler errors if it is missing. It is enforced at compile time, not at runtime." },
+          { "q": "What are collection expressions in C# 12?", "a": "`[1, 2, 3]` is a unified syntax that creates the appropriate collection type (array, List, Span) based on the target type. `[.. list1, .. list2]` spreads two collections." },
+          { "q": "What is a raw string literal?", "a": "A string delimited by `\"\"\"` that requires no escaping for backslashes or quotes, and can span multiple lines. Indentation is trimmed relative to the closing `\"\"\"`." },
+          { "q": "What is System.Threading.Lock in C# 13?", "a": "A dedicated `Lock` type replacing `lock (object)` - provides `EnterScope()` returning a `Lock.Scope` that can be used with `using` for exception-safe locking." },
+          { "q": "What does primary constructor syntax give you in C# 12?", "a": "`class Order(int id, decimal total)` generates a constructor with those parameters, available as captured fields in the class body without explicit property declarations." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Name some notable features from C# 10, 11, 12, and 13." },
+          { "role": "you", "text": "C# 10 added global usings, file-scoped namespaces which remove the extra indentation level, and record structs. C# 11 added raw string literals with `\"\"\"` for multi-line JSON without escaping, `required` members to enforce property initialisation, and list patterns. C# 12 added primary constructors and collection expressions. C# 13 added params on any IEnumerable and a proper `System.Threading.Lock` type." },
+          { "role": "interviewer", "text": "Which do you reach for most in day-to-day work?" },
+          { "role": "you", "text": "File-scoped namespaces immediately - one line instead of a block, removes indentation from every class. Records for DTOs and API response types. And required members - we use them on configuration POCOs so the compiler catches a missing required field at build time rather than in production." },
+          { "role": "interviewer", "text": "What is the benefit of raw string literals?" },
+          { "role": "you", "text": "No backslash escaping. Embedding SQL, JSON, or regex in code used to need `\\\"` everywhere. With `\"\"\"` you paste the literal text unchanged. Indentation is trimmed to the closing delimiter, so the string in code looks exactly as it will at runtime." },
+          { "role": "interviewer", "text": "What are collection expressions in C# 12?" },
+          { "role": "you", "text": "`[1, 2, 3]` creates the right collection type based on context. Assigned to `int[]` it is an array. Assigned to `List<int>` it is a list. The spread operator `..` merges sequences: `[..list1, ..list2]`. It unifies array creation, list initialisation, and span creation under one syntax." },
+          { "role": "interviewer", "text": "How do language versions map to .NET?" },
+          { "role": "you", "text": "One-to-one with the annual .NET release: C# 10/.NET 6, C# 11/.NET 7, C# 12/.NET 8, C# 13/.NET 9. The SDK automatically selects the C# version for the target framework. You can override with `<LangVersion>` in the project file but there is rarely a reason to." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-029",
+      "q": "What are expression trees in C# and what is a real use case?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["expression-trees", "linq", "ef-core", "iqueryable", "metaprogramming"],
+      "answer": {
+        "oneLiner": "An expression tree (`Expression<Func<...>>`) represents code as a data structure rather than compiled IL. Libraries like EF Core walk the tree and translate the C# lambda into SQL.",
+        "detail": "When you write `x => x.Total > 100` as `Func<Order, bool>`, it compiles to IL and runs as code. When you write the same lambda as `Expression<Func<Order, bool>>`, the compiler builds an in-memory tree of nodes representing the code structure - binary expressions, member accesses, constants, and parameters. No IL is emitted for the lambda body. A LINQ provider like EF Core receives this tree and walks it to produce a SQL query. You can also build trees programmatically with the `Expression` factory methods, compose them at runtime, and compile to a delegate with `.Compile()`. Other uses include dynamic queries, custom attribute mappers, and compile-time code generation via source generators.",
+        "keyPoints": [
+          "`Func<T, bool>` is compiled IL that runs; `Expression<Func<T, bool>>` is a data structure describing the code.",
+          "EF Core walks the expression tree to translate `o => o.Total > 100` into `WHERE Total > 100` SQL.",
+          "You can compile a tree to a runnable delegate: `pred.Compile()` returns a `Func<Order, bool>`.",
+          "If EF Core cannot translate an expression node, it either throws or switches to client-side evaluation.",
+          "Expression trees enable dynamic query building - you can assemble a filter at runtime from user input and pass it to `IQueryable.Where`."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - Func runs in memory; EF loads all orders then filters\nFunc<Order, bool> filter = o => o.Total > 100;\nvar orders = db.Orders.AsEnumerable().Where(filter).ToList(); // SELECT * then filter in memory\n\n// ✅ GOOD - Expression is translated to SQL by EF Core\nExpression<Func<Order, bool>> filter = o => o.Total > 100;\nvar orders = db.Orders.Where(filter).ToList(); // SELECT ... WHERE Total > 100\n\n// You can also compile and run a tree in memory\nvar compiled = filter.Compile();\nbool matchesInMemory = compiled(new Order { Total = 150 }); // true",
+          "note": "IQueryable.Where takes Expression<Func<T, bool>>; IEnumerable.Where takes Func<T, bool> - the difference determines whether SQL or in-memory filtering happens."
+        },
+        "analogy": "An expression tree is a recipe card - not a cooked meal but a set of instructions that any kitchen (EF Core, SQL provider, in-memory) can execute in its own way.",
+        "redFlags": [
+          "Confusing `Func<T, bool>` (compiled code) with `Expression<Func<T, bool>>` (inspectable tree).",
+          "Not knowing that IQueryable.Where takes an Expression, not a Func.",
+          "Not knowing that EF Core falls back to client-side evaluation when it cannot translate an expression node.",
+          "Not knowing expression trees underpin all LINQ-to-SQL translation."
+        ],
+        "followUpsQA": [
+          { "q": "What is the difference between Func<T,bool> and Expression<Func<T,bool>>?", "a": "`Func<T,bool>` is compiled code you invoke directly. `Expression<Func<T,bool>>` is a tree of data nodes describing the code that a library can inspect and translate." },
+          { "q": "Why does IQueryable.Where take an Expression?", "a": "So the LINQ provider can translate the filter to SQL rather than executing it as a C# delegate in memory." },
+          { "q": "How do you run an expression tree?", "a": "Call `.Compile()` to get a delegate, then invoke it like any Func." },
+          { "q": "What happens when EF Core cannot translate an expression node?", "a": "It either throws a translation exception or falls back to client-side evaluation - loading data from the database and filtering in memory." },
+          { "q": "Can you build an expression tree programmatically?", "a": "Yes - using `Expression.Lambda`, `Expression.Property`, `Expression.Constant`, etc. to compose nodes at runtime. This powers dynamic query builders." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What are expression trees and what is a real use case?" },
+          { "role": "you", "text": "`Expression<Func<Order, bool>>` represents a C# lambda as a data structure - a tree of nodes describing the code rather than compiled IL. EF Core walks that tree and translates it to a SQL WHERE clause. That is how `db.Orders.Where(o => o.Total > 100)` becomes `SELECT ... WHERE Total > 100` at the database." },
+          { "role": "interviewer", "text": "How is that different from a plain Func?" },
+          { "role": "you", "text": "A `Func<Order, bool>` is compiled IL - you call it and it executes. An `Expression<Func<Order, bool>>` is data you can inspect, transform, or translate. If you pass a Func to IQueryable.Where, EF switches to client-side evaluation and loads all rows before filtering. Pass an Expression and EF generates SQL." },
+          { "role": "interviewer", "text": "Can you run an expression tree?" },
+          { "role": "you", "text": "Yes - `filter.Compile()` returns a `Func<Order, bool>`. You can then invoke it like any delegate. This lets you build a filter once as an expression for EF Core and then compile it for in-memory testing without writing the predicate twice." },
+          { "role": "interviewer", "text": "What happens when EF Core cannot translate a node?" },
+          { "role": "you", "text": "In EF Core 3+ it throws by default - strict translation mode. This was a change from EF6 which silently fell back to client evaluation, loading all rows and filtering in memory. The explicit exception is better: it tells you immediately that your expression contains something EF cannot translate to SQL." },
+          { "role": "interviewer", "text": "What is a real advanced use?" },
+          { "role": "you", "text": "Dynamic query builders. In a reporting API where users pick filter columns at runtime, I build an expression tree from their input using `Expression.Lambda` and `Expression.Property`. The result is an `IQueryable` filter that EF translates to a parameterised SQL WHERE clause - type-safe, injection-safe, and no raw SQL strings." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-030",
+      "q": "What is the difference between `Func`, `Action`, and `Predicate`?",
+      "level": "junior",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["func", "action", "predicate", "delegates"],
+      "answer": {
+        "oneLiner": "All three are built-in generic delegates. `Action` returns void. `Func` returns a value (the last type parameter). `Predicate<T>` is equivalent to `Func<T, bool>` for tests but is a distinct delegate type.",
+        "detail": "`Action<T1, T2, ...>` can take up to 16 parameters and always returns void - use it for side-effect callbacks. `Func<T1, ..., TResult>` can take up to 16 input parameters and the last type parameter is always the return type. `Predicate<T>` takes one argument of type T and returns bool - it was introduced before LINQ and is used in older APIs like `List<T>.FindAll` and `Array.Find`. LINQ uses `Func<T, bool>` for `Where` and `Any`, not `Predicate<T>`. They are semantically the same but distinct .NET types - you cannot pass a `Predicate<T>` where a `Func<T, bool>` is expected without converting.",
+        "keyPoints": [
+          "`Action<T>` returns void - use for callbacks and event-like patterns.",
+          "`Func<T, TResult>` returns a value; the last type parameter is always the return type.",
+          "`Predicate<T>` returns bool for one argument - equivalent to `Func<T, bool>` in behaviour but a distinct type.",
+          "LINQ uses `Func<T, bool>` (not `Predicate<T>`) in operators like `Where`, `Any`, and `All`.",
+          "Older BCL APIs like `List<T>.FindAll` use `Predicate<T>` - a historical distinction from before LINQ."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - Predicate<T> passed where Func<T,bool> is expected\nPredicate<Order> isLarge = o => o.Total > 500;\nvar largeOrders = orders.Where(isLarge); // compile error - wrong delegate type\n\n// ✅ GOOD - use Func<T,bool> for LINQ; Predicate<T> for older BCL methods\nFunc<Order, bool> isLarge = o => o.Total > 500;\nAction<Order> notifyCustomer = o => _emailService.Send(o.CustomerEmail, \"Order update\");\nPredicate<Order> isCancelled = o => o.Status == OrderStatus.Cancelled;\n\nvar large = orders.Where(isLarge).ToList();           // LINQ uses Func\nvar cancelled = orders.FindAll(isCancelled);          // List.FindAll uses Predicate",
+          "note": "Predicate<T> and Func<T,bool> are semantically identical but distinct .NET delegate types - they are not interchangeable without an explicit conversion."
+        },
+        "analogy": "Action, Func, and Predicate are three versions of the same envelope: one for void messages, one for replies, one for yes/no questions.",
+        "redFlags": [
+          "Not knowing `Func`'s last type parameter is always the return type.",
+          "Thinking `Predicate<T>` and `Func<T, bool>` are the same .NET type - they are not.",
+          "Using `Predicate<T>` with LINQ operators that expect `Func<T, bool>` - it will not compile.",
+          "Not knowing that `Action` has no return value and `Func` always has one."
+        ],
+        "followUpsQA": [
+          { "q": "What is Func's last type parameter?", "a": "Always the return type: `Func<int, string, bool>` takes an int and a string and returns a bool." },
+          { "q": "Does Action return anything?", "a": "No - Action always returns void. It is the delegate type for fire-and-forget callbacks." },
+          { "q": "Are Predicate<T> and Func<T,bool> interchangeable?", "a": "Semantically yes but they are distinct .NET delegate types. You can convert explicitly: `Func<Order,bool> f = pred.Invoke;`." },
+          { "q": "Which BCL methods use Predicate<T>?", "a": "`List<T>.FindAll`, `List<T>.Find`, `Array.Find`, `Array.FindAll` - all pre-LINQ methods." },
+          { "q": "How many parameters can Func take?", "a": "Up to 16 input parameters plus the return type - `Func<T1, T2, ..., T16, TResult>`." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What is the difference between Func, Action, and Predicate?" },
+          { "role": "you", "text": "All three are built-in generic delegates. `Action` returns void - use it for side-effect callbacks. `Func` returns a value; the last type parameter is the return type, so `Func<Order, decimal>` takes an Order and returns a decimal. `Predicate<T>` returns bool for a single argument - semantically the same as `Func<T, bool>` but a distinct type." },
+          { "role": "interviewer", "text": "Why does LINQ use Func<T,bool> instead of Predicate<T>?" },
+          { "role": "you", "text": "LINQ was designed around the `Func` family for composability across all operators. `Predicate<T>` predates LINQ and is used in the older BCL methods like `List<T>.FindAll`. They chose not to mix the two families to keep LINQ consistent. If you try to pass a `Predicate<T>` to `Where`, you get a compile error." },
+          { "role": "interviewer", "text": "Can you convert between the two?" },
+          { "role": "you", "text": "Yes - explicitly. `Func<Order, bool> f = predicate.Invoke;` wraps the predicate in a Func. Or just rewrite the lambda as a Func from the start. In practice I always use `Func<T, bool>` unless an API specifically requires a `Predicate<T>`." },
+          { "role": "interviewer", "text": "What is a real use of Action?" },
+          { "role": "you", "text": "Callbacks and middleware pipelines. ASP.NET Core's `app.Use(async (context, next) => ...)` middleware takes an `Action`-like delegate. In our order processing pipeline, each step is an `Action<OrderContext>` registered in a list and invoked in sequence." },
+          { "role": "interviewer", "text": "What is the maximum number of parameters for Func?" },
+          { "role": "you", "text": "16 input parameters plus the return type, so `Func<T1, ..., T16, TResult>`. In practice if you need more than 3 or 4 parameters you should define a named class and use a simpler delegate signature." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    }
+]

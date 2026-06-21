@@ -1,0 +1,757 @@
+{
+  "subtopicId": "async",
+  "questions": [
+    {
+      "id": "js-async-001",
+      "q": "Explain the event loop, call stack, and the task vs microtask queues.",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["event-loop", "call-stack", "microtask", "macrotask"],
+      "answer": {
+        "oneLiner": "JavaScript runs on a single thread. When the call stack is empty, the event loop drains all microtasks first, then picks one macrotask, and repeats.",
+        "detail": "The call stack is where synchronous code runs - one frame at a time. When you call a function it is pushed on; when it returns it is popped off. Async work is handed to the browser or Node runtime (timers, network, I/O). When that work completes, a callback is placed in a queue. The event loop checks: if the call stack is empty, it first drains every item in the microtask queue (promise callbacks, queueMicrotask, await continuations). Only after the microtask queue is fully empty does the event loop pick ONE macrotask (setTimeout, setInterval, UI events, I/O) and run it. Then microtasks are drained again, and the cycle repeats. This is why a resolved promise always beats a 0ms timer.",
+        "keyPoints": [
+          "The call stack runs synchronous code - only one thing at a time",
+          "Microtasks include: promise .then, queueMicrotask, and await continuations",
+          "Macrotasks include: setTimeout, setInterval, I/O callbacks, and UI events",
+          "After each macrotask, the entire microtask queue is drained before the next macrotask runs"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - assuming setTimeout(fn, 0) fires before a promise\nsetTimeout(() => console.log('timer'), 0);\nPromise.resolve().then(() => console.log('promise'));\n// Mistake: developer thinks output is 'timer', 'promise'\n\n// ✅ GOOD - understand the correct order\nconsole.log('sync-start');\nsetTimeout(() => console.log('macrotask: timer'), 0);\nPromise.resolve().then(() => console.log('microtask: promise'));\nconsole.log('sync-end');\n// Output: sync-start, sync-end, microtask: promise, macrotask: timer",
+          "note": "Microtasks always run before the next macrotask - promise beats the 0ms timer every time."
+        },
+        "analogy": "Sync work first; promises are the express lane before timers.",
+        "redFlags": [
+          "Saying setTimeout(fn, 0) fires immediately or before promises",
+          "Confusing microtasks and macrotasks - not knowing which queue each API uses",
+          "Not knowing that ALL microtasks drain before the next macrotask runs",
+          "Saying the event loop runs on a separate thread from JavaScript"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the output order of: console.log('A'); setTimeout(()=>console.log('B'),0); Promise.resolve().then(()=>console.log('C')); console.log('D');",
+            "a": "A, D, C, B - synchronous logs first, then the promise microtask, then the timer macrotask."
+          },
+          {
+            "q": "Does the microtask queue drain completely before the next macrotask?",
+            "a": "Yes - every queued microtask runs before the event loop picks up the next macrotask, even if microtasks queue more microtasks."
+          },
+          {
+            "q": "Is an await continuation a microtask or macrotask?",
+            "a": "A microtask - code after await resumes in the microtask queue, so it runs before any setTimeout callback."
+          },
+          {
+            "q": "What happens if a microtask keeps queuing new microtasks?",
+            "a": "The microtask queue never empties and the browser freezes - this is a microtask starvation bug."
+          },
+          {
+            "q": "Where do click event handlers sit in the queue?",
+            "a": "In the macrotask queue - UI events are macrotasks."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Explain the event loop, call stack, and the task versus microtask queues."
+          },
+          {
+            "role": "you",
+            "text": "JavaScript runs on a single call stack - one function at a time. When async work like a timer or fetch finishes, its callback lands in a queue. The event loop checks: if the stack is empty, drain all microtasks first, then run one macrotask. Microtasks are promise callbacks and await continuations; macrotasks are timers and I/O events."
+          },
+          {
+            "role": "interviewer",
+            "text": "So in practice, what prints if I have console.log('A'), a setTimeout with 0ms, a resolved promise, and console.log('D')?"
+          },
+          {
+            "role": "you",
+            "text": "A, D, C, B - where C is the promise and B is the timer. Sync code runs first giving us A and D, then the promise microtask C runs, and finally the setTimeout macrotask B fires last."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why does the promise beat the 0ms timer? Isn't 0ms effectively immediate?"
+          },
+          {
+            "role": "you",
+            "text": "0ms just means the earliest the runtime can schedule it as a macrotask, not that it is immediate. The event loop always drains the full microtask queue before picking up any macrotask, so the promise wins regardless of the timer delay."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens if a microtask callback schedules another microtask? Does the loop move on?"
+          },
+          {
+            "role": "you",
+            "text": "No - the loop keeps draining until the microtask queue is completely empty. If microtasks keep spawning new microtasks, you get starvation - the macrotask queue never gets a turn and the UI freezes. This is an important production risk when chaining recursive promise callbacks."
+          },
+          {
+            "role": "interviewer",
+            "text": "Good. Where would a click event handler sit - microtask or macrotask?"
+          },
+          {
+            "role": "you",
+            "text": "Macrotask - UI events like click, input, and scroll are all macrotasks. That is why a promise resolution that fires during a click handler completes before the next UI event can be processed."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-async-002",
+      "q": "Predict the order: setTimeout(()=>console.log(2),0); console.log(5);",
+      "level": "junior",
+      "type": "code",
+      "freq": "high",
+      "tags": ["setTimeout", "event-loop", "trace", "async"],
+      "answer": {
+        "oneLiner": "It prints 5 then 2. The synchronous log runs immediately; the setTimeout callback is a macrotask that waits until the call stack is empty.",
+        "detail": "When JavaScript encounters setTimeout, it hands the callback off to the browser runtime with a 0ms delay. But 0ms does not mean 'now' - it means 'add this to the macrotask queue as soon as possible'. The synchronous console.log(5) runs next because the call stack is still active. Only after the call stack empties does the event loop pick up the waiting macrotask and run the callback that logs 2. This order holds even if the computer is fast enough to trigger the timer before the sync code completes.",
+        "keyPoints": [
+          "setTimeout always registers a macrotask - the callback never runs synchronously",
+          "0ms delay means the earliest slot after current sync code, not immediate execution",
+          "The call stack must be completely empty before any queued callback can run",
+          "Synchronous code always finishes before any timer or promise callback"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - assuming 0ms timer fires before sync code\nsetTimeout(() => console.log('order confirmation sent'), 0);\nconsole.log('checkout complete');\n// Mistake: developer expects 'order confirmation sent' first\n\n// ✅ GOOD - sync always runs before macrotask callbacks\nconsole.log('checkout complete');    // runs first\nsetTimeout(() => {\n  console.log('order confirmation sent'); // runs after sync\n}, 0);\n// Output: checkout complete, order confirmation sent",
+          "note": "setTimeout(fn, 0) does not bypass the event loop - sync code always wins."
+        },
+        "analogy": "0ms is not now - it is after whatever is already running finishes.",
+        "redFlags": [
+          "Saying 2 prints before 5 because 0ms is fast",
+          "Confusing setTimeout with synchronous execution",
+          "Not knowing that 0ms just means the next available macrotask slot",
+          "Saying the output depends on hardware speed or the JavaScript engine"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the output?",
+            "a": "5 then 2 - synchronous code runs first, the setTimeout callback runs after the stack clears."
+          },
+          {
+            "q": "Would the order change if the delay were 100ms instead of 0ms?",
+            "a": "No - 5 still prints first because sync code runs before any queued callback regardless of delay."
+          },
+          {
+            "q": "What kind of task is a setTimeout callback?",
+            "a": "A macrotask - it goes into the macrotask queue and waits for the call stack to be empty."
+          },
+          {
+            "q": "What if I added a Promise.resolve().then(() => console.log(3)) between the two lines?",
+            "a": "Output would be 5, 3, 2 - sync first, then the promise microtask, then the setTimeout macrotask."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What does this snippet print and in what order: setTimeout(() => console.log(2), 0) followed by console.log(5)?"
+          },
+          {
+            "role": "you",
+            "text": "It prints 5 then 2. The synchronous console.log(5) runs immediately on the call stack, while the setTimeout callback is deferred as a macrotask even with a 0ms delay."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why doesn't 0ms mean it fires immediately?"
+          },
+          {
+            "role": "you",
+            "text": "0ms means the browser adds the callback to the macrotask queue as soon as possible - but the event loop can only pick it up after the current call stack is empty. So any synchronous code still running wins."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if I inserted a Promise.resolve().then(() => console.log(3)) between them?"
+          },
+          {
+            "role": "you",
+            "text": "Then the output becomes 5, 3, 2. The promise callback is a microtask, so it runs before the macrotask timer - microtasks drain completely before the next macrotask is picked up."
+          },
+          {
+            "role": "interviewer",
+            "text": "Good. Would the answer ever change based on the machine being faster or slower?"
+          },
+          {
+            "role": "you",
+            "text": "No - this order is guaranteed by the JavaScript specification, not by hardware speed. The event loop rules are deterministic: sync, then microtasks, then one macrotask. The timer delay is a minimum wait, not an exact firing time."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-async-003",
+      "q": "Compare callbacks, promises, and observables.",
+      "level": "mid",
+      "type": "comparison",
+      "freq": "high",
+      "tags": ["callbacks", "promises", "observables", "async"],
+      "answer": {
+        "oneLiner": "Callbacks are functions you hand off to run later; promises represent one future value with chainable error handling; observables are lazy, cancellable streams of multiple values over time.",
+        "detail": "Callbacks are the oldest pattern - you pass a function to run when async work is done. The problem is nesting: if you need sequential async steps, you get deeply nested callbacks (callback hell) and inversion of control where the API decides when your code runs. Promises solve nesting with .then/.catch chaining and let you handle errors in one place, but they resolve only once and cannot be cancelled natively. async/await is syntactic sugar over promises for even cleaner sequential-looking code. Observables (from RxJS) go further - they are lazy (nothing runs until you subscribe), emit zero to many values over time, support cancellation via unsubscribe, and have rich operators like debounce, switchMap, and retry. Promises are ideal for a single network call; observables shine for event streams, WebSockets, or autocomplete.",
+        "keyPoints": [
+          "Callback: simple but leads to callback hell and inversion of control with nested error handling",
+          "Promise: one future value, chainable with .then/.catch, not cancellable natively",
+          "Observable (RxJS): zero to many values, lazy, cancellable by unsubscribing, rich operators",
+          "async/await is syntactic sugar over promises - it does not create a new async mechanism"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - callback hell for sequential API calls\ngetUser(userId, (user) => {\n  getOrders(user.id, (orders) => {\n    getInvoice(orders[0].id, (invoice) => { /* deeply nested */ });\n  });\n});\n\n// ✅ GOOD - async/await for clean sequential flow\nasync function loadUserDashboard(userId) {\n  const user = await getUser(userId);\n  const orders = await getOrders(user.id);\n  const invoice = await getInvoice(orders[0].id);\n  return { user, orders, invoice };\n}",
+          "note": "async/await flattens deeply nested callbacks into readable sequential code."
+        },
+        "analogy": "Callback is a sticky note; promise is a tracking number; observable is a live delivery feed.",
+        "redFlags": [
+          "Saying async/await replaces promises - it is built on top of them",
+          "Confusing observable with promise by saying both emit one value",
+          "Not knowing that observables are lazy and require a subscription to run",
+          "Saying promises are cancellable without mentioning AbortController"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is callback hell and how do promises fix it?",
+            "a": "Callback hell is deeply nested callbacks for sequential async steps. Promises fix it with .then chaining that keeps code flat and errors catchable in one .catch."
+          },
+          {
+            "q": "Can you cancel a native promise?",
+            "a": "Not directly - you cancel the underlying request with AbortController and pass the signal to fetch, but the promise itself has no cancel method."
+          },
+          {
+            "q": "When would you choose an observable over a promise for an HTTP call?",
+            "a": "When you need cancellation on navigation, retry logic, or need to compose multiple streams - RxJS HttpClient in Angular returns observables for these reasons."
+          },
+          {
+            "q": "What does lazy mean for an observable?",
+            "a": "Nothing executes until you call subscribe - the observable is just a blueprint until then."
+          },
+          {
+            "q": "How many values can a promise emit versus an observable?",
+            "a": "A promise resolves or rejects exactly once; an observable can emit zero to many values and then complete or error."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Walk me through the differences between callbacks, promises, and observables."
+          },
+          {
+            "role": "you",
+            "text": "Callbacks are the basic building block - you pass a function to run later. The problem is nesting: sequential async steps create deeply indented code called callback hell, and error handling is scattered. Promises solve this with .then chaining and a single .catch."
+          },
+          {
+            "role": "interviewer",
+            "text": "And where do observables fit - when would you reach for one over a promise?"
+          },
+          {
+            "role": "you",
+            "text": "When you need multiple values over time, cancellation, or rich operators. A promise resolves once and cannot be cancelled. An observable is lazy and emits repeatedly - perfect for WebSocket messages, autocomplete search inputs, or any event stream."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you give me a concrete example where observables give you something promises cannot?"
+          },
+          {
+            "role": "you",
+            "text": "Autocomplete is a good one. With observables you chain debounceTime to wait until the user stops typing, switchMap to cancel the previous HTTP call if a new character arrives, and distinctUntilChanged to skip duplicate searches. That would require manual AbortController work with promises."
+          },
+          {
+            "role": "interviewer",
+            "text": "You said promises are not cancellable. What is AbortController then?"
+          },
+          {
+            "role": "you",
+            "text": "AbortController cancels the underlying fetch request, not the promise itself. The promise still settles - it rejects with an AbortError. So you are cancelling the network work, not the JavaScript promise object."
+          },
+          {
+            "role": "interviewer",
+            "text": "What does 'lazy' mean when talking about observables?"
+          },
+          {
+            "role": "you",
+            "text": "Nothing runs until you call subscribe. The observable is just a description of work. A promise starts executing immediately when created - that is an important difference in memory and performance for expensive operations."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-async-004",
+      "q": "Is JavaScript single-threaded? How does it handle concurrency?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["single-threaded", "concurrency", "web-workers", "event-loop"],
+      "answer": {
+        "oneLiner": "Yes - JavaScript has one main thread with one call stack. It achieves concurrency by offloading async work to the browser or Node runtime, then scheduling callbacks back via the event loop.",
+        "detail": "The JavaScript engine (V8, SpiderMonkey) runs on a single main thread. There is only one call stack, so only one piece of code runs at a time. Concurrency happens because the browser or Node runtime handles timers, network requests, and file I/O on their own threads in the background. When that background work finishes, the runtime places the callback in the event loop queue. The event loop picks it up when the main thread is free. This model means long-running synchronous operations (heavy loops, large JSON parsing) block the main thread and freeze the UI - there is no preemption. For true parallelism, Web Workers run scripts on a completely separate thread, but they have no access to the DOM and communicate only via message passing.",
+        "keyPoints": [
+          "One main thread, one call stack - only one thing runs at a time on the JS engine",
+          "Timers, network, and file I/O are handled by the browser or Node runtime, not the JS engine",
+          "The event loop bridges runtime callbacks back to the main thread",
+          "Web Workers provide true parallelism but have no DOM access and use message passing"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - heavy sync work blocks the UI thread\nfunction processLargeReport(rows) {\n  return rows.map(row => heavyTransform(row)); // freezes browser\n}\n\n// ✅ GOOD - offload to a Web Worker to keep UI responsive\nconst reportWorker = new Worker('report-worker.js');\nreportWorker.postMessage({ rows });\nreportWorker.onmessage = (e) => renderResults(e.data);",
+          "note": "Heavy computation belongs in a Web Worker so the main thread stays free for user interaction."
+        },
+        "analogy": "One chef in the kitchen, but the oven and dishwasher run in the background.",
+        "redFlags": [
+          "Saying JavaScript is multi-threaded because async code runs concurrently",
+          "Confusing concurrency (interleaving) with parallelism (truly simultaneous)",
+          "Not knowing that Web Workers have no DOM access",
+          "Saying fetch or setTimeout run on the JS thread"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What happens if a synchronous function takes 5 seconds to run?",
+            "a": "It blocks the main thread for 5 seconds - the UI freezes, user input is unresponsive, and no callbacks can run during that time."
+          },
+          {
+            "q": "Who actually handles the timer in setTimeout?",
+            "a": "The browser runtime (or Node libuv), not the JavaScript engine - the engine just receives the callback when the runtime says the delay has passed."
+          },
+          {
+            "q": "How do Web Workers communicate with the main thread?",
+            "a": "Via postMessage to send data and onmessage to receive it - data is copied using structured clone, not shared."
+          },
+          {
+            "q": "Can two Web Workers share data without copying it?",
+            "a": "Yes, using SharedArrayBuffer and transferable objects - the buffer is shared in memory rather than copied, which is faster for large payloads."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Is JavaScript single-threaded, and if so how does it handle async work without blocking?"
+          },
+          {
+            "role": "you",
+            "text": "Yes, one main thread, one call stack. The JS engine only does one thing at a time. Async work like timers and network requests is offloaded to the browser runtime which runs on its own threads. When that work finishes, the runtime puts the callback in the event loop queue and the main thread picks it up when free."
+          },
+          {
+            "role": "interviewer",
+            "text": "So fetch is not running on the JavaScript thread?"
+          },
+          {
+            "role": "you",
+            "text": "Correct - the JS engine calls the browser API which does the actual network I/O on a separate thread. The JS thread is free to do other work while waiting. When the response arrives, the callback lands in the queue and the event loop schedules it back onto the main thread."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if I have a CPU-heavy task, like parsing a 100MB JSON file? Can async help?"
+          },
+          {
+            "role": "you",
+            "text": "No - async only helps with I/O, not CPU work. Parsing JSON is pure computation on the main thread, so it blocks. The right tool is a Web Worker - it runs on a real separate thread so the UI stays responsive while the parsing happens in the background."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can the Web Worker access the DOM to update the page directly?"
+          },
+          {
+            "role": "you",
+            "text": "No - Web Workers have no DOM access at all. The worker does the computation and sends results back to the main thread via postMessage, and the main thread does the DOM update. Data is copied using structured clone by default, not shared."
+          },
+          {
+            "role": "interviewer",
+            "text": "Is there any way to share memory between the main thread and a worker without copying?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - SharedArrayBuffer lets both threads access the same memory region. You coordinate access with Atomics to prevent race conditions. It was temporarily disabled in browsers after the Spectre vulnerability but is now re-enabled with proper HTTP headers like Cross-Origin-Opener-Policy."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-async-005",
+      "q": "What are Web Workers and when would you use them?",
+      "level": "senior",
+      "type": "conceptual",
+      "freq": "medium",
+      "tags": ["web-workers", "threads", "performance"],
+      "answer": {
+        "oneLiner": "Web Workers run scripts on a separate background thread so heavy computation does not freeze the UI. They have no DOM access and communicate with the main thread via message passing.",
+        "detail": "A Web Worker is created with new Worker('worker.js') and runs that script file on a dedicated thread separate from the main JavaScript thread. The worker has its own global scope (not window), cannot touch the DOM, and cannot access most browser APIs. Communication is message-based: the main thread sends data with worker.postMessage(data) and listens with worker.onmessage; the worker does the same in reverse. Data is transferred by structured clone (copied) unless you use transferable objects like ArrayBuffer, which move ownership to the worker without copying. Web Workers are ideal for CPU-bound tasks: parsing large datasets, image or video processing, cryptographic operations, and running WASM code. For even more isolation, you can use SharedWorker (one worker shared across browser tabs) or OffscreenCanvas (render in a worker). Always terminate workers you no longer need with worker.terminate() to free the thread.",
+        "keyPoints": [
+          "Runs on a real separate thread - true parallelism, not just async scheduling",
+          "No DOM access and no window object - communicate only via postMessage and onmessage",
+          "Data is copied by structured clone - use transferable objects for large payloads to avoid the copy cost",
+          "Best for CPU-heavy work: parsing, image processing, cryptography, or WASM execution"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - parsing a large product catalogue on the main thread\nfunction buildSearchIndex(products) {\n  return products.map(p => tokenize(p.description)); // blocks UI\n}\n\n// ✅ GOOD - offload to a Web Worker\nconst searchWorker = new Worker('search-index-worker.js');\nsearchWorker.postMessage({ products });\nsearchWorker.onmessage = (e) => {\n  searchIndex = e.data.index; // main thread receives result\n  enableSearchBar();\n};",
+          "note": "The main thread stays responsive while the worker builds the index in the background."
+        },
+        "analogy": "A Web Worker is a back-office team member who handles heavy processing so the front desk never goes offline.",
+        "redFlags": [
+          "Saying Web Workers can access or update the DOM directly",
+          "Confusing Web Workers with async/await - workers are true threads, not just deferred callbacks",
+          "Not knowing that data is copied by default, not shared",
+          "Forgetting to terminate workers after use, causing thread leaks"
+        ],
+        "followUpsQA": [
+          {
+            "q": "Can a Web Worker access localStorage?",
+            "a": "No - Web Workers have no access to localStorage, sessionStorage, the DOM, or the window object."
+          },
+          {
+            "q": "What is a transferable object and why does it matter?",
+            "a": "An object like ArrayBuffer whose ownership is transferred to the worker without copying - this avoids the performance cost of cloning large binary data."
+          },
+          {
+            "q": "How do you stop a Web Worker?",
+            "a": "Call worker.terminate() from the main thread, or self.close() from inside the worker - otherwise the thread keeps running and consuming resources."
+          },
+          {
+            "q": "What is the difference between a dedicated Worker and a SharedWorker?",
+            "a": "A dedicated Worker belongs to one page; a SharedWorker is shared across multiple tabs or windows from the same origin."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What are Web Workers and when would you actually use one in production?"
+          },
+          {
+            "role": "you",
+            "text": "Web Workers run a script on a real separate thread, completely independent from the main JavaScript thread. They have no DOM access and communicate only via postMessage. You use them when you have CPU-bound work that would freeze the UI - things like parsing a large product catalogue, processing images, or running cryptographic hashing."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned no DOM access. What can a worker access then?"
+          },
+          {
+            "role": "you",
+            "text": "It has its own global scope (self instead of window), access to fetch, setTimeout, WebSockets, IndexedDB, and the File API. So it can do I/O and computation but nothing visual. Any UI update has to go back through a postMessage to the main thread."
+          },
+          {
+            "role": "interviewer",
+            "text": "How does data actually move between the main thread and the worker?"
+          },
+          {
+            "role": "you",
+            "text": "By default it is structured clone - the data is deeply copied, similar to JSON parse and stringify but faster and supports more types. For large binary data like an ArrayBuffer you use transferable objects instead, which move ownership to the worker without copying, making it an O(1) transfer cost."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if I forget to call worker.terminate()?"
+          },
+          {
+            "role": "you",
+            "text": "The worker thread keeps running in the background consuming CPU and memory even if the page navigates away or the reference is garbage collected. You should always call worker.terminate() when done, or self.close() from inside the worker itself."
+          },
+          {
+            "role": "interviewer",
+            "text": "Have you heard of SharedWorker? How is it different?"
+          },
+          {
+            "role": "you",
+            "text": "A SharedWorker is shared across multiple tabs or windows from the same origin. All connected pages talk to the same worker instance via MessagePort. It is useful for coordinating shared state like a WebSocket connection that multiple tabs should reuse rather than each opening its own."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-async-006",
+      "q": "How would you build an app that works offline?",
+      "level": "senior",
+      "type": "scenario",
+      "freq": "medium",
+      "tags": ["offline", "service-worker", "pwa", "caching"],
+      "answer": {
+        "oneLiner": "Register a Service Worker to cache the app shell and API responses, store structured data in IndexedDB, and replay queued offline changes when the connection returns.",
+        "detail": "An offline-capable app (PWA) uses several browser technologies together. The Service Worker is a script that runs in a background thread and intercepts all network requests from the page. On install, it pre-caches static assets (HTML, CSS, JS, images). On fetch, it applies a cache strategy - cache-first for static assets, network-first or stale-while-revalidate for API data. When the user is offline, the Service Worker serves cached responses so the app still loads. Dynamic data (user-generated content, shopping cart, form submissions) is stored in IndexedDB, which is an async key-value store with good storage limits. When the user goes offline and makes changes, those are queued in IndexedDB. The Background Sync API lets the Service Worker retry these queued requests automatically when connectivity returns, even if the user has closed the tab. Connectivity status is available via navigator.onLine and the online/offline events on window.",
+        "keyPoints": [
+          "Service Worker intercepts fetch events and serves from Cache Storage as the offline fallback",
+          "IndexedDB stores structured offline data with large capacity",
+          "Background Sync API replays queued mutations when connectivity returns",
+          "navigator.onLine and online/offline events detect connectivity changes in the UI"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - dropping the order when offline instead of queuing it\nasync function submitOrder(order) {\n  if (!navigator.onLine) { alert('No internet'); return; } // data lost\n  await fetch('/api/orders', { method: 'POST', body: JSON.stringify(order) });\n}\n\n// ✅ GOOD - queue offline and sync when back online\nasync function submitOrder(order) {\n  if (!navigator.onLine) {\n    await saveToIndexedDB('pendingOrders', order);\n    return showBanner('Order saved - will send when back online');\n  }\n  await fetch('/api/orders', { method: 'POST', body: JSON.stringify(order) });\n}",
+          "note": "Queuing to IndexedDB instead of dropping data gives a far better user experience offline."
+        },
+        "analogy": "A Service Worker is a local proxy that serves your app from its own shelf when the internet shelf is empty.",
+        "redFlags": [
+          "Saying localStorage is sufficient for offline data storage - it has a 5MB limit and is synchronous",
+          "Not knowing the difference between Cache Storage (for network responses) and IndexedDB (for structured data)",
+          "Thinking navigator.onLine alone is a reliable connectivity check - it only means a network interface is connected",
+          "Not knowing that a Service Worker requires HTTPS (except localhost)"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the difference between Cache Storage and IndexedDB for offline use?",
+            "a": "Cache Storage is designed for HTTP request/response pairs (assets and API responses). IndexedDB is a key-value database for structured application data like user records or queued form submissions."
+          },
+          {
+            "q": "What cache strategy would you use for a news feed?",
+            "a": "Stale-while-revalidate - serve the cached version immediately for speed, then fetch the latest version in the background and update the cache for the next load."
+          },
+          {
+            "q": "Does navigator.onLine reliably tell you the internet is available?",
+            "a": "No - it only checks if a network interface is connected, not if the internet is reachable. A user behind a captive portal or a broken router would show as online."
+          },
+          {
+            "q": "What is the Background Sync API and what fallback exists for unsupported browsers?",
+            "a": "Background Sync lets a Service Worker retry a tagged sync request when connectivity returns, even after the page closes. For unsupported browsers, you check on reconnect in the online event handler and retry manually."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "How would you architect a web app that needs to work offline, like a field inspection tool used in areas with poor signal?"
+          },
+          {
+            "role": "you",
+            "text": "I would build it as a PWA using a Service Worker for caching and IndexedDB for data. The Service Worker pre-caches the app shell on install so the app loads even with no network. API data uses a cache-first or stale-while-revalidate strategy so inspectors see recent data instantly."
+          },
+          {
+            "role": "interviewer",
+            "text": "What happens when an inspector submits a form while offline?"
+          },
+          {
+            "role": "you",
+            "text": "The submission is saved to IndexedDB with a pending status and the inspector sees a confirmation that it will sync later. When connectivity returns, the Background Sync API triggers the Service Worker to replay the queued request. If the browser does not support Background Sync, I listen to the online event and flush the queue manually."
+          },
+          {
+            "role": "interviewer",
+            "text": "You mentioned navigator.onLine to detect connectivity - is that reliable?"
+          },
+          {
+            "role": "you",
+            "text": "Not entirely. It tells you a network interface is connected, but not that the internet is actually reachable. A user behind a captive hotel WiFi portal would show as online. I use it as a first check but implement a lightweight ping to a known endpoint to confirm true connectivity before retrying submissions."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is the difference between Cache Storage and IndexedDB? Why not just use one of them?"
+          },
+          {
+            "role": "you",
+            "text": "Cache Storage is designed for HTTP request and response pairs - it is what the Service Worker uses to store assets and API responses as network-level objects. IndexedDB is a structured key-value store for application data - inspection records, user profiles, queued mutations. They serve different layers: network caching versus application data."
+          },
+          {
+            "role": "interviewer",
+            "text": "What security requirement must a Service Worker meet?"
+          },
+          {
+            "role": "you",
+            "text": "Service Workers require HTTPS, except on localhost for development. This is enforced because a Service Worker can intercept all network requests from the page - running it over plain HTTP would allow a man-in-the-middle to inject a malicious Service Worker."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-async-007",
+      "q": "What is method chaining and how do you enable it?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "low",
+      "tags": ["method-chaining", "fluent", "this"],
+      "answer": {
+        "oneLiner": "Method chaining is calling multiple methods in sequence on the same object. You enable it by returning 'this' (or a new instance) from each method so the next call has something to operate on.",
+        "detail": "When a method returns this, the caller gets back the same object and can immediately call another method on it without storing an intermediate variable. This creates a fluent interface - a readable left-to-right chain of operations. Built-in array methods like map, filter, and reduce already chain because they return a new array. Custom classes enable chaining by returning this from mutation methods. Immutable styles like those used in query builders or test frameworks return a new instance each time instead of mutating this, which avoids shared state bugs. Method chaining improves readability for builder patterns, query construction (Knex, Mongoose), and data transformation pipelines. The main risk is long chains with no intermediate error handling - if one step throws, the error message points to the chain and is harder to debug.",
+        "keyPoints": [
+          "Each method must return this or a new chainable object for chaining to work",
+          "Array methods like map, filter, and reduce chain because they return new arrays",
+          "Fluent interfaces improve readability for builders and query patterns",
+          "Long chains can be hard to debug - consider breaking them into named intermediate steps for complex logic"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - no chaining, verbose intermediate variables\nconst filtered = orders.filter(o => o.status === 'shipped');\nconst totals = filtered.map(o => o.total);\nconst revenue = totals.reduce((acc, v) => acc + v, 0);\n\n// ✅ GOOD - method chaining for a clean pipeline\nconst shippedRevenue = orders\n  .filter(o => o.status === 'shipped')\n  .map(o => o.total)\n  .reduce((acc, v) => acc + v, 0);",
+          "note": "Array methods chain naturally because each returns a new array - making transformation pipelines concise."
+        },
+        "analogy": "Method chaining is an assembly line - each station hands the part to the next without dropping it.",
+        "redFlags": [
+          "Not knowing that a method must return this or a new object to enable chaining",
+          "Thinking all methods automatically support chaining in JavaScript",
+          "Confusing method chaining with promise chaining - different mechanisms",
+          "Writing chains so long that a thrown error becomes impossible to locate"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What must a method return for chaining to work?",
+            "a": "It must return this (for mutable chaining) or a new instance of the same type (for immutable chaining) so the next method has a target to call on."
+          },
+          {
+            "q": "How does a custom class enable method chaining?",
+            "a": "By returning this at the end of each method that should be chainable: setName(n) { this.name = n; return this; }"
+          },
+          {
+            "q": "Why do array methods like map and filter chain so well?",
+            "a": "Because they always return a new array, and arrays have all the same chainable methods available on them."
+          },
+          {
+            "q": "What is the downside of very long method chains?",
+            "a": "When an error is thrown mid-chain, the stack trace points to one line making it hard to isolate which step failed - breaking the chain into named variables helps debugging."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "What is method chaining and how do you implement it in a custom class?"
+          },
+          {
+            "role": "you",
+            "text": "Method chaining is calling multiple methods in sequence on the same object without intermediate variables. You enable it by returning this from each method so the caller immediately has the object back to call the next method on."
+          },
+          {
+            "role": "interviewer",
+            "text": "Can you show me a quick example with a custom class?"
+          },
+          {
+            "role": "you",
+            "text": "Sure. A query builder: class OrderQuery { where(field, val) { this.filters.push({field, val}); return this; } limit(n) { this.max = n; return this; } execute() { return db.query(this); } }. Then you write: new OrderQuery().where('status', 'shipped').limit(20).execute()."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why do built-in array methods chain without you doing anything special?"
+          },
+          {
+            "role": "you",
+            "text": "Because map, filter, and reduce return new arrays, and arrays already have all the chainable methods on their prototype. So orders.filter(...).map(...).reduce(...) works naturally. The return type stays consistent throughout the chain."
+          },
+          {
+            "role": "interviewer",
+            "text": "What is a risk of making chains very long?"
+          },
+          {
+            "role": "you",
+            "text": "Debugging becomes painful. If one step throws, the error points to one line number covering the whole chain. I split complex chains into named intermediate variables so stack traces are meaningful and each step can be inspected in isolation."
+          },
+          {
+            "role": "interviewer",
+            "text": "Should methods mutate this or return a new instance for chaining?"
+          },
+          {
+            "role": "you",
+            "text": "It depends on the use case. Mutable chaining with return this is simpler and fine for builders and configurations that are discarded after use. Immutable chaining that returns a new instance is safer for shared objects - it prevents callers from accidentally affecting each other's chain. Libraries like Lodash chain use the immutable style."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    },
+    {
+      "id": "js-async-008",
+      "q": "Predict the output of an async/await + promise ordering snippet.",
+      "level": "senior",
+      "type": "code",
+      "freq": "medium",
+      "tags": ["async-await", "promises", "event-loop", "trace"],
+      "answer": {
+        "oneLiner": "The output is: Start, End, Promise, Timeout. Synchronous code runs first, then microtasks (promise .then), then macrotasks (setTimeout).",
+        "detail": "When the script runs: console.log('Start') executes synchronously. setTimeout schedules a macrotask callback. Promise.resolve().then() schedules a microtask. console.log('End') executes synchronously. At this point the call stack is empty. The event loop drains the microtask queue first: it runs the .then callback which logs 'Promise'. Then it picks up the macrotask: the setTimeout callback logs 'Timeout'. If you use async/await instead of .then, the behaviour is the same - code after await resumes as a microtask, so it still runs before any setTimeout. The key mental model is: sync - then microtasks - then one macrotask - then microtasks again - then one macrotask - and so on.",
+        "keyPoints": [
+          "Synchronous code always runs first regardless of any async operations registered",
+          "Promise .then callbacks and await continuations are microtasks",
+          "setTimeout and setInterval callbacks are macrotasks",
+          "The complete microtask queue drains between each macrotask"
+        ],
+        "code": {
+          "lang": "javascript",
+          "snippet": "// ❌ BAD - assuming timer fires before promise because it was registered first\nsetTimeout(() => console.log('payment processed'), 0);\nPromise.resolve().then(() => console.log('cart cleared'));\n// Wrong assumption: 'payment processed' then 'cart cleared'\n\n// ✅ GOOD - know the correct order\nconsole.log('checkout started');                            // 1: sync\nsetTimeout(() => console.log('analytics sent'), 0);        // 4: macrotask\nPromise.resolve().then(() => console.log('cart cleared')); // 3: microtask\nconsole.log('checkout ended');                             // 2: sync\n// Output: checkout started, checkout ended, cart cleared, analytics sent",
+          "note": "Sync, then microtask (promise), then macrotask (timer) - registration order does not change this."
+        },
+        "analogy": "Finish your sentence, clear your inbox, then read the next letter.",
+        "redFlags": [
+          "Saying the output is Start, Promise, End, Timeout - forgetting End is synchronous",
+          "Saying setTimeout with 0ms fires before the promise because it was registered first",
+          "Not knowing that async/await continuation is a microtask, not a macrotask",
+          "Confusing the order of microtasks and macrotasks after the call stack empties"
+        ],
+        "followUpsQA": [
+          {
+            "q": "What is the exact output of: console.log('Start'); setTimeout(()=>console.log('Timeout'),0); Promise.resolve().then(()=>console.log('Promise')); console.log('End');",
+            "a": "Start, End, Promise, Timeout - sync logs first, then the promise microtask, then the timer macrotask."
+          },
+          {
+            "q": "If the promise .then schedules another .then inside it, when does that inner .then run?",
+            "a": "Before the setTimeout - the inner .then is a new microtask added to the queue while draining, so it still runs before any macrotask."
+          },
+          {
+            "q": "Does using async/await change the output compared to using .then?",
+            "a": "No - await continuation resumes as a microtask, exactly like .then, so the ordering behaviour is identical."
+          },
+          {
+            "q": "What if there were two setTimeout calls? Which runs first?",
+            "a": "They run in registration order as separate macrotasks, each separated by a microtask drain cycle."
+          }
+        ],
+        "dialogue": [
+          {
+            "role": "interviewer",
+            "text": "Predict the output: console.log('Start'); setTimeout(() => console.log('Timeout'), 0); Promise.resolve().then(() => console.log('Promise')); console.log('End');"
+          },
+          {
+            "role": "you",
+            "text": "Start, End, Promise, Timeout. The two console.log calls are synchronous so they run immediately in order. The setTimeout schedules a macrotask and the Promise.resolve().then schedules a microtask. Once the stack empties, microtasks drain first giving us Promise, then the macrotask fires giving us Timeout."
+          },
+          {
+            "role": "interviewer",
+            "text": "Why does End print before Promise even though the promise was registered before the End log?"
+          },
+          {
+            "role": "you",
+            "text": "Because registering a promise callback does not pause execution. Promise.resolve().then schedules a callback in the microtask queue and then code continues running synchronously - so End executes before the queue is even checked. The queue only drains after the call stack is completely empty."
+          },
+          {
+            "role": "interviewer",
+            "text": "What if the promise .then callback itself creates another .then? Does that run before or after the Timeout?"
+          },
+          {
+            "role": "you",
+            "text": "Before Timeout. When the first .then runs and schedules a new .then inside it, that new microtask is added to the current microtask drain cycle. The event loop keeps draining until the microtask queue is empty before touching any macrotask. So all chained .then callbacks, no matter how deep, run before any setTimeout."
+          },
+          {
+            "role": "interviewer",
+            "text": "Would rewriting this with async/await change the output?"
+          },
+          {
+            "role": "you",
+            "text": "No - await is syntactic sugar for .then. Code after an await resumes as a microtask in the same queue. So an async function that awaits a resolved promise will log its continuation before any setTimeout, just like a .then callback would."
+          },
+          {
+            "role": "interviewer",
+            "text": "If there were two timeouts registered - setTimeout(A, 0) and setTimeout(B, 0) - does a microtask drain happen between them?"
+          },
+          {
+            "role": "you",
+            "text": "Yes - each macrotask is followed by a full microtask drain. After A runs, all pending microtasks run before B is picked up. This matters in practice: if A's callback resolves a promise, that promise's .then runs before B, not after."
+          },
+          {
+            "role": "interviewer",
+            "text": "Perfect. That's exactly the depth I was looking for. ✅"
+          }
+        ]
+      }
+    }
+  ]
+}

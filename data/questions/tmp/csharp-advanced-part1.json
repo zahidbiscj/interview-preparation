@@ -1,0 +1,260 @@
+{
+  "subtopicId": "advanced",
+  "questions": [
+    {
+      "id": "csharp-advanced-001",
+      "q": "Explain delegates, events, `Func`, and `Action` with examples.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["delegates", "events", "func", "action", "functional"],
+      "answer": {
+        "oneLiner": "A delegate is a type-safe function pointer. `Func` and `Action` are built-in generic delegates. An event wraps a delegate so outside code can only subscribe and unsubscribe, never invoke it.",
+        "detail": "A delegate is a type that holds a reference to a method with a matching signature. `Action<T>` is a built-in delegate that takes parameters and returns void. `Func<T, TResult>` is a built-in delegate whose last type parameter is the return type. An `event` wraps a delegate field and restricts external callers to `+=` and `-=` only - they cannot invoke the delegate or clear it. Only the class that declares the event can raise it. Delegates support multicast: using `+=` adds a method to the invocation list and all subscribers are called in order when the delegate is invoked.",
+        "keyPoints": [
+          "`Action<T>` returns void; `Func<T, TResult>` returns a value - the last type parameter is always the return type.",
+          "Multicast delegates call all subscribers in subscription order when invoked.",
+          "`event` restricts external code to subscribe and unsubscribe only - the declaring class controls invocation.",
+          "Always raise events with `?.Invoke()` to avoid a null-check race condition in multi-threaded code.",
+          "Forgetting to unsubscribe with `-=` causes memory leaks because the publisher holds a reference to the subscriber."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - public delegate field lets anyone invoke or clear subscribers\npublic class OrderService {\n    public Action<int>? OrderShipped;\n    public void Ship(int id) { OrderShipped(id); } // crash if null\n}\n\n// ✅ GOOD - event restricts external code; ?.Invoke is null-safe\npublic class OrderService {\n    public event EventHandler<int>? OrderShipped;\n    public void Ship(int id) {\n        // process order...\n        OrderShipped?.Invoke(this, id);\n    }\n}\nvar svc = new OrderService();\nsvc.OrderShipped += (_, id) => Console.WriteLine($\"Order {id} shipped\");\nsvc.Ship(42);",
+          "note": "The event keyword prevents external code from calling Invoke or resetting the delegate to null."
+        },
+        "analogy": "An event is a doorbell - visitors press it, but only you answer.",
+        "redFlags": [
+          "Saying events and public delegate fields are the same thing.",
+          "Not knowing that external code cannot invoke or clear an event - only subscribe and unsubscribe.",
+          "Confusing `Action` (returns void) with `Func` (returns a value).",
+          "Not knowing that failing to call `-=` causes a memory leak when a short-lived subscriber is held by a long-lived publisher."
+        ],
+        "followUpsQA": [
+          { "q": "Why wrap a delegate in an event?", "a": "An event prevents external code from invoking the delegate or overwriting the subscriber list - only the declaring class can raise it." },
+          { "q": "What is a multicast delegate?", "a": "A delegate that holds multiple method references and calls them all in order when invoked." },
+          { "q": "How do you safely raise an event in a multi-threaded app?", "a": "Use `?.Invoke()` which atomically copies the reference before checking for null, avoiding a race between the null check and the call." },
+          { "q": "What is the memory leak pattern with events?", "a": "A subscriber that never calls `-=` is kept alive by the publisher for as long as the publisher lives." },
+          { "q": "What is the difference between Func and Predicate?", "a": "`Predicate<T>` is equivalent to `Func<T, bool>` in meaning but is a distinct .NET type; LINQ uses `Func<T, bool>` in operators like `Where`." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Explain delegates, events, Func and Action - and how they relate to each other." },
+          { "role": "you", "text": "A delegate is a type-safe function pointer that holds a reference to a method with a matching signature. `Action` and `Func` are built-in generic delegate types so you do not need to declare your own. `Action` returns void, `Func` returns a value. An event wraps a delegate field so external code can only subscribe and unsubscribe - it cannot invoke or clear the subscriber list." },
+          { "role": "interviewer", "text": "Why would you use an event instead of just making the delegate field public?" },
+          { "role": "you", "text": "Encapsulation. With a public delegate field any consumer can write `svc.OrderShipped = null` and wipe all subscribers, or call it directly. The `event` keyword blocks both of those. Only the class that declares the event can raise it." },
+          { "role": "interviewer", "text": "How do you raise an event safely in a multi-threaded service?" },
+          { "role": "you", "text": "Use `OrderShipped?.Invoke(this, id)`. The `?.` operator copies the delegate reference atomically before the null check so another thread cannot unsubscribe between the check and the call. That eliminates the classic TOCTOU race condition." },
+          { "role": "interviewer", "text": "What happens if a subscriber never unsubscribes?" },
+          { "role": "you", "text": "Memory leak. The publisher holds a reference to the subscriber delegate, which keeps the subscriber object alive even if nothing else references it. In a long-running e-commerce service with many short-lived order handlers this adds up. The fix is always to `-=` in Dispose or when the component shuts down." },
+          { "role": "interviewer", "text": "When would you choose a plain Func over an event?" },
+          { "role": "you", "text": "When you need a single callback injected as a dependency - like a price-calculation strategy passed to a discount engine. Events are for one-to-many notification. A `Func` injected via the constructor is simpler and more testable for a single callback. The key fact is that `Func` supports only one subscriber at a time unless you combine delegates manually." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-002",
+      "q": "What are generics in C#? Why are they useful and how are they different from Java generics?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["generics", "type-safety", "performance"],
+      "answer": {
+        "oneLiner": "Generics let you write type-safe, reusable code where the type is a parameter. Unlike Java, C# generics are reified - value types get their own specialised version with no boxing.",
+        "detail": "With generics you write a class or method once and parameterise it by type. The compiler enforces type safety, so a `List<Product>` cannot hold a `Customer`. In Java, generics are erased at compile time - all generic types become `Object` at runtime and value types are boxed. In C#, generics are reified: the type information is preserved at runtime. For value types, the runtime generates a dedicated specialisation so `List<int>` stores raw `int` values on a contiguous array with no boxing overhead. Constraints let you restrict what `T` can be, which lets you call interface members or use `new T()` inside the generic.",
+        "keyPoints": [
+          "C# generics are reified - `typeof(List<int>)` and `typeof(List<string>)` are distinct types at runtime.",
+          "No boxing for value types - `List<int>` stores `int[]` internally, unlike Java which boxes to `Integer`.",
+          "Constraints like `where T : class, IEntity, new()` unlock interface calls and constructor use inside the generic.",
+          "Generic interfaces can be covariant (`out T`) or contravariant (`in T`) for flexible assignment.",
+          "Using `object` instead of generics in new code forces casting and loses compile-time type safety."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - object forces casting and loses type safety\npublic class Repository {\n    public object GetById(int id) => _db.Find(id);\n}\nvar p = (Product)repo.GetById(1); // cast can fail at runtime\n\n// ✅ GOOD - generic with constraint; type-safe, no casting\npublic class Repository<T> where T : class, IEntity {\n    private readonly AppDbContext _db;\n    public Repository(AppDbContext db) => _db = db;\n    public Task<T?> GetByIdAsync(int id) => _db.Set<T>().FindAsync(id).AsTask();\n    public void Add(T entity) => _db.Set<T>().Add(entity);\n}",
+          "note": "The constraint `where T : class, IEntity` lets the compiler verify T has the members needed without a cast."
+        },
+        "analogy": "Generics are a stamp mould - one design, any metal, no melting required.",
+        "redFlags": [
+          "Saying C# generics work the same way as Java generics - Java erases types at runtime, C# does not.",
+          "Not knowing that C# value-type generics avoid boxing while Java always boxes.",
+          "Confusing constraints with inheritance - `where T : IEntity` is a compile-time restriction, not inheritance.",
+          "Using `object` collections instead of generics in new code."
+        ],
+        "followUpsQA": [
+          { "q": "Do C# generics box value types?", "a": "No - the runtime creates a specialised version for each value type, so `List<int>` stores raw int values with no heap allocation per element." },
+          { "q": "What does a constraint enable inside a generic method?", "a": "You can call members of the constrained interface or create instances with `new()` - without a constraint the compiler treats T as object." },
+          { "q": "What is covariance in generics?", "a": "`out T` on an interface means you can assign `IEnumerable<Dog>` to `IEnumerable<Animal>` because T only appears in output positions." },
+          { "q": "Are List<int> and List<string> the same type at runtime?", "a": "No - C# reifies generics so they are distinct types; Java type erasure makes them the same raw List." },
+          { "q": "What does `where T : new()` mean?", "a": "T must have a public parameterless constructor, which lets you write `new T()` inside the generic method." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What are generics in C# and why are they useful?" },
+          { "role": "you", "text": "Generics let you write one class or method and parameterise it by type, so you get type safety and code reuse together. A `Repository<Product>` can only hold Products - no casting, no runtime surprises." },
+          { "role": "interviewer", "text": "How do C# generics differ from Java generics?" },
+          { "role": "you", "text": "Java erases generic type information at compile time - everything becomes Object at runtime and value types get boxed. C# reifies generics so `typeof(List<int>)` is a real distinct type. For value types the runtime generates a specialised version, so `List<int>` stores raw int values on an array - no boxing at all." },
+          { "role": "interviewer", "text": "What do constraints give you?" },
+          { "role": "you", "text": "They restrict what T can be and unlock capabilities inside the generic. With `where T : class, IEntity, new()` I can call `IEntity` members, use `new T()` to create instances, and the compiler verifies all of it. Without constraints you can only treat T as object." },
+          { "role": "interviewer", "text": "Give me a real scenario where generics helped you." },
+          { "role": "you", "text": "A generic `Repository<T>` in our e-commerce platform meant we wrote GetById, Add, and Update once, then used `Repository<Product>`, `Repository<Order>`, and `Repository<Customer>` without a line of duplicate code. EF Core's `DbContext.Set<T>()` makes this possible. The constraint `where T : class` is required by EF." },
+          { "role": "interviewer", "text": "What is the risk of a constraint being too broad?" },
+          { "role": "you", "text": "Too broad and you lose safety - `where T : class` alone means T could be any reference type including string. Too narrow and you limit reuse. The right constraint is the minimum interface the generic actually needs. A concrete fact: `where T : IEntity` means the compiler allows `entity.Id` inside the method without a cast." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-003",
+      "q": "Explain LINQ -- key concepts and most commonly used operators.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["linq", "functional", "ienumerable", "query"],
+      "answer": {
+        "oneLiner": "LINQ is a composable, type-safe query syntax over any sequence. It uses operators like `Where`, `Select`, `GroupBy`, and `OrderBy`, and runs lazily - the query executes only when you enumerate it.",
+        "detail": "LINQ works on anything that implements `IEnumerable<T>` or `IQueryable<T>`. You chain operators to build a pipeline. The query is not executed when you write it - it is deferred until you enumerate the result with `foreach`, `ToList()`, `First()`, etc. On `IQueryable<T>`, operators build an expression tree that a LINQ provider like EF Core translates to SQL, so filtering and sorting happen in the database. On `IEnumerable<T>`, operators run as C# lambdas in memory. The most common operators are `Where` (filter), `Select` (project), `SelectMany` (flatten), `GroupBy` (bucket), `OrderBy`/`OrderByDescending` (sort), `Any`/`All` (boolean test), `First`/`FirstOrDefault` (single element), and `Count`/`Sum`/`Average`/`Max` (aggregates).",
+        "keyPoints": [
+          "LINQ is lazy - the query runs when enumerated, not when written; re-enumerating re-executes the query against the source.",
+          "On `IQueryable` (EF Core) operators translate to SQL; on `IEnumerable` they run in memory.",
+          "Calling `ToList()` before `Where` on a DbSet loads the entire table into memory before filtering.",
+          "`SelectMany` flattens nested sequences - use it to project a one-to-many relationship into a flat result.",
+          "Method syntax and query syntax compile to identical IL - method syntax is preferred for most real-world use."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - ToList() materialises the whole table, then filters in memory\nvar bad = db.Orders.ToList().Where(o => o.Status == OrderStatus.Shipped);\n\n// ✅ GOOD - Where on IQueryable translates to SQL WHERE clause\nvar topCustomers = db.Orders\n    .Where(o => o.Status == OrderStatus.Shipped)\n    .GroupBy(o => o.CustomerId)\n    .Select(g => new {\n        CustomerId = g.Key,\n        TotalSpend = g.Sum(o => o.Total),\n        OrderCount = g.Count()\n    })\n    .OrderByDescending(x => x.TotalSpend)\n    .Take(10)\n    .ToList();",
+          "note": "The entire LINQ chain on IQueryable becomes one SQL query with WHERE, GROUP BY, ORDER BY, and TOP 10."
+        },
+        "analogy": "LINQ is a pipeline blueprint - nothing flows until you open the tap.",
+        "redFlags": [
+          "Saying LINQ executes when you write the query - it is deferred until enumeration.",
+          "Calling `ToList()` before `Where` on a DbSet, which loads the entire table into memory first.",
+          "Not knowing that re-enumerating an `IEnumerable` query hits the source twice.",
+          "Confusing `IEnumerable` LINQ (in-memory lambdas) with `IQueryable` LINQ (translated to SQL)."
+        ],
+        "followUpsQA": [
+          { "q": "What is deferred execution?", "a": "The query runs when you enumerate it - with foreach, ToList, First, etc. - not when you define it." },
+          { "q": "What is the difference between First() and FirstOrDefault()?", "a": "`First()` throws InvalidOperationException if the sequence is empty; `FirstOrDefault()` returns the type default (null for classes) instead." },
+          { "q": "When would you use SelectMany?", "a": "When each element maps to a collection and you want a flat result - like projecting each order to its order lines." },
+          { "q": "Why is Count() on IEnumerable slow?", "a": "IEnumerable has no Count property so LINQ walks the entire sequence. ICollection exposes a Count property that is O(1)." },
+          { "q": "What happens if you call a LINQ method EF Core cannot translate?", "a": "EF Core either throws a translation exception or falls back to client-side evaluation, loading more data than needed." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Explain LINQ and its key operators." },
+          { "role": "you", "text": "LINQ is a composable query pipeline over any IEnumerable or IQueryable. The core operators are Where for filtering, Select for projecting, GroupBy for bucketing, OrderBy for sorting, and aggregates like Sum and Count. The critical point is that the query is lazy - nothing runs until you enumerate it." },
+          { "role": "interviewer", "text": "What problem does deferred execution cause in practice?" },
+          { "role": "you", "text": "Re-enumeration. If I write a query and iterate it twice - once to log and once to process - it hits the database twice. The fix is to call `ToList()` once and work from the materialised list. Also, modifying the source collection between definition and enumeration changes the results." },
+          { "role": "interviewer", "text": "What is the difference between LINQ on IEnumerable and on IQueryable?" },
+          { "role": "you", "text": "On `IEnumerable` the operators are C# lambdas running in memory. On `IQueryable`, EF Core intercepts the operators, builds an expression tree, and translates the whole chain to SQL. The biggest mistake is calling `ToList()` before a `Where` on a DbSet - that loads the entire table before filtering." },
+          { "role": "interviewer", "text": "Give me a real scenario where you fixed a LINQ performance bug." },
+          { "role": "you", "text": "In a logistics app, a report was loading 200,000 shipment records with `ToList()` and then filtering by date in LINQ. Moving the `Where` call before `ToList()` let EF Core generate a `WHERE ShipDate >= @date` clause. Query time dropped from 8 seconds to 300 milliseconds." },
+          { "role": "interviewer", "text": "When would you use SelectMany?" },
+          { "role": "you", "text": "To flatten one-to-many relationships. Each `Order` has a list of `OrderLines` - `orders.SelectMany(o => o.Lines)` gives a flat sequence of all lines across all orders. Without SelectMany you would have a nested `IEnumerable<IEnumerable<OrderLine>>`." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-004",
+      "q": "Explain pattern matching in C# -- switch expressions, type patterns, property patterns.",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["pattern-matching", "switch", "csharp-8", "csharp-9"],
+      "answer": {
+        "oneLiner": "Pattern matching tests a value's type, shape, and properties in one concise expression, replacing long if/else chains with readable, exhaustive switch expressions.",
+        "detail": "C# 7 introduced the type pattern: `if (shape is Circle c)` tests the type and binds the variable in one step. C# 8 added the switch expression, which returns a value and the compiler warns if the arms are not exhaustive. Property patterns let you match on property values inside the type: `shape is Circle { Radius: > 10 }`. Relational patterns use comparison operators: `x is > 0 and < 100`. Guards add a `when` clause to a switch arm. C# 11 added list patterns that match sequences by structure like `[1, .., 5]`. All patterns compose freely with `and`, `or`, and `not`.",
+        "keyPoints": [
+          "Type pattern: `if (shape is Circle c)` both tests the type and declares the variable in one step - no separate cast needed.",
+          "Switch expression returns a value; the compiler warns if not all cases are covered (exhaustiveness check).",
+          "Property pattern: `shape is Circle { Radius: > 10 }` tests a property value without explicit casting.",
+          "Relational patterns use `>`, `<`, `>=`, `<=` and combine with `and`/`or`/`not`.",
+          "C# 11 list patterns match sequences by structure: `[first, .., last]` using a slice pattern `..`."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - long if/else chain with manual casting\nstring Describe(Shape shape) {\n    if (shape is Circle) { var c = (Circle)shape; return $\"Circle r={c.Radius}\"; }\n    else if (shape is Rectangle) { return \"Rect\"; }\n    else return \"Unknown\";\n}\n\n// ✅ GOOD - switch expression: exhaustive, no casts, property patterns\nstring Describe(Shape shape) => shape switch {\n    Circle { Radius: > 100 } c => $\"Large circle r={c.Radius}\",\n    Circle c                   => $\"Circle r={c.Radius}\",\n    Rectangle { Width: var w, Height: var h } when w == h => $\"Square {w}x{h}\",\n    Rectangle r                => $\"Rect {r.Width}x{r.Height}\",\n    null                       => \"null\",\n    _                          => \"Unknown shape\"\n};",
+          "note": "Switch expression checks exhaustiveness at compile time and eliminates manual casting."
+        },
+        "analogy": "Pattern matching is a smart post box that sorts by shape, size, and label all at once.",
+        "redFlags": [
+          "Saying pattern matching is just syntactic sugar for if/else - the compiler enforces exhaustiveness on switch expressions.",
+          "Not knowing you can combine type and property patterns in one arm without a separate cast.",
+          "Confusing switch expression (returns a value) with switch statement (does not).",
+          "Not knowing the `when` guard clause can extend any pattern arm."
+        ],
+        "followUpsQA": [
+          { "q": "What makes a switch expression exhaustive?", "a": "The compiler requires every possible input value to be covered by at least one arm - a discard `_` arm covers the remaining cases." },
+          { "q": "How does a positional pattern work?", "a": "It uses a type's `Deconstruct` method or record syntax to match by position: `point is (0, var y)` matches a Point with X = 0." },
+          { "q": "What is a relational pattern?", "a": "`x is > 0 and < 100` uses comparison operators directly in the pattern, composable with `and`, `or`, and `not`." },
+          { "q": "What are C# 11 list patterns?", "a": "`[1, .., 5]` matches a sequence that starts with 1 and ends with 5 regardless of length - the `..` is a slice pattern." },
+          { "q": "Can you use patterns outside of a switch?", "a": "Yes - the `is` operator supports all patterns in any expression, including inside if conditions." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "Explain pattern matching in C# - the main kinds and what they give you." },
+          { "role": "you", "text": "Pattern matching tests a value's type, shape, and properties in one expression. The type pattern `if (shape is Circle c)` tests and binds in one step. A switch expression returns a value and the compiler enforces exhaustiveness. Property patterns like `Circle { Radius: > 10 }` test property values without casting." },
+          { "role": "interviewer", "text": "What does exhaustiveness mean in practice?" },
+          { "role": "you", "text": "The compiler warns if a switch expression has input values that no arm covers. This forces you to handle every case or add a discard `_` arm. For a payment processing engine that switches on `PaymentStatus`, missing a status is a compile warning rather than a silent runtime bug." },
+          { "role": "interviewer", "text": "Show me a property pattern example." },
+          { "role": "you", "text": "`order is Order { Status: OrderStatus.Pending, Total: > 1000 }` matches a pending order over 1000 in one expression. You can also bind the value: `{ Total: var t }`. No casting, no intermediate variables - all inline." },
+          { "role": "interviewer", "text": "What are list patterns added in C# 11?" },
+          { "role": "you", "text": "`[first, .., last]` matches a list by structure - `first` binds the first element, `last` binds the last, and `..` matches any number of elements in between. I used this in a CSV parser to handle headers differently from data rows." },
+          { "role": "interviewer", "text": "How do you combine patterns?" },
+          { "role": "you", "text": "With `and`, `or`, and `not`. For example `x is > 0 and < 100` or `status is not OrderStatus.Cancelled`. Patterns compose freely so you can build readable, complex conditions without nested ifs. The `when` guard clause adds a boolean condition on top of a pattern arm." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    },
+    {
+      "id": "csharp-advanced-005",
+      "q": "What are extension methods and when should you use them?",
+      "level": "mid",
+      "type": "conceptual",
+      "freq": "high",
+      "tags": ["extension-methods", "linq", "fluent"],
+      "answer": {
+        "oneLiner": "Extension methods are static methods with a `this T` first parameter that let you call them as instance methods on type T without modifying it. All LINQ operators are extension methods.",
+        "detail": "At compile time the call `\"hello\".Truncate(5)` is rewritten to `StringExtensions.Truncate(\"hello\", 5)`. There is no runtime magic - it is purely syntactic sugar. Extension methods only have access to public members of the type, so they cannot read private fields. If an instance method with the same name and signature exists, it always wins over the extension. The main uses are: adding fluent methods to sealed or third-party types you cannot modify, building LINQ-style pipelines, and grouping related helpers without inheritance. Avoid them for core business logic because they are harder to discover, mock, or override.",
+        "keyPoints": [
+          "Must be a static method in a static class with the first parameter typed as `this T`.",
+          "Called like an instance method at the call site - the compiler rewrites it to a static call.",
+          "Extension methods only see public members - they cannot access private state.",
+          "An instance method always takes priority over an extension method with the same signature.",
+          "All LINQ operators (Where, Select, GroupBy) are extension methods on IEnumerable and IQueryable."
+        ],
+        "code": {
+          "lang": "csharp",
+          "snippet": "// ❌ BAD - utility buried in a helper class, not discoverable via IntelliSense\npublic class StringHelper {\n    public static string ToSlug(string s) => s.ToLower().Replace(' ', '-');\n}\nvar slug = StringHelper.ToSlug(productName);\n\n// ✅ GOOD - extension method surfaces in IntelliSense on the string itself\npublic static class StringExtensions {\n    public static string ToSlug(this string s) =>\n        s.ToLower().Replace(' ', '-');\n}\nvar slug = productName.ToSlug(); // reads naturally",
+          "note": "Extension methods surface in IntelliSense on the type, making them more discoverable than static helper classes."
+        },
+        "analogy": "Extension methods are adaptor plugs - they fit existing sockets without rewiring the wall.",
+        "redFlags": [
+          "Saying extension methods modify the original class - they are static methods rewritten by the compiler.",
+          "Not knowing that instance methods always win over extensions with the same signature.",
+          "Using extension methods to encapsulate core business logic that needs to be mocked or overridden.",
+          "Not knowing that all LINQ operators are extension methods on IEnumerable and IQueryable."
+        ],
+        "followUpsQA": [
+          { "q": "Where must an extension method be defined?", "a": "In a static, non-generic, non-nested class - the method itself must also be static with a `this` first parameter." },
+          { "q": "Can an extension method access private state?", "a": "No - it only sees public members because it compiles to an external static call." },
+          { "q": "What wins when an instance method and extension method have the same signature?", "a": "The instance method always wins - the extension is only considered when no matching instance method exists." },
+          { "q": "How do extension methods enable fluent APIs?", "a": "By returning the same type or a derived type, each method can be chained - this is how LINQ builds readable pipelines." },
+          { "q": "How do you add methods to a sealed class you cannot modify?", "a": "Extension methods - you cannot subclass a sealed type, but you can add an extension method using `this SealedType` as the first parameter." }
+        ],
+        "dialogue": [
+          { "role": "interviewer", "text": "What are extension methods and when should you use them?" },
+          { "role": "you", "text": "Extension methods are static methods in a static class where the first parameter has the `this` keyword. That tells the compiler to let callers treat the method as an instance method on that type. The classic example is LINQ - every operator like `Where` and `Select` is an extension method on `IEnumerable`." },
+          { "role": "interviewer", "text": "What actually happens at runtime?" },
+          { "role": "you", "text": "`productName.ToSlug()` is rewritten by the compiler to `StringExtensions.ToSlug(productName)`. There is no virtual dispatch, no modification of the original type. It is pure compile-time sugar with zero extra runtime overhead." },
+          { "role": "interviewer", "text": "What are the limits?" },
+          { "role": "you", "text": "They only see public members - no private fields. And an instance method always beats an extension with the same signature, so you cannot override existing behaviour. If the class is later updated to add the same method, your extension silently stops being called." },
+          { "role": "interviewer", "text": "When would you not use them?" },
+          { "role": "you", "text": "For core business logic that needs to be injected, mocked, or overridden. Those belong in interfaces and classes. Extension methods are best for pure utilities that add convenience to a type - formatters, validators, or helpers on primitives and DTOs." },
+          { "role": "interviewer", "text": "Give me a real example from production." },
+          { "role": "you", "text": "In a healthcare app we added `IsValidNhsNumber(this string s)` as an extension on string. It checks the NHS checksum algorithm. Every input model calls `patientId.IsValidNhsNumber()` and it reads naturally. The key technical fact: because it compiles to a static call, there is zero overhead compared to a regular static method." },
+          { "role": "interviewer", "text": "Perfect. That's exactly the depth I was looking for. ✅" }
+        ]
+      }
+    }
+  ]
+}
