@@ -258,9 +258,12 @@ export class QuestionBankService {
 
     if (!topic.loaded) {
       this._loadingTopicId.set(id);
+      this._error.set(null); // clear any stale error before retrying
       try {
         const file = await firstValueFrom(
-          this.http.get<TopicFile>(`assets/data/questions/${topic.file}`)
+          this.http.get<TopicFile>(`assets/data/questions/${topic.file}`, {
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+          })
         );
         this.topicCache.set(id, file);
 
@@ -384,9 +387,12 @@ export class QuestionBankService {
     if (!topic) return null;
     try {
       const file = await firstValueFrom(
-        this.http.get<TopicFile>(`assets/data/questions/${topic.file}`)
+        this.http.get<TopicFile>(`assets/data/questions/${topic.file}`, {
+          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+        })
       );
       this.topicCache.set(id, file);
+      this._error.set(null);
       return file;
     } catch {
       this._error.set(`Failed to load questions for "${topic.name}".`);
@@ -550,13 +556,12 @@ export class QuestionBankService {
     try {
       const raw = localStorage.getItem(SETS_KEY);
       const parsed: QuestionSet[] = raw ? JSON.parse(raw) : [];
-      if (parsed.length > 0) return parsed;
-      // No sets yet — seed the JD-matched preset sets.
-      localStorage.setItem(SETS_KEY, JSON.stringify(PRESET_SETS));
-      return PRESET_SETS;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch {
-      return [];
+      // corrupted localStorage — fall through to seed presets
     }
+    localStorage.setItem(SETS_KEY, JSON.stringify(PRESET_SETS));
+    return [...PRESET_SETS];
   }
 
   /** Record a finished practice batch into today's tally. */
