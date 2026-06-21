@@ -403,14 +403,27 @@ import { ButtonModule } from 'primeng/button';
 
     .sim-link .ico { margin-right: 4px; }
 
-    /* ── Mobile topbar: icon-only nav so every link stays visible ── */
-    @media (max-width: 600px) {
-      .topbar { padding: 0 10px; gap: 8px; }
-      .topbar-right { gap: 6px; }
+    /* ── Mobile topbar: 2-row layout to prevent overlap ── */
+    @media (max-width: 768px) {
+      .topbar {
+        height: auto;
+        flex-wrap: wrap;
+        padding: 8px 10px 6px;
+        gap: 6px;
+      }
+      .topbar-left { order: 1; flex-shrink: 0; }
+      .topbar-right { order: 2; margin-left: auto; gap: 6px; }
+      .topbar-center {
+        order: 3;
+        flex: 0 0 100%;
+        width: 100%;
+        padding-bottom: 2px;
+      }
       .menu-btn .lbl { display: none; }
       .sim-link .lbl { display: none; }
       .sim-link .ico { margin-right: 0; }
       .sim-link { padding: 6px 9px; font-size: 1em; }
+      .app-brand .lbl { display: none; }
     }
   `]
 })

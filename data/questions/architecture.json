@@ -1,4 +1,4 @@
-{
+﻿{
   "topicId": "architecture",
   "topicName": "System Design & Architecture",
   "subtopics": [
@@ -11,18 +11,18 @@
           "id": "architecture-patterns-001",
           "q": "What is Clean Architecture (Onion Architecture), and what is the Dependency Rule?",
           "answer": {
-            "oneLiner": "Concentric rings â€” Domain at the centre, then Application, then Infrastructure and Presentation â€” where all dependencies point inward and the domain knows nothing about the outside.",
+            "oneLiner": "Concentric rings — Domain at the centre, then Application, then Infrastructure and Presentation — where all dependencies point inward and the domain knows nothing about the outside.",
             "keyPoints": [
               "Domain (centre): entities, value objects, zero dependencies.",
               "Application: use-cases and interfaces like IRepository.",
               "Infrastructure/Presentation (outer): EF, HTTP, controllers.",
-              "Dependency Rule: source dependencies point inward only â€” via Dependency Inversion."
+              "Dependency Rule: source dependencies point inward only — via Dependency Inversion."
             ],
             "detail": "Interfaces are defined in inner layers and implemented in outer ones, so you can swap DB, broker, or UI without touching domain code. Use-cases test in milliseconds against fakes.",
-            "analogy": "Like an onion â€” peel any outer layer and the core business rules stay intact.",
+            "analogy": "Like an onion — peel any outer layer and the core business rules stay intact.",
             "code": {
               "lang": "csharp",
-              "snippet": "// Application layer â€” defines the contract (inner ring)\npublic interface IOrderRepository\n{\n    Task<Order?> GetByIdAsync(Guid id, CancellationToken ct);\n    Task AddAsync(Order order, CancellationToken ct);\n}\n\n// Infrastructure layer â€” implements it (outer ring)\npublic class EfOrderRepository : IOrderRepository\n{\n    private readonly AppDbContext _db;\n    public EfOrderRepository(AppDbContext db) => _db = db;\n\n    public Task<Order?> GetByIdAsync(Guid id, CancellationToken ct)\n        => _db.Orders.FindAsync(new object[] { id }, ct).AsTask();\n\n    public async Task AddAsync(Order order, CancellationToken ct)\n    {\n        _db.Orders.Add(order);\n        await _db.SaveChangesAsync(ct);\n    }\n}"
+              "snippet": "// Application layer — defines the contract (inner ring)\npublic interface IOrderRepository\n{\n    Task<Order?> GetByIdAsync(Guid id, CancellationToken ct);\n    Task AddAsync(Order order, CancellationToken ct);\n}\n\n// Infrastructure layer — implements it (outer ring)\npublic class EfOrderRepository : IOrderRepository\n{\n    private readonly AppDbContext _db;\n    public EfOrderRepository(AppDbContext db) => _db = db;\n\n    public Task<Order?> GetByIdAsync(Guid id, CancellationToken ct)\n        => _db.Orders.FindAsync(new object[] { id }, ct).AsTask();\n\n    public async Task AddAsync(Order order, CancellationToken ct)\n    {\n        _db.Orders.Add(order);\n        await _db.SaveChangesAsync(ct);\n    }\n}"
             },
             "redFlags": [
               "Defining repositories in Infrastructure and calling them from Application.",
@@ -56,7 +56,7 @@
               },
               {
                 "role": "me",
-                "text": "It's concentric rings â€” Domain at the centre, then Application, then Infrastructure and Presentation. The Dependency Rule says source dependencies only ever point **inward**."
+                "text": "It's concentric rings — Domain at the centre, then Application, then Infrastructure and Presentation. The Dependency Rule says source dependencies only ever point **inward**."
               },
               {
                 "role": "interviewer",
@@ -64,15 +64,15 @@
               },
               {
                 "role": "me",
-                "text": "Through Dependency Inversion â€” the inner layer **defines** an interface like `IOrderRepository` and Infrastructure implements it, so the arrow still points inward."
+                "text": "Through Dependency Inversion — the inner layer **defines** an interface like `IOrderRepository` and Infrastructure implements it, so the arrow still points inward."
               },
               {
                 "role": "interviewer",
-                "text": "Say you need to send an email from a use-case and also audit it â€” where does that logic live without polluting the domain?"
+                "text": "Say you need to send an email from a use-case and also audit it — where does that logic live without polluting the domain?"
               },
               {
                 "role": "me",
-                "text": "I'd define an `IEmailSender` abstraction in Application, implement it in Infrastructure, and handle auditing as a cross-cutting pipeline behaviour â€” the domain stays pure."
+                "text": "I'd define an `IEmailSender` abstraction in Application, implement it in Infrastructure, and handle auditing as a cross-cutting pipeline behaviour — the domain stays pure."
               },
               {
                 "role": "interviewer",
@@ -83,20 +83,20 @@
         },
         {
           "id": "architecture-patterns-002",
-          "q": "Explain the Repository Pattern â€” what it is, why you use it, and the criticisms when used with Entity Framework.",
+          "q": "Explain the Repository Pattern — what it is, why you use it, and the criticisms when used with Entity Framework.",
           "answer": {
-            "oneLiner": "It wraps data access behind a collection-like interface so callers don't care where data comes from â€” but with EF Core it can be redundant since DbContext is already a unit-of-work plus repository.",
+            "oneLiner": "It wraps data access behind a collection-like interface so callers don't care where data comes from — but with EF Core it can be redundant since DbContext is already a unit-of-work plus repository.",
             "keyPoints": [
               "Centralises query logic and enables testing against fakes.",
               "Criticism: EF's DbSet is already a repository, DbContext a UoW.",
               "Returning IQueryable leaks EF; returning IEnumerable forces in-memory filtering.",
               "Prefer specific repos (IOrderRepository) over generic IRepository<T>."
             ],
-            "detail": "A pragmatic middle ground is query/specification objects run directly against DbContext â€” testable without the leaky wrapper. It genuinely pays off with multiple data sources or strict Clean Architecture boundaries.",
-            "analogy": "Like a librarian â€” you ask for 'Tolkien books after 1960' and get a list, not access to the storeroom.",
+            "detail": "A pragmatic middle ground is query/specification objects run directly against DbContext — testable without the leaky wrapper. It genuinely pays off with multiple data sources or strict Clean Architecture boundaries.",
+            "analogy": "Like a librarian — you ask for 'Tolkien books after 1960' and get a list, not access to the storeroom.",
             "code": {
               "lang": "csharp",
-              "snippet": "// Specific repository â€” domain-intent clear\npublic interface IOrderRepository\n{\n    Task<Order?> GetByIdAsync(Guid id, CancellationToken ct);\n    Task<IReadOnlyList<Order>> GetPendingOrdersAsync(CancellationToken ct);\n    Task AddAsync(Order order, CancellationToken ct);\n}\n\n// Avoid: leaky generic repository exposing IQueryable\npublic interface IRepository<T>  // <- anti-pattern when IQueryable is exposed\n{\n    IQueryable<T> Query(); // exposes EF internals to Application layer\n}"
+              "snippet": "// Specific repository — domain-intent clear\npublic interface IOrderRepository\n{\n    Task<Order?> GetByIdAsync(Guid id, CancellationToken ct);\n    Task<IReadOnlyList<Order>> GetPendingOrdersAsync(CancellationToken ct);\n    Task AddAsync(Order order, CancellationToken ct);\n}\n\n// Avoid: leaky generic repository exposing IQueryable\npublic interface IRepository<T>  // <- anti-pattern when IQueryable is exposed\n{\n    IQueryable<T> Query(); // exposes EF internals to Application layer\n}"
             },
             "redFlags": [
               "Saying repositories are always needed with EF.",
@@ -109,8 +109,8 @@
                 "a": "An encapsulated, composable query object that holds filter/sort criteria, testable without a DB."
               },
               {
-                "q": "Generic vs specific repository â€” which and why?",
-                "a": "Specific (IOrderRepository) â€” it speaks domain intent and avoids leaking IQueryable."
+                "q": "Generic vs specific repository — which and why?",
+                "a": "Specific (IOrderRepository) — it speaks domain intent and avoids leaking IQueryable."
               },
               {
                 "q": "How do you test data access without a real DB?",
@@ -129,7 +129,7 @@
               },
               {
                 "role": "me",
-                "text": "It wraps data access behind a collection-like interface so callers don't know where data comes from â€” centralising query logic and making use-cases testable against fakes."
+                "text": "It wraps data access behind a collection-like interface so callers don't know where data comes from — centralising query logic and making use-cases testable against fakes."
               },
               {
                 "role": "interviewer",
@@ -141,11 +141,11 @@
               },
               {
                 "role": "interviewer",
-                "text": "Your repo returns `IQueryable` so callers can compose queries â€” any problem with that?"
+                "text": "Your repo returns `IQueryable` so callers can compose queries — any problem with that?"
               },
               {
                 "role": "me",
-                "text": "Yes â€” that leaks EF into the Application layer; if I return `IEnumerable` instead I force in-memory filtering. I'd prefer specific methods or a specification object."
+                "text": "Yes — that leaks EF into the Application layer; if I return `IEnumerable` instead I force in-memory filtering. I'd prefer specific methods or a specification object."
               },
               {
                 "role": "interviewer",
@@ -158,14 +158,14 @@
           "id": "architecture-patterns-003",
           "q": "What is the Unit of Work pattern, and how does EF Core implement it?",
           "answer": {
-            "oneLiner": "Unit of Work tracks all changes during a business operation and commits them atomically â€” EF Core's DbContext is the canonical implementation.",
+            "oneLiner": "Unit of Work tracks all changes during a business operation and commits them atomically — EF Core's DbContext is the canonical implementation.",
             "keyPoints": [
               "Collects inserts/updates/deletes, then one SaveChanges in a single transaction.",
               "DbContext is a UoW: ChangeTracker records, SaveChangesAsync commits.",
               "Repositories in one request share the same scoped DbContext.",
               "An explicit IUnitOfWork lets Application control commit timing without exposing EF."
             ],
-            "detail": "Commit once at the use-case boundary â€” multiple independent SaveChanges calls cause partial commits. Keep the UoW scoped tightly to avoid stale data and long-held connections.",
+            "detail": "Commit once at the use-case boundary — multiple independent SaveChanges calls cause partial commits. Keep the UoW scoped tightly to avoid stale data and long-held connections.",
             "code": {
               "lang": "csharp",
               "snippet": "// Application layer\npublic class PlaceOrderHandler\n{\n    private readonly IOrderRepository _orders;\n    private readonly IInventoryRepository _inventory;\n    private readonly IUnitOfWork _uow;\n\n    public async Task HandleAsync(PlaceOrderCommand cmd, CancellationToken ct)\n    {\n        var order = Order.Create(cmd.CustomerId, cmd.Items);\n        var item = await _inventory.GetAsync(cmd.Items[0].ProductId, ct);\n        item.Reserve(cmd.Items[0].Quantity);\n\n        await _orders.AddAsync(order, ct);\n        // Both changes commit atomically:\n        await _uow.CommitAsync(ct);\n    }\n}"
@@ -178,7 +178,7 @@
             "followUpsQA": [
               {
                 "q": "How do you handle transactions across microservices?",
-                "a": "You can't use a single ACID transaction â€” use a SAGA with compensating steps.",
+                "a": "You can't use a single ACID transaction — use a SAGA with compensating steps.",
                 "relatedId": "architecture-patterns-012"
               },
               {
@@ -209,7 +209,7 @@
               },
               {
                 "role": "me",
-                "text": "`DbContext` is the canonical UoW â€” its ChangeTracker records inserts/updates/deletes and `SaveChangesAsync` commits them all in one transaction."
+                "text": "`DbContext` is the canonical UoW — its ChangeTracker records inserts/updates/deletes and `SaveChangesAsync` commits them all in one transaction."
               },
               {
                 "role": "interviewer",
@@ -217,7 +217,7 @@
               },
               {
                 "role": "me",
-                "text": "You get multiple independent transactions, so a later failure leaves partial commits â€” I commit once at the use-case boundary instead."
+                "text": "You get multiple independent transactions, so a later failure leaves partial commits — I commit once at the use-case boundary instead."
               },
               {
                 "role": "interviewer",
@@ -233,15 +233,15 @@
             "oneLiner": "CQRS separates writes (Commands) from reads (Queries) so each side can be optimised and scaled independently.",
             "keyPoints": [
               "Commands mutate and return little; Queries return data, never mutate.",
-              "Reads can hit a denormalised model, cache, or replica â€” bypassing domain rules.",
+              "Reads can hit a denormalised model, cache, or replica — bypassing domain rules.",
               "Writes go through full domain validation and aggregates.",
               "MediatR dispatches commands/queries; event sourcing is optional and complex."
             ],
-            "detail": "Useful when reads dwarf writes or domain logic is complex. Skip it for simple CRUD â€” it just adds ceremony.",
+            "detail": "Useful when reads dwarf writes or domain logic is complex. Skip it for simple CRUD — it just adds ceremony.",
             "analogy": "A kitchen: orders go to the chef (commands); the menu board is just read (queries).",
             "code": {
               "lang": "csharp",
-              "snippet": "// Handler â€” write side (Command)\npublic class PlaceOrderHandler : IRequestHandler<PlaceOrderCommand, Guid>\n{\n    private readonly IOrderRepository _repo;\n    private readonly IUnitOfWork _uow;\n    public PlaceOrderHandler(IOrderRepository repo, IUnitOfWork uow)\n        => (_repo, _uow) = (repo, uow);\n\n    public async Task<Guid> Handle(PlaceOrderCommand cmd, CancellationToken ct)\n    {\n        var order = Order.Create(cmd.CustomerId, cmd.Items);\n        await _repo.AddAsync(order, ct);\n        await _uow.CommitAsync(ct);\n        return order.Id;\n    }\n}\n\n// Handler â€” read side (Query) â€” skips domain layer, hits DB directly\npublic class GetOrderSummaryHandler : IRequestHandler<GetOrderSummaryQuery, OrderSummaryDto>\n{\n    private readonly AppDbContext _db;\n    public GetOrderSummaryHandler(AppDbContext db) => _db = db;\n\n    public Task<OrderSummaryDto> Handle(GetOrderSummaryQuery q, CancellationToken ct)\n        => _db.Orders\n              .AsNoTracking()\n              .Where(o => o.Id == q.OrderId)\n              .Select(o => new OrderSummaryDto(o.Id, o.Status, o.TotalAmount))\n              .FirstOrDefaultAsync(ct)!;\n}"
+              "snippet": "// Handler — write side (Command)\npublic class PlaceOrderHandler : IRequestHandler<PlaceOrderCommand, Guid>\n{\n    private readonly IOrderRepository _repo;\n    private readonly IUnitOfWork _uow;\n    public PlaceOrderHandler(IOrderRepository repo, IUnitOfWork uow)\n        => (_repo, _uow) = (repo, uow);\n\n    public async Task<Guid> Handle(PlaceOrderCommand cmd, CancellationToken ct)\n    {\n        var order = Order.Create(cmd.CustomerId, cmd.Items);\n        await _repo.AddAsync(order, ct);\n        await _uow.CommitAsync(ct);\n        return order.Id;\n    }\n}\n\n// Handler — read side (Query) — skips domain layer, hits DB directly\npublic class GetOrderSummaryHandler : IRequestHandler<GetOrderSummaryQuery, OrderSummaryDto>\n{\n    private readonly AppDbContext _db;\n    public GetOrderSummaryHandler(AppDbContext db) => _db = db;\n\n    public Task<OrderSummaryDto> Handle(GetOrderSummaryQuery q, CancellationToken ct)\n        => _db.Orders\n              .AsNoTracking()\n              .Where(o => o.Id == q.OrderId)\n              .Select(o => new OrderSummaryDto(o.Id, o.Status, o.TotalAmount))\n              .FirstOrDefaultAsync(ct)!;\n}"
             },
             "redFlags": [
               "Thinking CQRS always needs a separate DB or event sourcing.",
@@ -259,13 +259,13 @@
                 "relatedId": "architecture-patterns-010"
               },
               {
-                "q": "CQRS vs Event Sourcing â€” must they go together?",
-                "a": "No â€” CQRS is just read/write separation; event sourcing is an optional companion.",
+                "q": "CQRS vs Event Sourcing — must they go together?",
+                "a": "No — CQRS is just read/write separation; event sourcing is an optional companion.",
                 "relatedId": "architecture-patterns-advanced-002"
               },
               {
                 "q": "When is CQRS overkill?",
-                "a": "Simple CRUD with balanced load â€” it just adds two code paths and ceremony."
+                "a": "Simple CRUD with balanced load — it just adds two code paths and ceremony."
               }
             ],
             "dialogue": [
@@ -275,7 +275,7 @@
               },
               {
                 "role": "me",
-                "text": "It separates writes (Commands) from reads (Queries) so each side can be modelled, optimised, and scaled independently â€” I reach for it when reads dwarf writes or the domain is complex."
+                "text": "It separates writes (Commands) from reads (Queries) so each side can be modelled, optimised, and scaled independently — I reach for it when reads dwarf writes or the domain is complex."
               },
               {
                 "role": "interviewer",
@@ -283,7 +283,7 @@
               },
               {
                 "role": "me",
-                "text": "No â€” that's the point. Queries can hit a denormalised model, replica, or cache and project straight to a DTO, bypassing domain rules; only commands run full validation."
+                "text": "No — that's the point. Queries can hit a denormalised model, replica, or cache and project straight to a DTO, bypassing domain rules; only commands run full validation."
               },
               {
                 "role": "interviewer",
@@ -291,7 +291,7 @@
               },
               {
                 "role": "me",
-                "text": "They become eventually consistent â€” the write publishes an event that updates the read model, so I design the UI to tolerate a brief lag."
+                "text": "They become eventually consistent — the write publishes an event that updates the read model, so I design the UI to tolerate a brief lag."
               },
               {
                 "role": "interviewer",
@@ -302,9 +302,9 @@
         },
         {
           "id": "architecture-patterns-005",
-          "q": "Monolith vs Microservices â€” how do you choose, and what are the real trade-offs?",
+          "q": "Monolith vs Microservices — how do you choose, and what are the real trade-offs?",
           "answer": {
-            "oneLiner": "Monoliths are simpler to build and run; microservices give independent scaling and deployment but add distributed-system complexity â€” choose on team size, domain maturity, and operational capability.",
+            "oneLiner": "Monoliths are simpler to build and run; microservices give independent scaling and deployment but add distributed-system complexity — choose on team size, domain maturity, and operational capability.",
             "keyPoints": [
               "Monolith: one deploy, easy debugging, ACID across the domain.",
               "Microservices: independent deploy, fault isolation, targeted scaling.",
@@ -335,17 +335,17 @@
               },
               {
                 "q": "What's the recommended starting point?",
-                "a": "A modular monolith â€” extract services only with a proven reason."
+                "a": "A modular monolith — extract services only with a proven reason."
               }
             ],
             "dialogue": [
               {
                 "role": "interviewer",
-                "text": "Monolith or microservices â€” how do you choose?"
+                "text": "Monolith or microservices — how do you choose?"
               },
               {
                 "role": "me",
-                "text": "I choose on team size, domain maturity, and operational capability â€” a monolith is simpler to build and run, microservices buy independent scaling and deployment at a real cost."
+                "text": "I choose on team size, domain maturity, and operational capability — a monolith is simpler to build and run, microservices buy independent scaling and deployment at a real cost."
               },
               {
                 "role": "interviewer",
@@ -353,15 +353,15 @@
               },
               {
                 "role": "me",
-                "text": "Network calls, eventual consistency, distributed transactions, and serious observability overhead â€” you need tracing, multi-service CI/CD, and orchestration."
+                "text": "Network calls, eventual consistency, distributed transactions, and serious observability overhead — you need tracing, multi-service CI/CD, and orchestration."
               },
               {
                 "role": "interviewer",
-                "text": "A startup with four engineers insists on microservices for 'future scale' â€” what do you say?"
+                "text": "A startup with four engineers insists on microservices for 'future scale' — what do you say?"
               },
               {
                 "role": "me",
-                "text": "I'd push back and start with a modular monolith â€” they get clean boundaries now and can extract a service later when a specific scaling or team-autonomy need actually proves itself."
+                "text": "I'd push back and start with a modular monolith — they get clean boundaries now and can extract a service later when a specific scaling or team-autonomy need actually proves itself."
               },
               {
                 "role": "interviewer",
@@ -374,7 +374,7 @@
           "id": "architecture-patterns-006",
           "q": "How do you design for scalability and fault tolerance? Explain horizontal vs vertical scaling, retries, and the circuit breaker pattern.",
           "answer": {
-            "oneLiner": "Scale out behind a load balancer with stateless services, add retries with backoff and circuit breakers to stop cascades â€” in .NET, wire it with Polly or the standard resilience handler.",
+            "oneLiner": "Scale out behind a load balancer with stateless services, add retries with backoff and circuit breakers to stop cascades — in .NET, wire it with Polly or the standard resilience handler.",
             "keyPoints": [
               "Vertical = bigger box (ceiling); horizontal = more instances (needs stateless).",
               "Stateless: session/cache in Redis, not in-process.",
@@ -382,15 +382,15 @@
               "Circuit breaker fails fast after N failures; always add timeouts."
             ],
             "detail": "Circuit breaker states: Closed (normal), Open (fail fast), Half-Open (probe). Order matters: timeout wraps circuit breaker wraps retry. Bulkheads cap concurrent calls so a slow dependency can't exhaust shared resources.",
-            "analogy": "A circuit breaker is like a fuse â€” it trips to protect the system instead of letting the wiring burn.",
+            "analogy": "A circuit breaker is like a fuse — it trips to protect the system instead of letting the wiring burn.",
             "code": {
               "lang": "csharp",
-              "snippet": "// .NET 8 â€” Microsoft.Extensions.Http.Resilience\nbuilder.Services.AddHttpClient<IPaymentClient, PaymentClient>()\n    .AddResilienceHandler(\"payment\", pipeline =>\n    {\n        pipeline.AddRetry(new HttpRetryStrategyOptions\n        {\n            MaxRetryAttempts = 3,\n            BackoffType = DelayBackoffType.Exponential,\n            UseJitter = true,\n            ShouldHandle = args => ValueTask.FromResult(\n                args.Outcome.Result?.StatusCode is\n                    HttpStatusCode.ServiceUnavailable or\n                    HttpStatusCode.TooManyRequests)\n        });\n        pipeline.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions\n        {\n            BreakDuration = TimeSpan.FromSeconds(30)\n        });\n        pipeline.AddTimeout(TimeSpan.FromSeconds(5));\n    });"
+              "snippet": "// .NET 8 — Microsoft.Extensions.Http.Resilience\nbuilder.Services.AddHttpClient<IPaymentClient, PaymentClient>()\n    .AddResilienceHandler(\"payment\", pipeline =>\n    {\n        pipeline.AddRetry(new HttpRetryStrategyOptions\n        {\n            MaxRetryAttempts = 3,\n            BackoffType = DelayBackoffType.Exponential,\n            UseJitter = true,\n            ShouldHandle = args => ValueTask.FromResult(\n                args.Outcome.Result?.StatusCode is\n                    HttpStatusCode.ServiceUnavailable or\n                    HttpStatusCode.TooManyRequests)\n        });\n        pipeline.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions\n        {\n            BreakDuration = TimeSpan.FromSeconds(30)\n        });\n        pipeline.AddTimeout(TimeSpan.FromSeconds(5));\n    });"
             },
             "redFlags": [
               "Retrying non-idempotent POSTs without idempotency keys.",
-              "No jitter on retries â€” thundering herd.",
-              "Retries without a circuit breaker â€” amplifies load."
+              "No jitter on retries — thundering herd.",
+              "Retries without a circuit breaker — amplifies load."
             ],
             "followUpsQA": [
               {
@@ -419,7 +419,7 @@
               },
               {
                 "role": "me",
-                "text": "Scale out behind a load balancer with stateless services, then add retries with backoff and circuit breakers to stop cascades â€” in .NET I wire it with Polly or the standard resilience handler."
+                "text": "Scale out behind a load balancer with stateless services, then add retries with backoff and circuit breakers to stop cascades — in .NET I wire it with Polly or the standard resilience handler."
               },
               {
                 "role": "interviewer",
@@ -435,7 +435,7 @@
               },
               {
                 "role": "me",
-                "text": "Yes â€” timeout wraps circuit breaker wraps retry, so each individual attempt is bounded and repeated failures trip the breaker instead of being retried forever."
+                "text": "Yes — timeout wraps circuit breaker wraps retry, so each individual attempt is bounded and repeated failures trip the breaker instead of being retried forever."
               },
               {
                 "role": "interviewer",
@@ -455,7 +455,7 @@
               "Sync (HTTP/gRPC) when caller needs an answer now; gRPC for internal calls.",
               "Async (Service Bus/Kafka) to decouple services from each other's uptime."
             ],
-            "detail": "A BFF is a gateway tailored per client type. Watch the chatty anti-pattern â€” synchronous Aâ†’Bâ†’C chains stack latency; prefer events for non-critical paths.",
+            "detail": "A BFF is a gateway tailored per client type. Watch the chatty anti-pattern — synchronous Aâ†’Bâ†’C chains stack latency; prefer events for non-critical paths.",
             "redFlags": [
               "Saying HTTP is always right without considering async.",
               "Forgetting the gateway is a single point of failure.",
@@ -471,12 +471,12 @@
                 "a": "Mutual TLS so both sides present certs, often handled by the service mesh."
               },
               {
-                "q": "YARP vs Azure APIM â€” when each?",
+                "q": "YARP vs Azure APIM — when each?",
                 "a": "YARP for in-process/custom reverse-proxy routing; APIM for managed policies, throttling, and a developer portal."
               },
               {
                 "q": "Isn't the gateway a single point of failure?",
-                "a": "Yes â€” run it redundantly behind a load balancer with health checks."
+                "a": "Yes — run it redundantly behind a load balancer with health checks."
               }
             ],
             "dialogue": [
@@ -486,7 +486,7 @@
               },
               {
                 "role": "me",
-                "text": "It's the single entry point for clients â€” handling routing, JWT auth, rate limiting, SSL termination, and sometimes response aggregation."
+                "text": "It's the single entry point for clients — handling routing, JWT auth, rate limiting, SSL termination, and sometimes response aggregation."
               },
               {
                 "role": "interviewer",
@@ -494,15 +494,15 @@
               },
               {
                 "role": "me",
-                "text": "Sync over HTTP or gRPC when the caller needs an answer now â€” gRPC for internal hops â€” and async over Service Bus or Kafka to decouple from each other's uptime."
+                "text": "Sync over HTTP or gRPC when the caller needs an answer now — gRPC for internal hops — and async over Service Bus or Kafka to decouple from each other's uptime."
               },
               {
                 "role": "interviewer",
-                "text": "A request fans out Aâ†’Bâ†’Câ†’D synchronously â€” what's the risk and how do you fix it?"
+                "text": "A request fans out Aâ†’Bâ†’Câ†’D synchronously — what's the risk and how do you fix it?"
               },
               {
                 "role": "me",
-                "text": "Latency stacks and any one outage breaks the chain â€” I'd switch non-critical steps to events and aggregate at the gateway or a BFF to flatten the calls."
+                "text": "Latency stacks and any one outage breaks the chain — I'd switch non-critical steps to events and aggregate at the gateway or a BFF to flatten the calls."
               },
               {
                 "role": "interviewer",
@@ -515,20 +515,20 @@
           "id": "architecture-patterns-008",
           "q": "What is CORS, and how does ASP.NET Core handle it? How does it relate to event-driven design?",
           "answer": {
-            "oneLiner": "CORS is a browser mechanism that blocks cross-origin requests unless the server allows them via response headers â€” ASP.NET Core configures this with built-in middleware.",
+            "oneLiner": "CORS is a browser mechanism that blocks cross-origin requests unless the server allows them via response headers — ASP.NET Core configures this with built-in middleware.",
             "keyPoints": [
               "Browsers enforce same-origin (scheme + domain + port) by default.",
               "Server sends Access-Control-Allow-* headers to permit cross-origin calls.",
               "Non-simple requests trigger a preflight OPTIONS request.",
               "Configure with AddCors + UseCors; never wildcard with credentials."
             ],
-            "detail": "CORS only affects browser-to-server calls, not server-to-server. In event-driven setups, backend consumers use a broker so CORS never applies â€” only the BFF/gateway needs it.",
+            "detail": "CORS only affects browser-to-server calls, not server-to-server. In event-driven setups, backend consumers use a broker so CORS never applies — only the BFF/gateway needs it.",
             "code": {
               "lang": "csharp",
               "snippet": "// Program.cs\nbuilder.Services.AddCors(options =>\n    options.AddPolicy(\"Spa\", p =>\n        p.WithOrigins(\"https://localhost:4200\", \"https://myapp.azurestaticapps.net\")\n         .AllowAnyHeader()\n         .AllowAnyMethod()));\n\nvar app = builder.Build();\napp.UseCors(\"Spa\"); // Before UseAuthentication / UseAuthorization"
             },
             "redFlags": [
-              "AllowAnyOrigin() with AllowCredentials() â€” rejected by browsers.",
+              "AllowAnyOrigin() with AllowCredentials() — rejected by browsers.",
               "Thinking CORS protects server-to-server calls.",
               "Placing UseCors after UseAuthorization."
             ],
@@ -543,7 +543,7 @@
               },
               {
                 "q": "Why doesn't CORS protect against CSRF?",
-                "a": "CORS restricts reading responses, not sending the request â€” CSRF needs tokens/SameSite."
+                "a": "CORS restricts reading responses, not sending the request — CSRF needs tokens/SameSite."
               },
               {
                 "q": "Why never AllowAnyOrigin with AllowCredentials?",
@@ -565,15 +565,15 @@
               },
               {
                 "role": "me",
-                "text": "`AddCors` to define a named policy with explicit origins, then `UseCors` in the pipeline â€” placed before authentication and authorization."
+                "text": "`AddCors` to define a named policy with explicit origins, then `UseCors` in the pipeline — placed before authentication and authorization."
               },
               {
                 "role": "interviewer",
-                "text": "Your backend consumes events off a Service Bus topic â€” does CORS apply there?"
+                "text": "Your backend consumes events off a Service Bus topic — does CORS apply there?"
               },
               {
                 "role": "me",
-                "text": "No â€” CORS only governs browser-to-server calls, so a broker-based consumer never sees it; only the BFF or gateway facing the SPA needs a policy."
+                "text": "No — CORS only governs browser-to-server calls, so a broker-based consumer never sees it; only the BFF or gateway facing the SPA needs a policy."
               },
               {
                 "role": "interviewer",
@@ -584,13 +584,13 @@
         },
         {
           "id": "architecture-patterns-009",
-          "q": "Compare Layered (N-Tier) Architecture with Clean Architecture â€” when would you choose each?",
+          "q": "Compare Layered (N-Tier) Architecture with Clean Architecture — when would you choose each?",
           "answer": {
-            "oneLiner": "N-Tier flows top-down (UI â†’ Logic â†’ Data) with higher layers depending on lower; Clean Architecture inverts it so the domain depends on nothing â€” pick based on size and testability needs.",
+            "oneLiner": "N-Tier flows top-down (UI â†’ Logic â†’ Data) with higher layers depending on lower; Clean Architecture inverts it so the domain depends on nothing — pick based on size and testability needs.",
             "keyPoints": [
               "N-Tier: business layer references concrete data-access classes.",
               "Clean: domain defines interfaces, infrastructure implements them.",
-              "N-Tier is simpler â€” fine for small CRUD apps.",
+              "N-Tier is simpler — fine for small CRUD apps.",
               "Clean is testable in isolation but adds projects and ceremony."
             ],
             "detail": "The key difference is where interfaces live. Small app with one dev â†’ N-Tier. Domain-rich, larger team, long horizon â†’ Clean pays off. For brownfield, introduce interfaces gradually.",
@@ -606,7 +606,7 @@
               },
               {
                 "q": "Can you mix N-Tier and Clean in one solution?",
-                "a": "Yes â€” keep simple modules N-Tier and apply Clean to domain-rich ones."
+                "a": "Yes — keep simple modules N-Tier and apply Clean to domain-rich ones."
               },
               {
                 "q": "What is the Application layer's role in Clean?",
@@ -625,7 +625,7 @@
               },
               {
                 "role": "me",
-                "text": "N-Tier flows top-down â€” UI to Logic to Data â€” with each layer depending on the one below; Clean inverts it so the domain depends on nothing."
+                "text": "N-Tier flows top-down — UI to Logic to Data — with each layer depending on the one below; Clean inverts it so the domain depends on nothing."
               },
               {
                 "role": "interviewer",
@@ -633,15 +633,15 @@
               },
               {
                 "role": "me",
-                "text": "Where the interfaces live â€” in Clean the domain defines them and infrastructure implements them, so dependencies point inward."
+                "text": "Where the interfaces live — in Clean the domain defines them and infrastructure implements them, so dependencies point inward."
               },
               {
                 "role": "interviewer",
-                "text": "Small CRUD admin tool, one developer â€” which do you pick and why?"
+                "text": "Small CRUD admin tool, one developer — which do you pick and why?"
               },
               {
                 "role": "me",
-                "text": "N-Tier â€” it's simpler and Clean's extra projects and ceremony would be pure overhead with no domain richness to justify them."
+                "text": "N-Tier — it's simpler and Clean's extra projects and ceremony would be pure overhead with no domain richness to justify them."
               },
               {
                 "role": "interviewer",
@@ -656,18 +656,18 @@
           "answer": {
             "oneLiner": "The Mediator routes messages through a central hub so senders and receivers don't know each other; MediatR dispatches Command/Query objects to handlers and adds pipeline behaviours for cross-cutting concerns.",
             "keyPoints": [
-              "Decouples components â€” a controller sends a command, not a class call.",
+              "Decouples components — a controller sends a command, not a class call.",
               "IMediator.Send routes to one IRequestHandler; DI discovers handlers.",
               "Pipeline behaviours add validation, logging, caching composably.",
               "Downsides: hides dependencies, and it's overkill for simple CRUD."
             ],
-            "detail": "The main value beyond dispatch is IPipelineBehavior â€” validation, logging, transactions run before handlers without them knowing. For 3-5 endpoints, direct service injection is cleaner.",
+            "detail": "The main value beyond dispatch is IPipelineBehavior — validation, logging, transactions run before handlers without them knowing. For 3-5 endpoints, direct service injection is cleaner.",
             "code": {
               "lang": "csharp",
               "snippet": "// 1. Request + Handler\npublic record GetProductQuery(Guid Id) : IRequest<ProductDto>;\n\npublic class GetProductHandler : IRequestHandler<GetProductQuery, ProductDto>\n{\n    private readonly IProductRepository _repo;\n    public GetProductHandler(IProductRepository repo) => _repo = repo;\n\n    public async Task<ProductDto> Handle(GetProductQuery q, CancellationToken ct)\n    {\n        var product = await _repo.GetByIdAsync(q.Id, ct);\n        return product is null\n            ? throw new NotFoundException(nameof(Product), q.Id)\n            : new ProductDto(product.Id, product.Name, product.Price);\n    }\n}\n\n// 2. Controller\n[HttpGet(\"{id}\")]\npublic Task<ProductDto> Get(Guid id, CancellationToken ct)\n    => _mediator.Send(new GetProductQuery(id), ct);"
             },
             "redFlags": [
-              "Saying MediatR is CQRS â€” it only facilitates it.",
+              "Saying MediatR is CQRS — it only facilitates it.",
               "Not knowing what IPipelineBehavior does.",
               "Using MediatR with no pipeline behaviours."
             ],
@@ -686,7 +686,7 @@
               },
               {
                 "q": "Is MediatR the same as CQRS?",
-                "a": "No â€” it only facilitates CQRS by routing commands and queries.",
+                "a": "No — it only facilitates CQRS by routing commands and queries.",
                 "relatedId": "architecture-patterns-004"
               }
             ],
@@ -697,7 +697,7 @@
               },
               {
                 "role": "me",
-                "text": "Mediator routes messages through a central hub so senders and receivers don't reference each other â€” MediatR dispatches Command/Query objects to a single matching `IRequestHandler` via DI."
+                "text": "Mediator routes messages through a central hub so senders and receivers don't reference each other — MediatR dispatches Command/Query objects to a single matching `IRequestHandler` via DI."
               },
               {
                 "role": "interviewer",
@@ -705,15 +705,15 @@
               },
               {
                 "role": "me",
-                "text": "`IPipelineBehavior` â€” it lets validation, logging, caching, and transactions run around every handler without the handler knowing about them."
+                "text": "`IPipelineBehavior` — it lets validation, logging, caching, and transactions run around every handler without the handler knowing about them."
               },
               {
                 "role": "interviewer",
-                "text": "You've got three endpoints and no cross-cutting needs â€” still use MediatR?"
+                "text": "You've got three endpoints and no cross-cutting needs — still use MediatR?"
               },
               {
                 "role": "me",
-                "text": "No â€” for a handful of endpoints with no pipeline behaviours, direct service injection is cleaner and MediatR just hides dependencies."
+                "text": "No — for a handful of endpoints with no pipeline behaviours, direct service injection is cleaner and MediatR just hides dependencies."
               },
               {
                 "role": "interviewer",
@@ -770,7 +770,7 @@
               },
               {
                 "role": "me",
-                "text": "Bounded Contexts, Aggregates, Entities, Value Objects, and Domain Events â€” all bound together by a Ubiquitous Language shared across code, tests, and conversations."
+                "text": "Bounded Contexts, Aggregates, Entities, Value Objects, and Domain Events — all bound together by a Ubiquitous Language shared across code, tests, and conversations."
               },
               {
                 "role": "interviewer",
@@ -778,7 +778,7 @@
               },
               {
                 "role": "me",
-                "text": "It's the single entry point that enforces invariants â€” all changes flow through it, and it references other aggregates only by ID."
+                "text": "It's the single entry point that enforces invariants — all changes flow through it, and it references other aggregates only by ID."
               },
               {
                 "role": "interviewer",
@@ -786,7 +786,7 @@
               },
               {
                 "role": "me",
-                "text": "On a CRUD-heavy app with thin business rules â€” the tactical patterns add ceremony with no payoff; DDD earns its keep only in genuinely complex domains."
+                "text": "On a CRUD-heavy app with thin business rules — the tactical patterns add ceremony with no payoff; DDD earns its keep only in genuinely complex domains."
               },
               {
                 "role": "interviewer",
@@ -799,9 +799,9 @@
           "id": "architecture-patterns-012",
           "q": "What is the SAGA pattern for distributed transactions, and how does it differ from two-phase commit?",
           "answer": {
-            "oneLiner": "A SAGA is a sequence of local transactions where each step triggers the next via events; if one fails, compensating transactions undo prior steps â€” eventual consistency without a distributed lock.",
+            "oneLiner": "A SAGA is a sequence of local transactions where each step triggers the next via events; if one fails, compensating transactions undo prior steps — eventual consistency without a distributed lock.",
             "keyPoints": [
-              "2PC locks resources across services â€” strong consistency but a distributed lock.",
+              "2PC locks resources across services — strong consistency but a distributed lock.",
               "SAGA: each service does a local transaction and emits an event.",
               "Compensating transactions undo earlier steps and must be idempotent.",
               "Choreography (no coordinator) vs orchestration (central controller)."
@@ -838,7 +838,7 @@
               },
               {
                 "role": "me",
-                "text": "It's a sequence of local transactions where each step triggers the next via an event, and if one fails, compensating transactions undo the prior steps â€” eventual consistency without a distributed lock."
+                "text": "It's a sequence of local transactions where each step triggers the next via an event, and if one fails, compensating transactions undo the prior steps — eventual consistency without a distributed lock."
               },
               {
                 "role": "interviewer",
@@ -846,15 +846,15 @@
               },
               {
                 "role": "me",
-                "text": "2PC holds locks across all services for strong consistency but creates a distributed lock and a coordinator bottleneck; SAGA never locks â€” it accepts temporary inconsistency."
+                "text": "2PC holds locks across all services for strong consistency but creates a distributed lock and a coordinator bottleneck; SAGA never locks — it accepts temporary inconsistency."
               },
               {
                 "role": "interviewer",
-                "text": "A SAGA step's event gets redelivered and runs twice â€” what breaks and how do you prevent it?"
+                "text": "A SAGA step's event gets redelivered and runs twice — what breaks and how do you prevent it?"
               },
               {
                 "role": "me",
-                "text": "You'd double-apply the step, so every step and compensation must be idempotent â€” I dedupe on a processed message ID before doing the work."
+                "text": "You'd double-apply the step, so every step and compensation must be idempotent — I dedupe on a processed message ID before doing the work."
               },
               {
                 "role": "interviewer",
@@ -865,7 +865,7 @@
         },
         {
           "id": "architecture-patterns-013",
-          "q": "Synchronous vs asynchronous communication in microservices â€” how do you decide?",
+          "q": "Synchronous vs asynchronous communication in microservices — how do you decide?",
           "answer": {
             "oneLiner": "Use sync (HTTP/gRPC) when the caller needs an immediate result; use async messaging when work can be deferred or services should be decoupled from each other's availability.",
             "keyPoints": [
@@ -874,7 +874,7 @@
               "Sync hops stack latency; async defers it.",
               "Always use DLQs for messages that repeatedly fail."
             ],
-            "detail": "Use async for events, notifications, and cross-context integration; sync for real-time queries and auth. Watch the dual-write problem â€” solve it with the Transactional Outbox or CDC.",
+            "detail": "Use async for events, notifications, and cross-context integration; sync for real-time queries and auth. Watch the dual-write problem — solve it with the Transactional Outbox or CDC.",
             "redFlags": [
               "Defaulting to async for everything.",
               "Not knowing the dual-write problem.",
@@ -901,7 +901,7 @@
             "dialogue": [
               {
                 "role": "interviewer",
-                "text": "Sync vs async communication in microservices â€” how do you decide?"
+                "text": "Sync vs async communication in microservices — how do you decide?"
               },
               {
                 "role": "me",
@@ -913,15 +913,15 @@
               },
               {
                 "role": "me",
-                "text": "It couples availability and stacks latency across hops â€” if one service is down, the whole chain fails."
+                "text": "It couples availability and stacks latency across hops — if one service is down, the whole chain fails."
               },
               {
                 "role": "interviewer",
-                "text": "You write to the DB and publish an event in one handler â€” what's the hidden risk?"
+                "text": "You write to the DB and publish an event in one handler — what's the hidden risk?"
               },
               {
                 "role": "me",
-                "text": "The dual-write problem â€” the DB commit and the publish can't be atomic, so I use the Transactional Outbox or CDC to publish reliably from the committed data."
+                "text": "The dual-write problem — the DB commit and the publish can't be atomic, so I use the Transactional Outbox or CDC to publish reliably from the committed data."
               },
               {
                 "role": "interviewer",
@@ -934,7 +934,7 @@
           "id": "architecture-patterns-014",
           "q": "What is idempotency in distributed systems, and how do you implement it in a .NET API?",
           "answer": {
-            "oneLiner": "An operation is idempotent if running it many times gives the same result as running it once â€” essential when retries and at-least-once delivery are the norm.",
+            "oneLiner": "An operation is idempotent if running it many times gives the same result as running it once — essential when retries and at-least-once delivery are the norm.",
             "keyPoints": [
               "GET/PUT/DELETE are idempotent by spec; POST is not.",
               "Idempotency key: client sends a UUID; API returns the stored result on replay.",
@@ -966,7 +966,7 @@
               },
               {
                 "q": "Do GET requests need idempotency keys?",
-                "a": "No â€” GET is already idempotent and side-effect-free by spec."
+                "a": "No — GET is already idempotent and side-effect-free by spec."
               }
             ],
             "dialogue": [
@@ -976,7 +976,7 @@
               },
               {
                 "role": "me",
-                "text": "An operation is idempotent if running it many times gives the same result as running it once â€” essential when retries and at-least-once delivery are normal."
+                "text": "An operation is idempotent if running it many times gives the same result as running it once — essential when retries and at-least-once delivery are normal."
               },
               {
                 "role": "interviewer",
@@ -988,7 +988,7 @@
               },
               {
                 "role": "interviewer",
-                "text": "Two duplicate requests arrive at the same instant â€” how do you avoid a race?"
+                "text": "Two duplicate requests arrive at the same instant — how do you avoid a race?"
               },
               {
                 "role": "me",
@@ -1837,12 +1837,12 @@
           "answer": {
             "oneLiner": "Entities have identity and a lifecycle; value objects are immutable and compared by value; an aggregate is a cluster of those with one root that guards invariants; a bounded context is the boundary where a model and its language stay consistent.",
             "keyPoints": [
-              "Entity â€” identity persists even as attributes change (e.g. Order)",
-              "Value object â€” immutable, equality by value (e.g. Money, Address)",
-              "Aggregate root â€” single entry point that enforces invariants; reference others by ID",
-              "Bounded context â€” one consistent model per boundary, often one per microservice"
+              "Entity — identity persists even as attributes change (e.g. Order)",
+              "Value object — immutable, equality by value (e.g. Money, Address)",
+              "Aggregate root — single entry point that enforces invariants; reference others by ID",
+              "Bounded context — one consistent model per boundary, often one per microservice"
             ],
-            "detail": "Entity â€” identity persists even as attributes change (e.g. Order) The pattern ensures Value object â€” immutable, equality by value (e.g. Money, Address)",
+            "detail": "Entity — identity persists even as attributes change (e.g. Order) The pattern ensures Value object — immutable, equality by value (e.g. Money, Address)",
             "analogy": "Think of it like a library—each section is a bounded context.",
             "redFlags": [
               "Saying: Treating every table as an aggregate",
@@ -1881,7 +1881,7 @@
               },
               {
                 "role": "me",
-                "text": "To keep aggregate boundaries and transactions small â€” each aggregate is its own consistency and loading unit, so direct object references blur those boundaries."
+                "text": "To keep aggregate boundaries and transactions small — each aggregate is its own consistency and loading unit, so direct object references blur those boundaries."
               },
               {
                 "role": "interviewer",
@@ -1889,7 +1889,7 @@
               },
               {
                 "role": "me",
-                "text": "As small as the invariants allow â€” ideally one root plus only what must change atomically with it; everything else is referenced by ID."
+                "text": "As small as the invariants allow — ideally one root plus only what must change atomically with it; everything else is referenced by ID."
               },
               {
                 "role": "interviewer",
@@ -1928,16 +1928,16 @@
         },
         {
           "id": "architecture-patterns-advanced-002",
-          "q": "Event sourcing vs traditional CRUD â€” what's the difference and the trade-offs?",
+          "q": "Event sourcing vs traditional CRUD — what's the difference and the trade-offs?",
           "answer": {
             "oneLiner": "CRUD stores only the current state and overwrites it; event sourcing stores an append-only log of every state change and rebuilds current state by replaying events, giving a full audit history at the cost of complexity.",
             "keyPoints": [
-              "CRUD â€” simple, current state only, history is lost on update",
-              "Event sourcing â€” append-only events are the source of truth",
+              "CRUD — simple, current state only, history is lost on update",
+              "Event sourcing — append-only events are the source of truth",
               "Benefits: full audit, time-travel, natural fit with CQRS read models",
               "Costs: schema/versioning of events, replay cost, steep learning curve"
             ],
-            "detail": "CRUD â€” simple, current state only, history is lost on update The pattern ensures Event sourcing â€” append-only events are the source of truth",
+            "detail": "CRUD — simple, current state only, history is lost on update The pattern ensures Event sourcing — append-only events are the source of truth",
             "analogy": "Think of it like a library—each section is a bounded context.",
             "redFlags": [
               "Saying: Using event sourcing for simple CRUD",
@@ -1950,7 +1950,7 @@
               },
               {
                 "q": "Does event sourcing require CQRS?",
-                "a": "No, but they pair naturally â€” events feed projected read models."
+                "a": "No, but they pair naturally — events feed projected read models."
               },
               {
                 "q": "How do you handle event schema evolution?",
@@ -1958,13 +1958,13 @@
               },
               {
                 "q": "When is event sourcing the wrong choice?",
-                "a": "Simple CRUD with no audit/temporal need â€” it's needless complexity."
+                "a": "Simple CRUD with no audit/temporal need — it's needless complexity."
               }
             ],
             "dialogue": [
               {
                 "role": "interviewer",
-                "text": "Event sourcing vs traditional CRUD â€” what's the difference?"
+                "text": "Event sourcing vs traditional CRUD — what's the difference?"
               },
               {
                 "role": "me",
@@ -1976,15 +1976,15 @@
               },
               {
                 "role": "me",
-                "text": "You gain full audit history and time-travel and a natural fit with CQRS read models â€” but you pay in event versioning, replay cost, and a steep learning curve."
+                "text": "You gain full audit history and time-travel and a natural fit with CQRS read models — but you pay in event versioning, replay cost, and a steep learning curve."
               },
               {
                 "role": "interviewer",
-                "text": "Replaying millions of events to load one aggregate is slow â€” what's the fix?"
+                "text": "Replaying millions of events to load one aggregate is slow — what's the fix?"
               },
               {
                 "role": "me",
-                "text": "Snapshots â€” periodically persist the aggregate state so you replay only events since the last snapshot."
+                "text": "Snapshots — periodically persist the aggregate state so you replay only events since the last snapshot."
               },
               {
                 "role": "interviewer",
@@ -2023,16 +2023,16 @@
         },
         {
           "id": "architecture-patterns-advanced-003",
-          "q": "Caching strategies: cache-aside vs write-through vs write-behind â€” and where does Redis fit?",
+          "q": "Caching strategies: cache-aside vs write-through vs write-behind — and where does Redis fit?",
           "answer": {
             "oneLiner": "Cache-aside has the app load and populate the cache on a miss; write-through writes to cache and DB together (consistent, slower writes); write-behind writes to cache and flushes to the DB asynchronously (fast, risk of loss). Redis is the common distributed store for all three.",
             "keyPoints": [
-              "Cache-aside â€” app manages it; lazy-loaded; most common default",
-              "Write-through â€” write cache+DB synchronously; strong consistency, slower",
-              "Write-behind â€” write cache now, persist later; fast but can lose data on crash",
+              "Cache-aside — app manages it; lazy-loaded; most common default",
+              "Write-through — write cache+DB synchronously; strong consistency, slower",
+              "Write-behind — write cache now, persist later; fast but can lose data on crash",
               "Redis serves as the distributed cache across instances for any of these"
             ],
-            "detail": "Cache-aside â€” app manages it; lazy-loaded; most common default The pattern ensures Write-through â€” write cache+DB synchronously; strong consistency, slower",
+            "detail": "Cache-aside — app manages it; lazy-loaded; most common default The pattern ensures Write-through — write cache+DB synchronously; strong consistency, slower",
             "analogy": "Think of it like a library—each section is a bounded context.",
             "redFlags": [
               "Saying: Thinking write-behind is safe without durability handling",
@@ -2059,7 +2059,7 @@
             "dialogue": [
               {
                 "role": "interviewer",
-                "text": "Cache-aside vs write-through vs write-behind â€” explain them."
+                "text": "Cache-aside vs write-through vs write-behind — explain them."
               },
               {
                 "role": "me",
@@ -2071,7 +2071,7 @@
               },
               {
                 "role": "me",
-                "text": "Cache-aside â€” it's simple, lazy-loaded, and only caches what's actually read, with the app in control of invalidation."
+                "text": "Cache-aside — it's simple, lazy-loaded, and only caches what's actually read, with the app in control of invalidation."
               },
               {
                 "role": "interviewer",
@@ -2079,7 +2079,7 @@
               },
               {
                 "role": "me",
-                "text": "Data loss â€” if the cache node crashes before the async flush, those writes are gone, so it needs durability handling like a persistent write log."
+                "text": "Data loss — if the cache node crashes before the async flush, those writes are gone, so it needs durability handling like a persistent write log."
               },
               {
                 "role": "interviewer",
@@ -2118,16 +2118,16 @@
         },
         {
           "id": "architecture-patterns-advanced-004",
-          "q": "Modular monolith vs monolith vs microservices â€” what are the missing distinctions?",
+          "q": "Modular monolith vs monolith vs microservices — what are the missing distinctions?",
           "answer": {
-            "oneLiner": "A modular monolith is a single deployable with strongly enforced internal module boundaries â€” it gives you the maintainability of microservices without the distributed-systems and deployment overhead.",
+            "oneLiner": "A modular monolith is a single deployable with strongly enforced internal module boundaries — it gives you the maintainability of microservices without the distributed-systems and deployment overhead.",
             "keyPoints": [
-              "Traditional monolith â€” one deploy, but often tangled (big ball of mud)",
-              "Modular monolith â€” one deploy, but clean module boundaries + in-process calls",
-              "Microservices â€” independent deploy/scale, but network + ops complexity",
+              "Traditional monolith — one deploy, but often tangled (big ball of mud)",
+              "Modular monolith — one deploy, but clean module boundaries + in-process calls",
+              "Microservices — independent deploy/scale, but network + ops complexity",
               "Modular monolith is the recommended starting point; extract services later"
             ],
-            "detail": "Traditional monolith â€” one deploy, but often tangled (big ball of mud) The pattern ensures Modular monolith â€” one deploy, but clean module boundaries + in-process calls",
+            "detail": "Traditional monolith — one deploy, but often tangled (big ball of mud) The pattern ensures Modular monolith — one deploy, but clean module boundaries + in-process calls",
             "analogy": "Think of it like a library—each section is a bounded context.",
             "redFlags": [
               "Saying: Equating modular monolith with a plain monolith",
@@ -2154,11 +2154,11 @@
             "dialogue": [
               {
                 "role": "interviewer",
-                "text": "Modular monolith vs monolith vs microservices â€” what's the distinction people miss?"
+                "text": "Modular monolith vs monolith vs microservices — what's the distinction people miss?"
               },
               {
                 "role": "me",
-                "text": "The modular monolith â€” a single deployable with strongly enforced internal module boundaries, giving microservices' maintainability without the distributed-systems overhead."
+                "text": "The modular monolith — a single deployable with strongly enforced internal module boundaries, giving microservices' maintainability without the distributed-systems overhead."
               },
               {
                 "role": "interviewer",
@@ -2174,7 +2174,7 @@
               },
               {
                 "role": "me",
-                "text": "Each module is already a candidate service with a clean boundary, so extracting one means swapping in-process calls for network calls â€” not untangling spaghetti."
+                "text": "Each module is already a candidate service with a clean boundary, so extracting one means swapping in-process calls for network calls — not untangling spaghetti."
               },
               {
                 "role": "interviewer",
@@ -2217,12 +2217,12 @@
           "answer": {
             "oneLiner": "On a spectrum of isolation vs cost: database-per-tenant gives strongest isolation but high cost; schema-per-tenant is a middle ground; a shared schema with a TenantId column is cheapest and most scalable but needs strict query filtering.",
             "keyPoints": [
-              "DB-per-tenant â€” best isolation/compliance, costly, harder to scale to thousands",
-              "Schema-per-tenant â€” moderate isolation, moderate operational cost",
-              "Shared schema (TenantId) â€” cheapest and densest, but risk of data leakage",
+              "DB-per-tenant — best isolation/compliance, costly, harder to scale to thousands",
+              "Schema-per-tenant — moderate isolation, moderate operational cost",
+              "Shared schema (TenantId) — cheapest and densest, but risk of data leakage",
               "Shared schema needs enforced tenant filters (e.g. EF global query filters)"
             ],
-            "detail": "DB-per-tenant â€” best isolation/compliance, costly, harder to scale to thousands The pattern ensures Schema-per-tenant â€” moderate isolation, moderate operational cost",
+            "detail": "DB-per-tenant — best isolation/compliance, costly, harder to scale to thousands The pattern ensures Schema-per-tenant — moderate isolation, moderate operational cost",
             "analogy": "Think of it like a library—each section is a bounded context.",
             "redFlags": [
               "Saying: Forgetting tenant filtering on shared-schema queries",
@@ -2253,7 +2253,7 @@
               },
               {
                 "role": "me",
-                "text": "A spectrum of isolation vs cost â€” database-per-tenant for strongest isolation, schema-per-tenant as a middle ground, and a shared schema with a TenantId column as the cheapest and densest."
+                "text": "A spectrum of isolation vs cost — database-per-tenant for strongest isolation, schema-per-tenant as a middle ground, and a shared schema with a TenantId column as the cheapest and densest."
               },
               {
                 "role": "interviewer",
@@ -2261,7 +2261,7 @@
               },
               {
                 "role": "me",
-                "text": "Cross-tenant data leakage â€” a single missing TenantId filter exposes another tenant's data, so I enforce it globally."
+                "text": "Cross-tenant data leakage — a single missing TenantId filter exposes another tenant's data, so I enforce it globally."
               },
               {
                 "role": "interviewer",
@@ -2348,7 +2348,7 @@
               },
               {
                 "role": "me",
-                "text": "Make additive, non-breaking changes where possible â€” new optional fields and endpoints â€” version only when you must break, and deprecate gracefully with notice."
+                "text": "Make additive, non-breaking changes where possible — new optional fields and endpoints — version only when you must break, and deprecate gracefully with notice."
               },
               {
                 "role": "interviewer",
@@ -2356,11 +2356,11 @@
               },
               {
                 "role": "me",
-                "text": "Removing or renaming a field, changing its type, tightening validation, or making an optional field required â€” anything an existing client can't tolerate."
+                "text": "Removing or renaming a field, changing its type, tightening validation, or making an optional field required — anything an existing client can't tolerate."
               },
               {
                 "role": "interviewer",
-                "text": "You must remove a field consumers still use â€” how do you do it safely?"
+                "text": "You must remove a field consumers still use — how do you do it safely?"
               },
               {
                 "role": "me",
@@ -2443,7 +2443,7 @@
               },
               {
                 "role": "me",
-                "text": "Like watertight compartments in a ship, it isolates resources â€” thread or connection pools â€” per dependency, so one slow or failing dependency can't exhaust shared resources and sink the whole app."
+                "text": "Like watertight compartments in a ship, it isolates resources — thread or connection pools — per dependency, so one slow or failing dependency can't exhaust shared resources and sink the whole app."
               },
               {
                 "role": "interviewer",
@@ -2451,7 +2451,7 @@
               },
               {
                 "role": "me",
-                "text": "A circuit breaker stops calling a failing dependency after N failures; a bulkhead caps how many concurrent calls a dependency can consume â€” they're complementary."
+                "text": "A circuit breaker stops calling a failing dependency after N failures; a bulkhead caps how many concurrent calls a dependency can consume — they're complementary."
               },
               {
                 "role": "interviewer",
@@ -2459,7 +2459,7 @@
               },
               {
                 "role": "me",
-                "text": "From the dependency's expected concurrency and latency budget â€” enough to serve normal load but small enough that a stall can't starve the rest of the app."
+                "text": "From the dependency's expected concurrency and latency budget — enough to serve normal load but small enough that a stall can't starve the rest of the app."
               },
               {
                 "role": "interviewer",
@@ -2498,16 +2498,16 @@
         },
         {
           "id": "architecture-patterns-advanced-008",
-          "q": "Vertical vs horizontal scaling â€” how does the choice affect your design?",
+          "q": "Vertical vs horizontal scaling — how does the choice affect your design?",
           "answer": {
             "oneLiner": "Vertical scaling adds power to one machine (simple, but a hard ceiling and a single point of failure); horizontal scaling adds more instances behind a load balancer, which scales further but forces you to design stateless services.",
             "keyPoints": [
-              "Vertical â€” bigger box, no code changes, but limited and risky (SPOF)",
-              "Horizontal â€” more instances, near-limitless, but needs statelessness",
+              "Vertical — bigger box, no code changes, but limited and risky (SPOF)",
+              "Horizontal — more instances, near-limitless, but needs statelessness",
               "Move session/cache out of process (Redis), avoid in-memory request state",
               "Horizontal also enables rolling deploys and fault isolation"
             ],
-            "detail": "Vertical â€” bigger box, no code changes, but limited and risky (SPOF) The pattern ensures Horizontal â€” more instances, near-limitless, but needs statelessness",
+            "detail": "Vertical — bigger box, no code changes, but limited and risky (SPOF) The pattern ensures Horizontal — more instances, near-limitless, but needs statelessness",
             "analogy": "Think of it like a library—each section is a bounded context.",
             "redFlags": [
               "Saying: Holding session/state in-process while scaling out",
@@ -2520,7 +2520,7 @@
               },
               {
                 "q": "Where do you put session state then?",
-                "a": "In Redis or the DB â€” a shared external store."
+                "a": "In Redis or the DB — a shared external store."
               },
               {
                 "q": "What else does horizontal scaling enable?",
@@ -2528,17 +2528,17 @@
               },
               {
                 "q": "Does vertical scaling have a ceiling?",
-                "a": "Yes â€” you eventually hit the largest available machine."
+                "a": "Yes — you eventually hit the largest available machine."
               }
             ],
             "dialogue": [
               {
                 "role": "interviewer",
-                "text": "Vertical vs horizontal scaling â€” how does the choice affect design?"
+                "text": "Vertical vs horizontal scaling — how does the choice affect design?"
               },
               {
                 "role": "me",
-                "text": "Vertical adds power to one machine â€” simple, no code changes, but a hard ceiling and a single point of failure; horizontal adds instances behind a load balancer, scaling far further but forcing stateless services."
+                "text": "Vertical adds power to one machine — simple, no code changes, but a hard ceiling and a single point of failure; horizontal adds instances behind a load balancer, scaling far further but forcing stateless services."
               },
               {
                 "role": "interviewer",
@@ -2546,7 +2546,7 @@
               },
               {
                 "role": "me",
-                "text": "Because any instance can handle any request, so in-process session or cache state would be inconsistent across instances â€” it has to move out."
+                "text": "Because any instance can handle any request, so in-process session or cache state would be inconsistent across instances — it has to move out."
               },
               {
                 "role": "interviewer",
@@ -2597,12 +2597,12 @@
           "answer": {
             "oneLiner": "Deploy a new version alongside the old and shift traffic gradually or instantly with a fallback: rolling replaces instances batch by batch, blue-green swaps two full environments, canary sends a small % first, and feature flags decouple release from deploy.",
             "keyPoints": [
-              "Rolling â€” replace instances in batches; cheap, slower rollback",
-              "Blue-green â€” two environments, instant switch and instant rollback",
-              "Canary â€” route a small % to the new version, watch metrics, then ramp",
-              "Feature flags â€” ship code dark, turn features on independently of deploy"
+              "Rolling — replace instances in batches; cheap, slower rollback",
+              "Blue-green — two environments, instant switch and instant rollback",
+              "Canary — route a small % to the new version, watch metrics, then ramp",
+              "Feature flags — ship code dark, turn features on independently of deploy"
             ],
-            "detail": "All of these require backward-compatible changes â€” especially DB migrations must work with both old and new code running at once (expand/contract pattern).",
+            "detail": "All of these require backward-compatible changes — especially DB migrations must work with both old and new code running at once (expand/contract pattern).",
             "analogy": "Think of it like a library—each section is a bounded context.",
             "redFlags": [
               "Saying: Breaking DB schema changes that old instances can't tolerate",
@@ -2633,7 +2633,7 @@
               },
               {
                 "role": "me",
-                "text": "Deploy the new version alongside the old and shift traffic gradually or instantly â€” rolling replaces instances in batches, blue-green swaps two full environments, canary sends a small percent first, and feature flags decouple release from deploy."
+                "text": "Deploy the new version alongside the old and shift traffic gradually or instantly — rolling replaces instances in batches, blue-green swaps two full environments, canary sends a small percent first, and feature flags decouple release from deploy."
               },
               {
                 "role": "interviewer",
@@ -2641,15 +2641,15 @@
               },
               {
                 "role": "me",
-                "text": "Blue-green â€” you just point traffic back at the still-running old environment for an instant rollback."
+                "text": "Blue-green — you just point traffic back at the still-running old environment for an instant rollback."
               },
               {
                 "role": "interviewer",
-                "text": "During a rollout both versions run at once â€” what does that demand of your DB migrations?"
+                "text": "During a rollout both versions run at once — what does that demand of your DB migrations?"
               },
               {
                 "role": "me",
-                "text": "They must be backward compatible â€” I use expand/contract: add the new column first, deploy code that writes both, then contract and remove the old once all instances are upgraded."
+                "text": "They must be backward compatible — I use expand/contract: add the new column first, deploy code that writes both, then contract and remove the old once all instances are upgraded."
               },
               {
                 "role": "interviewer",
