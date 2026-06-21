@@ -10,6 +10,9 @@ const BOOKMARK_KEY = 'qbank.bookmarks';
 const THEME_KEY = 'qbank.theme';
 const DAILY_KEY = 'qbank.daily';
 const SETS_KEY = 'qbank.sets';
+const SETS_VERSION_KEY = 'qbank.sets.version';
+const SETS_VERSION = 2;
+const REMOVED_PRESET_IDS = new Set(['preset-dotnet-fullstack-interview']);
 
 /** Pre-built sets seeded on first visit (keyed to real question IDs in the bank). */
 const PRESET_SETS: QuestionSet[] = [
@@ -515,13 +518,24 @@ export class QuestionBankService {
     try {
       const raw = localStorage.getItem(SETS_KEY);
       const parsed: QuestionSet[] = raw ? JSON.parse(raw) : [];
-      if (parsed.length > 0) return parsed;
-      // No sets yet — seed the JD-matched preset sets.
-      localStorage.setItem(SETS_KEY, JSON.stringify(PRESET_SETS));
-      return PRESET_SETS;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const storedVersion = Number(localStorage.getItem(SETS_VERSION_KEY) ?? 1);
+        if (storedVersion < SETS_VERSION) {
+          const existingIds = new Set(parsed.map(s => s.id));
+          const missing = PRESET_SETS.filter(p => !existingIds.has(p.id));
+          const merged = [...missing, ...parsed.filter(s => !REMOVED_PRESET_IDS.has(s.id))];
+          localStorage.setItem(SETS_KEY, JSON.stringify(merged));
+          localStorage.setItem(SETS_VERSION_KEY, String(SETS_VERSION));
+          return merged;
+        }
+        return parsed.filter(s => !REMOVED_PRESET_IDS.has(s.id));
+      }
     } catch {
-      return [];
+      // corrupted localStorage — fall through to seed presets
     }
+    localStorage.setItem(SETS_KEY, JSON.stringify(PRESET_SETS));
+    localStorage.setItem(SETS_VERSION_KEY, String(SETS_VERSION));
+    return [...PRESET_SETS];
   }
 
   /** Record a finished practice batch into today's tally. */
