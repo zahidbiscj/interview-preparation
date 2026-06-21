@@ -3568,7 +3568,7 @@
               "lang": "csharp",
               "snippet": "// Cached dropdown in a service\npublic class CategoryService\n{\n    private readonly IMemoryCache _cache;\n    private readonly AppDbContext _db;\n\n    public CategoryService(IMemoryCache cache, AppDbContext db)\n    { _cache = cache; _db = db; }\n\n    public async Task<List<SelectListItem>> GetCategoryOptionsAsync()\n    {\n        return await _cache.GetOrCreateAsync(\"category-options\", async entry =>\n        {\n            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);\n            return await _db.Categories\n                .Select(c => new SelectListItem(c.Name, c.Id.ToString()))\n                .ToListAsync();\n        });\n    }\n}",
               "note": "Invalidate the cache key when a category is created/updated/deleted"
-            ],
+            },
             "redFlags": [
               "Querying the database for static dropdown data on every page load.",
               "Loading 10,000 options into a single dropdown — use typeahead/search instead."
